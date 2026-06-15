@@ -1,0 +1,271 @@
+/* Text Styles */
+hr { color: #000000 }
+body, table, tr, th /* Normal */
+{
+ font-size: 15px;
+ font-family: 'Segoe UI',Tahoma,Verdana,Arial,sans-serif;
+ font-style: normal;
+ font-weight: normal;
+ color: #000000;
+ text-decoration: none;
+}
+span.f_BodyText, strong.f_BodyText, em.f_BodyText /* Body Text */
+{
+}
+span.f_Callouts, strong.f_Callouts, em.f_Callouts /* Callouts */
+{
+ font-size: 13px;
+ font-family: Verdana,Geneva,Arial,sans-serif;
+ letter-spacing: -1px;
+}
+span.f_CodeExample, strong.f_CodeExample, em.f_CodeExample /* Code Example */
+{
+ font-size: 13px;
+ font-family: 'Courier New',Courier,monospace;
+}
+span.f_Comment, strong.f_Comment, em.f_Comment /* Comment */
+{
+}
+span.f_Heading1, strong.f_Heading1, em.f_Heading1 /* Heading1 */
+{
+ font-size: 21px;
+ font-weight: bold;
+}
+span.f_Heading2, strong.f_Heading2, em.f_Heading2 /* Heading2 */
+{
+ font-size: 16px;
+ font-family: Arial,Helvetica,sans-serif;
+ font-weight: bold;
+}
+span.f_Heading3, strong.f_Heading3, em.f_Heading3 /* Heading3 */
+{
+ font-size: 16px;
+ font-family: Arial,Helvetica,sans-serif;
+ font-weight: bold;
+}
+span.f_ImageCaption, strong.f_ImageCaption, em.f_ImageCaption /* Image Caption */
+{
+ font-style: italic;
+}
+span.f_Notes, strong.f_Notes, em.f_Notes /* Notes */
+{
+ font-style: italic;
+}
+span.f_NotesBox, strong.f_NotesBox, em.f_NotesBox /* NotesBox */
+{
+ font-style: italic;
+}
+span.f_PopupBox, strong.f_PopupBox, em.f_PopupBox /* Popup Box */
+{
+ font-size: 12px;
+}
+span.f_SeeAlso, strong.f_SeeAlso, em.f_SeeAlso /* SeeAlso */
+{
+ font-size: 16px;
+}
+span.f_T_Code, strong.f_T_Code, em.f_T_Code /* T_Code */
+{
+ font-family: 'Courier New',Courier,monospace;
+ letter-spacing: -1px;
+}
+span.f_T_Emphasis, strong.f_T_Emphasis, em.f_T_Emphasis /* T_Emphasis */
+{
+ font-size: 13px;
+ font-weight: bold;
+}
+span.f_T_Entry, strong.f_T_Entry, em.f_T_Entry /* T_Entry */
+{
+ font-family: 'Courier New',Courier,monospace;
+ font-weight: bold;
+ letter-spacing: -1px;
+}
+span.f_T_Entry10pt, strong.f_T_Entry10pt, em.f_T_Entry10pt /* T_Entry 10pt */
+{
+ font-size: 13px;
+ font-family: 'Courier New',Courier,monospace;
+ font-style: italic;
+ font-weight: bold;
+ letter-spacing: -1px;
+}
+span.f_T_Menu, strong.f_T_Menu, em.f_T_Menu /* T_Menu */
+{
+ font-family: 'Segoe UI Semibold',Tahoma,Verdana,Arial,sans-serif;
+}
+span.f_T_Menu10p, strong.f_T_Menu10p, em.f_T_Menu10p /* T_Menu 10p */
+{
+ font-family: 'Segoe UI Semibold',Tahoma,Verdana,Arial,sans-serif;
+}
+span.f_TipBody, strong.f_TipBody, em.f_TipBody /* Tip Body */
+{
+ font-family: Verdana,Geneva,Arial,sans-serif;
+ letter-spacing: -1px;
+}
+span.f_TipHeading, strong.f_TipHeading, em.f_TipHeading /* Tip Heading */
+{
+ font-family: Tahoma,Geneva,Verdana,sans-serif;
+ font-weight: bold;
+}
+/* Paragraph styles */
+p, p.p_Normal, div.p_Normal, li.p_Normal /* Normal */
+{
+ text-align: left;
+ text-indent: 0;
+ padding: 0 0 0 0;
+ margin: 0 0 0 0;
+}
+.p_BodyText /* Body Text */
+{
+ font-size: 15px;
+ margin: 0 0 10px 0;
+}
+.p_Callouts /* Callouts */
+{
+ font-size: 13px;
+ margin: 0 0 5px 0;
+}
+.p_CodeExample /* Code Example */
+{
+ font-size: 13px;
+ line-height: 1.0;
+ white-space: nowrap;
+}
+.p_Comment /* Comment */
+{
+ font-size: 15px;
+ text-align: center;
+}
+.p_Heading1 /* Heading1 */
+{
+ font-size: 100%;
+ font-weight: normal;
+ text-align: left;
+ text-indent: 0;
+ page-break-after: avoid;
+ padding: 0 0 0 0;
+ margin: 0 0 0 0;
+}
+.p_Heading2 /* Heading2 */
+{
+ font-size: 100%;
+ font-weight: normal;
+ text-align: left;
+ text-indent: 0;
+ page-break-after: avoid;
+ padding: 0 0 0 0;
+ margin: 0 0 0 0;
+}
+.p_Heading3 /* Heading3 */
+{
+ font-size: 100%;
+ font-weight: normal;
+ text-align: left;
+ text-indent: 0;
+ page-break-after: avoid;
+ padding: 0 0 0 0;
+ margin: 0 0 0 0;
+}
+.p_ImageCaption /* Image Caption */
+{
+ font-size: 15px;
+}
+.p_Notes /* Notes */
+{
+ font-size: 15px;
+}
+.p_NotesBox /* NotesBox */
+{
+ font-size: 15px;
+ margin: 10px 0 0 0;
+}
+.p_PopupBox /* Popup Box */
+{
+ font-size: 12px;
+}
+.p_SeeAlso /* SeeAlso */
+{
+ font-size: 16px;
+ page-break-after: avoid;
+ margin: 10px 0 0 0;
+}
+.p_TipBody /* Tip Body */
+{
+ font-size: 15px;
+}
+.p_TipHeading /* Tip Heading */
+{
+ font-size: 15px;
+}
+/* Table styles */
+div.hmrotate90  { display:inline-block; -webkit-writing-mode: vertical-rl; -ms-writing-mode: tb-rl; writing-mode: vertical-rl; }
+div.hmrotate270 { display:inline-block; -webkit-writing-mode: vertical-rl; -ms-writing-mode: tb-rl; writing-mode: vertical-rl; transform: rotate(180deg); }
+
+a.imagetogglelink {
+  position: relative;
+  display: inline-block;
+}
+svg.image-toggle-magnifier { /* Magnifier icon for image toggles */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  width: 40pt;
+  height: 40pt;
+  max-width: 80%;
+  max-height: 80%;
+  fill: #FFFFFF;
+  stroke: #808080;
+  stroke-width: 0.5pt;
+  opacity: 0.3;
+  transition: opacity 0.3s;
+}
+img.image-toggle:hover + svg.image-toggle-magnifier, svg.image-toggle-magnifier:hover {
+  opacity: 1;
+}
+
+
+
+#hmpopupdiv /* used for javascript text popups */
+{
+  display: none;
+  position: absolute;
+  z-index: 1000;
+  background-color: #FFFFFF;
+  padding: 6px;
+  border:1px solid #000000;
+  border-radius: 5px;
+  box-shadow: 5px 5px 5px #888;
+}
+
+#hmlightbox /* image lightbox */
+{
+  border: none;
+  padding: 8px;
+  background: #FFF;
+  font-size: 110%;
+  font-weight: bold;
+  color: #777;
+  box-shadow: 5px 5px 5px #888;
+}
+
+a.dropdown-toggle /* dropdown toggle caption */
+{
+  cursor: pointer;
+}
+a.inline-toggle /* inline toggle caption */
+{
+  cursor: pointer;
+}
+img.dropdown-toggle-icon /* toggle icon */
+{
+  cursor: pointer;
+}
+/* CSS for responsive image maps */
+
+.hmImageMap a.hmHotspotRect { display:block; position:absolute; border: 1px solid transparent; background:#000; opacity:0.01 }
+.hmImageMap a.hmHotspotEllipse { display:block; position:absolute; border-radius:50%; border: 1px solid transparent; background:#000; opacity:0.01 }
+.hmImageMap:hover a.hmHotspotRect {opacity:0.3 }
+.hmImageMap:hover a.hmHotspotEllipse { opacity:0.3 }
+a.hmHotspotRect:hover { border:1px solid #000; background:#FFF; opacity:0.3 }
+a.hmHotspotEllipse:hover { border:1px solid #000; background:#FFF; opacity:0.3 }

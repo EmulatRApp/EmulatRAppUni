@@ -1,0 +1,284 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Operating EmulatR &gt; Storage &gt; Create Guest Disk Storage</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="ATA disk,bare image,blank-4G,create_if_missing,dec_disk_media_types,disk geometry,disk_types.json,dqa0,mkdisk,RZ28,sparse image,virtual disk" />
+   <meta name="description" content="EmulatR provisions disk images two ways: automatically at boot, driven by the platform manifest (create_if_missing), and manually with the tools/mkdisk.py generator. Both share..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "--create-guest-disk-storage---.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Create Guest Disk Storage</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?--create-guest-disk-storage---.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="4_-operating-emulatr----------.html">Operating EmulatR</a> &gt; <a href="4_4-storage.html">Storage</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Create Guest Disk Storage</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="4_4-storage.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="4_4-storage.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="--virtual-disk-images.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">EmulatR provisions disk images two ways: automatically at boot, driven by the platform manifest (<span class="f_CodeExample">create_if_missing</span>), and manually with the <span class="f_CodeExample">tools/mkdisk.py</span> generator. Both share one image-creation codepath and one geometry catalog, so a disk type's size is defined in exactly one place. A manifest references a disk <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">type</strong>, not a raw byte count -- the size is resolved from the catalog at load.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Geometry catalog (single source of truth)</span></h2>
+<p class="p_Normal">The authoritative geometry source is <span class="f_CodeExample">config/disk_types.json</span>, generated at build time from <span class="f_CodeExample">dec_disk_media_types.tsv</span>. Never hand-maintain both: edit the TSV, regenerate the JSON. Each type names <span class="f_CodeExample">total_lbn</span> and <span class="f_CodeExample">block_bytes</span>; capacity is derived (<span class="f_CodeExample">total_lbn * block_bytes</span>). A type is either a real DEC model (for example RZ28) or a sized blank target (for example blank-4G).</p>
+<p class="p_Normal">&nbsp;</p>
+<div style="text-align: left; text-indent: 0; padding: 0 0 0 0; margin: 0 0 0 0;"><table style="border:none; border-spacing:0; border-collapse:collapse;">
+<thead>
+<tr>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">type</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">interface</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">total_lbn</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">block_bytes</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">capacity</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">blank-4G</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">ata</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">8388608</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">512</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">4 GiB</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">RZ26</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">scsi</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">2050860</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">512</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">1.05 GB</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">RZ28</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">scsi</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">4110480</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">512</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">2.1 GB</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">RZ29</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">scsi</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">8407200</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">512</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">4.2 GB</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Automatic provisioning (create_if_missing)</span></h2>
+<p class="p_Normal">When a manifest storage entry names a missing image and sets <span class="f_CodeExample">create_if_missing</span>, EmulatR provisions a blank sparse image of the catalogued size on first boot. It never overwrites an existing image, and never provisions read-only media (an ISO is supplied, not created). Example manifest entry for the dqa0 ATA disk:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_CodeExample"><span class="f_CodeExample">{&nbsp;&quot;channel&quot;:&nbsp;0,&nbsp;&quot;unit&quot;:&nbsp;0,&nbsp;&quot;type&quot;:&nbsp;&quot;ata_disk&quot;,</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&quot;media&quot;:&nbsp;&quot;dqa0.img&quot;,&nbsp;&quot;disk_type&quot;:&nbsp;&quot;blank-4G&quot;,</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&quot;create_if_missing&quot;:&nbsp;true&nbsp;}</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_Normal">On first cold boot the run log reports the provisioning and the attach:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_CodeExample"><span class="f_CodeExample">Storage:&nbsp;created&nbsp;blank&nbsp;disk&nbsp;image&nbsp;'dqa0.img'&nbsp;(4294967296&nbsp;bytes)</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">attached&nbsp;ATA&nbsp;disk&nbsp;'dqa0.img'&nbsp;to&nbsp;IDE&nbsp;ch0&nbsp;unit0</span></p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Manual creation (tools/mkdisk.py)</span></h2>
+<p class="p_Normal">Use <span class="f_CodeExample">mkdisk.py</span> to pre-make a typed image outside the boot path -- a specific DEC model, or a sized install target. It calls the same core as <span class="f_CodeExample">create_if_missing</span>: looks up <span class="f_CodeExample">total_lbn * block_bytes</span> from the catalog, writes a sparse zero-filled file, refuses to overwrite without <span class="f_CodeExample">--force</span>, never creates for read-only media, and self-checks that the final size equals the catalog size.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_CodeExample"><span class="f_CodeExample">python&nbsp;tools/mkdisk.py&nbsp;--type&nbsp;blank-4G&nbsp;--out&nbsp;dqa0.img</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">python&nbsp;tools/mkdisk.py&nbsp;--type&nbsp;RZ28&nbsp;--out&nbsp;dka0.img</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_Normal">The image written is BARE: exactly <span class="f_CodeExample">total_lbn * block_bytes</span>, zero-filled, with no partition table and no DEC disklabel. The guest OS install writes those structures. For the install path (boot the installer, install onto a blank target, boot the installed disk) a bare image is what you want.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Cross-platform sparseness</span></h2>
+<p class="p_Normal">Image creation uses a truncate-to-size, which is genuinely sparse on Linux ext4 (a 4 GiB image does not write 4 GiB physically). On Windows NTFS the file is lazily zero-filled and is not flagged sparse unless <span class="f_CodeExample">FSCTL_SET_SPARSE</span> is issued; <span class="f_CodeExample">mkdisk.py</span> sets it so behavior is identical on Windows and Linux. In practice the image costs nothing on disk until the guest writes to it.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--virtual-disk-images.html" class="topiclink">Virtual Disk Images</a></p>
+<p class="p_Normal"><a href="4_7-guest-boot----------------.html" class="topiclink">Guest Boot</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

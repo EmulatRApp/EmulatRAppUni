@@ -1,0 +1,327 @@
+﻿<!DOCTYPE html>
+<html><head>
+   <title>EmulatR AppUni Version 4</title>
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta name="robots" content="noindex,follow" />
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+ 
+   <!-- This line includes the general project style sheet (not required) -->
+   <link type="text/css" href="default.css" rel="stylesheet" />
+
+   <!-- This block defines the styles of the TOC headings, change them as needed -->
+   <style type="text/css">
+       body { font-size: 1em }
+       .heading1 { color: #000; text-decoration: none; }
+       .heading2 { color: #000; text-decoration: none; }
+       .heading3 { color: #000; text-decoration: none; }
+       .heading4 { color: #000; text-decoration: none; }
+       .heading5 { color: #000; text-decoration: none; }
+       .heading6 { color: #000; text-decoration: none; }
+
+       .hilight1 { color: #FFFFFF; background: #2C5D88; text-decoration: none; }
+       .hilight2 { color: #FFFFFF; background: #2C5D88; text-decoration: none; }
+       .hilight3 { color: #FFFFFF; background: #2C5D88; text-decoration: none; }
+       .hilight4 { color: #FFFFFF; background: #2C5D88; text-decoration: none; }
+       .hilight5 { color: #FFFFFF; background: #2C5D88; text-decoration: none; }
+       .hilight6 { color: #FFFFFF; background: #2C5D88; text-decoration: none; }
+
+       /* TOC LIST CSS */
+       #toc    { padding:0; margin:0 }
+       #toc li { 
+			margin-top:2px; 
+			margin-left:0; 
+			padding: 1px;
+			background-position: 0px 3px !important;
+			background-size: 18px 18px !important;
+            padding-left: 23px !important;
+			}
+       #toc ul { padding-left:0; margin-left:0px }       
+       /* TOC LIST CSS */
+       
+       @media (pointer: coarse) {
+         body    { transform-origin: 0 0;
+		   transform:scale(1.25); 
+		   max-width: 80%;
+       }       
+   </style>
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript">
+   $(document).ready(function(){
+   	   var hiTest = /^hilight/im,
+			parentScope = (parent.hmNavigationFrame);
+		if (parentScope) parent.currentNav("toc");
+		$("a[class^='heading']").on("click",function(event){
+			var doSwipe = (hiTest.test($(this).children("span").first().attr("class")) || false || (parentScope && !parent.hmBrowser.nonDeskTouch));
+			if (doSwipe && parentScope) {
+			window.parent.showNav("toggle");
+			}
+			});
+     });
+   </script>
+      <script type="text/javascript">
+     var parentScope = (parent.hmNavigationFrame);
+     if (!parentScope) {
+		      var s = document.createElement("script");
+		      s.setAttribute("type","text/javascript");
+		      s.setAttribute("src", "helpman_navigation.js");
+		      document.getElementsByTagName("head")[0].appendChild(s);
+	    }
+     else {
+       if (initialtocstate != "expandall") parent.hmAddCss(document, "#toc li ul { display: none }");
+     }
+     function loadicons() { var icons = new Array(); for (i=0; i<arguments.length; i++) { icons[i] = new Image(); icons[i].src = arguments[i]; } }
+     function loadtoc() { if (parentScope) parent.loadstate(document.getElementById("toc")); else loadstate(document.getElementById("toc")); }
+     function savetoc() { if (parentScope) parent.savestate(document.getElementById("toc")); else savestate(document.getElementById("toc")); }
+     function clicked(node, event) { deselect(); if (parentScope) parent.hmNodeClicked(node, event); else hmNodeClicked(node, event); }
+     function dblclicked(node) { if (parentScope) parent.hmNodeDblclicked(node); else hmNodeDblclicked(node); }
+     function deselect() { if (window.getSelection) window.getSelection().removeAllRanges(); else if (document.selection) document.selection.empty(); }
+     $(document).ready(function(){
+       loadtoc();
+       $(window).onunload = savetoc;
+     });
+   </script>
+</head>
+<body>
+<ul id="toc" style="list-style-type:none;display:block;padding-left:0">
+<li class="heading1" id="i1" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a1" href="1_-introduction.html" target="hmcontent"><span class="heading1" id="s1" ondblclick="return dblclicked(this)">Introduction</span></a>
+<ul id="ul1" style="list-style-type:none">
+<li class="heading2" id="i1.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a1.1" href="--what-is-emulatr.html" target="hmcontent"><span class="heading2" id="s1.1">What is EmulatR</span></a>
+</li>
+<li class="heading2" id="i1.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a1.2" href="license.html" target="hmcontent"><span class="heading2" id="s1.2">License</span></a>
+</li>
+<li class="heading2" id="i1.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a1.3" href="goals--objectives.html" target="hmcontent"><span class="heading2" id="s1.3">Goals &amp; Objectives</span></a>
+</li>
+<li class="heading2" id="i1.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a1.4" href="--supported-systems.html" target="hmcontent"><span class="heading2" id="s1.4">Supported Systems</span></a>
+</li>
+<li class="heading2" id="i1.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a1.5" href="--current-platform-support.html" target="hmcontent"><span class="heading2" id="s1.5">Current Platform Support</span></a>
+</li>
+<li class="heading2" id="i1.6" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a1.6" href="--feature-matrix.html" target="hmcontent"><span class="heading2" id="s1.6">Feature Matrix</span></a>
+</li>
+<li class="heading2" id="i1.7" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a1.7" href="--current-development-status--.html" target="hmcontent"><span class="heading2" id="s1.7">Current Development Status&nbsp;</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i2" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a2" href="2_-installation.html" target="hmcontent"><span class="heading1" id="s2" ondblclick="return dblclicked(this)">Installation</span></a>
+<ul id="ul2" style="list-style-type:none">
+<li class="heading2" id="i2.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a2.1" href="--required-tools--frameworks.html" target="hmcontent"><span class="heading2" id="s2.1">Required Tools &amp; Frameworks</span></a>
+</li>
+<li class="heading2" id="i2.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a2.2" href="--building-from-source.html" target="hmcontent"><span class="heading2" id="s2.2">Building from Source</span></a>
+</li>
+<li class="heading2" id="i2.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a2.3" href="--firmware-requirements.html" target="hmcontent"><span class="heading2" id="s2.3">Firmware Requirements</span></a>
+</li>
+<li class="heading2" id="i2.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a2.4" href="--first-startup.html" target="hmcontent"><span class="heading2" id="s2.4">First Startup</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i3" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a3" href="3_-quick-start----------------.html" target="hmcontent"><span class="heading1" id="s3" ondblclick="return dblclicked(this)">Quick Start&nbsp;</span></a>
+<ul id="ul3" style="list-style-type:none">
+<li class="heading2" id="i3.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a3.1" href="--launching-emulatr.html" target="hmcontent"><span class="heading2" id="s3.1">Launching EmulatR</span></a>
+</li>
+<li class="heading2" id="i3.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a3.2" href="--loading-firmware.html" target="hmcontent"><span class="heading2" id="s3.2">Loading Firmware</span></a>
+</li>
+<li class="heading2" id="i3.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a3.3" href="running-from-the-shell.html" target="hmcontent"><span class="heading2" id="s3.3">Running from the shell</span></a>
+</li>
+<li class="heading2" id="i3.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a3.4" href="--connecting-to-the-console.html" target="hmcontent"><span class="heading2" id="s3.4">Connecting to the Console</span></a>
+</li>
+<li class="heading2" id="i3.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a3.5" href="--reaching-the-srm-prompt.html" target="hmcontent"><span class="heading2" id="s3.5">Reaching the SRM Prompt</span></a>
+</li>
+<li class="heading2" id="i3.6" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a3.6" href="--clean-shutdown.html" target="hmcontent"><span class="heading2" id="s3.6">Clean Shutdown</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i4" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a4" href="4_-operating-emulatr----------.html" target="hmcontent"><span class="heading1" id="s4" ondblclick="return dblclicked(this)">Operating EmulatR</span></a>
+<ul id="ul4" style="list-style-type:none">
+<li class="heading2" id="i4.1" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.1" href="4_1-configuring--running.html" target="hmcontent"><span class="heading2" id="s4.1" ondblclick="return dblclicked(this)">Configuring &amp; Running</span></a>
+<ul id="ul4.1" style="list-style-type:none">
+<li class="heading3" id="i4.1.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.1.1" href="--configuring----------(moved-.html" target="hmcontent"><span class="heading3" id="s4.1.1">Configuring</span></a>
+</li>
+<li class="heading3" id="i4.1.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.1.2" href="--executing------------(moved).html" target="hmcontent"><span class="heading3" id="s4.1.2">Executing</span></a>
+</li>
+<li class="heading3" id="i4.1.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.1.3" href="--executing-two-instances.html" target="hmcontent"><span class="heading3" id="s4.1.3">Executing Two Instances</span></a>
+</li>
+<li class="heading3" id="i4.1.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.1.4" href="--example---performance.html" target="hmcontent"><span class="heading3" id="s4.1.4">Example - Performance</span></a>
+</li>
+</ul>
+</li>
+<li class="heading2" id="i4.2" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.2" href="4_2-console-connectivity.html" target="hmcontent"><span class="heading2" id="s4.2" ondblclick="return dblclicked(this)">Console Connectivity</span></a>
+<ul id="ul4.2" style="list-style-type:none">
+<li class="heading3" id="i4.2.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.2.1" href="--console-support------(moved-.html" target="hmcontent"><span class="heading3" id="s4.2.1">Console Support</span></a>
+</li>
+<li class="heading3" id="i4.2.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.2.2" href="--tcp-console-overview.html" target="hmcontent"><span class="heading3" id="s4.2.2">TCP Console Overview</span></a>
+</li>
+<li class="heading3" id="i4.2.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.2.3" href="--putty-_-plink-_-teraterm-_-m.html" target="hmcontent"><span class="heading3" id="s4.2.3">PuTTY / Plink / TeraTerm / MobaXterm / Netcat</span></a>
+</li>
+</ul>
+</li>
+<li class="heading2" id="i4.3" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.3" href="4_3-srm-console.html" target="hmcontent"><span class="heading2" id="s4.3" ondblclick="return dblclicked(this)">SRM Console</span></a>
+<ul id="ul4.3" style="list-style-type:none">
+<li class="heading3" id="i4.3.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.1" href="--srm-overview.html" target="hmcontent"><span class="heading3" id="s4.3.1">SRM Overview</span></a>
+</li>
+<li class="heading3" id="i4.3.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.2" href="--common-commands.html" target="hmcontent"><span class="heading3" id="s4.3.2">Common Commands</span></a>
+</li>
+<li class="heading3" id="i4.3.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.3" href="show-config.html" target="hmcontent"><span class="heading3" id="s4.3.3">show config</span></a>
+</li>
+<li class="heading3" id="i4.3.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.4" href="show-device.html" target="hmcontent"><span class="heading3" id="s4.3.4">show device</span></a>
+</li>
+<li class="heading3" id="i4.3.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.5" href="show-memory.html" target="hmcontent"><span class="heading3" id="s4.3.5">show memory</span></a>
+</li>
+<li class="heading3" id="i4.3.6" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.6" href="boot.html" target="hmcontent"><span class="heading3" id="s4.3.6">boot</span></a>
+</li>
+<li class="heading3" id="i4.3.7" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.7" href="set.html" target="hmcontent"><span class="heading3" id="s4.3.7">set</span></a>
+</li>
+<li class="heading3" id="i4.3.8" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.3.8" href="--srm-environment-variables.html" target="hmcontent"><span class="heading3" id="s4.3.8">SRM Environment Variables</span></a>
+</li>
+</ul>
+</li>
+<li class="heading2" id="i4.4" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.4" href="4_4-storage.html" target="hmcontent"><span class="heading2" id="s4.4" ondblclick="return dblclicked(this)">Storage</span></a>
+<ul id="ul4.4" style="list-style-type:none">
+<li class="heading3" id="i4.4.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.1" href="--create-guest-disk-storage---.html" target="hmcontent"><span class="heading3" id="s4.4.1">Create Guest Disk Storage</span></a>
+</li>
+<li class="heading3" id="i4.4.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.2" href="--virtual-disk-images.html" target="hmcontent"><span class="heading3" id="s4.4.2">Virtual Disk Images</span></a>
+</li>
+<li class="heading3" id="i4.4.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.3" href="--virtual-cdrom.html" target="hmcontent"><span class="heading3" id="s4.4.3">Virtual CDROM</span></a>
+</li>
+<li class="heading3" id="i4.4.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.4" href="--ide-devices.html" target="hmcontent"><span class="heading3" id="s4.4.4">IDE Devices</span></a>
+</li>
+<li class="heading3" id="i4.4.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.5" href="--atapi-devices.html" target="hmcontent"><span class="heading3" id="s4.4.5">ATAPI Devices</span></a>
+</li>
+<li class="heading3" id="i4.4.6" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.6" href="--iso-9660-pfd-(cd001).html" target="hmcontent"><span class="heading3" id="s4.4.6">ISO-9660 PFD (CD001)</span></a>
+</li>
+<li class="heading3" id="i4.4.7" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.7" href="--scsi-devices.html" target="hmcontent"><span class="heading3" id="s4.4.7">SCSI Devices</span></a>
+</li>
+<li class="heading3" id="i4.4.8" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.8" href="--storage-interconnect-and-fab.html" target="hmcontent"><span class="heading3" id="s4.4.8">Storage Interconnect and Fabric</span></a>
+</li>
+<li class="heading3" id="i4.4.9" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.4.9" href="--sdi-devices-_-dssi-devices-_.html" target="hmcontent"><span class="heading3" id="s4.4.9">SDI Devices / DSSI Devices / ST506 Devices</span></a>
+</li>
+</ul>
+</li>
+<li class="heading2" id="i4.5" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.5" href="4_5-snapshots.html" target="hmcontent"><span class="heading2" id="s4.5" ondblclick="return dblclicked(this)">Snapshots</span></a>
+<ul id="ul4.5" style="list-style-type:none">
+<li class="heading3" id="i4.5.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.5.1" href="--automatic-_-creating-_-resto.html" target="hmcontent"><span class="heading3" id="s4.5.1">Automatic / Creating / Restoring / Pruning</span></a>
+</li>
+</ul>
+</li>
+<li class="heading2" id="i4.6" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.6" href="4_6-firmware-update-utility-(l.html" target="hmcontent"><span class="heading2" id="s4.6" ondblclick="return dblclicked(this)">Firmware Update Utility (LFU)</span></a>
+<ul id="ul4.6" style="list-style-type:none">
+<li class="heading3" id="i4.6.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.6.1" href="--list-_-display-_-update.html" target="hmcontent"><span class="heading3" id="s4.6.1">List / Display / Update</span></a>
+</li>
+</ul>
+</li>
+<li class="heading2" id="i4.7" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.7" href="4_7-guest-boot----------------.html" target="hmcontent"><span class="heading2" id="s4.7">Guest Boot</span></a>
+</li>
+<li class="heading2" id="i4.8" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a4.8" href="4_8-logging--diagnostics.html" target="hmcontent"><span class="heading2" id="s4.8" ondblclick="return dblclicked(this)">Logging &amp; Diagnostics</span></a>
+<ul id="ul4.8" style="list-style-type:none">
+<li class="heading3" id="i4.8.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.8.1" href="--srm-performance-logging.html" target="hmcontent"><span class="heading3" id="s4.8.1">SRM Performance Logging</span></a>
+</li>
+<li class="heading3" id="i4.8.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading3" id="a4.8.2" href="--diagnostics--debugging---(ne.html" target="hmcontent"><span class="heading3" id="s4.8.2">Diagnostics &amp; Debugging</span></a>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i5" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a5" href="5_-architecture--internals----.html" target="hmcontent"><span class="heading1" id="s5" ondblclick="return dblclicked(this)">Architecture &amp; Internals</span></a>
+<ul id="ul5" style="list-style-type:none">
+<li class="heading2" id="i5.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a5.1" href="--overview--------------------.html" target="hmcontent"><span class="heading2" id="s5.1">Overview&nbsp;</span></a>
+</li>
+<li class="heading2" id="i5.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a5.2" href="--memory----------------------.html" target="hmcontent"><span class="heading2" id="s5.2">Memory</span></a>
+</li>
+<li class="heading2" id="i5.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a5.3" href="--addressing------------------.html" target="hmcontent"><span class="heading2" id="s5.3">Addressing</span></a>
+</li>
+<li class="heading2" id="i5.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a5.4" href="--firmware-decode--decompressi.html" target="hmcontent"><span class="heading2" id="s5.4">Firmware Decode &amp; Decompression&nbsp;</span></a>
+</li>
+<li class="heading2" id="i5.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a5.5" href="--execution-flight-plan-------.html" target="hmcontent"><span class="heading2" id="s5.5">Execution Flight Plan&nbsp;</span></a>
+</li>
+<li class="heading2" id="i5.6" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a5.6" href="clock-frequency-mhz.html" target="hmcontent"><span class="heading2" id="s5.6">Clock Frequency MHz</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i6" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a6" href="6_-reference------------------.html" target="hmcontent"><span class="heading1" id="s6" ondblclick="return dblclicked(this)">Reference</span></a>
+<ul id="ul6" style="list-style-type:none">
+<li class="heading2" id="i6.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a6.1" href="--environment-variables-(emula.html" target="hmcontent"><span class="heading2" id="s6.1">Environment Variables (EMULATR_*)</span></a>
+</li>
+<li class="heading2" id="i6.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a6.2" href="--glossary--------------------.html" target="hmcontent"><span class="heading2" id="s6.2">Glossary</span></a>
+</li>
+<li class="heading2" id="i6.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a6.3" href="--dependencies----------------.html" target="hmcontent"><span class="heading2" id="s6.3">Dependencies</span></a>
+</li>
+<li class="heading2" id="i6.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a6.4" href="--attributions--credits-------.html" target="hmcontent"><span class="heading2" id="s6.4">Attributions &amp; Credits</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i7" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a7" href="7_-troubleshooting------------.html" target="hmcontent"><span class="heading1" id="s7" ondblclick="return dblclicked(this)">Troubleshooting</span></a>
+<ul id="ul7" style="list-style-type:none">
+<li class="heading2" id="i7.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a7.1" href="--emulatr-will-not-start.html" target="hmcontent"><span class="heading2" id="s7.1">EmulatR will not start</span></a>
+</li>
+<li class="heading2" id="i7.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a7.2" href="--firmware-hangs-_-slow-boot-_.html" target="hmcontent"><span class="heading2" id="s7.2">Firmware Hangs / Slow Boot / Missing Devices</span></a>
+</li>
+<li class="heading2" id="i7.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a7.3" href="--console-connection-issues---.html" target="hmcontent"><span class="heading2" id="s7.3">Console Connection Issues</span></a>
+</li>
+<li class="heading2" id="i7.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a7.4" href="--halt-button-is-in_-boot-not-.html" target="hmcontent"><span class="heading2" id="s7.4">Halt Button is IN, BOOT NOT POSSIBLE</span></a>
+</li>
+<li class="heading2" id="i7.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a7.5" href="--example-(console)-execution.html" target="hmcontent"><span class="heading2" id="s7.5">Example (Console) execution</span></a>
+</li>
+<li class="heading2" id="i7.6" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a7.6" href="--evaluate-address.html" target="hmcontent"><span class="heading2" id="s7.6">&gt;&gt;&gt; Evaluate Address</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i8" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a8" href="8_-appendices---developer-refe.html" target="hmcontent"><span class="heading1" id="s8">Appendices - Developer Reference</span></a>
+</li>
+<li class="heading1" id="i9" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a9" href="8_1-platform-appendices.html" target="hmcontent"><span class="heading1" id="s9" ondblclick="return dblclicked(this)">Platform Appendices</span></a>
+<ul id="ul9" style="list-style-type:none">
+<li class="heading2" id="i9.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a9.1" href="--appendix---ds10.html" target="hmcontent"><span class="heading2" id="s9.1">Appendix - DS10</span></a>
+</li>
+<li class="heading2" id="i9.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a9.2" href="--env-vars-operation-ref-_-kil.html" target="hmcontent"><span class="heading2" id="s9.2">Env Vars Operation Ref / Kill the EmulatR / Known Limitations /</span></a>
+</li>
+<li class="heading2" id="i9.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a9.3" href="srm-boot-_-srm-commands-prompt.html" target="hmcontent"><span class="heading2" id="s9.3">SRM Boot / SRM Commands Prompt / SuperIO Controller /</span></a>
+</li>
+<li class="heading2" id="i9.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a9.4" href="task-matrix-_-timeout-loops.html" target="hmcontent"><span class="heading2" id="s9.4">Task Matrix / TimeOut Loops</span></a>
+</li>
+<li class="heading2" id="i9.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a9.5" href="--appendix-ds20-_-es40-_-es45.html" target="hmcontent"><span class="heading2" id="s9.5">Appendix DS20 / ES40 / ES45</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i10" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a10" href="8_2-subsystem-internals-------.html" target="hmcontent"><span class="heading1" id="s10" ondblclick="return dblclicked(this)">Subsystem Internal</span></a>
+<ul id="ul10" style="list-style-type:none">
+<li class="heading2" id="i10.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a10.1" href="--floating-point-consideration.html" target="hmcontent"><span class="heading2" id="s10.1">Floating-Point Considerations</span></a>
+</li>
+<li class="heading2" id="i10.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a10.2" href="--grainfactorylib.html" target="hmcontent"><span class="heading2" id="s10.2">grainFactoryLib</span></a>
+</li>
+<li class="heading2" id="i10.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a10.3" href="--dispatchtables.html" target="hmcontent"><span class="heading2" id="s10.3">DispatchTables</span></a>
+</li>
+<li class="heading2" id="i10.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a10.4" href="--cmake-macro-guards----------.html" target="hmcontent"><span class="heading2" id="s10.4">CMake Macro Guards</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i11" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a11" href="8_3-architecture-deep-dives---.html" target="hmcontent"><span class="heading1" id="s11" ondblclick="return dblclicked(this)">Architecture Deep-Dives&nbsp;</span></a>
+<ul id="ul11" style="list-style-type:none">
+<li class="heading2" id="i11.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a11.1" href="introduction---deep-architectu.html" target="hmcontent"><span class="heading2" id="s11.1">Introduction &amp; Overview</span></a>
+</li>
+<li class="heading2" id="i11.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a11.2" href="--memory-map--iprs.html" target="hmcontent"><span class="heading2" id="s11.2">Memory Map &amp; IPRs</span></a>
+</li>
+<li class="heading2" id="i11.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a11.3" href="--addressing--tlb.html" target="hmcontent"><span class="heading2" id="s11.3">Addressing &amp; TLB</span></a>
+</li>
+<li class="heading2" id="i11.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a11.4" href="--decompressor-internals.html" target="hmcontent"><span class="heading2" id="s11.4">Decompressor Internals</span></a>
+</li>
+<li class="heading2" id="i11.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a11.5" href="--execution-_-boot-internals.html" target="hmcontent"><span class="heading2" id="s11.5">Execution / Boot Internals</span></a>
+</li>
+</ul>
+</li>
+<li class="heading1" id="i12" data-bg="cicon1.svg;cicon2.svg" style="background:url(cicon2.svg) no-repeat;cursor:pointer;padding-left:20px" onclick="return clicked(this,event)"><a class="heading1" id="a12" href="8_4-tools.html" target="hmcontent"><span class="heading1" id="s12" ondblclick="return dblclicked(this)">Tools</span></a>
+<ul id="ul12" style="list-style-type:none">
+<li class="heading2" id="i12.1" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a12.1" href="--ghidra.html" target="hmcontent"><span class="heading2" id="s12.1">Ghidra</span></a>
+</li>
+<li class="heading2" id="i12.2" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a12.2" href="help--manual.html" target="hmcontent"><span class="heading2" id="s12.2">Help &amp; Manual</span></a>
+</li>
+<li class="heading2" id="i12.3" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a12.3" href="software-verify.html" target="hmcontent"><span class="heading2" id="s12.3">Software Verify</span></a>
+</li>
+<li class="heading2" id="i12.4" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a12.4" href="qt-creator.html" target="hmcontent"><span class="heading2" id="s12.4">Qt Creator</span></a>
+</li>
+<li class="heading2" id="i12.5" style="background:url(cicon9.svg) no-repeat;padding-left:20px" onclick="return clicked(this,event)"><a class="heading2" id="a12.5" href="host-decompressor.html" target="hmcontent"><span class="heading2" id="s12.5">Host Decompressor</span></a>
+</li>
+</ul>
+</li>
+</ul>
+<script type="text/javascript">loadicons('cicon2.svg','cicon1.svg','cicon9.svg');</script>
+</body>
+</html>

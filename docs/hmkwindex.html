@@ -1,0 +1,842 @@
+﻿<!DOCTYPE html>
+<html><head>
+   <title>EmulatR AppUni Version 4</title>
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta name="robots" content="noindex,follow" />
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+ 
+   <!-- This line includes the general project style sheet (not required) -->
+   <link type="text/css" href="default.css" rel="stylesheet" />
+
+   <script type="text/javascript">isIE=false</script>
+   <!--[if IE]>
+   <script type="text/javascript">isIE=true</script>
+   <![endif]-->
+
+   <!--HM_KEYWORD_INDEX_AS_LIST-->
+   <style type="text/css">
+       body { 
+        margin: 0; 
+        padding: 0; 
+        width: 100%;
+        height: 100%;
+        }
+       #keyword_entry_div {
+       	position: absolute;
+       	left: 5px;
+       	top: 5px;
+       	right: 5px;
+       	} 
+       #keyword_entry_div p {
+       	font-weight: bold;
+       }
+       #keyword_list_div {
+       	position: absolute;
+       	left: 5px;
+       	top: 45px;
+       	right: 5px;
+       	bottom: 5px;
+       	padding:0;
+       	} 
+       #keyword_entry {
+       	border: 1px solid silver;
+       	width: 100px;
+       	}
+       #keyword_list {
+       	border: 1px solid silver;
+       	width: 100%;
+      	height: 100%; 
+       	}
+       #keyword_menu {
+        display: none;
+	background: #fff;
+       	border: 1px solid silver;
+	padding: 10px;
+	box-shadow: 4px 4px 8px #888;
+	border-radius: 6px 6px;
+       	}
+       #keyword_menu a {
+       	display: block;
+        text-decoration: none;
+	color: #000;
+	padding: 2px 2px 2px 18px;
+	background: url(hm-keyword-page-icon.png) 2px 2px no-repeat;
+       	}
+       #keyword_menu a:hover {
+       	background: #2C5D88 url(hm-keyword-page-icon.png) 2px 2px no-repeat;
+        text-decoration: none;
+	color: #fff;
+       	}               
+       #keyword_menu_no_entry {
+        display: none;
+	background: #fff;
+       	border: 1px solid silver;
+	padding: 5px;
+	box-shadow: 4px 4px 8px #888;
+	border-radius: 6px 6px;
+	width: 50%;
+	font-size:1em;
+       }
+   </style>       
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){
+     var parentScope = (parent.hmNavigationFrame);
+     if (parentScope) parent.currentNav("index");
+	$("a[target='hmcontent']").on("click",function(event){
+		$("p.hilite").removeClass("hilite");
+		$(this).parent("p").addClass("hilite");
+		if (parentScope)
+			window.parent.showNav("toggle");
+		});
+        });
+   </script>
+   <script type="text/javascript" src="hmcontextids.js"></script>
+</head>
+<body>
+<div id="keyword_menu"></div>
+<div id="keyword_menu_no_entry">To locate information about this keyword, please select one of the subentries in the list.</div>
+<div id="keyword_entry_div"><p>Enter value</p><input type="text" id="keyword_entry" onkeyup="keywordEntryKey()" /></div>
+<div id="keyword_list_div">
+  <select id="keyword_list" size="2">
+  <option value="'Feature Matrix','--feature-matrix.html','Snapshots','4_5-snapshots.html','Snapshot Operations','--automatic-_-creating-_-resto.html'">.axpsnap</option>
+  <option value="'Connecting to the Console','--connecting-to-the-console.html','Configuring','--configuring----------(moved-.html'">10023</option>
+  <option value="show-memory.html">1024 MB</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Overview','--overview--------------------.html','Appendix - DS10','--appendix---ds10.html','Appendix DS20 / ES40 / ES45','--appendix-ds20-_-es40-_-es45.html','Overview','introduction---deep-architectu.html'">21264</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Appendix DS20 / ES40 / ES45','--appendix-ds20-_-es40-_-es45.html'">21264A</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Current Platform Support','--current-platform-support.html','show config','show-config.html','Overview','--overview--------------------.html','Appendix - DS10','--appendix---ds10.html','Overview','introduction---deep-architectu.html'">21272</option>
+  <option value="--example---performance.html">21272 Tsunami</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html'">21272-CA</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html'">21272-DA</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html'">21272-EA</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">268 MHz</option>
+  <option value="--memory----------------------.html">AAR</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Overview','--overview--------------------.html','Glossary','--glossary--------------------.html','Overview','introduction---deep-architectu.html'">Alpha AXP</option>
+  <option value="--supported-systems.html">Alpha EV6</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Platform Appendices','8_1-platform-appendices.html'">AlphaServer</option>
+  <option value="'Supported Systems','--supported-systems.html','Appendix - DS10','--appendix---ds10.html'">AlphaServer DS10</option>
+  <option value="--ghidra.html">analyzeHeadless</option>
+  <option value="8_-appendices---developer-refe.html">appendices</option>
+  <option value="'Supported Systems','--supported-systems.html','Memory','--memory----------------------.html'">arbiter</option>
+  <option value="goals--objectives.html">architectural correctness</option>
+  <option value="5_-architecture--internals----.html">architecture</option>
+  <option value="--addressing--tlb.html">ASM</option>
+  <option value="'Addressing','--addressing------------------.html','Addressing &amp; TLB','--addressing--tlb.html'">ASN</option>
+  <option value="--create-guest-disk-storage---.html">ATA disk</option>
+  <option value="--virtual-disk-images.html">ATA fixed disk</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Feature Matrix','--feature-matrix.html','show device','show-device.html','Storage','4_4-storage.html','Virtual CDROM','--virtual-cdrom.html','Storage Interconnect and Fabric','--storage-interconnect-and-fab.html'">ATAPI</option>
+  <option value="--atapi-devices.html">ATAPI signature</option>
+  <option value="'Reference','6_-reference------------------.html','Attributions &amp; Credits','--attributions--credits-------.html'">attributions</option>
+  <option value="help--manual.html">authoring tool</option>
+  <option value="'Reaching the SRM Prompt','--reaching-the-srm-prompt.html','boot','boot.html','SRM Environment Variables','--srm-environment-variables.html','Guest Boot','4_7-guest-boot----------------.html','Halt Button is IN, BOOT NOT POSSIBLE','--halt-button-is-in_-boot-not-.html'">auto_action</option>
+  <option value="--automatic-_-creating-_-resto.html">autoload-newest</option>
+  <option value="'Launching EmulatR','--launching-emulatr.html','Running EmulatR from the Shell','running-from-the-shell.html','Executing','--executing------------(moved).html','Snapshots','4_5-snapshots.html','Snapshot Operations','--automatic-_-creating-_-resto.html'">--autosnapshot</option>
+  <option value="host-decompressor.html">AXPBox</option>
+  <option value="'Current Development Status','--current-development-status--.html','Halt Button is IN, BOOT NOT POSSIBLE','--halt-button-is-in_-boot-not-.html'">b dqa1</option>
+  <option value="running-from-the-shell.html">background process</option>
+  <option value="--appendix---ds10.html">BAR</option>
+  <option value="--create-guest-disk-storage---.html">bare image</option>
+  <option value="running-from-the-shell.html">bash</option>
+  <option value="--supported-systems.html">Bcache</option>
+  <option value="--floating-point-consideration.html">Berkeley SoftFloat</option>
+  <option value="--create-guest-disk-storage---.html">blank-4G</option>
+  <option value="'SRM Console','4_3-srm-console.html','Common Commands','--common-commands.html','boot','boot.html','Guest Boot','4_7-guest-boot----------------.html'">boot</option>
+  <option value="--current-development-status--.html">boot milestone</option>
+  <option value="--halt-button-is-in_-boot-not-.html">BOOT NOT POSSIBLE</option>
+  <option value="7_-troubleshooting------------.html">boot problems</option>
+  <option value="--example---performance.html">boot transcript</option>
+  <option value="'boot','boot.html','SRM Environment Variables','--srm-environment-variables.html','Guest Boot','4_7-guest-boot----------------.html'">boot_osflags</option>
+  <option value="'boot','boot.html','SRM Environment Variables','--srm-environment-variables.html','Guest Boot','4_7-guest-boot----------------.html'">bootdef_dev</option>
+  <option value="'Goals &amp; Objectives','goals--objectives.html','Glossary','--glossary--------------------.html'">Box</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html','Execution / Boot Internals','--execution-_-boot-internals.html'">BoxResult</option>
+  <option value="'Installation','2_-installation.html','Qt Creator','qt-creator.html'">build</option>
+  <option value="--required-tools--frameworks.html">build prerequisites</option>
+  <option value="host-decompressor.html">build.sh</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Required Tools &amp; Frameworks','--required-tools--frameworks.html','Dependencies','--dependencies----------------.html'">C++20</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">calibration</option>
+  <option value="software-verify.html">call graph</option>
+  <option value="--memory-map--iprs.html">CALL_PAL</option>
+  <option value="--clean-shutdown.html">CALL_PAL HALT</option>
+  <option value="--addressing--tlb.html">canonical VA</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">CBox</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','show config','show-config.html','Overview','--overview--------------------.html','Memory','--memory----------------------.html','Overview','introduction---deep-architectu.html'">Cchip</option>
+  <option value="--iso-9660-pfd-(cd001).html">CD001</option>
+  <option value="--floating-point-consideration.html">cfenv</option>
+  <option value="'Clean Shutdown','--clean-shutdown.html','DS10 -- Env Vars, Shutdown &amp; Known Limitations','--env-vars-operation-ref-_-kil.html'">clean shutdown</option>
+  <option value="--floating-point-consideration.html">CLRFEN</option>
+  <option value="'Installation','2_-installation.html','Required Tools &amp; Frameworks','--required-tools--frameworks.html','Building from Source','--building-from-source.html','Dependencies','--dependencies----------------.html','Qt Creator','qt-creator.html'">CMake</option>
+  <option value="8_2-subsystem-internals-------.html">CMake guards</option>
+  <option value="--cmake-macro-guards----------.html">CMake option</option>
+  <option value="'Subsystem Internals','8_2-subsystem-internals-------.html','grainFactoryLib','--grainfactorylib.html'">codegen</option>
+  <option value="'3. Quick Start','3_-quick-start----------------.html','Launching EmulatR','--launching-emulatr.html','Executing','--executing------------(moved).html','Firmware Decode &amp; Decompression','--firmware-decode--decompressi.html','Execution Flight Plan','--execution-flight-plan-------.html'">cold boot</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','SRM Environment Variables','--srm-environment-variables.html','DS10 -- SRM Boot, Commands &amp; SuperIO Controller','srm-boot-_-srm-commands-prompt.html'">COM1</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','DS10 -- SRM Boot, Commands &amp; SuperIO Controller','srm-boot-_-srm-commands-prompt.html'">COM2</option>
+  <option value="running-from-the-shell.html">command line</option>
+  <option value="license.html">commercial license</option>
+  <option value="goals--objectives.html">commit point</option>
+  <option value="--cmake-macro-guards----------.html">compile guard</option>
+  <option value="--decompressor-internals.html">compressed firmware</option>
+  <option value="'Configuring &amp; Running','4_1-configuring--running.html','Executing Two Instances','--executing-two-instances.html'">concurrent instances</option>
+  <option value="--building-from-source.html">configure</option>
+  <option value="'Operating EmulatR','4_-operating-emulatr----------.html','Configuring &amp; Running','4_1-configuring--running.html'">configuring</option>
+  <option value="'Terminal Clients','--putty-_-plink-_-teraterm-_-m.html','Console Connection Issues','--console-connection-issues---.html'">connection refused</option>
+  <option value="'Connecting to the Console','--connecting-to-the-console.html','Operating EmulatR','4_-operating-emulatr----------.html','Console Connectivity','4_2-console-connectivity.html','Console Support','--console-support------(moved-.html','SRM Console','4_3-srm-console.html','Troubleshooting','7_-troubleshooting------------.html'">console</option>
+  <option value="running-from-the-shell.html">console log</option>
+  <option value="'TCP Console Overview','--tcp-console-overview.html','EmulatR will not start','--emulatr-will-not-start.html'">console port</option>
+  <option value="--tcp-console-overview.html">console server</option>
+  <option value="4_7-guest-boot----------------.html">conversational boot</option>
+  <option value="license.html">copyright</option>
+  <option value="show-config.html">core logic</option>
+  <option value="--feature-matrix.html">CPU pipeline</option>
+  <option value="--configuring----------(moved-.html">cpuCount</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">CpuState</option>
+  <option value="--create-guest-disk-storage---.html">create_if_missing</option>
+  <option value="--attributions--credits-------.html">credits</option>
+  <option value="--loading-firmware.html">current directory</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Storage','4_4-storage.html','IDE Devices','--ide-devices.html','ATAPI Devices','--atapi-devices.html','Storage Interconnect and Fabric','--storage-interconnect-and-fab.html'">CY82C693</option>
+  <option value="show-device.html">CY82C693 IDE</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">cycle counter</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">cycle_count_freq</option>
+  <option value="'Supported Systems','--supported-systems.html','Current Development Status','--current-development-status--.html','Example - Performance','--example---performance.html','show config','show-config.html'">Cypress 82C693</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Overview','--overview--------------------.html','Appendix - DS10','--appendix---ds10.html','DS10 -- SRM Boot, Commands &amp; SuperIO Controller','srm-boot-_-srm-commands-prompt.html','Overview','introduction---deep-architectu.html'">Cypress CY82C693</option>
+  <option value="--evaluate-address.html">d command</option>
+  <option value="--example-(console)-execution.html">d pmem</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">Dchip</option>
+  <option value="--appendix---ds10.html">DE500</option>
+  <option value="--attributions--credits-------.html">DEC</option>
+  <option value="--what-is-emulatr.html">DEC Alpha</option>
+  <option value="--create-guest-disk-storage---.html">dec_disk_media_types</option>
+  <option value="--dispatchtables.html">decode</option>
+  <option value="'Decompressor Internals','--decompressor-internals.html','Host Decompressor','host-decompressor.html'">decom.c</option>
+  <option value="--ghidra.html">decompile_ds10.sh</option>
+  <option value="--ghidra.html">decompiler</option>
+  <option value="--ghidra.html">DecompileToDir.java</option>
+  <option value="--firmware-decode--decompressi.html">decompress</option>
+  <option value="host-decompressor.html">decompressed_ds10_v7_3.bin</option>
+  <option value="'Architecture &amp; Internals','5_-architecture--internals----.html','Execution Flight Plan','--execution-flight-plan-------.html'">decompression</option>
+  <option value="'Appendices - Developer Reference','8_-appendices---developer-refe.html','8.3 Architecture Deep-Dives','8_3-architecture-deep-dives---.html'">deep-dive</option>
+  <option value="6_-reference------------------.html">dependencies</option>
+  <option value="--evaluate-address.html">deposit</option>
+  <option value="goals--objectives.html">determinism</option>
+  <option value="1_-introduction.html">developer</option>
+  <option value="8_3-architecture-deep-dives---.html">developer lens</option>
+  <option value="8_-appendices---developer-refe.html">developer reference</option>
+  <option value="--current-development-status--.html">development status</option>
+  <option value="8_4-tools.html">development tools</option>
+  <option value="--cmake-macro-guards----------.html">diagnostic build</option>
+  <option value="'Operating EmulatR','4_-operating-emulatr----------.html','Logging &amp; Diagnostics','4_8-logging--diagnostics.html'">diagnostics</option>
+  <option value="goals--objectives.html">differential validation</option>
+  <option value="--create-guest-disk-storage---.html">disk geometry</option>
+  <option value="--create-guest-disk-storage---.html">disk_types.json</option>
+  <option value="running-from-the-shell.html">disown</option>
+  <option value="8_2-subsystem-internals-------.html">dispatch tables</option>
+  <option value="--dispatchtables.html">DispatchKind</option>
+  <option value="--dispatchtables.html">DispatchTables.cpp</option>
+  <option value="--list-_-display-_-update.html">Display</option>
+  <option value="--current-development-status--.html">dka</option>
+  <option value="4_7-guest-boot----------------.html">dka0</option>
+  <option value="help--manual.html">documentation</option>
+  <option value="task-matrix-_-timeout-loops.html">dq_long_wait_on_busy</option>
+  <option value="task-matrix-_-timeout-loops.html">dq_wait_for_drq</option>
+  <option value="'Firmware Hangs, Slow Boot, and Missing Devices','--firmware-hangs-_-slow-boot-_.html','DS10 -- Task Matrix &amp; TimeOut Loops','task-matrix-_-timeout-loops.html'">dq_wait_on_busy</option>
+  <option value="--ide-devices.html">dqa</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Example - Performance','--example---performance.html','show device','show-device.html','Storage','4_4-storage.html','Create Guest Disk Storage','--create-guest-disk-storage---.html','Virtual Disk Images','--virtual-disk-images.html','Virtual CDROM','--virtual-cdrom.html','ATAPI Devices','--atapi-devices.html','Guest Boot','4_7-guest-boot----------------.html','Firmware Hangs, Slow Boot, and Missing Devices','--firmware-hangs-_-slow-boot-_.html','Appendix - DS10','--appendix---ds10.html'">dqa0</option>
+  <option value="'Guest Boot','4_7-guest-boot----------------.html','Appendix - DS10','--appendix---ds10.html'">dqa1</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Current Platform Support','--current-platform-support.html','Configuring','--configuring----------(moved-.html','Platform Appendices','8_1-platform-appendices.html'">DS10</option>
+  <option value="--executing-two-instances.html">ds10_flash.rom</option>
+  <option value="'Current Platform Support','--current-platform-support.html','Configuring','--configuring----------(moved-.html','Appendix - DS10','--appendix---ds10.html'">ds10_platform.json</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Firmware Requirements','--firmware-requirements.html','Loading Firmware','--loading-firmware.html'">ds10_v7_3.exe</option>
+  <option value="'Platform Appendices','8_1-platform-appendices.html','Appendix DS20 / ES40 / ES45','--appendix-ds20-_-es40-_-es45.html'">DS20</option>
+  <option value="--sdi-devices-_-dssi-devices-_.html">DSSI</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Addressing','--addressing------------------.html','Addressing &amp; TLB','--addressing--tlb.html'">DTB</option>
+  <option value="'Current Development Status','--current-development-status--.html','show device','show-device.html'">dva0</option>
+  <option value="--evaluate-address.html">e command</option>
+  <option value="--example-(console)-execution.html">e pmem</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">EBox</option>
+  <option value="--configuring----------(moved-.html">EmulatorSettings</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Logging &amp; Diagnostics','4_8-logging--diagnostics.html'">EMULATR</option>
+  <option value="--first-startup.html">Emulatr root</option>
+  <option value="--atapi-devices.html">EMULATR VIRTUAL CDROM</option>
+  <option value="'Building from Source','--building-from-source.html','3. Quick Start','3_-quick-start----------------.html','Launching EmulatR','--launching-emulatr.html'">Emulatr.exe</option>
+  <option value="--srm-environment-variables.html">EMULATR_</option>
+  <option value="'Snapshot Operations','--automatic-_-creating-_-resto.html','Environment Variables','--environment-variables-(emula.html'">EMULATR_AUTOSNAP</option>
+  <option value="--cmake-macro-guards----------.html">EMULATR_BOOTSTRAP_ITB_BYPASS</option>
+  <option value="--diagnostics--debugging---(ne.html">EMULATR_BREAK_ON_PA10</option>
+  <option value="--diagnostics--debugging---(ne.html">EMULATR_CHECKPOINTS</option>
+  <option value="--cmake-macro-guards----------.html">EMULATR_CHIPSET_DIAG</option>
+  <option value="--diagnostics--debugging---(ne.html">EMULATR_CHIPSET_DIAG_OFF</option>
+  <option value="--executing------------(moved).html">EMULATR_CONSOLE_MIRROR</option>
+  <option value="'Configuring','--configuring----------(moved-.html','Executing','--executing------------(moved).html','Executing Two Instances','--executing-two-instances.html','TCP Console Overview','--tcp-console-overview.html','Environment Variables','--environment-variables-(emula.html','EmulatR will not start','--emulatr-will-not-start.html','DS10 -- Env Vars, Shutdown &amp; Known Limitations','--env-vars-operation-ref-_-kil.html'">EMULATR_CONSOLE_PORT</option>
+  <option value="'Executing','--executing------------(moved).html','Snapshot Operations','--automatic-_-creating-_-resto.html','Environment Variables','--environment-variables-(emula.html'">EMULATR_CONSOLE_SNAPSHOT</option>
+  <option value="--required-tools--frameworks.html">EMULATR_CONSOLE_TRACE</option>
+  <option value="'CMake Macro Guards','--cmake-macro-guards----------.html','Qt Creator','qt-creator.html'">EMULATR_DEBUG_STEP</option>
+  <option value="--cmake-macro-guards----------.html">EMULATR_DIAGNOSTIC_LOGGING</option>
+  <option value="'Executing Two Instances','--executing-two-instances.html','Environment Variables','--environment-variables-(emula.html','EmulatR will not start','--emulatr-will-not-start.html','DS10 -- Env Vars, Shutdown &amp; Known Limitations','--env-vars-operation-ref-_-kil.html'">EMULATR_FLASH_ROM</option>
+  <option value="'Executing','--executing------------(moved).html','Diagnostics &amp; Debugging','--diagnostics--debugging---(ne.html'">EMULATR_FLASH_TRACE</option>
+  <option value="'Floating-Point Considerations','--floating-point-consideration.html','CMake Macro Guards','--cmake-macro-guards----------.html'">EMULATR_FP_SOFTFLOAT</option>
+  <option value="--diagnostics--debugging---(ne.html">EMULATR_GATE</option>
+  <option value="--diagnostics--debugging---(ne.html">EMULATR_GCT_WATCH</option>
+  <option value="--executing------------(moved).html">EMULATR_IDE_TRACE</option>
+  <option value="'Executing','--executing------------(moved).html','Diagnostics &amp; Debugging','--diagnostics--debugging---(ne.html'">EMULATR_IIC_TRACE</option>
+  <option value="'Building from Source','--building-from-source.html','Diagnostics &amp; Debugging','--diagnostics--debugging---(ne.html','Environment Variables','--environment-variables-(emula.html','CMake Macro Guards','--cmake-macro-guards----------.html'">EMULATR_MEMDIAG</option>
+  <option value="'Launching EmulatR','--launching-emulatr.html','Executing','--executing------------(moved).html','Snapshot Operations','--automatic-_-creating-_-resto.html','Environment Variables','--environment-variables-(emula.html'">EMULATR_NO_AUTOLOAD</option>
+  <option value="'First Startup','--first-startup.html','Connecting to the Console','--connecting-to-the-console.html','TCP Console Overview','--tcp-console-overview.html','Environment Variables','--environment-variables-(emula.html'">EMULATR_NO_PUTTY</option>
+  <option value="--cmake-macro-guards----------.html">EMULATR_PA_DUMP</option>
+  <option value="--diagnostics--debugging---(ne.html">EMULATR_PIC_TRACE</option>
+  <option value="'Current Platform Support','--current-platform-support.html','Configuring','--configuring----------(moved-.html','Environment Variables','--environment-variables-(emula.html'">EMULATR_PLATFORM_CONFIG</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">EMULATR_PROFILE_ALPHA_CLOCK_HZ</option>
+  <option value="'SRM Performance Logging','--srm-performance-logging.html','Diagnostics &amp; Debugging','--diagnostics--debugging---(ne.html'">EMULATR_RETIRE_TRACE_DIR</option>
+  <option value="--automatic-_-creating-_-resto.html">EMULATR_SNAPSHOT_MARKER</option>
+  <option value="--automatic-_-creating-_-resto.html">EMULATR_SNAPSHOT_PRUNE</option>
+  <option value="--clean-shutdown.html">EMULATR_STOP</option>
+  <option value="--environment-variables-(emula.html">EMULATR_STOP_FILE</option>
+  <option value="running-from-the-shell.html">EMULATR_TRACE_DIR</option>
+  <option value="--cmake-macro-guards----------.html">EMULATR_TRACE_HOOKS</option>
+  <option value="--diagnostics--debugging---(ne.html">EMULATR_TRACE_WINDOW</option>
+  <option value="--cmake-macro-guards----------.html">EMULATR_USE_OS_PAGES</option>
+  <option value="--configuring----------(moved-.html">EmulatrV4.ini</option>
+  <option value="task-matrix-_-timeout-loops.html">engineering status</option>
+  <option value="--execution-_-boot-internals.html">entry vector</option>
+  <option value="--env-vars-operation-ref-_-kil.html">environment variable</option>
+  <option value="'Reference','6_-reference------------------.html','Environment Variables','--environment-variables-(emula.html'">environment variables</option>
+  <option value="license.html">eNVy Systems</option>
+  <option value="--addressing--tlb.html">epoch invalidation</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','Current Platform Support','--current-platform-support.html','Platform Appendices','8_1-platform-appendices.html','Appendix DS20 / ES40 / ES45','--appendix-ds20-_-es40-_-es45.html'">ES40</option>
+  <option value="--appendix-ds20-_-es40-_-es45.html">es40_platform.json</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','Current Platform Support','--current-platform-support.html','Platform Appendices','8_1-platform-appendices.html','Appendix DS20 / ES40 / ES45','--appendix-ds20-_-es40-_-es45.html'">ES45</option>
+  <option value="--appendix-ds20-_-es40-_-es45.html">es45_platform.json</option>
+  <option value="host-decompressor.html">es45_v7_3.exe</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Current Platform Support','--current-platform-support.html','Feature Matrix','--feature-matrix.html','Example - Performance','--example---performance.html','show config','show-config.html','Architecture &amp; Internals','5_-architecture--internals----.html','Overview','--overview--------------------.html','Appendix - DS10','--appendix---ds10.html','Overview','introduction---deep-architectu.html'">EV6</option>
+  <option value="--firmware-decode--decompressi.html">ev6_huf_decom</option>
+  <option value="--decompressor-internals.html">ev6_huf_decom.m64</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Current Platform Support','--current-platform-support.html','Appendix DS20 / ES40 / ES45','--appendix-ds20-_-es40-_-es45.html'">EV67</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">Ev6EntryVectors</option>
+  <option value="'Overview','--overview--------------------.html','Addressing','--addressing------------------.html','Overview','introduction---deep-architectu.html','Addressing &amp; TLB','--addressing--tlb.html'">Ev6Translator</option>
+  <option value="4_7-guest-boot----------------.html">ewa0</option>
+  <option value="--evaluate-address.html">examine</option>
+  <option value="'Memory Map &amp; IPRs','--memory-map--iprs.html','Execution / Boot Internals','--execution-_-boot-internals.html'">EXC_ADDR</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html','Execution / Boot Internals','--execution-_-boot-internals.html'">ExecCtx</option>
+  <option value="5_-architecture--internals----.html">execution model</option>
+  <option value="--list-_-display-_-update.html">Exit</option>
+  <option value="goals--objectives.html">explicit serialization</option>
+  <option value="--floating-point-consideration.html">F_float</option>
+  <option value="--execution-_-boot-internals.html">faultCode</option>
+  <option value="'Overview','--overview--------------------.html','Floating-Point Considerations','--floating-point-consideration.html','Overview','introduction---deep-architectu.html'">FBox</option>
+  <option value="--what-is-emulatr.html">FDC</option>
+  <option value="srm-boot-_-srm-commands-prompt.html">FDD</option>
+  <option value="--feature-matrix.html">Feature Matrix</option>
+  <option value="--floating-point-consideration.html">FEN</option>
+  <option value="goals--objectives.html">fidelity standard</option>
+  <option value="goals--objectives.html">fidelity-faithful</option>
+  <option value="--virtual-disk-images.html">FileBlockMedia</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Installation','2_-installation.html','3. Quick Start','3_-quick-start----------------.html','Loading Firmware','--loading-firmware.html'">firmware</option>
+  <option value="'Firmware Requirements','--firmware-requirements.html','Launching EmulatR','--launching-emulatr.html','Loading Firmware','--loading-firmware.html','Running EmulatR from the Shell','running-from-the-shell.html','Configuring','--configuring----------(moved-.html','EmulatR will not start','--emulatr-will-not-start.html'">--firmware</option>
+  <option value="--firmware-requirements.html">firmware integrity check</option>
+  <option value="--firmware-requirements.html">firmware path resolution</option>
+  <option value="'Operating EmulatR','4_-operating-emulatr----------.html','Firmware Update Utility (LFU)','4_6-firmware-update-utility-(l.html'">firmware update</option>
+  <option value="'Firmware Requirements','--firmware-requirements.html','Configuring','--configuring----------(moved-.html'">firmwareImage</option>
+  <option value="'Firmware Requirements','--firmware-requirements.html','Configuring','--configuring----------(moved-.html'">firmwareSha256</option>
+  <option value="--first-startup.html">first run</option>
+  <option value="--first-startup.html">first startup</option>
+  <option value="--feature-matrix.html">Flash</option>
+  <option value="--executing-two-instances.html">flash corruption</option>
+  <option value="--executing-two-instances.html">flash isolation</option>
+  <option value="8_2-subsystem-internals-------.html">floating point</option>
+  <option value="--supported-systems.html">FLOPPY</option>
+  <option value="running-from-the-shell.html">forked process</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">fpBox</option>
+  <option value="--floating-point-consideration.html">fpBoxLib</option>
+  <option value="--floating-point-consideration.html">FPCR</option>
+  <option value="--reaching-the-srm-prompt.html">FRU</option>
+  <option value="--appendix---ds10.html">FRU EEPROM</option>
+  <option value="'Example - Performance','--example---performance.html','set','set.html','Firmware Hangs, Slow Boot, and Missing Devices','--firmware-hangs-_-slow-boot-_.html'">full_powerup_diags</option>
+  <option value="--floating-point-consideration.html">G_float</option>
+  <option value="'DispatchTables','--dispatchtables.html','Execution / Boot Internals','--execution-_-boot-internals.html'">g_primaryTable</option>
+  <option value="'Reaching the SRM Prompt','--reaching-the-srm-prompt.html','Execution Flight Plan','--execution-flight-plan-------.html'">GCT</option>
+  <option value="--firmware-hangs-_-slow-boot-_.html">GCT/FRU</option>
+  <option value="--grainfactorylib.html">genGrains.py</option>
+  <option value="--environment-variables-(emula.html">getenv</option>
+  <option value="'Required Tools &amp; Frameworks','--required-tools--frameworks.html','Tools','8_4-tools.html','Ghidra','--ghidra.html'">Ghidra</option>
+  <option value="'Reference','6_-reference------------------.html','Glossary','--glossary--------------------.html'">glossary</option>
+  <option value="goals--objectives.html">goals</option>
+  <option value="--clean-shutdown.html">graceful-stop</option>
+  <option value="'Overview','--overview--------------------.html','Glossary','--glossary--------------------.html','grainFactoryLib','--grainfactorylib.html','Overview','introduction---deep-architectu.html','Execution / Boot Internals','--execution-_-boot-internals.html'">grain</option>
+  <option value="8_2-subsystem-internals-------.html">grain factory</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">GrainMasterV4</option>
+  <option value="--grainfactorylib.html">GrainMasterV4.tsv</option>
+  <option value="--grainfactorylib.html">GrainStubs.cpp</option>
+  <option value="'Overview','--overview--------------------.html','Memory','--memory----------------------.html','Overview','introduction---deep-architectu.html'">GuestMemory</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Reaching the SRM Prompt','--reaching-the-srm-prompt.html','SRM Overview','--srm-overview.html','boot','boot.html'">HALT</option>
+  <option value="'Troubleshooting','7_-troubleshooting------------.html','Halt Button is IN, BOOT NOT POSSIBLE','--halt-button-is-in_-boot-not-.html'">halt button</option>
+  <option value="--halt-button-is-in_-boot-not-.html">halt gate</option>
+  <option value="--halt-button-is-in_-boot-not-.html">halt switch</option>
+  <option value="--grainfactorylib.html">handwritten.tsv</option>
+  <option value="--scsi-devices.html">HBA</option>
+  <option value="--ghidra.html">headless</option>
+  <option value="--common-commands.html">help</option>
+  <option value="'Tools','8_4-tools.html','Help &amp; Manual','help--manual.html'">Help &amp; Manual</option>
+  <option value="help--manual.html">help project</option>
+  <option value="'Firmware Decode &amp; Decompression','--firmware-decode--decompressi.html','Decompressor Internals','--decompressor-internals.html','Host Decompressor','host-decompressor.html'">host_decompressor</option>
+  <option value="--floating-point-consideration.html">HostBackend</option>
+  <option value="software-verify.html">hot path</option>
+  <option value="--firmware-decode--decompressi.html">Huffman</option>
+  <option value="--memory-map--iprs.html">HW_IPR</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html','Memory Map &amp; IPRs','--memory-map--iprs.html'">HW_MFPR</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html','Memory Map &amp; IPRs','--memory-map--iprs.html'">HW_MTPR</option>
+  <option value="--execution-_-boot-internals.html">HW_REI</option>
+  <option value="'Execution Flight Plan','--execution-flight-plan-------.html','Decompressor Internals','--decompressor-internals.html'">HW_RET</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">HWRPB</option>
+  <option value="--memory-map--iprs.html">I_CTL</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">IBox</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','Feature Matrix','--feature-matrix.html','Storage','4_4-storage.html','Storage Interconnect and Fabric','--storage-interconnect-and-fab.html','Tools','8_4-tools.html','Qt Creator','qt-creator.html'">IDE</option>
+  <option value="--ide-devices.html">IDE controller</option>
+  <option value="--atapi-devices.html">IDENTIFY DEVICE</option>
+  <option value="--atapi-devices.html">IDENTIFY PACKET DEVICE</option>
+  <option value="--floating-point-consideration.html">IEEE S</option>
+  <option value="--floating-point-consideration.html">IEEE T</option>
+  <option value="--execution-_-boot-internals.html">IFetchOverride</option>
+  <option value="--floating-point-consideration.html">IFpBackend</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Appendix - DS10','--appendix---ds10.html'">IIC</option>
+  <option value="'Firmware Decode &amp; Decompression','--firmware-decode--decompressi.html','Decompressor Internals','--decompressor-internals.html'">inflate</option>
+  <option value="host-decompressor.html">inflate.c</option>
+  <option value="--loading-firmware.html">ini default</option>
+  <option value="--configuring----------(moved-.html">IniLoader</option>
+  <option value="'Introduction','1_-introduction.html','Installation','2_-installation.html'">Installation</option>
+  <option value="--decompressor-internals.html">intercept-hybrid</option>
+  <option value="--memory-map--iprs.html">internal processor register</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">interval timer</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">intrclock_freq</option>
+  <option value="1_-introduction.html">Introduction</option>
+  <option value="'Overview','--overview--------------------.html','Glossary','--glossary--------------------.html','8.3 Architecture Deep-Dives','8_3-architecture-deep-dives---.html','Overview','introduction---deep-architectu.html','Memory Map &amp; IPRs','--memory-map--iprs.html'">IPR</option>
+  <option value="'Supported Systems','--supported-systems.html','show config','show-config.html'">ISA</option>
+  <option value="--example-(console)-execution.html">ISA table corrupt</option>
+  <option value="--virtual-cdrom.html">ISO</option>
+  <option value="--iso-9660-pfd-(cd001).html">ISO-9660</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Addressing','--addressing------------------.html','Addressing &amp; TLB','--addressing--tlb.html'">ITB</option>
+  <option value="--ghidra.html">JDK 21</option>
+  <option value="--supported-systems.html">KBD</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">kCchipTimerBit</option>
+  <option value="help--manual.html">keywords</option>
+  <option value="--env-vars-operation-ref-_-kil.html">kill EmulatR</option>
+  <option value="qt-creator.html">kit</option>
+  <option value="--env-vars-operation-ref-_-kil.html">known limitations</option>
+  <option value="--firmware-hangs-_-slow-boot-_.html">krn$_sleep</option>
+  <option value="'Overview','--overview--------------------.html','Addressing','--addressing------------------.html','Glossary','--glossary--------------------.html','Overview','introduction---deep-architectu.html','Addressing &amp; TLB','--addressing--tlb.html'">kseg</option>
+  <option value="--first-startup.html">Launching EmulatR</option>
+  <option value="--iso-9660-pfd-(cd001).html">LBA 16</option>
+  <option value="--grainfactorylib.html">leaf</option>
+  <option value="--grainfactorylib.html">leafBase</option>
+  <option value="--sdi-devices-_-dssi-devices-_.html">legacy interconnect</option>
+  <option value="'Current Development Status','--current-development-status--.html','Reaching the SRM Prompt','--reaching-the-srm-prompt.html','Example - Performance','--example---performance.html','Firmware Update Utility (LFU)','4_6-firmware-update-utility-(l.html'">LFU</option>
+  <option value="license.html">license</option>
+  <option value="license.html">license header</option>
+  <option value="--attributions--credits-------.html">licensing</option>
+  <option value="--list-_-display-_-update.html">List</option>
+  <option value="--console-connection-issues---.html">listener</option>
+  <option value="--connecting-to-the-console.html">localhost</option>
+  <option value="'Overview','--overview--------------------.html','Memory','--memory----------------------.html','Overview','introduction---deep-architectu.html'">LockMonitor</option>
+  <option value="running-from-the-shell.html">--log-file</option>
+  <option value="4_8-logging--diagnostics.html">logging</option>
+  <option value="srm-boot-_-srm-commands-prompt.html">logical device</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','DS10 -- SRM Boot, Commands &amp; SuperIO Controller','srm-boot-_-srm-commands-prompt.html'">LPT1</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">Machine</option>
+  <option value="4_5-snapshots.html">machine state</option>
+  <option value="'Firmware Decode &amp; Decompression','--firmware-decode--decompressi.html','Attributions &amp; Credits','--attributions--credits-------.html','Decompressor Internals','--decompressor-internals.html','Host Decompressor','host-decompressor.html'">Mark Adler</option>
+  <option value="'Launching EmulatR','--launching-emulatr.html','Running EmulatR from the Shell','running-from-the-shell.html'">--max-cycles</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">MBox</option>
+  <option value="'Virtual Disk Images','--virtual-disk-images.html','Virtual CDROM','--virtual-cdrom.html'">media</option>
+  <option value="--atapi-devices.html">MEDIUM NOT PRESENT</option>
+  <option value="'Running EmulatR from the Shell','running-from-the-shell.html','show memory','show-memory.html'">--mem</option>
+  <option value="--execution-_-boot-internals.html">MemDrainer</option>
+  <option value="5_-architecture--internals----.html">memory</option>
+  <option value="show-memory.html">memory array</option>
+  <option value="8_3-architecture-deep-dives---.html">memory map</option>
+  <option value="--reaching-the-srm-prompt.html">memory sizing</option>
+  <option value="'Example - Performance','--example---performance.html','set','set.html','Firmware Hangs, Slow Boot, and Missing Devices','--firmware-hangs-_-slow-boot-_.html'">memory_test</option>
+  <option value="show-memory.html">memorySize</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">MHz</option>
+  <option value="--create-guest-disk-storage---.html">mkdisk</option>
+  <option value="--memory----------------------.html">mmap</option>
+  <option value="--memory----------------------.html">MMIO</option>
+  <option value="'Console Support','--console-support------(moved-.html','Terminal Clients','--putty-_-plink-_-teraterm-_-m.html'">MobaXterm</option>
+  <option value="--configuring----------(moved-.html">model</option>
+  <option value="--supported-systems.html">MOUSE</option>
+  <option value="'Installation','2_-installation.html','Required Tools &amp; Frameworks','--required-tools--frameworks.html','Building from Source','--building-from-source.html','Dependencies','--dependencies----------------.html'">MSVC</option>
+  <option value="qt-creator.html">MSVC 2022</option>
+  <option value="--tcp-console-overview.html">multiple instances</option>
+  <option value="'Console Support','--console-support------(moved-.html','Terminal Clients','--putty-_-plink-_-teraterm-_-m.html'">netcat</option>
+  <option value="--tcp-console-overview.html">netstat</option>
+  <option value="'Launching EmulatR','--launching-emulatr.html','Running EmulatR from the Shell','running-from-the-shell.html','Snapshot Operations','--automatic-_-creating-_-resto.html'">--no-autoload</option>
+  <option value="'Running EmulatR from the Shell','running-from-the-shell.html','Executing','--executing------------(moved).html'">nohup</option>
+  <option value="license.html">non-commercial</option>
+  <option value="--list-_-display-_-update.html">nt_fw</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Current Development Status','--current-development-status--.html','Executing Two Instances','--executing-two-instances.html','SRM Console','4_3-srm-console.html','SRM Overview','--srm-overview.html','set','set.html','DS10 -- Env Vars, Shutdown &amp; Known Limitations','--env-vars-operation-ref-_-kil.html'">NVRAM</option>
+  <option value="--clean-shutdown.html">NVRAM flush</option>
+  <option value="--srm-environment-variables.html">NVRAM slots</option>
+  <option value="--memory----------------------.html">NXM</option>
+  <option value="goals--objectives.html">objectives</option>
+  <option value="set.html">oem_string</option>
+  <option value="--dispatchtables.html">opcode</option>
+  <option value="--what-is-emulatr.html">OpenVMS</option>
+  <option value="4_7-guest-boot----------------.html">OpenVMS boot</option>
+  <option value="4_-operating-emulatr----------.html">operating</option>
+  <option value="1_-introduction.html">operator</option>
+  <option value="--virtual-cdrom.html">option firmware</option>
+  <option value="'Firmware Hangs, Slow Boot, and Missing Devices','--firmware-hangs-_-slow-boot-_.html','DS10 -- Task Matrix &amp; TimeOut Loops','task-matrix-_-timeout-loops.html'">option-firmware scan</option>
+  <option value="'Firmware Decode &amp; Decompression','--firmware-decode--decompressi.html','Floating-Point Considerations','--floating-point-consideration.html','Decompressor Internals','--decompressor-internals.html','Host Decompressor','host-decompressor.html'">oracle</option>
+  <option value="host-decompressor.html">oracle.c</option>
+  <option value="--current-development-status--.html">OS boot</option>
+  <option value="--atapi-devices.html">PACKET command</option>
+  <option value="'Firmware Decode &amp; Decompression','--firmware-decode--decompressi.html','Execution Flight Plan','--execution-flight-plan-------.html','Memory Map &amp; IPRs','--memory-map--iprs.html'">PAL_BASE</option>
+  <option value="--memory-map--iprs.html">PAL_TEMP</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">PalBox</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Goals &amp; Objectives','goals--objectives.html','Feature Matrix','--feature-matrix.html','Example - Performance','--example---performance.html','SRM Overview','--srm-overview.html','Overview','--overview--------------------.html','Glossary','--glossary--------------------.html','Overview','introduction---deep-architectu.html'">PALcode</option>
+  <option value="--execution-_-boot-internals.html">PALcode trap delivery</option>
+  <option value="--memory-map--iprs.html">PALcode-visible IPR</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">PCC</option>
+  <option value="--feature-matrix.html">PCF8584</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">Pchip</option>
+  <option value="--ide-devices.html">PCI config</option>
+  <option value="--appendix---ds10.html">PCI device manifest</option>
+  <option value="--current-development-status--.html">PCI enumeration</option>
+  <option value="'Supported Systems','--supported-systems.html','show config','show-config.html','Storage Interconnect and Fabric','--storage-interconnect-and-fab.html'">PCI hose</option>
+  <option value="--reaching-the-srm-prompt.html">PCI probe</option>
+  <option value="--what-is-emulatr.html">PCI-to-ISA bridge</option>
+  <option value="4_1-configuring--running.html">performance</option>
+  <option value="'SRM Performance Logging','--srm-performance-logging.html','Software Verify','software-verify.html'">Performance Validator</option>
+  <option value="8_1-platform-appendices.html">per-model reference</option>
+  <option value="--grainfactorylib.html">personality</option>
+  <option value="--evaluate-address.html">physical address</option>
+  <option value="--memory-map--iprs.html">physical address map</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">Pic8259Pair</option>
+  <option value="8_3-architecture-deep-dives---.html">pipeline</option>
+  <option value="'SRM Performance Logging','--srm-performance-logging.html','Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html','Execution / Boot Internals','--execution-_-boot-internals.html'">PipelineDriver</option>
+  <option value="'Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html','Execution / Boot Internals','--execution-_-boot-internals.html'">PipelineSlot</option>
+  <option value="--appendix-ds20-_-es40-_-es45.html">planned platform</option>
+  <option value="'Appendices - Developer Reference','8_-appendices---developer-refe.html','Platform Appendices','8_1-platform-appendices.html'">platform appendix</option>
+  <option value="'Supported Systems','--supported-systems.html','Current Platform Support','--current-platform-support.html','Configuring &amp; Running','4_1-configuring--running.html','EmulatR will not start','--emulatr-will-not-start.html','Platform Appendices','8_1-platform-appendices.html','Appendix DS20 / ES40 / ES45','--appendix-ds20-_-es40-_-es45.html'">platform manifest</option>
+  <option value="--current-platform-support.html">platform selection</option>
+  <option value="--configuring----------(moved-.html">PlatformConfig</option>
+  <option value="'Current Platform Support','--current-platform-support.html','Configuring','--configuring----------(moved-.html'">platformConfigPath</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Required Tools &amp; Frameworks','--required-tools--frameworks.html','Connecting to the Console','--connecting-to-the-console.html','Console Support','--console-support------(moved-.html','Terminal Clients','--putty-_-plink-_-teraterm-_-m.html'">Plink</option>
+  <option value="'Halt Button is IN, BOOT NOT POSSIBLE','--halt-button-is-in_-boot-not-.html','Example (Console) execution','--example-(console)-execution.html','&gt;&gt;&gt; Evaluate Address','--evaluate-address.html'">pmem</option>
+  <option value="'Configuring','--configuring----------(moved-.html','Console Connection Issues','--console-connection-issues---.html'">port</option>
+  <option value="'First Startup','--first-startup.html','Console Connectivity','4_2-console-connectivity.html','Console Support','--console-support------(moved-.html','TCP Console Overview','--tcp-console-overview.html'">port 10023</option>
+  <option value="--emulatr-will-not-start.html">port in use</option>
+  <option value="'Reaching the SRM Prompt','--reaching-the-srm-prompt.html','Execution Flight Plan','--execution-flight-plan-------.html'">power-up</option>
+  <option value="--example---performance.html">power-up sequence</option>
+  <option value="--configuring----------(moved-.html">precedence</option>
+  <option value="--building-from-source.html">preset</option>
+  <option value="--ide-devices.html">primary channel</option>
+  <option value="--dispatchtables.html">primary table</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">profile clock</option>
+  <option value="--srm-performance-logging.html">profile file</option>
+  <option value="'Logging &amp; Diagnostics','4_8-logging--diagnostics.html','Tools','8_4-tools.html','Software Verify','software-verify.html'">profiler</option>
+  <option value="software-verify.html">profiling</option>
+  <option value="--memory-map--iprs.html">PT0</option>
+  <option value="--addressing------------------.html">PTE</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Feature Matrix','--feature-matrix.html','Required Tools &amp; Frameworks','--required-tools--frameworks.html','Connecting to the Console','--connecting-to-the-console.html','Console Support','--console-support------(moved-.html','Terminal Clients','--putty-_-plink-_-teraterm-_-m.html'">PuTTY</option>
+  <option value="'First Startup','--first-startup.html','TCP Console Overview','--tcp-console-overview.html'">PuTTY auto-launch</option>
+  <option value="--configuring----------(moved-.html">puttyPath</option>
+  <option value="--iso-9660-pfd-(cd001).html">PVD</option>
+  <option value="--dependencies----------------.html">Python</option>
+  <option value="'Installation','2_-installation.html','Required Tools &amp; Frameworks','--required-tools--frameworks.html','Dependencies','--dependencies----------------.html'">Qt</option>
+  <option value="qt-creator.html">Qt 6.10.2</option>
+  <option value="'Tools','8_4-tools.html','Qt Creator','qt-creator.html'">Qt Creator</option>
+  <option value="'Introduction','1_-introduction.html','3. Quick Start','3_-quick-start----------------.html'">Quick Start</option>
+  <option value="--sdi-devices-_-dssi-devices-_.html">RA disk</option>
+  <option value="--virtual-disk-images.html">raw image</option>
+  <option value="--console-connection-issues---.html">RAW mode</option>
+  <option value="'Connecting to the Console','--connecting-to-the-console.html','Console Connectivity','4_2-console-connectivity.html','Console Support','--console-support------(moved-.html','Terminal Clients','--putty-_-plink-_-teraterm-_-m.html'">RAW TCP</option>
+  <option value="--tcp-console-overview.html">RAW TCP socket</option>
+  <option value="--required-tools--frameworks.html">RAW-TCP client</option>
+  <option value="--iso-9660-pfd-(cd001).html">READ(10)</option>
+  <option value="host-decompressor.html">ref_decompressed.bin</option>
+  <option value="6_-reference------------------.html">reference</option>
+  <option value="8_3-architecture-deep-dives---.html">register level</option>
+  <option value="host-decompressor.html">regression guard</option>
+  <option value="--building-from-source.html">release</option>
+  <option value="--execution-flight-plan-------.html">relocation</option>
+  <option value="--building-from-source.html">RelWithDebInfo</option>
+  <option value="--tcp-console-overview.html">remote host</option>
+  <option value="--atapi-devices.html">REQUEST SENSE</option>
+  <option value="boot.html">RESTART</option>
+  <option value="--execution-_-boot-internals.html">retire</option>
+  <option value="--srm-performance-logging.html">retire-PC histogram</option>
+  <option value="--srm-performance-logging.html">RetireProfiler</option>
+  <option value="'Tools','8_4-tools.html','Ghidra','--ghidra.html'">reverse engineering</option>
+  <option value="--current-development-status--.html">roadmap</option>
+  <option value="'Firmware Requirements','--firmware-requirements.html','Configuring','--configuring----------(moved-.html'">ROM</option>
+  <option value="--floating-point-consideration.html">rounding mode</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">RPCC</option>
+  <option value="running-from-the-shell.html">run directory</option>
+  <option value="--launching-emulatr.html">run.log</option>
+  <option value="'Virtual CDROM','--virtual-cdrom.html','Halt Button is IN, BOOT NOT POSSIBLE','--halt-button-is-in_-boot-not-.html'">RUN/STOP</option>
+  <option value="4_1-configuring--running.html">running</option>
+  <option value="'Create Guest Disk Storage','--create-guest-disk-storage---.html','SCSI Devices','--scsi-devices.html'">RZ28</option>
+  <option value="--scsi-devices.html">RZ29</option>
+  <option value="--grainfactorylib.html">S_PalLinux</option>
+  <option value="--grainfactorylib.html">S_PalTru64</option>
+  <option value="--grainfactorylib.html">S_PalVms</option>
+  <option value="--memory-map--iprs.html">scbd field</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Storage','4_4-storage.html','SCSI Devices','--scsi-devices.html','Storage Interconnect and Fabric','--storage-interconnect-and-fab.html'">SCSI</option>
+  <option value="--scsi-devices.html">scsi_poll</option>
+  <option value="--scsi-devices.html">scsi_reset</option>
+  <option value="--sdi-devices-_-dssi-devices-_.html">SDI</option>
+  <option value="--dispatchtables.html">secondary table</option>
+  <option value="--virtual-disk-images.html">sector</option>
+  <option value="--grainfactorylib.html">SemanticFlags.tsv</option>
+  <option value="goals--objectives.html">separation of concerns</option>
+  <option value="'SRM Console','4_3-srm-console.html','SRM Overview','--srm-overview.html','Common Commands','--common-commands.html','set','set.html'">set</option>
+  <option value="'SRM Console','4_3-srm-console.html','SRM Overview','--srm-overview.html','Common Commands','--common-commands.html','set','set.html'">show</option>
+  <option value="'Example - Performance','--example---performance.html','Common Commands','--common-commands.html','show config','show-config.html'">show config</option>
+  <option value="'Example - Performance','--example---performance.html','Common Commands','--common-commands.html','show device','show-device.html'">show device</option>
+  <option value="'Common Commands','--common-commands.html','show memory','show-memory.html'">show memory</option>
+  <option value="srm-boot-_-srm-commands-prompt.html">SIO-TRACE</option>
+  <option value="--execution-_-boot-internals.html">six-stage pipeline</option>
+  <option value="goals--objectives.html">SMP</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Current Development Status','--current-development-status--.html','3. Quick Start','3_-quick-start----------------.html','Launching EmulatR','--launching-emulatr.html','Snapshots','4_5-snapshots.html'">snapshot</option>
+  <option value="--automatic-_-creating-_-resto.html">--snapshot-on-pc</option>
+  <option value="'Operating EmulatR','4_-operating-emulatr----------.html','Executing Two Instances','--executing-two-instances.html'">snapshots</option>
+  <option value="--automatic-_-creating-_-resto.html">snapshots directory</option>
+  <option value="'Dependencies','--dependencies----------------.html','Attributions &amp; Credits','--attributions--credits-------.html','Floating-Point Considerations','--floating-point-consideration.html'">SoftFloat</option>
+  <option value="--floating-point-consideration.html">SoftFloatBackend</option>
+  <option value="'Tools','8_4-tools.html','Software Verify','software-verify.html'">Software Verify</option>
+  <option value="'Overview','--overview--------------------.html','Addressing','--addressing------------------.html','Glossary','--glossary--------------------.html','Overview','introduction---deep-architectu.html'">SPAM</option>
+  <option value="'Overview','--overview--------------------.html','Addressing','--addressing------------------.html','Overview','introduction---deep-architectu.html','Addressing &amp; TLB','--addressing--tlb.html'">SPAMShardManager</option>
+  <option value="--create-guest-disk-storage---.html">sparse image</option>
+  <option value="--memory----------------------.html">sparse paging</option>
+  <option value="'Required Tools &amp; Frameworks','--required-tools--frameworks.html','Logging &amp; Diagnostics','4_8-logging--diagnostics.html','Diagnostics &amp; Debugging','--diagnostics--debugging---(ne.html','Dependencies','--dependencies----------------.html'">spdlog</option>
+  <option value="--ghidra.html">SRE</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Feature Matrix','--feature-matrix.html','Installation','2_-installation.html','SRM Console','4_3-srm-console.html','Overview','--overview--------------------.html','Execution Flight Plan','--execution-flight-plan-------.html','Glossary','--glossary--------------------.html','Overview','introduction---deep-architectu.html'">SRM</option>
+  <option value="srm-boot-_-srm-commands-prompt.html">SRM boot</option>
+  <option value="'Common Commands','--common-commands.html','DS10 -- SRM Boot, Commands &amp; SuperIO Controller','srm-boot-_-srm-commands-prompt.html'">SRM commands</option>
+  <option value="'Introduction','1_-introduction.html','Goals &amp; Objectives','goals--objectives.html','Operating EmulatR','4_-operating-emulatr----------.html','SRM Overview','--srm-overview.html'">SRM console</option>
+  <option value="--ghidra.html">SRM firmware</option>
+  <option value="--firmware-requirements.html">SRM firmware image</option>
+  <option value="--loading-firmware.html">SRM image</option>
+  <option value="'Current Development Status','--current-development-status--.html','First Startup','--first-startup.html','3. Quick Start','3_-quick-start----------------.html','Reaching the SRM Prompt','--reaching-the-srm-prompt.html'">SRM prompt</option>
+  <option value="--firmware-requirements.html">SRM V7.3</option>
+  <option value="--srm-environment-variables.html">SRM variables</option>
+  <option value="--list-_-display-_-update.html">srm_fw</option>
+  <option value="--configuring----------(moved-.html">SRMConsole</option>
+  <option value="'Current Development Status','--current-development-status--.html','Firmware Decode &amp; Decompression','--firmware-decode--decompressi.html','Execution Flight Plan','--execution-flight-plan-------.html','Glossary','--glossary--------------------.html'">SROM</option>
+  <option value="--decompressor-internals.html">SROM parameters</option>
+  <option value="--sdi-devices-_-dssi-devices-_.html">ST506</option>
+  <option value="software-verify.html">step loop</option>
+  <option value="--clean-shutdown.html">stop sentinel</option>
+  <option value="'Operating EmulatR','4_-operating-emulatr----------.html','Storage','4_4-storage.html'">storage</option>
+  <option value="--storage-interconnect-and-fab.html">storage fabric</option>
+  <option value="help--manual.html">styleclass</option>
+  <option value="--dispatchtables.html">subDecode</option>
+  <option value="'Appendices - Developer Reference','8_-appendices---developer-refe.html','Subsystem Internals','8_2-subsystem-internals-------.html'">subsystem internals</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Feature Matrix','--feature-matrix.html','DS10 -- SRM Boot, Commands &amp; SuperIO Controller','srm-boot-_-srm-commands-prompt.html'">SuperIO</option>
+  <option value="'Addressing','--addressing------------------.html','Addressing &amp; TLB','--addressing--tlb.html'">superpage</option>
+  <option value="--supported-systems.html">Supported Systems</option>
+  <option value="running-from-the-shell.html">switches</option>
+  <option value="--example-(console)-execution.html">sys_serial_num</option>
+  <option value="4_7-guest-boot----------------.html">SYSBOOT</option>
+  <option value="--example-(console)-execution.html">system serial number</option>
+  <option value="help--manual.html">table of contents</option>
+  <option value="task-matrix-_-timeout-loops.html">task matrix</option>
+  <option value="--clean-shutdown.html">taskkill</option>
+  <option value="--addressing--tlb.html">TBIA</option>
+  <option value="--addressing--tlb.html">TBIAP</option>
+  <option value="--addressing--tlb.html">TBIS</option>
+  <option value="'What is EmulatR','--what-is-emulatr.html','Feature Matrix','--feature-matrix.html','3. Quick Start','3_-quick-start----------------.html','Connecting to the Console','--connecting-to-the-console.html','Console Connection Issues','--console-connection-issues---.html'">TCP console</option>
+  <option value="running-from-the-shell.html">tee</option>
+  <option value="'Console Support','--console-support------(moved-.html','Terminal Clients','--putty-_-plink-_-teraterm-_-m.html'">telnet</option>
+  <option value="'Console Support','--console-support------(moved-.html','Terminal Clients','--putty-_-plink-_-teraterm-_-m.html'">Tera Term</option>
+  <option value="'Required Tools &amp; Frameworks','--required-tools--frameworks.html','Console Connectivity','4_2-console-connectivity.html'">terminal client</option>
+  <option value="--supported-systems.html">TIG</option>
+  <option value="--console-connection-issues---.html">timeout</option>
+  <option value="'Firmware Hangs, Slow Boot, and Missing Devices','--firmware-hangs-_-slow-boot-_.html','DS10 -- Task Matrix &amp; TimeOut Loops','task-matrix-_-timeout-loops.html'">timeout loop</option>
+  <option value="license.html">Timothy Peer</option>
+  <option value="'Feature Matrix','--feature-matrix.html','Overview','--overview--------------------.html','Addressing','--addressing------------------.html','8.3 Architecture Deep-Dives','8_3-architecture-deep-dives---.html','Overview','introduction---deep-architectu.html'">TLB</option>
+  <option value="'Overview','--overview--------------------.html','Addressing','--addressing------------------.html','Overview','introduction---deep-architectu.html','Addressing &amp; TLB','--addressing--tlb.html'">TlbEpoch</option>
+  <option value="qt-creator.html">toolchain</option>
+  <option value="2_-installation.html">tools</option>
+  <option value="help--manual.html">topic</option>
+  <option value="help--manual.html">topiclink</option>
+  <option value="4_8-logging--diagnostics.html">trace</option>
+  <option value="running-from-the-shell.html">--trace</option>
+  <option value="--executing------------(moved).html">traced boot</option>
+  <option value="5_-architecture--internals----.html">translation</option>
+  <option value="--addressing--tlb.html">translation buffer</option>
+  <option value="--floating-point-consideration.html">trap mode</option>
+  <option value="'Terminal Clients','--putty-_-plink-_-teraterm-_-m.html','Troubleshooting','7_-troubleshooting------------.html'">troubleshooting</option>
+  <option value="4_7-guest-boot----------------.html">Tru64 boot</option>
+  <option value="--what-is-emulatr.html">Tru64 UNIX</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','Glossary','--glossary--------------------.html','Appendix - DS10','--appendix---ds10.html'">Tsunami</option>
+  <option value="'Clock Frequency and the MHz Reading','clock-frequency-mhz.html','Clock Frequency and the MHz Reading','clock-frequency--mhz.html'">Tsunami21272_CsrSpec</option>
+  <option value="'Overview','--overview--------------------.html','Memory','--memory----------------------.html','Overview','introduction---deep-architectu.html'">TsunamiChipset</option>
+  <option value="'Appendix - DS10','--appendix---ds10.html','DS10 -- Task Matrix &amp; TimeOut Loops','task-matrix-_-timeout-loops.html'">tulip</option>
+  <option value="--executing-two-instances.html">two instances</option>
+  <option value="'Introduction','1_-introduction.html','What is EmulatR','--what-is-emulatr.html','Supported Systems','--supported-systems.html','Overview','--overview--------------------.html','Overview','introduction---deep-architectu.html'">Typhoon</option>
+  <option value="'Reaching the SRM Prompt','--reaching-the-srm-prompt.html','Example - Performance','--example---performance.html','Firmware Update Utility (LFU)','4_6-firmware-update-utility-(l.html','LFU Commands','--list-_-display-_-update.html'">UPD</option>
+  <option value="--list-_-display-_-update.html">Update</option>
+  <option value="'Example - Performance','--example---performance.html','Firmware Update Utility (LFU)','4_6-firmware-update-utility-(l.html','LFU Commands','--list-_-display-_-update.html'">update srm</option>
+  <option value="1_-introduction.html">User Guide</option>
+  <option value="'Memory Map &amp; IPRs','--memory-map--iprs.html','Addressing &amp; TLB','--addressing--tlb.html'">VA_CTL</option>
+  <option value="--floating-point-consideration.html">VAX float</option>
+  <option value="--list-_-display-_-update.html">Verify</option>
+  <option value="'show device','show-device.html','Virtual CDROM','--virtual-cdrom.html'">virtual CDROM</option>
+  <option value="--atapi-devices.html">virtual CD-ROM</option>
+  <option value="'Storage','4_4-storage.html','Create Guest Disk Storage','--create-guest-disk-storage---.html','Virtual Disk Images','--virtual-disk-images.html'">virtual disk</option>
+  <option value="'Overview','--overview--------------------.html','Memory','--memory----------------------.html','Overview','introduction---deep-architectu.html'">VirtualAlloc</option>
+  <option value="--iso-9660-pfd-(cd001).html">VirtualIsoDevice</option>
+  <option value="--scsi-devices.html">VirtualScsiDevice</option>
+  <option value="--dependencies----------------.html">Visual Studio</option>
+  <option value="7_-troubleshooting------------.html">will not start</option>
+  <option value="'Decompressor Internals','--decompressor-internals.html','Host Decompressor','host-decompressor.html'">WimC</option>
+  <option value="srm-boot-_-srm-commands-prompt.html">word-fold</option>
+  <option value="goals--objectives.html">Writeback</option>
+  <option value="--srm-environment-variables.html">wwid</option>
+</select>
+
+  <select id="keyword_list_dummy" size="5" style="display:none"></select>
+</div>
+
+   <script type="text/javascript">
+     /* Script for keyword listbox */
+     var idxMenu = null;
+     var idxEntries = new Array(); 
+     var idxEntryHeight = 0;
+
+     function keywordHideMenu() {	
+        if (idxMenu!=null) {
+          idxMenu.stop();
+          idxMenu.hide();
+          idxMenu = null;
+        }
+     }     	
+
+     function keywordEntryKey(value) {
+        var aKeyword = $('#keyword_entry').val().toLowerCase();
+     	var list = document.getElementById('keyword_list');
+    	var idx1 = 0;
+    	var idx2 = idxEntries.length-1;
+    	while (idx2>idx1+1) {
+    	  var delta = parseInt((idx2-idx1)/2) + idx1;
+    	  if (aKeyword.localeCompare(idxEntries[delta]) > 0) idx1 = delta;
+    	  else idx2 = delta;  
+        }
+    	$('#keyword_entry').unbind('onkeyup');
+        if (aKeyword.localeCompare(idxEntries[idx1]) < 0) idx2 = idx1;
+        list.selectedIndex = idx2;
+        if ((idxEntryHeight>0) && (idx2<idxEntries.length-1)) {
+          $(list).stop();	
+          idx1 = idx2 * idxEntryHeight;
+          if (idx1 > ((idxEntryHeight*idxEntries.length)-$(list).innerHeight())) idx1 = (idxEntryHeight*idxEntries.length)-$(list).innerHeight(); 
+          $(list).scrollTop(idx1);
+        } 
+    	$('#keyword_entry').bind('keywordEntryKey');
+        keywordHideMenu();
+     }
+    
+     function keywordListClick(event) {
+     	var list = document.getElementById('keyword_list');
+        var aKeyword = list.options[list.selectedIndex].text;
+        var aTarget = list.options[list.selectedIndex].value; 
+
+        if (aKeyword.substr(0,1)==String.fromCharCode(160)) {
+          var i = list.selectedIndex-1;
+          var aKw = '';
+          while (i>0) {
+          	aKw = list.options[i].text;
+          	if (aKw.substr(0,1)!=String.fromCharCode(160)) { 
+          	  aKeyword = aKw + ', ' + $.trim(aKeyword);
+          	  break;
+          	}
+          	i--;
+          }
+        }
+
+        $('#keyword_entry').attr('value', aKeyword);        
+        keywordHideMenu();
+
+        //if option.value starts with an "'", it's a list of entries => display menu 
+     	if (aTarget.substring(0,1)==String.fromCharCode(39)) {
+     	  var links = aTarget.substring(1,aTarget.length-1).split("','");
+          var i = 0;
+          var aCode = '';
+          while (i<links.length-1) {
+          	aCode = aCode + '<p><a href="javascript:keywordListJump(' + "'" + links[i+1] + "'" + ')">' + links[i] + '</a></p>';
+          	i = i+2;
+          }
+          
+          idxMenu = $('#keyword_menu');
+          idxMenu.html(aCode);
+          idxMenu.css({'z-index':99, 'position':'absolute', 'right':'4px'});
+          var ypos = event.clientY;
+          if ((ypos + idxMenu.outerHeight()) > $(window).height()) ypos = event.clientY - idxMenu.outerHeight();
+          idxMenu.css('top', ypos + 'px');
+          if (hmAnimate) idxMenu.show('fast');
+          else idxMenu.show();
+     	}
+     	else if ((aTarget=='undefined')||(aTarget=='')) {
+          idxMenu = $('#keyword_menu_no_entry');
+          idxMenu.css({'z-index':99, 'position':'absolute', 'right':'4px', 'opacity':1});
+          var ypos = event.clientY;
+          if ((ypos + idxMenu.outerHeight()) > $(window).height()) ypos = event.clientY - idxMenu.outerHeight();
+          idxMenu.css('top', ypos + 'px');
+          if (hmAnimate) idxMenu.show('fast');
+          else idxMenu.show();
+          idxMenu.fadeOut(5000);
+     	}
+     	else {
+     	  keywordListJump(aTarget);
+     	}	
+     }
+     
+     function keywordListJump(aTarget) {
+	
+	
+	parent.document.getElementById("hmcontent").src = aTarget;
+
+        //Google adwords tracking, if enabled:
+        if (parent.frames.length>0) {
+          if (parent.gaaccount) { 
+            var list = document.getElementById('keyword_list');
+            parent.track("index", idxEntries[list.selectedIndex]); 
+          }
+        }          
+     }
+     
+     $(document).ready( function() {
+       idxEntryHeight = parseInt(($('#keyword_list_dummy').innerHeight()/5)+0.5);
+       if (isIE) idxEntryHeight = 0; //autoscrolling in keyword list works well in IE
+       var kwmain = '';
+       var kw = '';
+       var list = document.getElementById('keyword_list');
+       $(list).click(function(event) { keywordListClick(event) });
+       	
+       for (var i=0; i < list.options.length; i++) {
+         kw = list.options[i].text;
+         
+         if ( (kw.substring(0,3)==String.fromCharCode(160,160,160)) || (kw.substring(0,3)==String.fromCharCode(32,32,32)) ) {
+           kw = kw.substr(3);	
+           idxEntries.push( kwmain+', '+kw.toLowerCase() );
+         }            
+         else {  
+           kwmain = kw.toLowerCase();
+           idxEntries.push(kwmain); 
+         }            
+       }
+
+       $(list).scroll(keywordHideMenu);
+       	
+       $(window).resize(function() { 
+         $('#keyword_entry').css('width', $('#keyword_list').width()+'px');
+	     $('#keyword_list_div').css('top', $('#keyword_entry_div').offset().top + $('#keyword_entry_div').outerHeight() + 5 + 'px');
+       });
+	 
+	   $(window).resize();
+	   
+     });
+   </script>
+ 
+</body>
+</html>

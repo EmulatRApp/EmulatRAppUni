@@ -1,0 +1,199 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Subsystem Internal &gt; DispatchTables</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="decode,DispatchKind,DispatchTables.cpp,g_primaryTable,opcode,primary table,secondary table,subDecode" />
+   <meta name="description" content="The dispatch tables are how the Decode stage turns a raw instruction word into a grain leaf. They are generated into DispatchTables.cpp from the master table, so the decode..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "--dispatchtables.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">DispatchTables</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?--dispatchtables.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="8_2-subsystem-internals-------.html">Subsystem Internal</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">DispatchTables</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="--grainfactorylib.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="8_2-subsystem-internals-------.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="--cmake-macro-guards----------.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">The dispatch tables are how the Decode stage turns a raw instruction word into a grain leaf. They are generated into <span class="f_CodeExample">DispatchTables.cpp</span> from the master table, so the decode path is data, not a hand-written switch.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Primary and secondary tables</span></h2>
+<p class="p_Normal">The top-level lookup is <span class="f_CodeExample">g_primaryTable</span>, indexed by the 6-bit primary opcode. Many Alpha opcodes are not fully decoded by that field alone -- arithmetic, floating point, the HW_MxPR instructions, and the PAL group all carry a sub-function in lower bits. For those, the primary entry points at a secondary (sparse) table keyed by the row's <span class="f_CodeExample">subDecode</span> value, so the full decode is a primary index followed, where needed, by a sparse secondary lookup. The Decode stage performs exactly that: read the opcode, index the primary table, and follow the sub-decode where the kind requires it, yielding the grain leaf that the Execute stage will invoke.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Dispatch kinds</span></h2>
+<p class="p_Normal">Each instruction is classified by a <span class="f_CodeExample">DispatchKind</span> that names its decode family and selects which secondary table (if any) applies. The canonical set covers the integer families <span class="f_CodeExample">IntArith</span>, <span class="f_CodeExample">IntLogical</span>, <span class="f_CodeExample">IntMul</span>, and <span class="f_CodeExample">IntShift</span>; the floating-point families <span class="f_CodeExample">FltIeee</span>, <span class="f_CodeExample">FltVax</span>, <span class="f_CodeExample">FltLogical</span>, <span class="f_CodeExample">ItFp</span>, and <span class="f_CodeExample">FpTiExt</span>; the privileged / hardware kinds <span class="f_CodeExample">HwLd</span>, <span class="f_CodeExample">HwSt</span>, <span class="f_CodeExample">HwMfpr</span>, <span class="f_CodeExample">HwMtpr</span>, <span class="f_CodeExample">HwRei</span>, and <span class="f_CodeExample">Pal</span>; and the control / miscellaneous kinds <span class="f_CodeExample">Direct</span>, <span class="f_CodeExample">JmpClass</span>, and <span class="f_CodeExample">Misc</span>, plus a <span class="f_CodeExample">Reserved</span> sentinel. A name helper (<span class="f_CodeExample">dispatchKindName()</span>) is generated alongside the enum for trace and diagnostics.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Because the tables are generated, adding or correcting an instruction is a table edit plus a regeneration, not a hand change to decode logic -- the same source-of-truth discipline as the rest of grainFactoryLib. A row with no implemented leaf resolves to a stub (which logs and does not compute) or, if there is no row at all, the opcode takes a decode fault (OPCDEC).</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--grainfactorylib.html" class="topiclink">grainFactoryLib</a></p>
+<p class="p_Normal"><a href="--execution-_-boot-internals.html" class="topiclink">Execution / Boot Internals</a></p>
+<p class="p_Normal"><a href="--execution-flight-plan-------.html" class="topiclink">Execution Flight Plan </a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

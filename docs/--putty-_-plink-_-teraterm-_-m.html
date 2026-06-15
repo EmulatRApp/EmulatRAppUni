@@ -1,0 +1,221 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Operating EmulatR &gt; Console Connectivity &gt; PuTTY / Plink / TeraTerm / MobaXterm / Netcat</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="connection refused,MobaXterm,netcat,Plink,PuTTY,RAW TCP,telnet,Tera Term,troubleshooting" />
+   <meta name="description" content="Connection steps for the common clients. In every case the target is localhost port 10023 (or a remote host and the port the instance was started with), using a RAW connection." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "--putty-_-plink-_-teraterm-_-m.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Terminal Clients</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?--putty-_-plink-_-teraterm-_-m.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="4_-operating-emulatr----------.html">Operating EmulatR</a> &gt; <a href="4_2-console-connectivity.html">Console Connectivity</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Terminal Clients</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="--tcp-console-overview.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="4_2-console-connectivity.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="4_3-srm-console.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">Connection steps for the common clients. In every case the target is <span class="f_CodeExample">localhost</span> port <span class="f_CodeExample">10023</span> (or a remote host and the port the instance was started with), using a RAW connection.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Plink</span></h2>
+<p class="p_CodeExample"><span class="f_CodeExample">plink&nbsp;-raw&nbsp;localhost&nbsp;-P&nbsp;10023&nbsp;#&nbsp;local</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">plink&nbsp;-raw&nbsp;192.168.1.50&nbsp;-P&nbsp;10023&nbsp;#&nbsp;remote</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">plink&nbsp;-v&nbsp;-raw&nbsp;localhost&nbsp;-P&nbsp;10023&nbsp;-log&nbsp;emulator.log&nbsp;#&nbsp;verbose&nbsp;+&nbsp;session&nbsp;log</span></p>
+<p class="p_Normal">Useful arguments: <span class="f_CodeExample">-raw</span> (raw TCP stream), <span class="f_CodeExample">-P &lt;port&gt;</span> (TCP port), <span class="f_CodeExample">-v</span> (verbose diagnostics), <span class="f_CodeExample">-log &lt;file&gt;</span> (save session log).</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">PuTTY</span></h2>
+<p class="p_Normal">Launch PuTTY, set Host Name <span class="f_CodeExample">localhost</span> and Port <span class="f_CodeExample">10023</span>, choose Connection type <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Raw</strong>, then press Open. For a remote instance use its IP in place of <span class="f_CodeExample">localhost</span>.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Tera Term</span></h2>
+<p class="p_Normal">New connection, select <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">TCP/IP</strong>, Host <span class="f_CodeExample">localhost</span>, TCP Port <span class="f_CodeExample">10023</span>, then connect.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">MobaXterm</span></h2>
+<p class="p_Normal">Session, then a Network session: Remote host <span class="f_CodeExample">localhost</span>, Port <span class="f_CodeExample">10023</span>, Protocol TCP, then connect.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Netcat (Linux / macOS)</span></h2>
+<p class="p_CodeExample"><span class="f_CodeExample">nc&nbsp;localhost&nbsp;10023&nbsp;#&nbsp;local</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">nc&nbsp;192.168.1.50&nbsp;10023&nbsp;#&nbsp;remote</span></p>
+<p class="p_Normal">Useful for scripting and automated testing.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Telnet</span></h2>
+<p class="p_Normal">Some telnet clients connect (<span class="f_CodeExample">telnet localhost 10023</span>), but because EmulatR uses a raw socket and performs no Telnet option negotiation, a raw-capable client (PuTTY Raw, Plink <span class="f_CodeExample">-raw</span>, Tera Term TCP/IP, MobaXterm TCP) is preferred.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Verifying the connection</span></h2>
+<p class="p_Normal">After connecting you should see console output -- a banner, the <span class="f_CodeExample">&gt;&gt;&gt;</span> prompt, or an in-progress power-up sequence -- depending on the current emulator state.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Troubleshooting</span></h2>
+<p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Connection refused:</strong> verify EmulatR is running, the console server is enabled, and the port number is correct.</p>
+<p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Connection timeout:</strong> verify firewall configuration and the host address, and that the listener is active.</p>
+<p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">No console output:</strong> verify the boot has progressed, console output is enabled, and you are on the right port.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--tcp-console-overview.html" class="topiclink">TCP Console Overview</a></p>
+<p class="p_Normal"><a href="--console-connection-issues---.html" class="topiclink">Console Connection Issues</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>
