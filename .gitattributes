@@ -4,6 +4,17 @@
 * text=auto
 
 ###############################################################################
+# Binary file types -- never normalize line endings or attempt text diffs.
+###############################################################################
+*.exe     binary
+*.rom     binary
+*.bin     binary
+*.sys     binary
+*.m64     binary
+*.xlsx    binary
+*.axpsnap binary
+
+###############################################################################
 # Set default behavior for command prompt diff.
 #
 # This is need for earlier builds of msysgit that does not have it on by
