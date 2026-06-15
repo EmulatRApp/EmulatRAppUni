@@ -1,0 +1,218 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Tools &gt; Host Decompressor</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="AXPBox,build.sh,decom.c,decompressed_ds10_v7_3.bin,es45_v7_3.exe,host_decompressor,inflate.c,Mark Adler,oracle,oracle.c,ref_decompressed.bin,regression guard,WimC" />
+   <meta name="description" content="tools/host_decompressor is a native, host-compiled build of the original DEC SRM Huffman / inflate decompressor. It serves as a trusted reference -- an oracle -- for the..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "host-decompressor.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">tools/Host Decompressor</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?host-decompressor.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="8_4-tools.html">Tools</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">tools/Host Decompressor</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="qt-creator.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="8_4-tools.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <span class="hmbtnnext"></span>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal"><span class="f_CodeExample">tools/host_decompressor</span> is a native, host-compiled build of the original DEC SRM Huffman / inflate decompressor. It serves as a trusted reference -- an oracle -- for the compressed Alpha firmware images, producing the decompressed firmware byte-for-byte without running any emulation. This page is the tool view (build, run, outputs); the algorithm and its place in the boot path are covered under Decompressor Internals.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Why it exists</span></h2>
+<p class="p_Normal">The guest firmware self-decompresses on the emulated CPU at every cold boot (about 4 million cycles -- the spin at PC <span class="f_CodeExample">0x60111c</span>). To confirm that EmulatR's CPU produces the correct decompressed image without trusting either EmulatR's own CPU or AXPBox, the tool builds the same algorithm DEC used, from the same sources the firmware was compiled from, as a native host program. The reference image it produces matches EmulatR's emulated-CPU output byte for byte, which makes it both a regression guard and a clean way to mint a decompressed ROM. It is strictly stronger as an oracle than AXPBox's <span class="f_CodeExample">decompressed.rom</span>, which is generated by running the guest decompressor on AXPBox's own emulated CPU and so still depends on a correct CPU and a contrived entry sequence.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Sources</span></h2>
+<p class="p_Normal">Under <span class="f_CodeExample">src/</span>, pinned copies of the read-only DEC originals plus the harness:</p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox"> inflate.c -- Mark Adler inflate, version c10p1 (the engine).</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox"> decom.c -- the DEC wrapper (main + decompress); reference only, not compiled.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox"> decomp.h -- types and the ROM / non-ROM switches.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox"> ev6_huf_decom.m64 -- the guest assembly startup that calls decompress(); reference only (it also performs CPU / PAL state setup, which any in-emulator host path must preserve).</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox"> oracle.c -- the harness: it locates the WimC header, sets the input / output pointers and compressed size, calls inflate(), and dumps the image.</span></p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Build and run</span></h2>
+<p class="p_Normal">Build with the bundled script (<span class="f_CodeExample">build.sh</span> on Linux / gcc, <span class="f_CodeExample">build.bat</span> on Windows), then run the oracle against a compressed firmware image:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_CodeExample"><span class="f_CodeExample">sh&nbsp;build.sh</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">./oracle&nbsp;&lt;path-to-compressed-firmware.exe&gt;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_Normal">Output is written to <span class="f_CodeExample">ref_decompressed.bin</span> with a printed summary; a known-good run of <span class="f_CodeExample">es45_v7_3.exe</span> is cached under <span class="f_CodeExample">out/</span>. The <span class="f_CodeExample">build_firmware_variants.sh</span> helper drives the oracle across multiple firmware images (the DS10 image, for example, yields <span class="f_CodeExample">decompressed_ds10_v7_3.bin</span>, which is the input the Ghidra workflow analyzes).</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Compressed-image layout</span></h2>
+<p class="p_Normal">The oracle finds the firmware payload by a linear scan for the <span class="f_CodeExample">WimC</span> magic (<span class="f_CodeExample">0x436D6957</span>). For <span class="f_CodeExample">es45_v7_3.exe</span> the header sits at file offset <span class="f_CodeExample">0x2400</span>; its longwords give the compressed size (<span class="f_CodeExample">0x1a6164</span>), the decompress target (<span class="f_CodeExample">0x8000</span>), and the start of the compressed data (WimC + 20 = file <span class="f_CodeExample">0x2414</span>). The decompressed output is <span class="f_CodeExample">0x30cc00</span> bytes (3,197,952).</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The regression guard</span></h2>
+<p class="p_Normal">In the decompressed image the V4-runtime quad at PA <span class="f_CodeExample">0xd950</span> is <span class="f_CodeExample">0x7be2a000_b4de0030</span> -- the <span class="f_CodeExample">hw_ret R2</span> at <span class="f_CodeExample">0xd954</span> uses R2 (byte <span class="f_CodeExample">0xe2</span>), never R6 (<span class="f_CodeExample">0xe6</span>). This is the signature that settled the 2026-05-30 single-bit-PAL-corruption question: that instruction is genuine firmware, not a decompression artifact. If a future change makes the guest CPU produce R6 in that neighborhood, it is a CPU regression, not a fix.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Integrating the oracle as a runtime alternate decompression path (<span class="f_CodeExample">--decompress=inline|host|cache</span>) is deferred until the SRM reaches the <span class="f_CodeExample">&gt;&gt;&gt;</span> prompt; the recommended intercept-hybrid design is described under Decompressor Internals.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--decompressor-internals.html" class="topiclink">Decompressor Internals</a></p>
+<p class="p_Normal"><a href="--ghidra.html" class="topiclink">Ghidra</a></p>
+<p class="p_Normal"><a href="--firmware-decode--decompressi.html" class="topiclink">Firmware Decode &amp; Decompression</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

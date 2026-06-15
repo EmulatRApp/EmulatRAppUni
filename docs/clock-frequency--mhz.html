@@ -1,0 +1,218 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Clock Frequency and the MHz Reading</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="268 MHz,calibration,cycle counter,cycle_count_freq,EMULATR_PROFILE_ALPHA_CLOCK_HZ,HWRPB,interval timer,intrclock_freq,kCchipTimerBit,MHz,PCC,profile clock,RPCC,Tsunami21272_CsrSpec" />
+   <meta name="description" content="The SRM banner and show config report a CPU speed -- on the DS10 profile, 268 MHz. That number is not a hardcoded banner string and it is not read from a stored constant; the..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "clock-frequency--mhz.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Clock Frequency and the MHz Reading</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?clock-frequency--mhz.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      &raquo;No topics above this level&laquo;
+      </p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Clock Frequency and the MHz Reading</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <span class="hmbtnprev"></span>
+      <a href="8_4-tools.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <span class="hmbtnnext"></span>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">The SRM banner and <span class="f_CodeExample">show config</span> report a CPU speed -- on the DS10 profile, 268 MHz. That number is not a hardcoded banner string and it is not read from a stored constant; the firmware derives it by measuring the CPU cycle counter against the chipset interval-timer interrupts. This page explains how that figure is produced and how to change it.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The profile clock</span></h2>
+<p class="p_Normal">EmulatR has one build-time constant for the modeled CPU frequency, <span class="f_CodeExample">EMULATR_PROFILE_ALPHA_CLOCK_HZ</span>, defined in <span class="f_CodeExample">chipsetLib/Tsunami21272_CsrSpec.h</span>. The current DS10 value is:</p>
+<p class="p_CodeExample"><span class="f_CodeExample">EMULATR_PROFILE_ALPHA_CLOCK_HZ&nbsp;=&nbsp;268435456&nbsp;(2^28&nbsp;Hz&nbsp;=&nbsp;268.435456&nbsp;MHz)</span></p>
+<p class="p_Normal">Everything downstream -- the interval-timer cadence and the frequency the firmware reports -- follows from this one number.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The interval timer cadence</span></h2>
+<p class="p_Normal">The Cchip interval timer is designed to fire at the architectural nominal of 1024 Hz. The cycle target per tick is the profile clock divided by 1024, rounded to the nearest power of two so the fire test is a single mask compare:</p>
+<p class="p_CodeExample"><span class="f_CodeExample">kCchipIntervalTimerCycles&nbsp;=&nbsp;kProfileAlphaClockHz&nbsp;/&nbsp;1024</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">kCchipTimerBit&nbsp;=&nbsp;roundLog2Nearest(kCchipIntervalTimerCycles)</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">fire&nbsp;when:&nbsp;(cycleCount&nbsp;&amp;&nbsp;kCchipTimerMask)&nbsp;==&nbsp;0&nbsp;&amp;&amp;&nbsp;cycleCount&nbsp;!=&nbsp;0</span></p>
+<p class="p_Normal">At 2^28 Hz this is exact: 2^28 / 1024 = 2^18, already a power of two, so the rounding introduces zero error and the timer fires every 2^18 cycles -- a clean 1024 Hz.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">How the firmware turns that into MHz</span></h2>
+<p class="p_Normal">The SRM measures its own clock: it reads the CPU cycle counter (PCC / RPCC) and counts how many cycles elapse across a known number of 1024 Hz interval-timer interrupts, then multiplies cycles-per-tick by the tick rate.</p>
+<p class="p_CodeExample"><span class="f_CodeExample">measured&nbsp;clock&nbsp;=&nbsp;cycles-per-tick&nbsp;x&nbsp;tick-rate</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;=&nbsp;2^18&nbsp;cycles&nbsp;x&nbsp;1024&nbsp;Hz</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;=&nbsp;2^28&nbsp;Hz&nbsp;=&nbsp;268.435456&nbsp;MHz&nbsp;-&gt;&nbsp;&quot;268&nbsp;MHz&quot;</span></p>
+<p class="p_Normal">So the reported MHz is the profile clock, recovered by measurement -- the calibration path comes back to exactly the value that drove the timer in the first place.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Why not the HWRPB constant?</span></h2>
+<p class="p_Normal">The Hardware Restart Parameter Block does carry a cycle-counter frequency field (<span class="f_CodeExample">cycle_count_freq</span>) and an interval-clock field (<span class="f_CodeExample">intrclock_freq</span>, interrupts per second times 4096), built by <span class="f_CodeExample">HwrpbBuilder</span>. But the <span class="f_CodeExample">cycle_count_freq</span> spec value is 500 MHz, while the banner shows 268 -- so on the DS10 the firmware is clearly using its own measurement rather than the stored constant. (Firmware that instead trusted the HWRPB field would report 500.) The interval-clock field is set consistently with the 1024 Hz cadence.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Changing the reported speed</span></h2>
+<p class="p_Normal">Override the profile clock at configure time, for example for an ES40 profile:</p>
+<p class="p_CodeExample"><span class="f_CodeExample">cmake&nbsp;-DEMULATR_PROFILE_ALPHA_CLOCK_HZ=600000000&nbsp;(ES40,&nbsp;~600&nbsp;MHz)</span></p>
+<p class="p_Normal">One caveat follows directly from the calibration mechanism: a clock that is not a power-of-two multiple of 1024 makes <span class="f_CodeExample">kCchipIntervalTimerCycles</span> round to the nearest power of two, so the tick rate drifts slightly from 1024 Hz and the firmware's measured MHz drifts with it (for ES40 600 MHz the tick lands at bit 19, about 1144 Hz, within ~12 percent of nominal -- harmless to a rate-agnostic OS but visible if a guest reads the calibrated speed). Powers of two like 2^28 calibrate exactly; other values trade a small reported-speed skew for the chosen cadence.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--execution-_-boot-internals.html" class="topiclink">Execution / Boot Internals</a></p>
+<p class="p_Normal"><a href="--memory-map--iprs.html" class="topiclink">Memory Map &amp; IPRs</a></p>
+<p class="p_Normal"><a href="show-config.html" class="topiclink">show config</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

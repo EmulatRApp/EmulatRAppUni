@@ -1,0 +1,321 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Architecture Deep-Dives &nbsp;&gt; Memory Map &amp; IPRs</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="CALL_PAL,EXC_ADDR,HW_IPR,HW_MFPR,HW_MTPR,I_CTL,internal processor register,IPR,PAL_BASE,PAL_TEMP,PALcode-visible IPR,physical address map,PT0,scbd field,VA_CTL" />
+   <meta name="description" content="This appendix is the register-level companion to the Memory and Addressing pages. It names the two internal-processor-register (IPR) namespaces EmulatR implements, the numeric..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "--memory-map--iprs.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Memory Map &amp; IPRs</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?--memory-map--iprs.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="8_3-architecture-deep-dives---.html">Architecture Deep-Dives&nbsp;</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Memory Map &amp; IPRs</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="introduction---deep-architectu.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="8_3-architecture-deep-dives---.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="--addressing--tlb.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">This appendix is the register-level companion to the Memory and Addressing pages. It names the two internal-processor-register (IPR) namespaces EmulatR implements, the numeric indices a developer reads in a trace, and the physical-address regions the chipset arbiter routes. The authoritative reference is the Alpha 21264 Hardware Reference Manual (EC-RE2CA-TE, Table 5-4) together with V4's <span class="f_CodeExample">coreLib/HW_IPR.h</span>.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Two IPR namespaces</span></h2>
+<p class="p_Normal">EmulatR follows the architecture's split between registers the operating system reaches through CALL_PAL and registers only PALcode can touch with HW_MFPR / HW_MTPR.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">1. PALcode-visible IPRs (0x0000 .. 0x00FF).</strong> These are CALL_PAL function codes, not hardware registers. The OS executes a CALL_PAL (for example MFPR_PTBR = 0x0015, MTPR_TBIA = 0x001B, MFPR_WHAMI = 0x003F); the PAL handler at the matching entry vector performs the actual access. Numbering follows the OSF/1 PALcode specification rather than the silicon. In V4 these are the <span class="f_CodeExample">PAL_MFPR</span> / <span class="f_CodeExample">PAL_MTPR</span> enums.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">2. EV6 hardware IPRs (0x0100 .. 0x02FF).</strong> These are the real register indices encoded in the <span class="f_CodeExample">scbd</span> field of an HW_MFPR / HW_MTPR instruction; only PALcode running in PAL mode may execute them. Numbering follows the 21264 HRM. The 0x0100 offset is an emulator convention so the hardware range cannot collide numerically with the PALcode-visible range: the decoder adds 0x0100 to the raw <span class="f_CodeExample">scbd</span> value, except the PAL_TEMP block (raw 0x40..0x5F) which adds 0x01C0 so PT0 lands at 0x0200.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Hardware IPR map (the indices you see in a trace)</span></h2>
+<p class="p_Normal">The hardware IPRs are grouped by the box that owns them. Selected indices from <span class="f_CodeExample">HW_IPR.h</span>:</p>
+<p class="p_Normal">&nbsp;</p>
+<div style="text-align: left; text-indent: 0; padding: 0 0 0 0; margin: 0 0 0 0;"><table style="border:none; border-spacing:0; border-collapse:collapse;">
+<thead>
+<tr>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Index</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Name</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Box / role</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0106</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_EXC_ADDR</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">IBox -- exception address; read = saved PC, write = HW_REI target. Bit[0] carries PAL mode.</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0110</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_PAL_BASE</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">IBox -- PAL base address (32K-aligned; low 15 bits zero).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0111</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_I_CTL</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">IBox -- IBox control register (SDE and related bits).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0113</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_IC_FLUSH</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">IBox -- I-cache flush all (action).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0120&nbsp;/&nbsp;0x0121</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_DTB_TAG0 / HW_DTB_PTE0</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">MBox -- DTB tag staging and PTE fill, bank 0 (writing the PTE triggers the fill).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0127</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_MM_STAT</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">MBox -- memory-management status (read-only; fault detail).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0140</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_PCTX</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Process context -- ASN + FPE + PPCE packed.</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x01C0&nbsp;/&nbsp;0x01C1</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_CC / HW_CC_CTL</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Cycle counter and its control (offset + enable).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x01C2&nbsp;/&nbsp;0x01C4</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_VA / HW_VA_CTL</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Faulting virtual address (read-only) and VA control (write-only, packed -- selects the 43/48-bit VA window).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x01A0&nbsp;..&nbsp;0x01A5</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_DTB_*1</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">MBox -- DTB bank 1 (the EV6 dual-bank DTB).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0200&nbsp;..&nbsp;0x0217</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_PAL_TEMP_0 .. _23</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">PAL temporaries PT0..PT23 (PAL-mode scratch; OSF/1 assigns KSP, PTBR, PCBB, etc.).</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x0218&nbsp;..&nbsp;0x021F</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">HW_PAL_TEMP_24 .. _31</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">PT24..PT31 -- EV5-vintage scratch, provisioned because bring-up SRM .exe code addresses PT31.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">PAL temporaries</span></h2>
+<p class="p_Normal">The EV6 provides 24 PAL temporary registers (PT0..PT23), reachable only via HW_MFPR / HW_MTPR in PAL mode. They are the backbone of PALcode: every PAL entry saves the guest GPRs into PAL_TEMPs and every PAL exit restores them. The OSF/1 convention pins specific temporaries to architectural state exposed through CALL_PAL (PT0 = KSP, PT2 = PTBR, PT4 = PCBB, PT5 = PRBR, PT6 = SCBB, and so on). The OS never reads a PAL_TEMP directly -- it issues CALL_PAL MFPR / MTPR and the handler relays to the right temporary. V4 widens the range to PT31 because the SRM firmware used during bring-up carries EV5-vintage code that addresses PT24..PT31 even on EV6 (observed at PC 0x12f88 issuing <span class="f_CodeExample">hw_mtpr Rx, 0x5F</span>); those extra eight are pure CpuState-backed scratch.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">IPRs that map to architectural state live as flat fields on <span class="f_CodeExample">CpuState</span> (ptbr, i_ctl, pal_base, ps, excAddr, fpcr). Selectors that are not yet CpuState-backed return <span class="f_CodeExample">kFaultUnimplemented</span>; adding one later is a CpuState field plus a switch case in the HW_MFPR / HW_MTPR leaf.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Physical address regions</span></h2>
+<p class="p_Normal">Guest physical addresses are routed by the Tsunami chipset arbiter. Reads and writes resolve to one of three destinations: main memory (the GuestMemory sparse backing, bounded by the Cchip AAR registers -- anything outside is a non-existent-memory / NXM fault), the chipset CSR space (Cchip / Dchip / Pchip control registers and the TIG region), or PCI / device MMIO windows. The halt-gate diagnostics read and write CSRs in this space; for example the console arming read targets <span class="f_CodeExample">pmem:80130000FF8</span> in the TIG region. The exhaustive per-register CSR table is in the Tsunami / 21272 Hardware Reference Manual; the operator-facing view of how to read these locations is on the Evaluate Address page.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--memory----------------------.html" class="topiclink">Memory</a></p>
+<p class="p_Normal"><a href="--addressing--tlb.html" class="topiclink">Addressing &amp; TLB</a></p>
+<p class="p_Normal"><a href="--evaluate-address.html" class="topiclink">Evaluate Address</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

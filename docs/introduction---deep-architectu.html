@@ -1,0 +1,237 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Architecture Deep-Dives &nbsp;&gt; Introduction &amp; Overview</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="21264,21272,Alpha AXP,BoxResult,CBox,Cchip,CpuState,Cypress CY82C693,Dchip,EBox,EV6,Ev6EntryVectors,Ev6Translator,ExecCtx,FBox,fpBox,grain,GrainMasterV4,GuestMemory,HW_MFPR,HW_MTPR,IBox,IPR,kseg,LockMonitor,Machine,MBox,PalBox,PALcode,Pchip,Pic8259Pair,PipelineDriver,PipelineSlot,SPAM,SPAMShardManager,SRM,TLB,TlbEpoch,TsunamiChipset,Typhoon,VirtualAlloc" />
+   <meta name="description" content="EmulatR is a full-system, high-fidelity emulator of the DEC Alpha AXP platform -- specifically the 21264 (EV6) processor and the 21272 (Tsunami / Typhoon) core logic as..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "introduction---deep-architectu.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Overview</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?introduction---deep-architectu.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="8_3-architecture-deep-dives---.html">Architecture Deep-Dives&nbsp;</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Overview</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="8_3-architecture-deep-dives---.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="8_3-architecture-deep-dives---.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="--memory-map--iprs.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">EmulatR is a full-system, high-fidelity emulator of the DEC Alpha AXP platform -- specifically the 21264 (EV6) processor and the 21272 (Tsunami / Typhoon) core logic as integrated in AlphaServer DS10 / ES40 / ES45-class systems. It is implemented in modern C++ (C++20) with a deliberately framework-free architectural core (Qt is confined to the periphery -- console UI and host glue), built with CMake. Its purpose is not to approximate an Alpha; it is to be one, faithfully enough that unmodified DEC SRM console firmware, PALcode, and the operating systems that ran on the metal run on EmulatR without knowing the difference.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">This page describes the architecture of the current implementation (V4) -- the execution model, the memory and translation system, the privileged boundary, and the device fabric -- and the standard every subsystem is measured against. The chapters that follow expand each area; the deep-dive appendices carry the register-level detail.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The fidelity standard and its authoritative sources</span></h2>
+<p class="p_Normal">EmulatR is governed by one standard: it must behave like real Alpha hardware in every architecturally visible way, even when that complicates the implementation. Correctness is defined by primary sources -- the <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Alpha Architecture Reference Manual</strong> and the original <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-style: italic; font-weight: bold;">DEC SRM console and PALcode sources</strong>. These define what correct behavior is.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">The test is black-box and adversarial, conducted by the most demanding guests available: the SRM console and PALcode exercise the privileged architecture directly, and a booting operating system exercises the memory model, the trap machinery, and the device fabric under real workloads. A second emulator (AXPBox) is consulted only as a convenience cross-check for differential triage -- it is explicitly <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">not</strong> an authoritative source, because another implementation can be wrong, whereas the architecture manual and the firmware sources cannot. If a guest can distinguish EmulatR from an AlphaServer through architecturally defined behavior, the emulator is wrong.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Primary goals and objectives</span></h2>
+<p class="p_Normal">1. <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Architectural correctness first.</strong> EmulatR models Alpha's architectural semantics, not a particular chip's timing. Correctness always outranks speed.</p>
+<p class="p_Normal">2. <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Deterministic, debuggable execution.</strong> Execution is reproducible and inspectable. The run loop is staged and cycle-counted, and the hot path is deliberately shallow so a stack trace at any point stays short and legible.</p>
+<p class="p_Normal">3. <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Explicit, per-instruction semantics.</strong> Every instruction resolves to one faithful grain leaf; behavior is never inferred from an operand-shape family. Architectural results and exceptions become visible only at the Writeback stage.</p>
+<p class="p_Normal">4. <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Separation of concerns.</strong> Decode, integer, floating-point, memory, control, and privilege are isolated into well-defined functional domains -- the &quot;Boxes&quot; -- with one-way dependency flow. No domain reaches into another's internal state.</p>
+<p class="p_Normal">5. <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">SMP-aware by construction.</strong> Per-CPU state, CPU-local translation buffers, and load-locked / store-conditional reservation tracking are built in, so a multiprocessor build is an extension rather than a rewrite (see the scope note below).</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The execution model</span></h2>
+<p class="p_Normal">Execution is driven by <span class="f_CodeExample">PipelineDriver</span> (pipelineLib) through six in-order stages: <span class="f_CodeExample">IF</span> (instruction fetch), <span class="f_CodeExample">DE</span> (decode / dispatch), <span class="f_CodeExample">GR</span> (grain-ready: read the register file into the execution context), <span class="f_CodeExample">EX</span> (execute), <span class="f_CodeExample">MEM</span> (memory drain), and <span class="f_CodeExample">WB</span> (writeback). Each instruction is carried through the six stages on a <span class="f_CodeExample">PipelineSlot</span>; architectural state -- the register file and the PC -- is committed only at <span class="f_CodeExample">WB</span>, the single well-defined commit point that makes exceptions precise and replay deterministic.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Dispatch is flat. At <span class="f_CodeExample">DE</span> a decoded instruction is resolved through the grain system to a single grain leaf -- a pure function with the signature <span class="f_CodeExample">BoxResult(InstructionGrain const&amp;, ExecCtx const&amp;)</span> -- that implements its semantics. Execution is partitioned into the functional Boxes, each a namespace of grain leaves rather than a class hierarchy: <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">IBox</strong> (control flow -- branches, jumps), <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">EBox</strong> (integer ALU), <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">FBox</strong> (floating point, IEEE and VAX, over the fpBox backend), <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">MBox</strong> (loads, stores, load-locked / store-conditional), <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">CBox</strong> (branch prediction and target resolution), and <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">PalBox</strong> (the privileged boundary). Dependencies flow one way: every Box depends on coreLib; most also on iprLib; MBox additionally on memoryLib.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">A deliberate consequence is that the hot path is shallow -- from the driver, through the stage, into a grain leaf, the call-stack depth is typically two and rarely exceeds four. That keeps traces legible (serving debuggability) and minimizes the per-instruction scaffolding that profiling has shown -- rather than the opcode bodies -- to dominate runtime (serving performance without compromising correctness). The grain leaves are the leaves of that call tree by construction.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Dispatch tables are generated, not hand-maintained. <span class="f_CodeExample">GrainMasterV4.tsv</span> is the single source of truth for instruction semantics; the <span class="f_CodeExample">genGrains.py</span> codegen reads it and emits the dense primary table (indexed by the 6-bit opcode) plus the sparse secondary tables for multi-function opcodes, including the personality-aware PALcode dispatch (OSF/1 and VMS). There is no runtime trace cache or JIT; the generated tables are the decode artifact.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Memory and address translation</span></h2>
+<p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Physical backing.</strong> <span class="f_CodeExample">GuestMemory</span> (memoryLib) is the single physical-memory interface -- a passive byte-store that pages the guest's physical address space in on demand, in 64 KiB pages, committed only as the guest first touches them, so a multi-gigabyte machine costs only its working set. The pages are backed by host <span class="f_CodeExample">VirtualAlloc</span> on Windows and by <span class="f_CodeExample">mmap</span> on Linux / ARM hosts (with a portable fallback). The earlier SafeMemory layer has been removed. <span class="f_CodeExample">GuestMemory</span> itself does no MMIO routing or fault generation: the <span class="f_CodeExample">TsunamiChipset</span> system-bus arbiter decodes addresses, routes device traffic, and raises range faults before raw RAM is ever touched. A <span class="f_CodeExample">LockMonitor</span> tracks per-CPU load-locked / store-conditional reservations at cache-line granularity.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Guest translation.</strong> Address translation is performed by <span class="f_CodeExample">Ev6Translator</span> (mmuLib) as the EV6 architecture specifies: PAL-mode bypass, the canonical virtual-address window check, and superpage (kseg) mapping, with non-mapped accesses returning an ITB or DTB miss. The translation buffers are modeled by the <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">SPAM</strong> cache -- Set-Partitioned Associative Memory -- as <span class="f_CodeExample">SPAMShardManager</span> instances resident in <span class="f_CodeExample">CpuState</span> (<span class="f_CodeExample">itbMgr</span> and <span class="f_CodeExample">dtbMgr</span>, each 16 shards by 8 ways = 128 entries). Invalidation is epoch-based and lazy (<span class="f_CodeExample">TlbEpoch</span>): a TBIA bumps a global counter and a TBIAP a per-process one, so a flush is O(1) and stale entries simply fail the liveness test at lookup. The translation buffers are CPU-local by design.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Faults, exceptions, and the privileged boundary</span></h2>
+<p class="p_Normal">There is no central fault dispatcher. A leaf, or the memory drainer that detects a fault, sets a <span class="f_CodeExample">faultCode</span> on the instruction's <span class="f_CodeExample">BoxResult</span> (for example a DTB miss or an unaligned access). The hardware exception entry points are compile-time constants in <span class="f_CodeExample">Ev6EntryVectors.h</span> (the vectors at <span class="f_CodeExample">0x100</span> through <span class="f_CodeExample">0x780</span>, spaced <span class="f_CodeExample">0x80</span> apart). At <span class="f_CodeExample">WB</span> the driver inspects the fault: a halt sets the CPU's halted flag; otherwise, once <span class="f_CodeExample">PAL_BASE</span> is established, control diverts to the computed entry vector. Privileged operations -- <span class="f_CodeExample">CALL_PAL</span>, <span class="f_CodeExample">HW_MTPR</span> / <span class="f_CodeExample">HW_MFPR</span>, <span class="f_CodeExample">HW_REI</span> -- are handled in <span class="f_CodeExample">PalBox</span>, which applies IPR side-effects (PAL_BASE normalization, TLB invalidation, ASN context) inline. Internal processor registers are flat members of <span class="f_CodeExample">CpuState</span>.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The machine and its device fabric</span></h2>
+<p class="p_Normal"><span class="f_CodeExample">Machine</span> (systemLib) is the top-level orchestrator: it owns the <span class="f_CodeExample">CpuState</span>, the <span class="f_CodeExample">GuestMemory</span>, and the <span class="f_CodeExample">TsunamiChipset</span>, and provides firmware load, reset, and the step / run entry points. The chipset aggregates the three 21272 components -- the <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Cchip</strong> (system control, memory arbitration, interval timers, DRAM array configuration), the <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Dchip</strong> (data path), and the <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Pchip</strong> (PCI host bridge) -- together with the on-board devices. The PCI fabric is a standard bus / slot / function hierarchy (there is no separate &quot;stratum&quot; abstraction).</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">The southbridge is the <strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Cypress CY82C693</strong> PCI-to-ISA bridge (<span class="f_CodeExample">Cypress_CY82C693ISABridge</span>), which carries the ISA / SuperIO plane. The modeled devices include the CY82C693 IDE / ATAPI channel, the SuperIO controller (FDC / COM / LPT), the TOY / RTC, a 16550 UART for the serial console, the PCF8584 IIC controller, the flash / SROM, and the dual 8259A interrupt controllers (<span class="f_CodeExample">Pic8259Pair</span>). SCSI endpoints (<span class="f_CodeExample">VirtualScsiDevice</span> and the ISO-CD variant) exist in the device library.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Lineage: four implementations, one set of objectives</span></h2>
+<p class="p_Normal">The current emulator is the fourth implementation; the objectives above were fixed from the start, and each version reached for them by a different mechanism.</p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">V1 dispatched each instruction through a virtual call to a per-instruction grain. It was correct and booted SRM, but the per-call overhead capped throughput.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">V2 chased performance by dispatching on instruction families (operand-shape signatures). It was fast, but families under-determined behavior -- instructions sharing a signature still needed per-instruction corner-case handling the model could not express.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">V3 tried to hybridize V1 and V2; the coupling was too tight and introduced silent-failure modes -- the worst outcome for an emulator whose value is fidelity.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">V4 keeps a flat dispatch path but resolves it to faithful per-instruction grain leaves via generated tables, with performance pursued as the sum of many marginal gains rather than one architectural bet. The dispatch mechanism evolved across all four; the objectives did not.</span></p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><em style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-style: italic;">Scope note: this page describes the V4 architecture and the standard it is held to. Some elements are infrastructure ahead of full activation -- multiprocessor execution and cross-CPU IPI, full PAL trap delivery, and SCSI / PCI device enumeration. For what is implemented and working in the current build versus what is still in progress, see Current Development Status.</em></p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--memory----------------------.html" class="topiclink">Memory</a></p>
+<p class="p_Normal"><a href="--addressing------------------.html" class="topiclink">Addressing</a></p>
+<p class="p_Normal"><a href="--execution-flight-plan-------.html" class="topiclink">Execution Flight Plan</a></p>
+<p class="p_Normal"><a href="--current-development-status--.html" class="topiclink">Current Development Status</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

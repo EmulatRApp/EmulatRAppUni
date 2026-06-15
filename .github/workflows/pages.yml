@@ -1,0 +1,45 @@
+name: Deploy documentation to GitHub Pages
+
+# Publishes the Help & Manual HTML output (the html/ folder) to GitHub Pages.
+# Runs on every push to main that touches the docs, and can be triggered manually.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'html/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Permissions the deploy needs (least privilege).
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress publish.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload html/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

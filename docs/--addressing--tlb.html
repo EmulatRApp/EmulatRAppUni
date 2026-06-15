@@ -1,0 +1,258 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>Architecture Deep-Dives &nbsp;&gt; Addressing &amp; TLB</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="ASM,ASN,canonical VA,DTB,epoch invalidation,Ev6Translator,ITB,kseg,SPAMShardManager,superpage,TBIA,TBIAP,TBIS,TlbEpoch,translation buffer,VA_CTL" />
+   <meta name="description" content="This appendix is the implementation-level companion to the Addressing page. It walks the V4 translation path from a virtual address to a physical address, then describes the..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "--addressing--tlb.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Addressing &amp; TLB</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?--addressing--tlb.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="8_3-architecture-deep-dives---.html">Architecture Deep-Dives&nbsp;</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Addressing &amp; TLB</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="--memory-map--iprs.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="8_3-architecture-deep-dives---.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="--decompressor-internals.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">This appendix is the implementation-level companion to the Addressing page. It walks the V4 translation path from a virtual address to a physical address, then describes the translation-buffer front end and the epoch scheme that makes a TLB flush a single counter bump. The authoritative reference is the Alpha Architecture Reference Manual (sections 4.1.6 / 4.1.7) and the 21264 Hardware Reference Manual; the V4 code lives in <span class="f_CodeExample">mmuLib/Ev6Translator.h</span> and <span class="f_CodeExample">pteLib/</span>.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The translator</span></h2>
+<p class="p_Normal"><span class="f_CodeExample">Ev6Translator</span> is not an object -- its entry points are static functions that take a <span class="f_CodeExample">CpuState const&amp;</span> as the first argument, so per-CPU state travels through CpuState rather than a translator instance. The MEM stage calls one of three entry points depending on the memory effect a leaf packed onto its BoxResult at EX:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">translateData -- a data load or store, no alignment check.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">translateDataAligned -- a data load or store with a size-class alignment check (1/2/4/8 bytes).</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">translateInstruction -- an instruction fetch (longword-aligned, consults the I-side superpage enables).</span></p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Each returns a <span class="f_CodeExample">TranslationResult</span>. On Success the caller's <span class="f_CodeExample">pa_out</span> holds the physical address; any other value is a translation fault that the MEM drainer converts to a fault code (<span class="f_CodeExample">mmuLib::toFaultCode</span>) and uses to short-circuit the register-file commit.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Translation path (data stream)</span></h2>
+<p class="p_Normal">For a normal load or store, <span class="f_CodeExample">translateData</span> proceeds in this order:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 20px; margin-left: 0;"><span class="f_Normal" style="display:inline-block;width:20px;margin-left:-20px">1.</span>-<strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Explicitly-physical accesses bypass upstream.</strong> HW_LD / HW_ST / LDQP / STQP are tagged physical and the MEM drainer sets pa = va before ever calling the translator. Importantly, EV6 PAL mode does NOT blanket-disable D-stream translation -- a normal load or store in PAL mode still translates. (An earlier blanket PAL bypass mis-mapped VMS system-space kernel-stack addresses and was removed.)</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 20px; margin-left: 0;"><span class="f_Normal" style="display:inline-block;width:20px;margin-left:-20px">2.</span>-<strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Canonical VA check.</strong> VA_CTL bit 1 selects 48-bit VA mode when set, otherwise 43-bit mode. In 43-bit mode VA&lt;63:43&gt; must sign-extend VA&lt;42&gt;; in 48-bit mode VA&lt;63:48&gt; must sign-extend VA&lt;47&gt;. A non-canonical address faults before any TLB lookup.</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 20px; margin-left: 0;"><span class="f_Normal" style="display:inline-block;width:20px;margin-left:-20px">3.</span>-<strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Kseg / superpage detection.</strong> The three SPE bits (on M_CTL for data, I_CTL for instructions) gate three kernel-only superpage modes. SPE[2] maps VA&lt;43:13&gt; directly to PA when VA&lt;47:46&gt; = 0b10; SPE[1] and SPE[0] cover the other two windows. A kseg-shaped address from non-kernel mode is an access violation; a non-kseg address falls through.</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 20px; margin-left: 0;"><span class="f_Normal" style="display:inline-block;width:20px;margin-left:-20px">4.</span>-<strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">DTB lookup.</strong> On a live hit, the PTE permission bits are checked and PA is composed as <span class="f_CodeExample">(PFN &lt;&lt; 13) | (VA &amp; 0x1FFF)</span>. On a miss the result is <span class="f_CodeExample">DtbMiss</span>, which the drainer maps to <span class="f_CodeExample">kFaultDtbMiss</span>; PALcode's DTB-miss handler refills the buffer (HW_MTPR DTB_TAG0 / DTB_PTE0) and the access retries.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">The instruction path mirrors this with a 4-byte alignment check (PC bit 0 is the PALmode flag and is masked before the check), the I-side SPE bits, and an ITB lookup that misses to <span class="f_CodeExample">kFaultItbMiss</span>. The EV6 base page is 8 KiB (shift 13); a PA is 44 bits wide.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The translation buffers (SPAM)</span></h2>
+<p class="p_Normal">Each CpuState owns its own pair of <span class="f_CodeExample">SPAMShardManager</span> front ends -- one ITB, one DTB. A manager holds an array of <span class="f_CodeExample">SPAMBucket</span> shards, the epoch state, and a small hash that picks a shard from the tag. In <span class="f_CodeExample">CpuState</span> the two managers are instantiated as <span class="f_CodeExample">SPAMShardManager&lt;16, 8&gt;</span> -- 16 shards by 8 ways = 128 entries each, matching the architectural EV6 ITB and DTB size (the shard count and ways are template parameters, so the geometry can be retuned without touching the lookup path). Its public surface mirrors the architectural operations: <span class="f_CodeExample">lookup</span> (one per access), <span class="f_CodeExample">insert</span> (the miss handler / HW_MTPR ITB_PTE / DTB_PTE), the three invalidate operations, and <span class="f_CodeExample">clear</span> for cold boot. Because translation buffers are CPU-local by construction, the manager carries no synchronization primitives; any future SMP cross-CPU invalidation would arrive through IPI machinery processed on the target CPU's own thread.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Epoch invalidation</span></h2>
+<p class="p_Normal">A naive TLB would walk every entry on a flush. V4 instead keeps two counters in the manager and stamps both into every entry at insert time. A flush of all entries is then a single counter bump; entries become stale the instant their stamped value fails to match the live counter on the next lookup. The mapping from PALcode flush operations is:</p>
+<p class="p_Normal">&nbsp;</p>
+<div style="text-align: left; text-indent: 0; padding: 0 0 0 0; margin: 0 0 0 0;"><table style="border:none; border-spacing:0; border-collapse:collapse;">
+<thead>
+<tr>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Operation</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Action</strong></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><strong style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Lazy?</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">TBIA</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">bump globalEpoch (invalidates everything)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">yes</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">TBIAP</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">bump processEpoch (ASM=1 global entries survive)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">yes</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">TBIS&nbsp;/&nbsp;TBISI&nbsp;/&nbsp;TBISD</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">locate the matching entry, clear it in place</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">no (targeted)</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">The liveness test applied at lookup is: an entry is live when its globalEpoch matches the manager's globalEpoch AND either the entry is ASM-global or its processEpoch matches. The ASM arm encodes the architecture's rule that an ASM=1 (global) mapping survives TBIAP. The counters are plain 64-bit integers, not atomics -- at one bump per 100 ns a 64-bit counter takes roughly 58,000 years to wrap, so wrap is not handled; a manager reset zeroes both counters and clears every shard if it ever matters.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="--addressing------------------.html" class="topiclink">Addressing</a></p>
+<p class="p_Normal"><a href="--memory-map--iprs.html" class="topiclink">Memory Map &amp; IPRs</a></p>
+<p class="p_Normal"><a href="--execution-_-boot-internals.html" class="topiclink">Execution / Boot Internals</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>
