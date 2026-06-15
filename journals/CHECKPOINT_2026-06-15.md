@@ -88,3 +88,41 @@
   GitHub **org**, not a second personal account (account can be converted to org
   later). Licensing contradiction (eNVy Non-Commercial v1.1 vs LICENSE.md GPLv3)
   still unresolved. Doc/admin session — no code/test landings.
+
+## 23:01 — Repo published as EmulatRApp/EmulatRAppUni: README, branch consolidation, Pages-from-main
+- **Working on:** Standing up the public repo after the transfer. Now at
+  `https://github.com/EmulatRApp/EmulatRAppUni.git`. Three threads: a real
+  root `README.md`, consolidating onto a single default branch, and serving the
+  H&M-generated docs from `main` via GitHub Pages.
+- **Done since last checkpoint:** (1) Replaced the `# Emulatr` stub `README.md`
+  at the repo root with a full, fact-derived README — modeled **DS10**
+  (21264A / 268 MHz, 21272 Tsunami, Cypress CY82C693, 1024 MB, SRM 7.3), status
+  table (boots to `>>>`; OS boot is the frontier), architecture highlights
+  (six-stage pipeline, grain dispatch, Boxes, GuestMemory, Ev6Translator/SPAM,
+  SoftFloat FP backend), build (CMake / Qt 6.10.2 / MSVC 2022 / C++20,
+  `EMULATR_*` options), run instructions, layout, license, credits; presented.
+  (2) Diagnosed the **two-branch split** — GitHub default `main` (auto-created,
+  empty) vs pushed code on `master`. Recommended standardizing on `main`
+  (`git branch -m master main` → `git push -f origin main` → `git branch -u
+  origin/main` → `git push origin --delete master`; `git config --global
+  init.defaultBranch main` going forward). (3) Wrote
+  `.github/workflows/pages.yml` to publish `<repo>/html/` to Pages on every push
+  to `main` touching `html/**` (+ `workflow_dispatch`), since branch-deploy mode
+  only allows `/` or `/docs`, not `/html`. Presented.
+- **Open / next:** User on the GitHub **Actions "Get started"** page; told to
+  ignore the starter-workflow gallery — the real switch is **Settings → Pages →
+  Source = GitHub Actions**, then `git add .github/workflows/pages.yml html/`,
+  commit, push. Live URL will be `https://emulatrapp.github.io/EmulatRAppUni/`.
+  Pending: generate H&M HTML into `html/` with a top-level `index.html` (offer to
+  drop a redirect stub once the landing filename is known); then add the
+  **Source Repository** doc page.
+- **Watch-outs:** First Actions run **fails at the upload step if `html/` is
+  empty** — must populate `html/` (with `index.html`) before/with the workflow
+  push. Ensure `.gitignore` does not swallow `html/` or `.github/`. Baked-in
+  literal still stale: source-header `Documentation:` URL points at
+  `timothypeer.github.io/ASA-EMulatR-Project/`; new home is
+  `emulatrapp.github.io/EmulatRAppUni/`. **Licensing contradiction unresolved** —
+  README says GPLv3 + commercial, but source-file headers still say eNVy Systems
+  Non-Commercial License v1.1; needs the user to declare which is authoritative.
+  Contact left obfuscated (`peert (at) envysys.com`). Doc/admin session — no
+  code/test landings.
