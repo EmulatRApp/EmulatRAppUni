@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:11:38.697Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>License</title>
+  <keywords>
+    <keyword>commercial license</keyword>
+    <keyword>copyright</keyword>
+    <keyword>eNVy Systems</keyword>
+    <keyword>license</keyword>
+    <keyword>license header</keyword>
+    <keyword>non-commercial</keyword>
+    <keyword>Timothy Peer</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">License</para>
+    </header>
+    <para styleclass="Heading3">ASA-EMulatR</para>
+    <para styleclass="Normal">Copyright © 2025–2026 Timothy Peer (eNVy Systems, Inc.)</para>
+    <para styleclass="Normal">https://envysys.com</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal">&#32;</para>
+    <para styleclass="Normal">This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.</para>
+    <para styleclass="Normal">&#32;</para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading3">Commercial Licensing</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">This project is also available under a separate commercial license. If you wish to use ASA-EMulatR in a proprietary product, closed-source environment, or in a manner incompatible with the GNU General Public License, you must obtain a commercial license from:</para>
+    <para styleclass="Normal">&#32;</para>
+    <para styleclass="Normal">Timothy Peer</para>
+    <para styleclass="Normal">eNVy Systems, Inc.</para>
+    <para styleclass="Normal">peert_at_envysys_dot_com</para>
+    <para styleclass="Normal">https://envysys.com</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Commercial licensing terms are available upon request.</para>
+    <para styleclass="Normal">For the full license terms and commercial-licensing inquiries, contact Timothy Peer / eNVy Systems, Inc. at peert_at_envysys_dot_.com.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Attributions--Credits-------">Attributions &amp; Credits</link></para>
+  </body>
+</topic>

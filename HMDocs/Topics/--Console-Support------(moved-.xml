@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:46:05.879Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Console Support</title>
+  <keywords>
+    <keyword>console</keyword>
+    <keyword>MobaXterm</keyword>
+    <keyword>netcat</keyword>
+    <keyword>Plink</keyword>
+    <keyword>port 10023</keyword>
+    <keyword>PuTTY</keyword>
+    <keyword>RAW TCP</keyword>
+    <keyword>telnet</keyword>
+    <keyword>Tera Term</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Console Support</para>
+    </header>
+    <para styleclass="Normal">EmulatR exposes its console as a RAW TCP stream (default <text styleclass="Code Example">localhost:10023</text>) -- there is no Telnet option negotiation, so a raw-capable client is preferred. Any of the following can attach:</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox"> PuTTY (Raw)</li>
+      <li styleclass="NotesBox"> Plink (-raw)</li>
+      <li styleclass="NotesBox"> Tera Term (TCP/IP)</li>
+      <li styleclass="NotesBox"> MobaXterm (TCP)</li>
+      <li styleclass="NotesBox"> netcat (nc) -- handy for scripting and automated testing</li>
+      <li styleclass="NotesBox"> telnet (may connect, but raw is preferred)</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">If EmulatR runs on another machine, replace <text styleclass="Code Example">localhost</text> with that host&apos;s name or IP. For development and debugging the recommended client is Plink with verbose logging:</para>
+    <para styleclass="Code Example">plink -v -raw localhost -P 10023</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">See TCP Console Overview for the port and auto-launch behavior, and Terminal Clients for the step-by-step connection in each program.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--TCP-Console-Overview">TCP Console Overview</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--PuTTY-_-Plink-_-TeraTerm-_-M">Terminal Clients</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Connecting-to-the-Console">Connecting to the Console</link></para>
+  </body>
+</topic>

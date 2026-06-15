@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T10:58:32.208Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>show config</title>
+  <keywords>
+    <keyword>21272</keyword>
+    <keyword>Cchip</keyword>
+    <keyword>core logic</keyword>
+    <keyword>Cypress 82C693</keyword>
+    <keyword>EV6</keyword>
+    <keyword>ISA</keyword>
+    <keyword>PCI hose</keyword>
+    <keyword>show config</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">SRM- show config</para>
+    </header>
+    <para styleclass="Normal"><text styleclass="Code Example">show config</text> prints the full configuration table: the SRM and PALcode versions; the processor (Alpha EV6 pass 1, 268 MHz); core logic (Cchip 21272-CA, Dchip 21272-DA, Pchip 21272-EA, TIG / Arbiter Rev 7.31); the memory array; the PCI hose (the Cypress 82C693 bridge and IDE at bus 0, slot 5); and the ISA device list (MOUSE, KBD, COM1, COM2, LPT1, FLOPPY with their base addresses and IRQs). A full sample is in Example - Performance.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="show-device">show device</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="show-memory">show memory</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Example---Performance">Example - Performance</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="Clock-Frequency--MHz">Clock Frequency and the MHz Reading</link></para>
+  </body>
+</topic>

@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T10:56:33.651Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Executing</title>
+  <keywords>
+    <keyword>--autosnapshot</keyword>
+    <keyword>cold boot</keyword>
+    <keyword>EMULATR_CONSOLE_MIRROR</keyword>
+    <keyword>EMULATR_CONSOLE_PORT</keyword>
+    <keyword>EMULATR_CONSOLE_SNAPSHOT</keyword>
+    <keyword>EMULATR_FLASH_TRACE</keyword>
+    <keyword>EMULATR_IDE_TRACE</keyword>
+    <keyword>EMULATR_IIC_TRACE</keyword>
+    <keyword>EMULATR_NO_AUTOLOAD</keyword>
+    <keyword>nohup</keyword>
+    <keyword>traced boot</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Executing</para>
+    </header>
+    <para styleclass="Normal">Beyond the basic launch (see Launching EmulatR), a few run scenarios come up often. All are launched from the Emulatr root and write diagnostics to a redirected log.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Traced boot</para>
+    <para styleclass="Normal">Turn on the device trace channels and put the console on an alternate port (so it coexists with another instance). PuTTY follows <text styleclass="Code Example">EMULATR_CONSOLE_PORT</text>.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">EMULATR_NO_AUTOLOAD=1 EMULATR_CONSOLE_PORT=10024 \</para>
+    <para styleclass="Code Example"> EMULATR_IDE_TRACE=1 EMULATR_IIC_TRACE=1 EMULATR_FLASH_TRACE=1 \</para>
+    <para styleclass="Code Example"> ./out/build/release/Emulatr.exe \</para>
+    <para styleclass="Code Example"> --firmware firmware/ds10_v7_3.exe --autosnapshot off 2&gt; run_ide.log</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Unattended (overnight) run</para>
+    <para styleclass="Normal">Use <text styleclass="Code Example">nohup</text> so the run survives logoff; leave autosnapshot on and mirror the console to the log.</para>
+    <para styleclass="Code Example">nohup env EMULATR_NO_AUTOLOAD=1 EMULATR_CONSOLE_SNAPSHOT=1 \</para>
+    <para styleclass="Code Example"> EMULATR_CONSOLE_MIRROR=1 EMULATR_CONSOLE_PORT=10023 \</para>
+    <para styleclass="Code Example"> ./out/build/relwithdebinfo/Emulatr.exe --firmware firmware/ds10_v7_3.exe \</para>
+    <para styleclass="Code Example"> &gt; run_overnight.log 2&gt;&amp;1 &amp;</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Harvest the slowest console phases</para>
+    <para styleclass="Normal">After a run with the console mirrored to the log, the slowest timestamped phases fall out of the log with:</para>
+    <para styleclass="Code Example">grep -a &apos;\[CON&apos; boot.log \</para>
+    <para styleclass="Code Example"> | sed -E &apos;s/.*\[CON [^+]*\+ *([0-9.]+) ms\] ?/\1\t/&apos; \</para>
+    <para styleclass="Code Example"> | sort -rn | head -25</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Launching-EmulatR">Launching EmulatR</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing-Two-Instances">Executing Two Instances</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Environment-Variables-(EMULA">Environment Variables </link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="Running-from-the-shell">Running from the shell</link></para>
+  </body>
+</topic>

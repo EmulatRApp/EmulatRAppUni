@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:46:14.243Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>SRM Console</title>
+  <keywords>
+    <keyword>boot</keyword>
+    <keyword>console</keyword>
+    <keyword>NVRAM</keyword>
+    <keyword>set</keyword>
+    <keyword>show</keyword>
+    <keyword>SRM</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">SRM Console</para>
+    </header>
+    <para styleclass="Normal">At the <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt the console accepts <text styleclass="Code Example">show</text> and <text styleclass="Code Example">set</text> commands plus device and diagnostic commands; variable changes persist to the flash / NVRAM image. This subsection covers the console and its everyday commands.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">In this section</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">SRM Overview -- what the console is and its reported versions.</li>
+      <li styleclass="NotesBox">Common Commands -- the command set at a glance.</li>
+      <li styleclass="NotesBox">show config -- the system configuration table.</li>
+      <li styleclass="NotesBox">show device -- enumerated devices.</li>
+      <li styleclass="NotesBox">show memory -- the memory array.</li>
+      <li styleclass="NotesBox">boot -- bootstrap (planned; HALT today).</li>
+      <li styleclass="NotesBox">set -- change and persist a console variable.</li>
+      <li styleclass="NotesBox">SRM Environment Variables -- where the full variable list lives.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--SRM-Overview">SRM Overview</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Common-Commands">Common Commands</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Example---Performance">Example - Performance</link></para>
+  </body>
+</topic>

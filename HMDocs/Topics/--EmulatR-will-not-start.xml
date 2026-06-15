@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:51:03.457Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>EmulatR will not start</title>
+  <keywords>
+    <keyword>console port</keyword>
+    <keyword>EMULATR_CONSOLE_PORT</keyword>
+    <keyword>EMULATR_FLASH_ROM</keyword>
+    <keyword>--firmware</keyword>
+    <keyword>platform manifest</keyword>
+    <keyword>port in use</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">EmulatR will not start</para>
+    </header>
+    <para styleclass="NotesBox">Console port already in use. Check with netstat -ano | grep 10023 and free it, or set EMULATR_CONSOLE_PORT.</para>
+    <para styleclass="NotesBox">Firmware not found. The ini default is the bare name and resolves against the CWD -- pass --firmware ./firmware/ds10_v7_3.exe or launch from the Emulatr root.</para>
+    <para styleclass="NotesBox">Missing platform manifest. A missing &lt;model&gt;_platform.json is a hard error with no fallback.</para>
+    <para styleclass="NotesBox">Two instances from one directory share ds10_flash.rom and snapshots/; concurrent NVRAM writes can corrupt the flash. Isolate with EMULATR_FLASH_ROM=&lt;copy&gt; (see Executing Two Instances).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Firmware-Requirements">Firmware Requirements</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing-Two-Instances">Executing Two Instances</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Configuring----------(moved-">Configuring</link></para>
+  </body>
+</topic>

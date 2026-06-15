@@ -1,0 +1,263 @@
+================================================================================
+EmulatR V4 -- Root Cause Analysis  (REV 2, post code-audit + HRM verification)
+"*** no timer interrupts on CPU 0 ***"  (SRM banner self-test failure)
+Date: 2026-05-30   Author: Tim Peer / Claude (Cowork)   Status: PROPOSED FIX
+Build: relwithdebinfo   Trace: traces/20260530-142423_srm.trc
+================================================================================
+
+REV 2 changes vs REV 1: added authoritative Tsunami MISC field table (Section
+4); corrected the "MISC bit 28" claim (bit 28 = NXM, not the interval timer);
+downgraded the "clear path" change from REQUIRED to OPTIONAL after auditing the
+run loop (edge-ack already present at Machine.cpp:895); confirmed the IER gate
+is already consistent; pinned the three stageInterruptDivert call sites.
+
+--------------------------------------------------------------------------------
+1. SUMMARY (the one-line root cause)
+--------------------------------------------------------------------------------
+The Cchip interval-timer interrupt is delivered to PALcode on the WRONG
+external-IRQ bit. The shared INTERRUPT-divert recipe sets ISUM external-
+interrupt field EI[0] (= IRQ_ERR, IRQ<0>, the error class) when it must set
+EI[2] (= IRQ_CLK, IRQ<2>, the clock class). SRM therefore services every
+timer tick with sys__int_err (find-no-error, dismiss) instead of sys__int_clk
+(count the tick). The clock counter never advances, so the self-test prints
+"*** no timer interrupts on CPU 0 ***".
+
+It is a one-bit defect: "1 << 33" must be "1 << 35" at the interval-timer
+divert site only.
+
+This is a correctness bug, NOT a timer-rate bug. More cycles do not help; the
+tick is structurally never counted.
+
+--------------------------------------------------------------------------------
+2. THE OFFENDING CODE
+--------------------------------------------------------------------------------
+File: systemLib/Machine.cpp  (function stageInterruptDivert, line 174)
+
+    cpu.isum = uint64_t{1} << 33;   // EI[0]    <-- error class for ALL callers
+
+EV6__ISUM__EI__S = 33, i.e. the 4-bit external-IRQ nibble begins at ISUM bit
+33. Bit 33 = EI[0]; bit 35 = EI[2].
+
+stageInterruptDivert is SHARED by three run-loop callers (see Section 6), all
+currently taking the no-arg form that hardcodes EI[0]. EI[0] is correct for the
+error and synthetic-injection callers, but WRONG for the interval timer, which
+must be EI[2].
+
+Companion comment mislabel: chipsetLib/CchipIntervalTimer.h line 60 documents
+the recipe as "isum |= EI[0]".
+
+--------------------------------------------------------------------------------
+3. AUTHORITATIVE IRQ ENCODING (canonical SRM PALcode)
+--------------------------------------------------------------------------------
+File: Processor Support/Palcode/palcode/srmconsole/EV6_OSF_PC264_PAL.MAR
+
+Lines 451-455 (mask definitions, within the EV6__ISUM EI field):
+
+    IRQ_IP  = 8        ; position within EV6__ISUM__IE field
+    IRQ_CLK = 4
+    IRQ_DEV = 2
+    IRQ_ERR = 1
+
+Lines 985-995 (dispatch) and the in-source comment:
+
+    ;   IRQ<0> = errors          ipl 7
+    ;   IRQ<1> = device          ipl 4
+    ;   IRQ<2> = clock           ipl 5
+    ;   IRQ<3> = interprocessor  ipl 5
+    ...
+    and  p7, #IRQ_CLK, p5        ; check for clock
+    beq  p5, sys__int_check_ip   ; check ip if not
+    br   r31, sys__int_clk       ; branch for clock
+
+EI nibble bit (relative to EI__S = 33) -> source -> handler:
+
+    EI[0]  bit 33  IRQ_ERR (value 1)  ipl 7  -> sys__int_err
+    EI[1]  bit 34  IRQ_DEV (value 2)  ipl 4  -> sys__int_dev
+    EI[2]  bit 35  IRQ_CLK (value 4)  ipl 5  -> sys__int_clk   <== interval timer
+    EI[3]  bit 36  IRQ_IP  (value 8)  ipl 5  -> sys__int_ip
+
+The interval timer is IRQ<2> = EI[2] = ISUM bit 35.
+
+--------------------------------------------------------------------------------
+4. HOW THE REAL CLOCK INTERRUPT IS CLEARED  (settles the HW_INT_CLR + bit-28
+   questions, HRM-verified)
+--------------------------------------------------------------------------------
+File: EV6_OSF_PC264_PAL.MAR, sys__int_clk, lines ~1340-1360:
+
+    ; Clear the timer interrupt request for this cpu.
+    ; we would write the MISC<ININTR> bit for this cpu.  MISC CSR @ 801.A000.0080
+    lda      p6, ^x10(r31)          ; start at bit position 4
+    sll      p6, p5, p6             ; shift left by whami
+    hw_stq/p p6, ^x80(p4)           ; write to 801.A000.0080  (Cchip MISC)
+
+Authoritative Cchip MISC field table -- Tsunami/Typhoon 21272 HRM, Section
+10.2.2 (Miscellaneous Register, offset 0x80):
+
+    NXM      <28>     R,W1C   Nonexistent memory address detected (DRIR<63>)
+    ACL      <24>     WO      Arbitration clear
+    ABT      <23:20>  R,W1S   Arbitration try
+    ABW      <19:16>  R,W1S   Arbitration won
+    IPREQ    <15:12>  WO      Interprocessor interrupt request
+    IPINTR   <11:8>   R,W1C   Interprocessor interrupt pending (drives irq<3>)
+    ITINTR   <7:4>    R,W1C   Interval timer interrupt pending (drives irq<2>),
+                              ONE BIT PER CPU.  CPU0 = bit 4.
+    CPUID    <1:0>    RO      ID of the CPU performing the read
+
+CONCLUSIONS:
+  * The interval timer is acknowledged by W1C of MISC<ITINTR<4+whami>> at PA
+    0x801_A000_0080.  CPU0 writes value 0x10 (bit 4).  HRM 6.x prose: "b_irq<2>
+    remains asserted for each CPU ... the CPU ... writes a one to its
+    MISC<ITINTR> bit to clear it."
+  * The second-opinion claim of "bit 28 (ITINTR) W1C" is incorrect.  Bit 28 is
+    MISC<NXM>, the nonexistent-memory error latch -- a DIFFERENT register field.
+    (Notably, NXM/bit-28 is exactly what sys__int_err tests; see Section 5.)
+  * HW_INT_CLR is NOT used for the Tsunami interval timer.  Neither proposed
+    HW_INT_CLR bit-map applies here.  HW_INT_CLR services CPU-internal sources
+    only (perf counters, etc.) and is a separate latent gap (PalEntries.cpp
+    :1722 no-op), worth implementing but not part of this fix.
+
+--------------------------------------------------------------------------------
+5. TRACE EVIDENCE (one full delivery, divert #9, cyc 198,181,146)
+--------------------------------------------------------------------------------
+Source: traces/20260530-142423_srm.trc
+
+INTERRUPT entry at PC 0x8681 (0x8680 | PALmode-bit). First IPR read returns:
+
+    HW_MFPR -> 0x0000000200000000      (= ISUM bit 33 = EI[0] = IRQ_ERR)
+
+The handler then runs the ERROR path (sys__int_err):
+
+    HW_LD  pa=0x801A0000080  -> 0x0000000100000010   (Cchip MISC)
+    AND    against 0x10000000 (bit 28 = MISC<NXM>)   -> 0, branch (no NXM error)
+    HW_LD  pa=0x801800003C0  -> 0x0                   (Pchip0 PERROR)
+    HW_ST  ... clear PERROR
+    HW_REI back to savedPc 0x1c6788
+
+It never writes MISC<ITINTR> (0x801A0000080 bits<7:4>), never increments a
+clock counter.  Console log: "CSR Cchip:MISC W" appears only 2 times in the
+entire run (init only); "CSR Pchip:PERROR R/W" dominates -- i.e. the error
+handler, not the clock handler, runs on every tick.
+
+The read-back value 0x200000000 = ISUM bit 33 independently confirms the divert
+is sitting on EI[0], matching Machine.cpp:174 exactly.  The handler's test of
+MISC bit 28 (NXM) corroborates the MISC field table in Section 4.
+
+--------------------------------------------------------------------------------
+6. RUN-LOOP CALL SITES (audited)  -- systemLib/Machine.cpp::run()
+--------------------------------------------------------------------------------
+Three callers of stageInterruptDivert(m_cpu):
+
+  line 857  if (intervalTimerShouldFire(cycleCount)) fireIntervalTimer();
+  line 864  if (canAcceptInterrupt(22) && cchip().pendingIrq2(0)) {
+  line 894      stageInterruptDivert(m_cpu);          // <== TIMER: must be EI[2]
+  line 895      cchip().clearPendingIrq2(0);          // edge-ack ALREADY here
+            }
+  line 923  if (!divertedThisCycle && cchip().pendingIrq0(0)
+  line 924      && canAcceptInterrupt(23)) {
+  line 954      stageInterruptDivert(m_cpu);          // ERROR: EI[0] is correct
+            }
+  line 1020     stageInterruptDivert(m_cpu);          // synthetic injection (dbg)
+
+IER gate (canAcceptInterrupt, lines 395-443): irqLevel -> ierBit = 57-irqLevel.
+  IPL 22 (timer) -> IER bit 35 = EI[2].  Consistent with the EI[2] divert.
+  Since timer diverts already pass canAcceptInterrupt(22), firmware has IER
+  bit 35 enabled.  NO change needed to the gate.
+
+Note: clearPendingIrq2(0) at line 895 already deasserts the latch at divert
+time, so the corrected EI[2] dispatch will NOT cause a re-divert storm even
+though the model does not yet act on the PAL's MISC<ITINTR> W1C write.
+
+--------------------------------------------------------------------------------
+7. PROPOSED CHANGES
+--------------------------------------------------------------------------------
+CHANGE 1 (the fix) -- parameterize the shared helper and target EI[2] for the
+timer.  systemLib/Machine.cpp:
+
+  Helper (line ~158):
+    - inline void stageInterruptDivert(coreLib::CpuState& cpu) noexcept
+    - {  ... ; cpu.isum = uint64_t{1} << 33; }   // EI[0]
+    + inline void stageInterruptDivert(coreLib::CpuState& cpu,
+    +                                  uint64_t isumMask) noexcept
+    + {  ... ; cpu.isum = isumMask; }
+
+  Timer caller (line 894):
+    - stageInterruptDivert(m_cpu);
+    + stageInterruptDivert(m_cpu, uint64_t{1} << 35);  // EI[2] = IRQ_CLK
+
+  Error caller (line 954):
+    - stageInterruptDivert(m_cpu);
+    + stageInterruptDivert(m_cpu, uint64_t{1} << 33);  // EI[0] = IRQ_ERR
+
+  Synthetic injection (line 1020):
+    - stageInterruptDivert(m_cpu);
+    + stageInterruptDivert(m_cpu, uint64_t{1} << 33);  // EI[0] (debug default)
+
+  Also fix the comment block (Machine.cpp:120-121) and CchipIntervalTimer.h:60
+  from "EI[0]" to name the per-caller EI index.
+
+CHANGE 2 (OPTIONAL, fidelity only -- NOT required for this fix):
+  Model MISC<ITINTR<4+n>> W1C: when PAL writes a 1 to MISC bits <7:4>, clear
+  the addressed CPU's pendingIrq2 latch.  This is the HRM-faithful deassert
+  path.  It is OPTIONAL because Machine.cpp:895 already edge-acks at divert,
+  so there is no storm risk without it.  Defer unless/until SMP or the
+  wtint/sleep path (which cannot W1C while asleep) requires true level
+  semantics.  Wiring point: TsunamiChipset.cpp MISC-write decode -> Cchip
+  clearPendingIrq2(cpuFromBit).  (TsunamiCchip.h:1276 flags this as the
+  Phase-C ITINTR->b_irq<2> deassert side, currently unwired.)
+
+CHANGE 3: none.  IER gate already consistent (Section 6).  HW_INT_CLR is a
+  separate, out-of-scope latent gap.
+
+--------------------------------------------------------------------------------
+8. VERIFICATION PLAN (after edits)
+--------------------------------------------------------------------------------
+1. Build relwithdebinfo; run doctest (CHECK-only; exceptions disabled).
+2. Cold boot (or resume from predig post-banner ~190M anchor).
+3. Expect in the console log:
+   - "CSR Cchip:MISC W off=0x00000080" now firing once per tick, value 0x10
+     (bit 4 = ITINTR for CPU0)  -- was 2 writes total.
+   - the banner line "*** no timer interrupts on CPU 0 ***" GONE.
+4. In the retire trace, the INTERRUPT handler entry should now read ISUM
+   bit 35 (value 0x800000000) and branch to sys__int_clk (writes MISC<4>),
+   not sys__int_err (NXM/PERROR scan).
+5. Confirm no b_irq<2> re-divert storm (divert cadence stays ~1.05M cyc).
+
+--------------------------------------------------------------------------------
+9. EVALUATION OF THE SECOND-OPINION CODE REVIEW
+--------------------------------------------------------------------------------
+AGREE (correct and well-stated):
+  * Root cause: 1<<33 = EI[0] = error class; must be EI[2] for the clock.
+  * SRM dispatches bit-33 to sys__int_err, which dismisses without counting.
+  * Parameterize stageInterruptDivert; pass 1<<35 (timer), 1<<33 (error).
+  * Keep the error/NXM path on EI[0] (1<<33).
+
+CORRECT / REFINE:
+  * MISC clear bit: it is MISC<ITINTR> = bits <7:4> (CPU0 = bit 4), per HRM
+    Section 10.2.2 and confirmed by sys__int_clk writing 0x10<<whami.  It is
+    NOT bit 28.  Bit 28 is MISC<NXM> (nonexistent-memory error latch) -- the
+    bit the ERROR handler tests, which is part of why the mis-delivery looked
+    like a clean error dismissal.
+  * The MISC W1C handshake is not required to make this fix correct: the run
+    loop already edge-acks via clearPendingIrq2(0) at Machine.cpp:895.  Wiring
+    the W1C->deassert is optional fidelity (Change 2), deferrable.
+  * canAcceptInterrupt arguments (22 timer / 23 error) and the IER bit-35 gate
+    are already in place; no call-site IPL change is needed beyond the isum
+    mask.
+
+--------------------------------------------------------------------------------
+10. SOURCES
+--------------------------------------------------------------------------------
+systemLib/Machine.cpp:120, 158-175, 395-443 (canAcceptInterrupt),
+    857, 864, 894-895, 923-924, 954, 1020
+chipsetLib/CchipIntervalTimer.h:60
+chipsetLib/TsunamiCchip.h:1276
+palBoxLib/grains/PalEntries.cpp:1396, 1722
+coreLib/CpuState.h:336 (isum), coreLib/Ev6EntryVectors.h:86 (kEntry_INTERRUPT)
+Processor Support/Palcode/palcode/srmconsole/EV6_OSF_PC264_PAL.MAR:451-455,
+    985-995, 993, 1243 (sys__int_clk), ~1340-1360 (MISC<ITINTR> clear)
+Processor Support/tsunami_typhoon_21272_hrm.txt: Section 10.2.2 (MISC field
+    table), lines ~12652-12660 (interval-timer interrupt prose), ~18395-18460
+    (MISC bit-field table: NXM<28>, IPINTR<11:8>, ITINTR<7:4>, CPUID<1:0>)
+traces/20260530-142423_srm.trc
+traces/console_20260530-123204.log
+================================================================================

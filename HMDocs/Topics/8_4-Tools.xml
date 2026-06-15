@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:52:35.190Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Tools</title>
+  <keywords>
+    <keyword>development tools</keyword>
+    <keyword>Ghidra</keyword>
+    <keyword>Help &amp; Manual</keyword>
+    <keyword>IDE</keyword>
+    <keyword>profiler</keyword>
+    <keyword>Qt Creator</keyword>
+    <keyword>reverse engineering</keyword>
+    <keyword>Software Verify</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Tools</para>
+    </header>
+    <para styleclass="Normal">The external tools used to build, profile, reverse-engineer, and document EmulatR. None of these are required to run the emulator; they are the developer-side toolchain behind the project.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">In this section</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">Ghidra -- reverse-engineering the decompressed SRM firmware.</li>
+      <li styleclass="NotesBox">Help &amp; Manual -- the authoring tool that produces this documentation.</li>
+      <li styleclass="NotesBox">Software Verify -- the Performance Validator profiler used to find hot spots.</li>
+      <li styleclass="NotesBox">Qt Creator -- the IDE and CMake build environment.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Required-Tools--Frameworks">Required Tools &amp; Frameworks</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Building-from-Source">Building from Source</link></para>
+  </body>
+</topic>

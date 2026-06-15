@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-14T23:40:28.015Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Execution Flight Plan</title>
+  <keywords>
+    <keyword>cold boot</keyword>
+    <keyword>decompression</keyword>
+    <keyword>GCT</keyword>
+    <keyword>hw_ret</keyword>
+    <keyword>PAL_BASE</keyword>
+    <keyword>power-up</keyword>
+    <keyword>relocation</keyword>
+    <keyword>SRM</keyword>
+    <keyword>SROM</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Execution Flight Plan</para>
+    </header>
+    <para styleclass="Normal">A cold boot is a fixed sequence of stages from reset to the interactive prompt. Each instruction along the way is carried through the six in-order pipeline stages (IF, DE, GR, EX, MEM, WB) and commits at Writeback (see Overview); the stages below are the firmware-level milestones.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The stages</para>
+    <list id="0" type="ol" listtype="decimal" formatstring="&#37;&#48;&#58;&#115;&#46;" format-charset="DEFAULT_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="Normal" style="font-family:&apos;Segoe UI&apos;; font-size:11pt; color:#000000;">
+      <li styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Reset / SROM hand-off.</text> The machine resets with the SROM parameters in registers R16-R21 and enters the firmware startup.</li>
+      <li styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">PAL and CPU setup.</text> The startup establishes <text styleclass="Code Example">PAL_BASE</text>, sets the <text styleclass="Code Example">I_CTL</text> SDE bits, flushes the ITB / DTB and instruction cache, and primes the shadow registers.</li>
+      <li styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Decompression.</text> The firmware inflates its own compressed image (about 4M cycles; see Firmware Decode &amp; Decompression).</li>
+      <li styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Relocation.</text> A memory-copy moves the decompressed firmware to its run location and jumps to the SRM console entry.</li>
+      <li styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">SRM power-up.</text> Banner and memory sizing; the PCI / ISA probe; GCT / FRU initialization; the option-firmware scan of the CD and floppy; the Loadable Firmware Update utility (<text styleclass="Code Example">UPD&gt;</text>); system and disk testing; and finally the interactive <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt. (That visible sequence is detailed in Reaching the SRM Prompt.)</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Where the flight currently ends</para>
+    <para styleclass="Normal">The cold boot reaches the <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt and is fully interactive. The remaining runtime work downstream of decompression centers on a clock-interrupt return path (the <text styleclass="Code Example">hw_ret R2</text> sequence) and, for booting a guest, the front-panel halt gate and PCI device enumeration. Those are tracked in Current Development Status.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Overview--------------------">Overview</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Firmware-Decode--Decompressi">Firmware Decode &amp; Decompression</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Reaching-the-SRM-Prompt">Reaching the SRM Prompt</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Execution-_-Boot-Internals">Execution / Boot Internals (appendix)</link></para>
+  </body>
+</topic>

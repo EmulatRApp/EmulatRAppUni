@@ -1,0 +1,393 @@
+================================================================================
+ AXPBox Reference Scaffold -- VMS PAL interrupt semantics, decoded
+================================================================================
+ Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+ Author:  Claude (Anthropic) with Timothy Peer, eNVy Systems Inc.
+ Date:    2026-06-03
+ Status:  DESIGN / REFERENCE -- no V4 code changes ride with this document.
+================================================================================
+
+PURPOSE
+
+  AXPBox (D:\EmulatR\axpbox, ES40 fork) boots real SRM firmware on a full
+  Tsunami chipset model.  Its CPU core contains a C++ TRANSLITERATION of the
+  EV6 OpenVMS PALcode (AlphaCPU_vmspal.cpp) -- effectively an executable,
+  readable oracle for exactly the semantics V4 must reproduce by running
+  the PAL binary natively.  This document decodes the parts relevant to the
+  current frontier (conserved-register corruption across timer interrupts,
+  fclose(&spl_kernel) halt at cyc 21,431,065,646) and lays out the
+  comparison scaffold:
+
+      V4 behavior  <-->  AXPBox implementation  <-->  SRM/PAL sources
+
+  Process rule (house): everything here is decoded and agreed BEFORE any
+  V4 implementation work is coded.  Each section ends with the V4 audit
+  questions it generates.
+
+--------------------------------------------------------------------------------
+1. SOURCE MAP
+--------------------------------------------------------------------------------
+
+  Mechanism            AXPBox                      SRM / PAL source           V4
+  -------------------  --------------------------  -------------------------  --------------------------
+  Register file        AlphaCPU.hpp r[64]          n/a (silicon)              coreLib/CpuState.h intReg
+  Shadow mapping       AlphaCPU.hpp RREG macro     ev6_vms_pal.mar SDE refs   coreLib/PalShadow.h
+  I_CTL / SDE bit      AlphaCPU.hpp state.sde      ev6_vms_pal.mar 1527+      coreLib/IprFields.h
+  Interrupt initiate   AlphaCPU_vmspal.cpp         ev6_vms_pal.mar            (PAL binary executes;
+                       vmspal_int_initiate_         (INTERRUPT flow,            entry staged by
+                       interrupt() line ~835        0x8680 -> 0xd5c0 live)      Machine::stageInterruptDivert)
+  CALL_PAL REI         AlphaCPU_vmspal.cpp         ev6_vms_pal.mar            (PAL binary executes;
+                       vmspal_call_rei() line ~613  (REI flow)                  HW_REI leaf = PalEntries.cpp
+                                                                                execHwRei)
+  SCB dispatch         initiate_interrupt body     apisrm kernel.c SCB        firmware-faithful
+  Kernel/process       n/a (firmware runs it)      apisrm kernel.c,           firmware-faithful
+                                                    process.c, timer.c
+
+  Image-symbol recovery (both ds10 and es40 SRM images carry the embedded
+  name/descriptor table): rows of (namePA:u32, descPA:u32); pairing is
+  name[i] <-> desc[i-1]; code entry = *(desc + 8).  ds10_v7_3 table at file
+  offset 0x159f54..0x161f84, image loads at PA 0x8000 (file = PA - 0x8000).
+  The same recipe re-derives anchors for the es40 image AXPBox boots.
+
+--------------------------------------------------------------------------------
+2. AXPBOX REGISTER MODEL (the reference shadow semantics)
+--------------------------------------------------------------------------------
+
+  AlphaCPU.hpp:
+      u64 r[64];   // 0..31 native, 32..63 shadow
+      bool sde;    // I_CTL SDE<1> mirror, updated when I_CTL is written
+
+      #define RREG(a) (((a) & 0x1f) + \
+          (((state.pc & 1) && (((a) & 0xc) == 0x4) && state.sde) ? 32 : 0))
+
+  Decode:
+    - (a & 0xc) == 0x4 selects exactly R4-R7 and R20-R23 (bits 3:2 == 01).
+    - The mapping is applied PER ACCESS, consulting the CURRENT values of
+      PALmode (pc bit 0) and SDE.  There is no swap and no transition edge;
+      an I_CTL write that flips SDE takes effect on the very next register
+      access.
+
+  AlphaCPU_vmspal.cpp PALtemp macros (the PAL's working set IS the shadow
+  bank -- this is why shadow contents are long-lived state, not scratch):
+      p4..p7   = r[36..39]   (shadow R4-R7)
+      p20..p23 = r[52..55]   (shadow R20-R23)
+      r0..r3, r8..r19, r24.. = native registers, accessed raw
+
+  Persistent PALtemp conventions observed (p21 = PAL scratch/impure base):
+      p21+0x010  per-mode saved-SP area base
+      p21+0x018  kernel SP
+      p21+0x0f0  R1 spill slot
+      p21+0x128  interrupt's new PS/IPL fragment
+      p21+0x150  saved PC (exc_addr image)
+      p21+0x158  SCB vector offset
+      p21+0x160  value handed to native R4 for the SCB handler
+      p21+0x168  value handed to native R5 for the SCB handler
+      p21+0x170  SCB base (SCBB)
+  (Matches the live decode memory: handler PC r2 = *(*(impure+0x170) +
+   *(impure+0x158)).)
+
+  EQUIVALENCE INVARIANT for V4's swap model:
+
+      live bank == shadow bank  IFF  (PALmode && SDE<1>)
+
+  V4 swaps at edges instead of mapping per access.  The two models are
+  equivalent ONLY if V4 swaps on EVERY edge of the conjunction:
+    (a) PALmode edges with SDE set        -> palModeEnter / palModeLeave
+    (b) SDE edges while in PALmode        -> HW_I_CTL case (landed 2026-06-03)
+    (c) No other writer of palMode or i_ctl may bypass these helpers.
+
+  V4 AUDIT QUESTIONS (sec. 2):
+    A1. Enumerate every site that mutates pc bit 0 / palMode.  Each must
+        route through palModeEnter/palModeLeave/setPalMode.  Known sites to
+        verify: stageInterruptDivert, fault delivery in PipelineDriver,
+        CALL_PAL entry staging, HW_REI, snapshot restore, cold reset.
+    A2. Enumerate every writer of cpu.i_ctl.  Each SDE<1> change while in
+        PAL mode must swap.  Known: PalEntries.cpp HW_I_CTL (fixed);
+        snapshot restore (must restore intShadow + i_ctl coherently --
+        verify Snapshot.cpp serializes intShadow).
+    A3. Instruction-order hazard: an instruction that BOTH accesses a
+        shadowed register AND changes the predicate (HW_REI reading Rb,
+        HW_MTPR I_CTL written from a shadowed source) must access with the
+        PRE-change mapping.  Verify execHwRei reads Rb before setPalMode
+        (confirmed correct 2026-06-03) and HW_I_CTL reads opB before swap
+        (confirmed: opB latched at operand fetch).
+
+--------------------------------------------------------------------------------
+3. INTERRUPT INITIATE -- vmspal_int_initiate_interrupt() DECODED
+--------------------------------------------------------------------------------
+
+  This is the reference for what the genuine PAL INTERRUPT flow (live
+  0x8680 -> 0xd5c0 -> SCB dispatch) must have done by the time the native
+  SCB handler starts.
+
+  Step by step:
+    1. p4 = PS & 0x18 (current mode).  If non-kernel: cm=0, save outgoing
+       SP into the per-mode slot (*(p21+0x10) + cm*8), load kernel SP from
+       p21+0x18.
+    2. Force 64-byte stack alignment: p20 = SP & 0x3f;  SP &= ~0x3f.
+       The displaced alignment is preserved in PS<63:56> of the frame.
+    3. PUSH THE FRAME (8 quadwords, NATIVE registers, raw access --
+       state.r[4..7], not RREG):
+           SP-0x40: R2
+           SP-0x38: R3
+           SP-0x30: R4        <-- natives; the silicon PAL achieves this
+           SP-0x28: R5            with its SDE zap/re-enable dance
+           SP-0x20: R6            (ev6_vms_pal.mar "zap sde" ...
+           SP-0x18: R7             "Assumption: PALcode is running with
+                                    sde set!!")
+           SP-0x30: (continued below after handler regs staged)
+    4. Stage handler context:
+           R1 spilled to p21+0xf0 and reloaded (scratch round trip)
+           R3 = p21 (impure base handed to handler)
+           native R4 = *(p21+0x160), native R5 = *(p21+0x168)
+           R2 = *( *(p21+0x170) + *(p21+0x158) ) & ~3   = SCB handler PC
+           R3 = *(SCB slot + 8)                          = handler param
+       (R2/R3 are loaded from the SCB slot AFTER R3=p21 was used for the
+        0x160/0x168 fetches -- final handler view: R2=PC, R3=param.)
+    5. New PS: PS = (PS & ~0xffff) | *(p21+0x128)   (new IPL etc.)
+    6. Complete frame:
+           SP-0x40 ... as above
+           SP+0x30 (= old SP-0x10): saved PC from p21+0x150
+           SP+0x38: frame PS = (orig_sp_align << 56) | (old PS & 0xffff)
+       then SP -= 0x40 and jump to R2 (native mode).
+
+  CONSERVATION CONTRACT established by the reference:
+    - R2-R7: preserved by the PAL FRAME (natives pushed, REI pops).
+    - R0, R1, R8-R19, R24-R29: preserved by HANDLER DISCIPLINE (the SCB
+      handlers save what they use; observed: int_clk prologue saves
+      R0, R1, R16, R17 at its own SP).
+    - R20-R23 native: NOT in the frame.  Preserved only if the handler
+      and the PAL exit path leave the NATIVE bank untouched (PAL-mode
+      writes go to shadows).  Ledger interpretation: a native R20-R23
+      mismatch across divert->REI is evidence-grade but must be checked
+      against handler code before being called a V4 bug.
+    - Shadow bank p4-p7/p20-p23: long-lived PAL state; must persist
+      across native execution windows (V4: intShadow array).
+
+  V4 AUDIT QUESTIONS (sec. 3):
+    B1. V4's stageInterruptDivert only redirects PC to palBase+0x680 and
+        sets ISUM; the FRAME is built by the PAL binary itself.  Verify the
+        PAL's frame-push stores land in the native bank: the push happens
+        in PAL mode under the SDE zap window, so V4's bank at that moment
+        must be NATIVE (i.e., the HW_I_CTL swap must have fired BEFORE the
+        stq sequence).  The DIVERT-REI ledger run answers this empirically.
+    B2. Confirm the SDE zap/re-enable instructions actually execute in the
+        live PAL on the DS10 image for the INTERRUPT path (the 2026-06-03
+        break-trace only captured the one-time CALL_PAL path at 0xf551;
+        the per-interrupt entry runs before any gate opens).  If the ledger
+        shows corruption, gate BreakpointSink open=0x8681 close=0x7bef0 to
+        capture the push window directly.
+
+--------------------------------------------------------------------------------
+4. CALL_PAL REI -- vmspal_call_rei() DECODED
+--------------------------------------------------------------------------------
+
+    1. Save PC to p21+0x150 (PALtemp bookkeeping).
+    2. Stack alignment check: if (SP & 0x3f) -> vector 0x430 exception.
+    3. Read frame PS from SP+0x38; VALIDATE:
+           new_cm may not be more privileged than current; reserved bits
+           checked against mask 0x3f0000000000001b -> 0x430 on failure.
+    4. POP natives raw (reverse of push):
+           R4 = *(SP+0x10)   R5 = *(SP+0x18)
+           R6 = *(SP+0x20)   R7 = *(SP+0x28)
+           R2 = *(SP+0x00)   R3 = *(SP+0x08)
+           PC = *(SP+0x30) & ~3
+    5. SP = (SP + 0x40) | (frame PS >> 56)   (re-apply stashed alignment);
+       if returning to outer mode, save kernel SP to p21+0x18 and load the
+       outer mode's SP from the per-mode area.
+    6. PS = (PS & ~0xffff) | (frame PS & 0xffff); cm updated; IER masks
+       re-derived from ipl_ier_mask[new IPL]; check_int = true (pending
+       interrupts re-evaluated immediately).
+
+  V4 AUDIT QUESTIONS (sec. 4):
+    C1. The pop runs in PAL mode.  Same bank requirement as B1, mirrored:
+        the SDE zap must be live so the ldq's write NATIVE R4-R7.  If V4
+        missed the zap (pre-fix) the pops landed in shadows and the final
+        swap-out handed the handler's leftovers to the resumed context --
+        the exact mechanism of the krn$_create corruption.  The ledger
+        CLEAN/MISMATCH split across diverts [0..2] confirms or refutes the
+        residual case (nvram_get fp).
+    C2. check_int semantics: after REI, V4 must re-evaluate pending
+        interrupts before retiring many native instructions; verify the
+        run loop's divert poll cadence matches.
+
+--------------------------------------------------------------------------------
+5. CURRENT BUG, EXPRESSED IN REFERENCE TERMS
+--------------------------------------------------------------------------------
+
+  Observed (2026-06-03, run 174002):
+    - divert[2] interrupts nvram_checksum (savedPc 0xae8a4) while
+      nvram_get's fp (eerom FILE*) is live in a conserved register.
+    - ~6.5K cycles after the REI, fclose receives fp = &spl_kernel
+      (0x1cc4c0) -> ip=0 -> dva=0 -> "close" PV read from PA 0x10 = 0x8c00
+      -> entry *(0x8c08) = 0 -> JSR 0 -> PC=0 HALT at cyc 21,431,065,646.
+    - Reference says fp, if held in R2-R7, is frame-conserved; if in
+      R20-R23, it is conserved only by bank separation.  Either way a
+      mismatch in the DIVERT-REI ledger names the register and the side
+      (push vs pop vs handler) when combined with a gated capture.
+
+  Decision tree on the ledger run:
+    - MISMATCH at divert[2] on R4-R7        -> frame push/pop bank error
+      (sec. 3 B1 / sec. 4 C1); gate 0x8681..0x7bef0 next to see the push.
+    - MISMATCH on R20-R23                   -> bank separation leak
+      (shadow swap timing) or handler clobber; disassemble handler use
+      of R20-R23 before blaming V4.
+    - CLEAN on all diverts                  -> corruption is downstream of
+      REI (candidates: DTBM-double PAL path at 0x8321 which fires between
+      powerup start and the halt; or a non-divert PAL entry).  Next
+      instrument: value tripwire on 0x1cc4c0 register writes inside cyc
+      window 21.4306e9..21.4311e9, run from the predig snapshot.
+
+--------------------------------------------------------------------------------
+6. PHASE 2 -- DIFFERENTIAL HARNESS (V4 vs AXPBox)
+--------------------------------------------------------------------------------
+
+  Constraint: AXPBox boots the ES40 SRM (same apisrm + ev6_vms_pal
+  codebase, different platform image), and its interrupt timing will never
+  align cycle-for-cycle with V4.  Full lockstep is therefore not the
+  design; PC-anchored comparison is.
+
+  Mode A -- invariant oracles (in V4 alone; cheapest, do first):
+    Promote the DIVERT-REI ledger from TEMP to a permanent PalFidelityOracle
+    with optional halt-on-violation:
+      - conserved R2-R7 across divert->REI (live now)
+      - SP across divert->REI (frame discipline, sec. 3/4)
+      - frame-PS reserved-bits mask on every REI (sec. 4 step 3)
+      - palMode/PC<0> coherence after every transition
+    Halt-on-violation stops the run AT the corruption with registers
+    intact instead of 17K cycles downstream.
+
+  Mode B -- anchor-PC state probes (V4 vs AXPBox, semantic compare):
+    1. Resolve the same kernel symbols in both images via the embedded
+       symbol table (sec. 1 recipe): krn$_create, krn$_process, powerup,
+       timer_interrupt, fopen, fclose, nvram_get, ...
+    2. Both emulators dump (pc, hitIndex, R0-R30) at anchor hits.
+       V4: BreakpointSink checkpoint ledger already does first-hit; extend
+       to per-hit streaming for selected anchors.
+       AXPBox: patch point at the main execute loop (AlphaCPU.cpp single-
+       step path) comparing state.pc against a small anchor list; same
+       dump format.
+    3. Comparator aligns records by (symbol, hitIndex) and reports first
+       divergence in ARGUMENT/RESULT registers (R16-R21, R0) -- semantic
+       divergence, robust to timing and address-layout differences.
+
+  Mode C -- windowed retire lockstep (only when Mode B corners a window):
+    From a common anchor with interrupts quiesced (both emulators between
+    ticks), compare full retire streams (pc + writeback value) until first
+    divergence.  Requires an AXPBox retire-trace tap; ES40's IDB/DEBUG
+    tracing in the tree is the starting point.
+
+  Deliverables order:
+    D1. Mode A oracle (small V4 patch, after ledger results are read).
+    D2. es40 image symbol-table dump tool reuse (existing python recipe).
+    D3. AXPBox anchor-dump patch + V4 anchor streaming + comparator script.
+    D4. Mode C tap, only if D3 corners a window that needs it.
+
+--------------------------------------------------------------------------------
+7. WORK PLAN / STATE
+--------------------------------------------------------------------------------
+
+  [x] HW_I_CTL SDE-edge swap fix (landed, verified by powerup checkpoint)
+  [x] DIVERT-REI ledger fill/compare (TEMP, in tree, run in progress)
+  [ ] Read ledger results; walk sec. 5 decision tree
+  [ ] Promote predig_ snapshot at ~cyc 21.16B (pre-divert[0]) so every
+      iteration replays in seconds
+  [ ] Sec. 2 audits A1-A3 (paper audit, no code)
+  [ ] Mode A oracle design sign-off, then implementation
+  [ ] Phase 2 D2-D4 as scheduled work
+
+--------------------------------------------------------------------------------
+8. REGISTER FIDELITY AUDIT MATRIX (completeness + execution + usage)
+--------------------------------------------------------------------------------
+
+  Scope rule: audit every place register IDENTITY interacts with PAL
+  machinery.  The general ISA register paths (operate-format Ra/Rb/Rc,
+  literal bit, memory-format) are exercised by the existing doctest suite
+  and are NOT re-audited here.
+
+  Legend -- Method: P = paper audit (code vs HRM vs AXPBox reference),
+            D = doctest (synthetic sequence), O = oracle (empirical run,
+            ledger / tripwire / gated capture).
+  Priority: 1 = likely-to-bite next, 3 = due diligence.
+
+  Item  Subject                          V4 target (file:line)            Reference                     Method  Pri
+  ----  -------------------------------  -------------------------------  ----------------------------  ------  ---
+  R1    Shadow predicate at every        coreLib/PalShadow.h (helpers);   AXPBox RREG macro             P + O   1
+        access point (= audits A1-A3     mutators: Machine.cpp:194        (AlphaCPU.hpp:388)
+        made exhaustive).  Every         (stageInterruptDivert),
+        palMode / i_ctl writer routes    PipelineDriver.h:1180 (fault
+        through the helpers; no direct   delivery), PalEntries.cpp:1129
+        pc-bit0 or i_ctl stores          (CALL_PAL entry), :1628
+        anywhere else.                   (HW_I_CTL), :1993 (HW_REI),
+                                         Snapshot.cpp (restore), cold
+                                         reset.
+  R2    CALL_PAL linkage register        PalEntries.cpp:1121-1143         AXPBox CALL_PAL dispatch;     P + D   1
+        selection: I_CTL bit 20          (write AFTER palModeEnter);      HRM I_CTL CALL_PAL_R23.
+        (CALL_PAL_R23) selects R23 vs    coreLib/IprFields.h:171,:238.    NOTE: R23 is IN the shadow
+        R27.  With CALL_PAL_R23 + SDE,                                    set; with SDE the linkage
+        the linkage write must land in                                    must land in the SHADOW
+        the SHADOW bank (write is                                         bank.  Check what the DS10
+        post-swap -- verify).            .                                PAL actually sets in I_CTL
+                                                                          (live value 0x300386: bit 20
+                                                                          = 1 -> R23 linkage ACTIVE).
+  R3    Divert / fault mid-pipeline      PipelineDriver.h (retire +       Architectural: interrupts     P + O   1
+        register commit: no in-flight    squash paths); Machine.cpp       are taken on retire
+        instruction half-applied or      divert poll site (~917).         boundaries; no partial
+        doubly-applied when the PC is    Register commit at MEM           writeback may survive a
+        redirected.  Includes: divert    (V3 carry-forward; memory        divert.
+        between MEM-commit and retire    [[register-commit-at-mem]]).
+        of the same instruction.
+  R4    HW_MFPR / HW_MTPR field          PalEntries.cpp HW_MFPR /         AXPBox AlphaCPU.cpp IPR       P       2
+        decode: which encoded field      HW_MTPR dispatch; the            handlers; HRM HW_MTPR
+        (Ra vs Rb) is data source /      grainFactory decode that fills   encoding (Ra=Rb required
+        destination, per IPR; scbd       opB for MTPR and rc for MFPR.    by spec, but PAL binaries
+        bits must not alias into                                          rely on a specific field).
+        index decode (memory
+        [[hex-radix-switch-case]]
+        class of bug).
+  R5    HW_LD / HW_ST variants:          MemDrainer.h HW_LD/HW_ST         AXPBox hw_ldq/hw_stq usage    P       2
+        phys / alt-mode / lock /         paths; mode-bit decode.          throughout vmspal (always
+        vpte forms -- register usage                                      phys-kernel in PAL frame
+        and side effects (no             .                                work).
+        unintended locked-access
+        register coupling;
+        reservedCacheLine vs intReg).
+  R6    Writeback under squash: the      pipelineLib iBox squash /        Architectural: wrong-path     P + D   2
+        100%-mispredict refetch model    refetch (memory                  instructions never update
+        must never let wrong-path        [[v4-branch-prediction]]);       the regfile.
+        instructions touch intReg or     pendingWrites drain on squash.
+        intShadow.
+  R7    Snapshot / restore coherence:    Snapshot.cpp serialize +         Invariant of sec. 2: bank     P + D   2
+        intReg + intShadow + i_ctl +     restore; PalShadow.h caller      assignment is a pure
+        pc bit 0 restored as a           discipline comment (bypass       function of (palMode, SDE)
+        consistent bank assignment       sites must self-justify).        + swap history; a restore
+        (a snapshot taken mid-PAL                                         must reproduce it exactly.
+        with SDE zapped must restore
+        the same view).
+  R8    FP register parity: no PAL       coreLib/CpuState.h f-regs;       AXPBox f[64] exists but SDE   P       3
+        shadow set for FP (AXPBox        FPCR pair (V4-shallow,           does not map FP; confirm V4
+        f[64] is layout symmetry,        2026-05-27).                     never swaps FP.
+        not architecture); confirm
+        V4 has no accidental FP
+        coupling to palMode.
+  R9    Per-mode SP shadowing (KSP /     coreLib/CpuState.h:502           AXPBox per-mode SP via        P + O   2
+        ESP / SSP / USP exchange at      (per-mode shadow stack           PALtemps p21+0x10/0x18
+        cm changes); interrupt frame     pointers); SWPCTX path           (sec. 3 step 1, sec. 4
+        forces 64-byte alignment with    (HwpcbContext).                  step 5).
+        stash in PS<63:56> -- V4 runs
+        the PAL binary so this is
+        empirical: SP must round-trip
+        through divert->REI (add to
+        Mode A oracle).
+
+  Sequencing:
+    - R1, R2, R3 first (priority 1).  R2 is cheap and concretely scary:
+      live i_ctl = 0x300386 has bit 20 SET, so the DS10 PAL runs with R23
+      linkage + SDE<1> -- the linkage register IS a shadowed register on
+      this firmware.  A doctest takes an afternoon.
+    - R4-R7, R9 as paper audits during run downtime.
+    - Every MISMATCH the Mode A oracle ever prints feeds back a row here.
+
+================================================================================
+ END
+================================================================================

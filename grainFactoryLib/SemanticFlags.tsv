@@ -1,0 +1,218 @@
+# ============================================================================
+# SemanticFlags.tsv -- per-grain semantic vocabulary for EmulatR V4
+# ============================================================================
+# Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+# Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
+# Licensed under eNVy Systems Non-Commercial License v1.1
+#
+# Project Architect: Timothy Peer
+# AI Collaboration:  Claude (Anthropic)
+#
+# Commercial use prohibited without separate license.
+# Contact:        peert@envysys.com  |  https://envysys.com
+# Documentation:  https://timothypeer.github.io/ASA-EMulatR-Project/
+# ============================================================================
+#
+# Purpose
+# -------
+# This file is the second source of truth for the GrainFactory codegen,
+# alongside GrainMaster.tsv.  Each row defines one semantic flag bit
+# carried on the InstructionGrain.  The codegen tool joins the two TSVs
+# at build time and refuses to emit if a GrainMaster row references a
+# flag name that is not defined here, or if a flag name is defined here
+# but never referenced by any row in GrainMaster.
+#
+# Encoding axis (which leaf to call) is owned by the dispatch tables.
+# Semantics axis (how the pipeline handles the result) is owned by the
+# flags below.  The pipeline never switches on opcode -- it consults
+# semFlags at the stage that owns the predicate.
+#
+# Format
+# ------
+# Tab-separated.  Lines starting with '#' are comments.  Blank lines
+# are ignored.  Column header row is the first non-comment line.
+#
+#   bit          integer 0..63 (uint64_t flag word)
+#   name         S_xxx identifier referenced by GrainMaster.tsv
+#   category     grouping for codegen-emitted enum sections
+#   stages       comma-separated list of stages that read this flag
+#                  (DE GR EX MEM WB issue trace)
+#   description  short prose; no tabs
+#
+# Mutex groups are documented in the trailer at the bottom of this
+# file and enforced by codegen.
+#
+# ============================================================================
+
+bit	name	category	stages	description
+
+# --- format identification (mutually exclusive: exactly one per grain) ----
+0	S_PalFormat	format	DE,issue	CALL_PAL encoding (opcode 0x00)
+1	S_BraFormat	format	DE	Branch encoding (opcodes 0x30..0x3F)
+2	S_MemFormat	format	DE,MEM	Memory format encoding
+3	S_OpFormat	format	DE,GR	Integer operate format
+4	S_FpFormat	format	DE,GR,EX	Floating operate format
+5	S_HwFormat	format	DE,issue	PALmode HW_xxx encoding (0x19,0x1B,0x1D,0x1E,0x1F)
+6	S_JmpFormat	format	DE,EX	JMP/JSR/RET/JSR_COROUTINE (opcode 0x1A)
+7	S_MiscFormat	format	DE	MISC encoding (opcode 0x18)
+
+# --- operand presence and register file routing ---------------------------
+8	S_ReadsRa	operand	GR	Reads source register Ra
+9	S_ReadsRb	operand	GR	Reads source register Rb
+10	S_WritesRc	operand	MEM	Writes destination register Rc
+11	S_HasLit	operand	GR	IMM bit set; 8-bit literal replaces Rb
+12	S_ReadsInt	regfile	GR	Any source operand reads integer regfile
+13	S_ReadsFp	regfile	GR	Any source operand reads FP regfile
+14	S_WritesInt	regfile	MEM	Destination is integer regfile
+15	S_WritesFp	regfile	MEM	Destination is FP regfile
+
+# --- memory access ---------------------------------------------------------
+16	S_Load	memory	EX,MEM	Produces a MemRead effect
+17	S_Store	memory	EX,MEM	Produces a MemWrite effect
+18	S_Locked	memory	EX,MEM	Load-locked / store-conditional
+19	S_PhysAddr	memory	MEM	EA is physical (HW_LD / HW_ST hint)
+20	S_NoTbCheck	memory	MEM	Suppress TB exceptions (HW_LD hint)
+21	S_Cacheable	memory	MEM	Normal cacheable access (default; absence means uncached)
+22	S_WritesRa	operand	MEM	Writes destination register Ra (loads; BSR/JSR write return PC)
+
+# --- control flow ----------------------------------------------------------
+24	S_ChangesPC	control	EX,trace	Grain may divert PC at EX
+25	S_Uncond	control	EX	Unconditional control flow change
+26	S_Branch	control	DE,EX	PC-relative branch (BR,BSR,Bxx,FBxx)
+27	S_Indirect	control	EX	Target from register (JMP/JSR/RET/JSR_COR)
+28	S_CallBased	control	EX	Writes Ra with return address (BSR,JSR)
+29	S_RetBased	control	EX	Uses RET prediction stack (RET,JSR_COR)
+
+# --- privilege and trap entry/exit -----------------------------------------
+32	S_Privileged	privilege	issue	Raises OPCDEC if not in PAL mode
+33	S_PalEntry	privilege	EX	CALL_PAL: enters PALcode at dispatch entry
+34	S_PalExit	privilege	EX	HW_REI: exits PALcode and resumes EXC_ADDR
+35	S_OpcDec	privilege	DE	Reserved/unimplemented; raises OPCDEC
+36	S_PalTru64	privilege	DE	Valid under Tru64/UNIX (OSF/1) PAL personality
+37	S_PalVms	privilege	DE	Valid under OpenVMS PAL personality
+38	S_PalIntrinsic	privilege	EX,trace	CALL_PAL function decoded inline; no PAL transfer (CSERVE etc.)
+39	S_PalLinux	privilege	DE	Valid under Alpha Linux PAL personality (per AARM Table C-15 column 3)
+
+# --- floating-point traps and FPCR access ----------------------------------
+40	S_FpTrap	fptrap	EX,WB	May raise IEEE FP trap
+41	S_FpcrRead	fptrap	GR	Reads FPCR (MF_FPCR)
+42	S_FpcrWrite	fptrap	MEM	Writes FPCR (MT_FPCR)
+43	S_VaxFp	fptrap	DE	VAX FP encoding (FLTV); unimplemented on 21264
+
+# --- internal processor register access ------------------------------------
+48	S_IprRead	ipr	EX	HW_MFPR: reads internal processor register
+49	S_IprWrite	ipr	EX	HW_MTPR: writes internal processor register
+
+# --- memory and exception barriers -----------------------------------------
+50	S_Mb	barrier	MEM	Memory barrier (MISC 0x4000)
+51	S_Wmb	barrier	MEM	Write memory barrier (MISC 0x4400)
+52	S_TrapBarrier	barrier	WB	TRAPB; serializes precise traps
+53	S_ExcBarrier	barrier	WB	EXCB; serializes exceptions
+54	S_Imb	barrier	MEM,trace	I-cache memory barrier (CALL_PAL IMB); invalidates traces
+
+# --- pipeline hints --------------------------------------------------------
+56	S_NoTrace	hint	trace	Excluded from trace cache (HW_REI, RPCC, IPR access)
+57	S_RpccLike	hint	EX	Reads cycle counter (RPCC); non-deterministic w.r.t. snapshot
+58	S_PrefetchOnly	hint	MEM	No commit; prefetch hint only (FETCH, FETCH_M, ECB)
+59	S_WriteHint	hint	MEM	Write hint (WH64)
+
+# ============================================================================
+# Operand position conventions
+# ============================================================================
+#
+# Alpha ISA encoding determines the read/write directionality of each
+# operand position.  The operand-category flag set is therefore asymmetric:
+#
+#   Ra  read or write     S_ReadsRa, S_WritesRa
+#                         loads write Ra; stores read Ra; conditional
+#                         branches read Ra; BSR/JSR write Ra with return PC
+#
+#   Rb  source only       S_ReadsRb
+#                         Mem-format base; Op-format second source;
+#                         JMP/JSR/RET indirect target.  No Alpha encoding
+#                         writes Rb -- S_WritesRb intentionally not defined.
+#
+#   Rc  destination only  S_WritesRc
+#                         Op-format and Fp-format destination.  No Alpha
+#                         encoding reads Rc -- S_ReadsRc intentionally not
+#                         defined.
+#
+#   lit literal source    S_HasLit
+#                         Op-format IMM bit indicates 8-bit literal in
+#                         place of Rb.
+#
+# Bit 22 holds S_WritesRa despite category drift into the memory-bit
+# region; renumbering the file would have rippled through every flag
+# above bit 11.  The category column is the source of truth for grouping.
+#
+# ============================================================================
+# Mutex groups (codegen-enforced; codegen rejects rows that violate these)
+# ============================================================================
+#
+# format-mutex
+#   Exactly one of: S_PalFormat S_BraFormat S_MemFormat S_OpFormat
+#                   S_FpFormat  S_HwFormat  S_JmpFormat S_MiscFormat
+#   Every leaf must declare exactly one format flag.
+#
+# memrw-mutex
+#   At most one of: S_Load S_Store
+#   A single Alpha instruction either loads or stores; STQ_C is a store
+#   (S_Store + S_Locked), LDQ_L is a load (S_Load + S_Locked).
+#
+# pal-direction-mutex
+#   At most one of: S_PalEntry S_PalExit S_PalIntrinsic
+#   PalEntry is CALL_PAL with a real PALcode transfer (HALT, BPT, CHME,
+#   CHMK).  PalExit is HW_REI leaving PALcode.  PalIntrinsic is a
+#   CALL_PAL function decoded inline -- the C++ leaf reads operand
+#   regs directly, packs a regfile commit into BoxResult, and retires
+#   to PC+4 with no PAL environment entry.  CSERVE is the canonical
+#   PalIntrinsic; future synthetic services (debugger hooks, firmware
+#   fastpaths, emulator assists) take the same flag.  The three are
+#   architecturally distinct posture of CALL_PAL and never overlap on
+#   one grain.
+#
+# regdest-mutex
+#   At most one of: S_WritesInt S_WritesFp
+#   A single instruction writes to one register file (or none).
+#
+# ipr-mutex
+#   At most one of: S_IprRead S_IprWrite
+#   HW_MFPR reads an IPR; HW_MTPR writes one; never both in one grain.
+#
+# personality-flags (NOT a mutex group; any subset legal)
+#   S_PalTru64  S_PalVms  S_PalLinux
+#   Neither set:  personality-agnostic instruction (the common case).
+#   One set:      CALL_PAL function code valid only under that personality.
+#   Multiple set: encoding behaves identically (or with documented per-
+#                 personality semantic divergence) under all flagged
+#                 personalities.  Per AARM Table C-15 (alpha_arch_ref.txt
+#                 ~line 47644) which gives the canonical OpenVMS / Tru64
+#                 UNIX / Alpha Linux mnemonic for each function code.
+#   Codegen emits PAL dispatch sub-tables (osf, vms, linux); the CPU
+#   picks one at boot based on its configured PAL personality.  Non-
+#   CALL_PAL instructions never set these flags.
+#
+# ============================================================================
+# Stage consumers (informational; codegen verifies that each named stage
+# in the 'stages' column has at least one handler that reads the flag)
+# ============================================================================
+#
+# DE      decode stage; format/operand validation, OPCDEC dispatch
+# GR      register/operand read; bypass-network selection
+# EX      execute stage; ALU, branch resolution, divert decision, IPR access
+# MEM     memory effect application; commit register writes
+# WB      retirement; trap delivery, barrier ordering
+# issue   pre-issue protection check (PAL mode requirement)
+# trace   trace cache builder; classifies divert-capable and non-traceable grains
+#
+# ============================================================================
+# Reserved bits
+# ============================================================================
+#
+# Bits 22..23, 30..31, 39, 44..47, 55, 60..63 are intentionally left
+# unassigned to leave headroom inside each category for future flags.
+# (Bit 38 was reserved; now S_PalIntrinsic for inline-executed CALL_PAL
+# functions like CSERVE.)
+# Codegen treats reserved bits as zero and rejects rows that set them.
+#
+# ============================================================================

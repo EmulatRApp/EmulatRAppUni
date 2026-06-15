@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>IDE Devices</title>
+  <keywords>
+    <keyword>0x1F0</keyword>
+    <keyword>CY82C693</keyword>
+    <keyword>dqa</keyword>
+    <keyword>IDE controller</keyword>
+    <keyword>PCI config</keyword>
+    <keyword>primary channel</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">IDE Devices</para></header>
+    <para styleclass="Normal">The CY82C693 provides the IDE controller, exposed on PCI bus 0, slot 5, function 1 ("Cypress 82C693 IDE" in <text styleclass="Code Example">show config</text>). The primary channel is the <text styleclass="Code Example">dqa</text> device path. IDE register / port behavior (<text styleclass="Code Example">0x1F0</text> to <text styleclass="Code Example">0x1F7</text> and PCI config) and absent-slave probing are part of the current device-enumeration work.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--ATAPI-Devices">ATAPI Devices</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Virtual-Disk-Images">Virtual Disk Images</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Current-Development-Status--">Current Development Status</link></para>
+  </body>
+</topic>

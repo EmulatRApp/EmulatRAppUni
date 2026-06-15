@@ -1,0 +1,169 @@
+This is the execution you requested. It also contains the wall-time profiling (bottom).
+I am currently at the SRM prompt, ">>>" - is there anything I need to send to you?
+
+
+ASA EmulatR -- Alpha AXP (EV6 / 21264) Emulator
+Alpha Emulator Console V4.0-0
+(c) 2026 Timothy Peer / eNVy Systems, Inc.
+
+*** keyboard not plugged in...
+Flash ROM writes are disabled
+64 Meg of system memory
+probing hose 0, PCI
+probing PCI-to-ISA bridge, bus 1
+bus 0, slot 5 -- dqa -- Cypress 82C693 IDE
+initializing GCT/FRU at 3f32000
+
+Checking dqa0.0.0.105.0 for the option firmware files. . .
+dqa0.0.0.105.0 has no media present or is disabled via the RUN/STOP switch
+Checking dva0.0.0.0.0 for the option firmware files. . .
+
+Option firmware files were not found on CD or floppy.
+If you want to load the options firmware,
+please enter the device on which the files are located(ewa0),
+or just hit <return> to proceed with a standard console update:
+
+
+                ***** Loadable Firmware Update Utility *****
+------------------------------------------------------------------------------
+ Function    Description
+------------------------------------------------------------------------------
+ Display     Displays the system's configuration table.
+ Exit        Done exit LFU (reset).
+ List        Lists the device, revision, firmware name, and update revision.
+ Readme      Lists important release information.
+ Update      Replaces current firmware with loadable data image.
+ Verify      Compares loadable and hardware images.
+ ? or Help   Scrolls this function table.
+------------------------------------------------------------------------------
+
+UPD> update srm
+
+Confirm update on:
+srm              [Y/(N)]y
+
+WARNING: updates may take several minutes to complete for each device.
+
+                          DO NOT ABORT!
+
+srm             Updating to 7.3-1...  Verifying 7.3-1...  PASSED.
+
+UPD> exit
+
+ Initializing....
+
+snapshot Console V7.3-2, Feb 27 2007 13:25:53
+
+Halt Button is IN, AUTO_ACTION ignored
+
+>>>show device
+dqa0.0.0.105.0             DQA0          EMULATR VIRTUAL CDROM
+dva0.0.0.0.0               DVA0
+>>>show config
+                        snapshot
+
+SRM Console:    V7.3-2
+PALcode:        OpenVMS PALcode V1.98-83, Tru64 UNIX PALcode V1.92-73
+
+Processors
+CPU 0           Alpha EV6 pass 1 268 MHz
+                SROM Revision:   P▒
+                Bcache is disabled
+
+Core Logic
+Cchip           DECchip 21272-CA Rev 2
+Dchip           DECchip 21272-DA Rev 1
+Pchip 0         DECchip 21272-EA Rev 1
+
+TIG             Rev 7.31
+Arbiter         Rev 7.31 (0xff)
+
+MEMORY
+
+Array #       Size     Base Addr
+-------    ----------  ---------
+   0          64 MB    000000000
+
+Total Bad Pages = 0
+Total Good Memory = 64 MBytes
+
+
+PCI Hose 00
+     Bus 00  Slot 05/0: Cypress 82C693
+                                                         Bridge to Bus 1, ISA
+     Bus 00  Slot 05/1: Cypress 82C693 IDE
+                                   dqa.0.0.105.0
+                                   dqa0.0.0.105.0         EMULATR VIRTUAL CDRO
+
+
+ISA
+Slot    Device  Name            Type         Enabled  BaseAddr  IRQ     DMA
+0
+        0       MOUSE           Embedded        Yes     60      12
+
+        1       KBD             Embedded        Yes     60      1
+
+        2       COM1            Embedded        Yes     3f8     4
+
+        3       COM2            Embedded        Yes     2f8     3
+
+        4       LPT1            Embedded        Yes     3bc     7
+
+        5       FLOPPY          Embedded        Yes     3f0     6       2
+
+
+>>>show memory_test
+memory_test             full
+>>>show full_powerup_diags
+full_powerup_diags      OFF
+>>>set memory_test none
+>>>show memory_test
+memory_test             none
+>>>
+
+------------------------------------------
+tim@Tim-HPZ640 MINGW64 /d/emulatr/emulatrappuniv4/emulatr (master)
+$ grep '\[CON' run_ide_release.log | head -40
+[CON COM1 +    0.000 ms] *** keyboard not plugged in...
+[CON COM1 +    4.355 ms] Flash ROM writes are disabled
+[CON COM1 +2339885.907 ms] 64 Meg of system memory
+[CON COM1 +  193.857 ms] probing hose 0, PCI
+[CON COM1 +    6.472 ms] probing PCI-to-ISA bridge, bus 1
+[CON COM1 +   40.284 ms] bus 0, slot 5 -- dqa -- Cypress 82C693 IDE
+[CON COM1 + 5696.246 ms] initializing GCT/FRU at 3f32000
+Machine: b_irq<1> divert[2] (device) at cyc=6006156773 savedPc=0x00000000001c6a84 target=0x0000000000008680 picVector=0x00[CON COM1 +360036.356 ms]
+[CON COM1 +   31.268 ms] Checking dqa0.0.0.105.0 for the option firmware files. . .
+[CON COM1 +  719.498 ms] dqa0.0.0.105.0 has no media present or is disabled via the RUN/STOP switch
+[CON COM1 +492365.346 ms] Checking dva0.0.0.0.0 for the option firmware files. . .
+[CON COM1 +2158903.624 ms]
+[CON COM1 +   27.579 ms] Option firmware files were not found on CD or floppy.
+[CON COM1 +   21.735 ms] If you want to load the options firmware,
+[CON COM1 +   32.461 ms] please enter the device on which the files are located(ewa0),
+[CON COM1 +431256.760 ms] or just hit <return> to proceed with a standard console update:
+[CON COM1 +   40.339 ms]
+[CON COM1 +    0.668 ms]
+[CON COM1 +   31.355 ms]                 ***** Loadable Firmware Update Utility *****
+[CON COM1 +   41.583 ms] ------------------------------------------------------------------------------
+[CON COM1 +   12.913 ms]  Function    Description
+[CON COM1 +   40.743 ms] ------------------------------------------------------------------------------
+[CON COM1 +   28.754 ms]  Display     Displays the system's configuration table.
+[CON COM1 +   19.071 ms]  Exit        Done exit LFU (reset).
+[CON COM1 +   39.410 ms]  List        Lists the device, revision, firmware name, and update revision.
+[CON COM1 +   26.052 ms]  Readme      Lists important release information.
+[CON COM1 +   33.421 ms]  Update      Replaces current firmware with loadable data image.
+[CON COM1 +   26.843 ms]  Verify      Compares loadable and hardware images.
+[CON COM1 +   21.279 ms]  ? or Help   Scrolls this function table.
+[CON COM1 +   40.654 ms] ------------------------------------------------------------------------------
+[CON COM1 +    1.244 ms]
+[CON COM1 + 6235.341 ms] UPD> update srm
+[CON COM1 +   37.570 ms]
+[CON COM1 +   10.316 ms] Confirm update on:
+[CON COM1 + 1463.756 ms] srm              [Y/(N)]y
+[CON COM1 +    0.890 ms]
+[CON COM1 +   36.549 ms] WARNING: updates may take several minutes to complete for each device.
+[CON COM1 +    0.754 ms]
+[CON COM1 +   23.128 ms]                           DO NOT ABORT!
+[CON COM1 +    1.782 ms]
+
+tim@Tim-HPZ640 MINGW64 /d/emulatr/emulatrappuniv4/emulatr (master)
+

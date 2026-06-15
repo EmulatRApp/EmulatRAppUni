@@ -1,0 +1,41 @@
+# ============================================================================
+# dec_disk_media_types.tsv -- DEC disk media geometry reference for EmulatR
+# ============================================================================
+# All blocks are 512 bytes. total_lbn = sec_trk * heads * cyl.
+# SCSI: sec_trk marked ~ is nominal (zone-bit recording); READ CAPACITY total
+#       is authoritative, CHS is synthetic (MODE SENSE pages 3/4).
+# SDI (MSCP, RA-series): no host-visible CHS; host addresses by LBN and reads
+#       a packed media-type identifier. Geometry below is physical layout only.
+# DSSI (RF-series) and LESI (RC25): legacy VAX-era; not on the DS10 boot path.
+# IDE (dqa): not modeled here -- geometry comes from IdeDisk IDENTIFY DEVICE.
+# Capacity column is the marketed/nominal figure; total_lbn is the exact value.
+# ============================================================================
+# model	iface	sec_trk	heads	cyl	total_lbn	block_bytes	capacity	oem_or_note
+RZ22	scsi	33	4	776	102432	512	51M	Conner CP350
+RZ23	scsi	33	8	776	204864	512	102M	Conner CP3100
+RZ23L	scsi	39	4	1524	237744	512	118M	nominal_ZBR
+RZ24	scsi	38	8	1348	409792	512	205M	Conner CP3200
+RZ24L	scsi	66	8	1818	959904	512	240M	nominal_ZBR
+RZ25	scsi	62	9	1492	832536	512	416M	
+RZ25L	scsi	79	8	1891	1195112	512	523M	nominal_ZBR
+RZ26	scsi	57	14	2570	2050860	512	1.05G	
+RZ27	scsi	143	16	1366	3125408	512	1.6G	nominal_ZBR
+RZ28	scsi	99	16	2595	4110480	512	2.1G	DEC_ST32550N_class
+RZ28B	scsi	82	19	2626	4091308	512	2.1G	Seagate_ST12400N
+RZ29	scsi	113	20	3720	8407200	512	4.2G	nominal_ZBR
+RA60	sdi	42	4	2382	400176	512	205M	removable_pack
+RA70	sdi	33	11	1507	547041	512	280M	
+RA71	sdi	51	14	1915	1367310	512	684M	
+RA72	sdi	51	20	1915	1953300	512	1G	
+RA73	sdi	70	21	2667	3920490	512	2G	
+RA80	sdi	31	14	546	236964	512	124M	
+RA81	sdi	51	14	1248	891072	512	456M	456M_raw_446M_user
+RA82	sdi	57	15	1423	1216665	512	608M	
+RA90	sdi	69	13	2649	2376153	512	1.2G	thin_film
+RA92	sdi	69	13	3279	2941263	512	1.5G	
+RF30	dssi	37	6	1320	293040	512	143M	
+RF31	dssi	50	8	1861	744400	512	380M	
+RF71	dssi	37	16	1320	781440	512	390M	
+RF72	dssi	50	21	1861	1954050	512	1G	
+RC25	lesi	42	4	302	50736	512	26Mx2	fixed_plus_removable
+ESE20	sdi	4	128	483	247296	512	120M	solid_state_synthetic

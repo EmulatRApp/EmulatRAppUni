@@ -1,0 +1,98 @@
+================================================================================
+ARCHITECTURE SPECIFICATION CONTRACT
+INTERFACE: Alpha EV6 CPU Core <--> Tsunami System Bus
+VERSION:   1.0 (Refactor Base)
+STATUS:    APPROVED FOR IMPLEMENTATION
+================================================================================
+
+1. OVERVIEW AND GOALS
+This document defines the strict boundaries, responsibilities, and data flow 
+between the emulated EV6 CPU core, the system bus (Tsunami Chipset), and 
+backing physical memory. The primary mandate of this contract is the complete 
+decoupling of CPU execution logic from physical memory routing.
+
+2. COMPONENT RESPONSIBILITIES AND DEMARCATION
+
+2.1. The CPU Core (ExecCtx / Pipeline / MemDrainer)
+   - IGNORANCE: The CPU possesses zero knowledge of system topology, memory 
+     maps, PCI existence, or RAM limits.
+   - OUTPUT: Emits 44-bit Physical Addresses (PAs) for Load, Store, and Fetch.
+   - INTERNAL ROUTING: Exclusively handles PALcode scratchpad access 
+     (e.g., PA >= 0xFFFFFF00000). These transactions MUST NOT escape to the bus.
+   - TRAP HANDLING: Responds to MCHK (Machine Check) hardware signals by 
+     vectoring to the PALcode OSF Machine Check handler.
+
+2.2. The System Bus Arbiter (ISystemBus / TsunamiChipset)
+   - OMNISCIENCE: The absolute authority on physical address decoding.
+   - ROUTING: Evaluates all incoming PAs against AAR registers (RAM) and 
+     fixed I/O windows (MMIO).
+   - COHERENCE: Owns the LL/SC LockMonitor. Observes all writes to invalidate 
+     active Load-Locked reservations.
+   - ERROR GENERATION: Solely responsible for generating NXM (Non-Existent 
+     Memory) faults. If a PA is unclaimed, the bus MUST update chipset 
+     syndrome registers (Cchip::MISC) and assert the MCHK signal to the CPU.
+
+2.3. Physical Memory (GuestMemory)
+   - PASSIVITY: Reduced to a "Dumb Byte Store." 
+   - NO ROUTING: Contains zero MMIO hooks, no address range checks, and no 
+     fault generation logic.
+   - TRUST: Assumes any PA passed to its read/write methods has already been 
+     validated as legal DRAM by the System Bus Arbiter.
+
+3. TOPOLOGICAL FLOW
+
+   [ CPU CORE ]
+        |
+        | (Valid PA + Width)
+        v
+   [ ISystemBus Interface ] ---> (LL/SC Invalidation Check)
+        |
+        +-- (Decode: PA in AAR bounds) ----> [ GuestMemory (RAM) ]
+        |
+        +-- (Decode: PA in Tsunami I/O) ---> [ TsunamiPchip (PCI) ]
+        |
+        +-- (Decode: Unclaimed PA) --------> [ NXM / MCHK Latch ] --> (Interrupts CPU)
+
+4. C++ INTERFACE CONTRACT (coreLib/ISystemBus)
+
+   The CPU shall interface with the system solely through an abstract 
+   interface to prevent concrete chipset coupling.
+
+   struct BusResult {
+       MemStatus status;  // Ok, or hardware fault state
+       uint64_t data;     // Payload for reads
+   };
+
+   class ISystemBus {
+   public:
+       virtual ~ISystemBus() = default;
+       virtual BusResult read(uint64_t pa, uint8_t width) = 0;
+       virtual BusResult write(uint64_t pa, uint64_t value, uint8_t width) = 0;
+       
+       // Instruction fetch (bypass LL/SC checks, handle cache line fills)
+       virtual BusResult fetch(uint64_t pa, uint8_t width) = 0;
+   };
+
+5. ERROR REPORTING MANDATES (Ticket 10 / NXM Fallthrough)
+
+   Under NO circumstances shall a component silently drop or fake a return 
+   value for an unmapped read/write outside of explicit PCI/ISA bridging rules.
+
+   If the TsunamiChipset receives a PA it cannot map:
+   1. It MUST NOT throw a C++ exception.
+   2. It MUST set Cchip::MISC.NXM = 1.
+   3. It MUST set Cchip::MISC.NXM_SRC to the faulting CPU ID.
+   4. It MUST return a status (e.g., MemStatus::BusError) that the CPU 
+      microcode translates into a hardware Machine Check exception.
+   5. The PALmode exception handler will then execute, read the Cchip::MISC 
+      register, process the HW_REI, and resume.
+
+6. ACCEPTANCE CRITERIA
+   - grep -R "MMIO" GuestMemory.cpp -> 0 results.
+   - CPU PipelineDriver depends only on ISystemBus, not TsunamiChipset.
+   - SRM firmware successfully sizes memory by reading PA 0x2000000000, 
+     catching the MCHK, reading Cchip::MISC, and continuing execution.
+
+================================================================================
+END OF CONTRACT
+================================================================================

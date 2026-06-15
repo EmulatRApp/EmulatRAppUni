@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:48:24.567Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Diagnostics &amp; Debugging</title>
+  <keywords>
+    <keyword>EMULATR_BREAK_ON_PA10</keyword>
+    <keyword>EMULATR_CHECKPOINTS</keyword>
+    <keyword>EMULATR_CHIPSET_DIAG_OFF</keyword>
+    <keyword>EMULATR_FLASH_TRACE</keyword>
+    <keyword>EMULATR_GATE</keyword>
+    <keyword>EMULATR_GCT_WATCH</keyword>
+    <keyword>EMULATR_IIC_TRACE</keyword>
+    <keyword>EMULATR_MEMDIAG</keyword>
+    <keyword>EMULATR_PIC_TRACE</keyword>
+    <keyword>EMULATR_RETIRE_TRACE_DIR</keyword>
+    <keyword>EMULATR_TRACE_WINDOW</keyword>
+    <keyword>spdlog</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Diagnostics &amp; Debugging</para>
+    </header>
+    <para styleclass="Normal">Diagnostics are turned on with runtime <text styleclass="Code Example">EMULATR_*</text> environment variables, set in the launching shell before the process starts. The complete table lives in the Reference section&apos;s Environment Variables page; this page groups them by what they do.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Three gotchas to know first</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">Presence, not value. Most gates test only that the variable is set, so VAR=0 still ENABLES them. The few that parse a value (the autosnapshot / marker / path / numeric knobs) are noted in the reference.</li>
+      <li styleclass="NotesBox">Read once. The trace and probe gates cache their result on first call, so they are effectively read at process start; exporting them mid-run has no effect.</li>
+      <li styleclass="NotesBox">Paths are CWD-relative. Launch from the Emulatr root so relative output and snapshot paths resolve to the canonical set.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Device / subsystem traces</para>
+    <para styleclass="Normal">Presence-gated, read once, written to stderr: <text styleclass="Code Example">EMULATR_IIC_TRACE</text> (PCF8584 IIC bus transactions), <text styleclass="Code Example">EMULATR_FLASH_TRACE</text> (FlashRom command / erase / write activity), <text styleclass="Code Example">EMULATR_PIC_TRACE</text> (the 8259 PIC pair -- IRQ assert / EOI). Redirect to per-trace logs, for example <text styleclass="Code Example">2&gt; iic.log</text>.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Chipset diagnostics and retire trace</para>
+    <para styleclass="Normal">The chipset CSR diagnostic stream is on by default; <text styleclass="Code Example">EMULATR_CHIPSET_DIAG_OFF</text> silences it (note the inverted sense -- setting it turns diagnostics OFF). <text styleclass="Code Example">EMULATR_TRACE_WINDOW</text> forces the retire-compact trace window, and <text styleclass="Code Example">EMULATR_RETIRE_TRACE_DIR</text> sets the output directory for the retire / breakpoint / profiler trace files (see SRM Performance Logging).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Probe and break gates</para>
+    <para styleclass="Normal">For pinpoint debugging: <text styleclass="Code Example">EMULATR_GCT_WATCH</text> (store-watch on the GCT / FRU config-tree region), <text styleclass="Code Example">EMULATR_BREAK_ON_PA10</text> (conditional break on accesses to PA 0x10..0x17), <text styleclass="Code Example">EMULATR_CHECKPOINTS</text> (named PC checkpoints), and <text styleclass="Code Example">EMULATR_GATE</text> (a PC / condition gate controlling trace windowing).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Compile-time diagnostics (NOT runtime env vars)</para>
+    <para styleclass="Normal">Some <text styleclass="Code Example">EMULATR_*</text> names are CMake options baked in at build time -- setting them in the shell does nothing. The important one is <text styleclass="Code Example">EMULATR_MEMDIAG</text>: a per-retired-instruction fprintf+fflush that imposes roughly a 900x slowdown and must stay OFF for normal use. <text styleclass="Code Example">EMULATR_DIAGNOSTIC_LOGGING</text> (centralized per-subsystem logging, non-Release builds) and the <text styleclass="Code Example">EMULATR_LOG_*</text> spdlog level macros are also build-time.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">For traced-boot command recipes, see Executing.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Environment-Variables-(EMULA">Environment Variables</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--SRM-Performance-Logging">SRM Performance Logging</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing------------(moved)">Executing</link></para>
+  </body>
+</topic>

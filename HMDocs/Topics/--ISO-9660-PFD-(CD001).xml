@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>ISO-9660 PFD (CD001)</title>
+  <keywords>
+    <keyword>CD001</keyword>
+    <keyword>ISO-9660</keyword>
+    <keyword>LBA 16</keyword>
+    <keyword>PVD</keyword>
+    <keyword>READ(10)</keyword>
+    <keyword>VirtualIsoDevice</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">ISO-9660 PFD (CD001)</para></header>
+    <para styleclass="Normal">An ISO-9660 image begins with a 16-block (32 KiB) system area, after which LBA 16 holds the Primary Volume Descriptor (PVD). The firmware's first coherence check is the standard identifier "CD001" at offset 1 of that descriptor. <text styleclass="Code Example">VirtualIsoDevice</text> serves the PVD so a <text styleclass="Code Example">READ(10)</text> of LBA 16 returns it. The doctest that locks this behavior:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">TEST_CASE("VirtualIsoDevice: serves the ISO-9660 PVD at LBA 16 (CD001)") {</para>
+    <para styleclass="Code Example">    // System area = 16 zero blocks; LBA 16 = PVD.</para>
+    <para styleclass="Code Example">    std::vector&lt;uint8_t&gt; img(17 * 2048, 0);</para>
+    <para styleclass="Code Example">    uint8_t* pvd = img.data() + 16 * 2048;</para>
+    <para styleclass="Code Example">    pvd[0] = 0x01;                       // descriptor type = PVD</para>
+    <para styleclass="Code Example">    std::memcpy(pvd + 1, "CD001", 5);    // standard identifier</para>
+    <para styleclass="Code Example">    pvd[6] = 0x01;                       // version</para>
+    <para styleclass="Code Example">    // block size 2048 (both-endian) at offset 128</para>
+    <para styleclass="Code Example">    VirtualIsoDevice cd; REQUIRE(cd.loadMedia("pvd.iso"));</para>
+    <para styleclass="Code Example">    uint8_t buf[2048]; ScsiCommand c = read10(16, 1, buf);</para>
+    <para styleclass="Code Example">    cd.handleCommand(c);</para>
+    <para styleclass="Code Example">    CHECK(c.status == ScsiStatus::Good);</para>
+    <para styleclass="Code Example">    CHECK(std::memcmp(buf + 1, "CD001", 5) == 0);</para>
+    <para styleclass="Code Example">}</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--ATAPI-Devices">ATAPI Devices</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Virtual-CDROM">Virtual CDROM</link></para>
+  </body>
+</topic>

@@ -1,0 +1,619 @@
+<topic template="Default" modified="2026-06-08T13:46:40.649-07:00" lasteditedby="tim" version="2">
+  <title>Environment Variables - Operation Reference</title>
+  <body>
+    <header>
+      <para styleclass="Heading1">Environment Variables - Operation Reference</para>
+    </header>
+    <para styleclass="Normal">Generated 2026-06-08 from the <text styleclass="Code Example">std::getenv</text> call sites in EmulatRAppUniV4\Emulatr. ASCII-only.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">This document lists the <text style="font-weight:bold;">runtime</text> environment variables the emulator reads at launch, plus the <text style="font-weight:bold;">compile-time</text> flags that look like env vars but are actually CMake build options. CLI flags that mirror an env var are cross-referenced.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">How they are read (important gotchas)</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">- All values are read with <text styleclass="Code Example">std::getenv</text>. Set them in the launching shell before starting the process. Inline bash assignment is the normal form:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example"><text styleclass="Normal"> &#160;EMULATR_CONSOLE_SNAPSHOT=1 ./out/build/relwithdebinfo/Emulatr.exe --firmware firmware/ds10_v7_3.exe</text></para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">- <text style="font-weight:bold;">Read-once gotcha.</text> The trace/diagnostic gates &#160; (<text styleclass="Code Example">EMULATR_CONSOLE_SNAPSHOT</text>,<text styleclass="Code Example"> EMULATR_IIC_TRACE</text>, <text styleclass="Code Example">EMULATR_FLASH_TRACE</text>, &#160;<text styleclass="Code Example">EMULATR_PIC_TRACE</text>, <text styleclass="Code Example">EMULATR_TICKWARP</text>, the RPCC probe knobs) cache their result in a function-local <text styleclass="Code Example">static bool const</text> on first call. &#160;They are effectively read once at process start; exporting them mid-run has no effect.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">- <text style="font-weight:bold;">Presence vs value.</text> Most gates test only <text style="font-style:italic;">presence</text> &#160;(<text styleclass="Code Example">getenv(...) != nullptr</text>), so VAR=0 still ENABLES them -- any value, &#160;including <text styleclass="Code Example">0</text> or empty, counts as set. The exceptions that parse a value are called out below (<text styleclass="Code Example">EMULATR_AUTOSNAP</text>, <text styleclass="Code Example">EMULATR_SNAPSHOT_MARKER</text>, &#160;the path vars, and the RPCC numeric knobs).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">- <text style="font-weight:bold;">Relative paths resolve against the launch CWD.</text>&#32;<text styleclass="Code Example">EMULATR_STOP_FILE</text> default and the <text styleclass="Code Example">snapshots/</text> dir are CWD-relative; launch from the Emulatr root for the canonical snapshot set.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">&#32;<text styleclass="Heading2">Snapshot / autoload</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="6" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Variable</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Values</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Default</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_CONSOLE_SNAPSHOT</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset (off)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Arms the Option-A console-snapshot marker watch in the UART. When set, a console input line matching the marker writes <text styleclass="Code Example">snapshots/predig_oemsnap_cyc&lt;N&gt;.axpsnap</text>. Read once at start.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_SNAPSHOT_MARKER</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">string</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">set oem_string snapshot</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">The exact line that triggers the console snapshot. Leading/trailing whitespace is trimmed; <text style="font-weight:bold;">internal whitespace is NOT normalized</text> (type single spaces).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_AUTOSNAP</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">off</text> (else on)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">on</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Disables periodic <text styleclass="Code Example">auto_*.axpsnap</text> saves. Mirrors <text styleclass="Code Example">--autosnapshot off</text>. Use for cold-boot mint runs to avoid the per-save disk cliff.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_NO_AUTOLOAD</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Skip autoload-newest at startup; forces a genuine cold boot instead of restoring the newest snapshot. Mirrors <text styleclass="Code Example">--no-autoload</text>.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_SNAPSHOT_PRUNE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset (no prune)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Enables pruning of old snapshots. Without it, <text styleclass="Code Example">pruneOldSnapshots</text> is a no-op and nothing is evicted.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">&#32;<text styleclass="Heading2">Process / platform control</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="5" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Variable</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Values</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Default</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_STOP_FILE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">path</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_STOP</text> (CWD-relative)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Path of the graceful-stop sentinel. <text styleclass="Code Example">touch</text> it to stop the run cleanly so <text styleclass="Code Example">~Machine</text> flushes flash NVRAM. The resolved absolute path is logged at startup (<text styleclass="Code Example">graceful-stop sentinel = ...</text>). Polled ~every 1M steps; consumed when seen.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_NO_PUTTY</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Do not auto-launch PuTTY for the TCP console backend. The listen socket still comes up; attach your own client.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_FLASH_ROM</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">path</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">ds10_flash.rom</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Backing file for the flash/NVRAM image (persisted config: env vars, <text styleclass="Code Example">update srm</text> heal).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_PLATFORM_CONFIG</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">path</para>
+        </td>
+        <td>
+          <para styleclass="Normal">built-in DS10 manifest</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Override the platform manifest (IIC device population, etc.).</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">&#32;<text styleclass="Heading2">Logging / diagnostics (runtime gates)</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Variable</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Values</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Default</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_CHIPSET_DIAG_OFF</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence/non-empty</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset (diag on)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Silences the chipset CSR diagnostic stream. Note the <text style="font-style:italic;">inverted sense</text>: setting it turns diagnostics OFF.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_TRACE_WINDOW</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Forces the DecListingSink retire-compact trace window even without the <text styleclass="Code Example">TRACE_RETIRE_COMPACT</text> mask bit.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_RETIRE_TRACE_DIR</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">dir path</para>
+        </td>
+        <td>
+          <para styleclass="Normal">build-tree default</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Output directory for retire-compact / breakpoint / profiler trace files.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">&#32;<text styleclass="Heading2">Device traces (per-subsystem, read once)</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Variable</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Values</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Default</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_IIC_TRACE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Trace PCF8584 IIC bus transactions.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_FLASH_TRACE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Trace FlashRom command/erase/write activity.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_PIC_TRACE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Trace the 8259 PIC pair (IRQ assert/EOI).</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">&#32;<text styleclass="Heading2">Performance / experimental</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="5" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Variable</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Values</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Default</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_TICKWARP</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Enables tick-warp fast-forward probes at known delay-loop PCs (RSCC balloon at <text styleclass="Code Example">0x7c304</text>, spin at <text styleclass="Code Example">0x1c655c</text>). <text style="font-style:italic;">Experimental; alters timing fidelity.</text></para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_RPCC_LOG_AFTER</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">uint (dec/hex)</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">185000000</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Cycle count after which the RPCC probe begins logging.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_RPCC_LOG_MAX</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">uint (dec/hex)</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">200000</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Max RPCC probe log entries.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_RPCC_LOG_FILE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">path</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">D:\EmulatR\EmulatRAppUniV4\rpcc_probe.txt</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">RPCC probe output file.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">&#32;<text styleclass="Heading2">Probe / debug gates</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="5" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Variable</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Values</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Default</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_GCT_WATCH</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Store-watch on the GCT/FRU config-tree region (PA <text styleclass="Code Example">0x3f32000-0x3f33fff</text>).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_BREAK_ON_PA10</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">presence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Conditional break on accesses to PA <text styleclass="Code Example">0x10-0x17</text>.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_CHECKPOINTS</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">spec string</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Named PC checkpoints, e.g. <text styleclass="Code Example">shcreate:0x...,shentry:0x...,isatty:0x...,rwp:0x...</text>.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_GATE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">spec string</para>
+        </td>
+        <td>
+          <para styleclass="Normal">unset</para>
+        </td>
+        <td>
+          <para styleclass="Normal">PC/condition gate spec controlling trace windowing.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">&#32;<text styleclass="Heading2">Compile-time flags (NOT runtime env vars)</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">These appear as <text styleclass="Code Example">EMULATR_</text> names but are CMake options / preprocessor defines baked in at build time. Setting them in the shell does nothing; they must be enabled in the build.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="5" colcount="3" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Flag</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Where</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Notes</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_MEMDIAG</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">CMakeLists.txt:263</text> (commented out)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Per-retired-instruction <text styleclass="Code Example">fprintf+fflush</text>. ~900x slowdown; <text style="font-weight:bold;">keep OFF</text>. Disabled 2026-06-01.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_DIAGNOSTIC_LOGGING</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">CMakeLists.txt:315</text> option</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Centralized per-subsystem diagnostic logging; defined only in non-Release configs. Mirrored onto the test target.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_PA_DUMP</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">CMakeLists.txt</text> (test mirror)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">PA-access dump; build define.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_LOG_TRACE/DEBUG/INFO/WARN/ERROR/CRITICAL</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">logging macros</para>
+        </td>
+        <td>
+          <para styleclass="Normal">spdlog level selection macros, not runtime env.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2"> CLI flags that mirror env vars</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="6" colcount="2" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">CLI</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Env equivalent</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">--autosnapshot off</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_AUTOSNAP=off</text></para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">--no-autoload</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">EMULATR_NO_AUTOLOAD=1</text></para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">--max-cycles &lt;N&gt;</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">(no env; default unlimited = <text styleclass="Code Example">~uint64_t{0}</text>)</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">--snapshot-on-pc &lt;pc&gt;[,...]</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">(no env)</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">--snapshot-name-tag &lt;s&gt;</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">(no env)</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2"> Operational recipes</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-weight:bold;">Reach </text><text styleclass="Code Example" style="font-weight:bold;">&gt;&gt;&gt;</text><text style="font-weight:bold;"> and capture diagnostics, interactive (PuTTY console live):</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">cd /d/EmulatR/EmulatRAppUniV4/Emulatr</para>
+    <para styleclass="Code Example">EMULATR_CONSOLE_SNAPSHOT=1 ./out/build/relwithdebinfo/Emulatr.exe \</para>
+    <para styleclass="Code Example"> &#160;--firmware firmware/ds10_v7_3.exe --autosnapshot off &#160;2&gt; run.log</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-weight:bold;">Same, fully detached (interaction is via the PuTTY/TCP console, not the shell):</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">cd /d/EmulatR/EmulatRAppUniV4/Emulatr</para>
+    <para styleclass="Code Example">EMULATR_CONSOLE_SNAPSHOT=1 nohup ./out/build/relwithdebinfo/Emulatr.exe \</para>
+    <para styleclass="Code Example"> &#160;--firmware firmware/ds10_v7_3.exe --autosnapshot off &#160;&gt; run.log 2&gt;&amp;1 &amp;</para>
+    <para styleclass="Code Example">disown; echo &quot;pid=$!&quot;</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-weight:bold;">Stop a running instance gracefully (flushes flash NVRAM):</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">grep graceful-stop run.log &#160; &#160; &#160; &#160; &#160; # find the exact sentinel path it watches</para>
+    <para styleclass="Code Example">touch /d/EmulatR/EmulatRAppUniV4/Emulatr/EMULATR_STOP</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-weight:bold;">Genuine cold boot (no snapshot restore), quiet, for profiling:</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">EMULATR_NO_AUTOLOAD=1 ./out/build/relwithdebinfo/Emulatr.exe \</para>
+    <para styleclass="Code Example"> &#160;--firmware firmware/ds10_v7_3.exe --autosnapshot off &#160;2&gt; /dev/null</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-weight:bold;">Enable a single device trace (IIC bus, e.g. for the FRU/EEPROM path):</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">EMULATR_IIC_TRACE=1 ./out/build/relwithdebinfo/Emulatr.exe \</para>
+    <para styleclass="Code Example"> &#160;--firmware firmware/ds10_v7_3.exe &#160;2&gt; iic.log</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><line style="height:1px; color:#000000;" /></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-style:italic;">Maintenance: regenerate by grepping getenv across EmulatRAppUniV4\Emulatr and diffing against the tables above. New runtime gates should be added here and noted in their commit.</text></para>
+  </body>
+</topic>

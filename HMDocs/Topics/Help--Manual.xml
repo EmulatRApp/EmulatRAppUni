@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Help &amp; Manual</title>
+  <keywords>
+    <keyword>authoring tool</keyword>
+    <keyword>documentation</keyword>
+    <keyword>Help &amp; Manual</keyword>
+    <keyword>help project</keyword>
+    <keyword>keywords</keyword>
+    <keyword>styleclass</keyword>
+    <keyword>table of contents</keyword>
+    <keyword>topic</keyword>
+    <keyword>topiclink</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Help &amp; Manual</para></header>
+    <para styleclass="Normal">Help &amp; Manual (EC Software) is the documentation authoring tool that produces this help project. Every page you are reading is a Help &amp; Manual topic; the project organizes those topics into the table of contents and compiles them to the published output.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">How this documentation is structured</para>
+    <para styleclass="Normal">The project is one topic per subject. Each topic is an XML file with a title, a keyword index, and a body; the table of contents is a separate map that nests the topics into the eight-section structure. Pages cross-reference each other through topic links rather than copied text, so a fact lives on one page and is linked from the others.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Authoring conventions</para>
+    <para styleclass="Normal">A consistent house style keeps the project uniform: body text uses the Normal style, section headings use the Heading styles, console and code text uses the Code Example style, and a See Also block of topic links closes most pages. Two rules matter for searchability and portability -- the keyword index on each page names every noun on that page, and the text is ASCII-only (a double hyphen stands in for a dash). These are the same conventions the rest of this documentation follows.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Attributions--Credits-------">Attributions &amp; Credits</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Required-Tools--Frameworks">Required Tools &amp; Frameworks</link></para>
+  </body>
+</topic>

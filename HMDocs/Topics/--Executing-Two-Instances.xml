@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Executing Two Instances</title>
+  <keywords>
+    <keyword>concurrent instances</keyword>
+    <keyword>ds10_flash.rom</keyword>
+    <keyword>EMULATR_CONSOLE_PORT</keyword>
+    <keyword>EMULATR_FLASH_ROM</keyword>
+    <keyword>flash corruption</keyword>
+    <keyword>flash isolation</keyword>
+    <keyword>NVRAM</keyword>
+    <keyword>snapshots</keyword>
+    <keyword>two instances</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Executing Two Instances</para></header>
+    <para styleclass="Normal">Two instances launched from the same directory share <text styleclass="Code Example">ds10_flash.rom</text> and the <text styleclass="Code Example">snapshots/</text> directory, and concurrent NVRAM writes can corrupt the flash. Give each console its own port with <text styleclass="Code Example">EMULATR_CONSOLE_PORT</text>, and if a run will write NVRAM (any <text styleclass="Code Example">set</text> or <text styleclass="Code Example">update</text> at the <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt), isolate its flash first.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">cp ds10_flash.rom ds10_flash_release.rom</para>
+    <para styleclass="Code Example"># then prepend on the launch line:  EMULATR_FLASH_ROM=ds10_flash_release.rom</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">With a separate <text styleclass="Code Example">EMULATR_FLASH_ROM</text> per instance, NVRAM writes no longer collide. Confirm the second instance came up on its own port by checking its log for "Listening on TCP port 10024".</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing------------(moved)">Executing</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="4_5-Snapshots">Snapshots</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Clean-Shutdown">Clean Shutdown</link></para>
+  </body>
+</topic>

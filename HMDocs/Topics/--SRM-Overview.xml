@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-14T22:32:46.971Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>SRM Overview</title>
+  <keywords>
+    <keyword>HALT</keyword>
+    <keyword>NVRAM</keyword>
+    <keyword>PALcode</keyword>
+    <keyword>set</keyword>
+    <keyword>show</keyword>
+    <keyword>SRM console</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">SRM Overview</para>
+    </header>
+    <para styleclass="Normal">At <text styleclass="Code Example">&gt;&gt;&gt;</text> you interact with the console using <text styleclass="Code Example">show</text> (display a variable), <text styleclass="Code Example">set</text> (change a variable), and device / diagnostic commands. Settings persist to the flash / NVRAM image. The default power-up action is HALT, so the console waits at <text styleclass="Code Example">&gt;&gt;&gt;</text> for an operator command.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The reported console version is <text styleclass="Code Example">V7.3-2 (Feb 27 2007)</text>; <text styleclass="Code Example">PALcode is OpenVMS V1.98-83 / Tru64 UNIX V1.92-73.</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Common-Commands">Common Commands</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--SRM-Environment-Variables">SRM Environment Variables</link></para>
+  </body>
+</topic>

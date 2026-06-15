@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:46:20.308Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Common Commands</title>
+  <keywords>
+    <keyword>boot</keyword>
+    <keyword>help</keyword>
+    <keyword>set</keyword>
+    <keyword>show</keyword>
+    <keyword>show config</keyword>
+    <keyword>show device</keyword>
+    <keyword>show memory</keyword>
+    <keyword>SRM commands</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">SRM - Common Commands</para>
+    </header>
+    <para styleclass="Normal">The commands used most often at the <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt. Each <text styleclass="Code Example">show</text> command has its own page in this subsection.</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">show &lt;var&gt; -- display the stored and active value of a console variable.</li>
+      <li styleclass="NotesBox">set &lt;var&gt; &lt;value&gt; -- change a variable (persisted to NVRAM).</li>
+      <li styleclass="NotesBox">show config -- system configuration table (CPU, core logic, memory, PCI / ISA).</li>
+      <li styleclass="NotesBox">show device -- enumerated storage / I/O devices.</li>
+      <li styleclass="NotesBox">show memory -- memory array layout.</li>
+      <li styleclass="NotesBox">boot -- bootstrap the OS (planned on EmulatR; HALT is the implemented action).</li>
+      <li styleclass="NotesBox">help / ? -- console help.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="show-config">show config</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="set">set</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--SRM-Environment-Variables">SRM Environment Variables</link></para>
+  </body>
+</topic>

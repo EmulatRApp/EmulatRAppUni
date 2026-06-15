@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T00:08:31.886Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>grainFactoryLib</title>
+  <keywords>
+    <keyword>codegen</keyword>
+    <keyword>genGrains.py</keyword>
+    <keyword>grain</keyword>
+    <keyword>GrainMasterV4.tsv</keyword>
+    <keyword>GrainStubs.cpp</keyword>
+    <keyword>handwritten.tsv</keyword>
+    <keyword>leaf</keyword>
+    <keyword>leafBase</keyword>
+    <keyword>personality</keyword>
+    <keyword>S_PalLinux</keyword>
+    <keyword>S_PalTru64</keyword>
+    <keyword>S_PalVms</keyword>
+    <keyword>SemanticFlags.tsv</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">grainFactoryLib</para>
+    </header>
+    <para styleclass="Normal">A grain is the unit of instruction semantics in V4: each decoded instruction resolves to a single grain leaf that implements its behavior. grainFactoryLib is where those leaves and the tables that reach them are generated, from tab-separated source-of-truth tables rather than hand-maintained switch statements.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Table-driven codegen</para>
+    <para styleclass="Normal">The codegen reads two tables and emits generated C++ headers and sources. <text styleclass="Code Example">SemanticFlags.tsv</text> defines the semantic flag vocabulary; <text styleclass="Code Example">GrainMasterV4.tsv</text> is the per-instruction master table. The generator <text styleclass="Code Example">codegen/genGrains.py</text> validates the join between them and emits, under <text styleclass="Code Example">generated/</text>: <text styleclass="Code Example">SemanticFlagsEnum.h</text> (the flag enum, masks, and predicates), <text styleclass="Code Example">DispatchKinds.h</text> (the dispatch-kind enum), <text styleclass="Code Example">GrainsForward.h</text> (per-box leaf declarations), <text styleclass="Code Example">DispatchTables.cpp</text> (the populated tables), and <text styleclass="Code Example">GrainStubs.cpp</text> (stub leaves for not-yet-implemented rows). Hand-written leaves are carried in <text styleclass="Code Example">codegen/handwritten.tsv</text> so a real implementation can supersede a generated stub.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The master table row</para>
+    <para styleclass="Normal">Each row of <text styleclass="Code Example">GrainMasterV4.tsv</text> describes one instruction with these columns: <text styleclass="Code Example">mnemonic</text>, <text styleclass="Code Example">primaryOpcode</text>, <text styleclass="Code Example">subDecode</text>, <text styleclass="Code Example">dispatchKind</text>, <text styleclass="Code Example">format</text>, <text styleclass="Code Example">box</text> (the functional domain that owns the leaf -- IBox, EBox, FBox, MBox, CBox, or PalBox), <text styleclass="Code Example">flags</text> (a bitwise-OR of S_* semantic flags), <text styleclass="Code Example">notes</text>, and <text styleclass="Code Example">leafBase</text>. The flags drive correctness-relevant behavior: for example a PAL row carries <text styleclass="Code Example">S_PalFormat | S_PalEntry | S_ChangesPC</text> and one or more personality flags.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">PALcode personalities</para>
+    <para styleclass="Normal">A single CALL_PAL opcode can mean different things under different operating systems, so rows carry personality flags -- <text styleclass="Code Example">S_PalTru64</text>, <text styleclass="Code Example">S_PalVms</text>, and <text styleclass="Code Example">S_PalLinux</text>. For instance opcode 0x83 is CHMK (change mode to kernel) under VMS but callsys under Tru64 and Linux; the row marks all three. The codegen iterates the personalities to emit the right dispatch, which keeps the OS-specific PAL behavior in the table rather than in code.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--DispatchTables">DispatchTables</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Execution-Flight-Plan-------">Execution Flight Plan </link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Floating-Point-Consideration">Floating-Point Considerations</link></para>
+  </body>
+</topic>

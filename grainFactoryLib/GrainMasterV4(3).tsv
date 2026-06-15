@@ -1,0 +1,523 @@
+# ============================================================================
+# GrainMasterV4.tsv -- per-grain dispatch and semantic table for EmulatR V4
+# ============================================================================
+# Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+# Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
+# Licensed under eNVy Systems Non-Commercial License v1.1
+#
+# Project Architect: Timothy Peer
+# AI Collaboration:  Claude (Anthropic)
+#
+# Commercial use prohibited without separate license.
+# Contact:        peert@envysys.com  |  https://envysys.com
+# Documentation:  https://timothypeer.github.io/ASA-EMulatR-Project/
+# ============================================================================
+#
+# Purpose
+# -------
+# Single source of truth for the GrainFactory codegen.  Each row describes
+# one Alpha AXP operation: the encoding fields that identify it, the
+# dispatch arm it lives in, the functional box that owns its leaf, and
+# the semantic flags it carries on the InstructionGrain.
+#
+# Supersedes V3's GrainMaster.tsv (kept as historical reference; do not
+# extend).  The V3 schema lacked a flags column, expressed personality
+# via the "_64" mnemonic suffix, and contained duplicates and
+# misclassifications that V4 codegen would refuse.
+#
+# Schema
+# ------
+# Tab-separated.  Lines starting with '#' are comments.  Blank lines
+# are ignored.  Column order:
+#
+#   mnemonic        Alpha mnemonic; case-sensitive.  May repeat across
+#                   rows when the same encoding exists under both PAL
+#                   personalities -- distinguished by personality flags.
+#
+#   primaryOpcode   Hex; 0x00..0x3F.  6-bit primary opcode field [31:26].
+#
+#   subDecode       Hex; sub-decode field value.  0x0 when dispatchKind
+#                   is Direct (no sub-decode).  Field width depends on
+#                   dispatchKind:
+#                       IntArith/IntLogical/IntShift/IntMul/ItFp
+#                          7 bits  (encoded [11:5])
+#                       FltIeee/FltLogical
+#                          11 bits (encoded [15:5])
+#                       Misc
+#                          16 bits (encoded [15:0])
+#                       JmpClass
+#                          2 bits  (encoded [15:14])
+#                       FpTiExt
+#                          7 bits  (encoded [11:5])
+#                       Pal
+#                          26 bits (encoded [25:0])
+#                       HwMfpr/HwLd/HwMtpr/HwSt
+#                          0..16 bits depending on encoding (TBD)
+#                       HwRei
+#                          (no sub-decode)
+#
+#   dispatchKind    Direct | IntArith | IntLogical | IntShift | IntMul |
+#                   ItFp | FltIeee | FltLogical | Misc | JmpClass |
+#                   FpTiExt | Pal | HwMfpr | HwLd | HwMtpr | HwRei |
+#                   HwSt | Reserved
+#
+#   format          Mem | Bra | Op | Fp | Pal | Hw | Jmp | Misc
+#                   Must agree with the S_xxxFormat flag in the flags
+#                   column; codegen verifies the join.
+#
+#   box             Ibox | Ebox | Fbox | Mbox | Cbox | PalBox
+#                   Functional box that owns the leaf.  Lowered by
+#                   codegen to a C++ namespace (eBox, fBox, mBox, cBox,
+#                   iBox, palBox) and a directory under {box}Lib/grains/.
+#
+#   flags           Pipe-separated list of S_xxx flag names defined in
+#                   SemanticFlags.tsv.  Codegen rejects rows that
+#                   reference undefined flags or violate mutex groups.
+#
+#   notes           Optional prose; codegen ignores.
+#
+# ============================================================================
+# Personality variants
+# ============================================================================
+# Some CALL_PAL function codes have different semantics under Tru64 vs
+# OpenVMS PAL personalities.  Two ways to encode this:
+#
+#   - One row with both S_PalTru64 and S_PalVms set: encoding behaves
+#     identically under both personalities (e.g., HALT).
+#   - Two rows with the same (primaryOpcode, subDecode) pair, one
+#     tagged S_PalTru64 and one tagged S_PalVms: encoding has distinct
+#     leaf semantics per personality.  Codegen synthesizes leaf names
+#     palBox::execXxx_tru64 and palBox::execXxx_vms, populates the
+#     personality-specific PAL sub-tables (g_palTableTru64,
+#     g_palTableVms) accordingly, and the CPU selects one at boot.
+#
+#   - Personality-agnostic instructions (the common case) set neither
+#     flag.  Outside CALL_PAL, no row should set either flag.
+#
+# ============================================================================
+
+mnemonic	primaryOpcode	subDecode	dispatchKind	format	box	flags	notes	leafBase
+
+# ----------------------------------------------------------------------------
+# CALL_PAL -- opcode 0x00
+# ----------------------------------------------------------------------------
+HALT	0x00	0x0000	Pal	Pal	PalBox	S_PalFormat|S_PalEntry|S_ChangesPC|S_Uncond|S_PalTru64|S_PalVms	halt processor; both personalities
+BPT	0x00	0x0080	Pal	Pal	PalBox	S_PalFormat|S_PalEntry|S_ChangesPC|S_Uncond|S_PalTru64	breakpoint trap (Tru64)
+BPT	0x00	0x0080	Pal	Pal	PalBox	S_PalFormat|S_PalEntry|S_ChangesPC|S_Uncond|S_PalVms	breakpoint trap (VMS)
+CHME	0x00	0x0082	Pal	Pal	PalBox	S_PalFormat|S_PalEntry|S_ChangesPC|S_Uncond|S_PalVms	change mode to executive (VMS only)
+CHMK	0x00	0x0083	Pal	Pal	PalBox	S_PalFormat|S_PalEntry|S_ChangesPC|S_Uncond|S_PalTru64	change mode to kernel (Tru64); same encoding as VMS CALLSYS
+LDQP	0x00	0x0003	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalTru64|S_PalVms	load quadword physical intrinsic; R0 := mem[R16] (8 bytes, physical addressing)
+STQP	0x00	0x0004	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_PalTru64|S_PalVms	store quadword physical intrinsic; mem[R16] := R17 (8 bytes, physical addressing)
+CSERVE	0x00	0x0009	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalTru64|S_PalVms	console service intrinsic; inline-executed, no PAL transfer; R16=func, R0=result
+MFPR_VPTB	0x00	0x0029	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalTru64|S_PalVms	read Virtual Page Table Base intrinsic; R0 := cpu.vptb
+MTPR_VPTB	0x00	0x002A	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_PalTru64|S_PalVms	write Virtual Page Table Base intrinsic; cpu.vptb := R16
+WTINT	0x00	0x003E	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalTru64|S_PalVms	wait for interrupt intrinsic; V4 has no interrupt source so returns 0 in R0 immediately
+
+
+# ----------------------------------------------------------------------------
+# Memory-format direct dispatch -- opcodes 0x08..0x0F, 0x20..0x2F
+# ----------------------------------------------------------------------------
+LDA	0x08	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt	load address: Ra <- Rb + sext(disp); no memory access
+LDAH	0x09	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt	load address high: Ra <- Rb + (sext(disp) << 16); no memory access
+LDBU	0x0A	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt|S_Load|S_Cacheable	load byte unsigned: Ra <- zero_extend(Mem[EA]<7:0>)
+LDQ_U	0x0B	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt|S_Load|S_Cacheable	load quadword unaligned: EA force-aligned by clearing low 3 bits
+LDWU	0x0C	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt|S_Load|S_Cacheable	load word unsigned: Ra <- zero_extend(Mem[EA]<15:0>)
+STW	0x0D	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Store|S_Cacheable	16-bit store (word)
+STB	0x0E	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Store|S_Cacheable	8-bit store (byte)
+STQ_U	0x0F	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Store|S_Cacheable	store quadword unaligned: EA force-aligned by clearing low 3 bits
+LDL	0x28	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt|S_Load|S_Cacheable	sign-extended 32-bit load: Ra <- sext_32(Mem[EA])
+LDQ	0x29	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt|S_Load|S_Cacheable	64-bit aligned load
+LDL_L	0x2A	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt|S_Load|S_Locked|S_Cacheable	sign-extended longword load locked
+LDQ_L	0x2B	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt|S_Load|S_Locked|S_Cacheable	quadword load locked
+STL	0x2C	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Store|S_Cacheable	32-bit aligned store
+STQ	0x2D	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Store|S_Cacheable	64-bit aligned store
+STL_C	0x2E	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRa|S_WritesInt|S_Store|S_Locked|S_Cacheable	store longword conditional; writes Ra with success indicator
+STQ_C	0x2F	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRa|S_WritesInt|S_Store|S_Locked|S_Cacheable	store quadword conditional; writes Ra with success indicator
+
+
+# ----------------------------------------------------------------------------
+# Integer arithmetic -- opcode 0x10
+# ----------------------------------------------------------------------------
+ADDL	0x10	0x00	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	32-bit add; result sign-extended to 64
+S4ADDL	0x10	0x02	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add longword: Rc = sext((Ra*4 + Rb)<31:0>)
+SUBL	0x10	0x09	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	32-bit subtract
+S4SUBL	0x10	0x0B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub longword: Rc = sext((Ra*4 - Rb)<31:0>)
+CMPBGE	0x10	0x0F	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-byte unsigned compare; 8-bit result in low byte of Rc
+S8ADDL	0x10	0x12	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add longword: Rc = sext((Ra*8 + Rb)<31:0>)
+S8SUBL	0x10	0x1B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub longword: Rc = sext((Ra*8 - Rb)<31:0>)
+CMPULT	0x10	0x1D	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	compare unsigned less than
+ADDQ	0x10	0x20	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	64-bit add
+S4ADDQ	0x10	0x22	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add quadword: Rc = Ra*4 + Rb
+SUBQ	0x10	0x29	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	64-bit subtract
+S4SUBQ	0x10	0x2B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub quadword: Rc = Ra*4 - Rb
+S8ADDQ	0x10	0x32	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add quadword: Rc = Ra*8 + Rb
+S8SUBQ	0x10	0x3B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub quadword: Rc = Ra*8 - Rb
+CMPEQ	0x10	0x2D	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	compare equal
+CMPULE	0x10	0x3D	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	compare unsigned less or equal
+CMPLT	0x10	0x4D	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	compare signed less than
+CMPLE	0x10	0x6D	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	compare signed less or equal
+
+# ----------------------------------------------------------------------------
+# Integer logical -- opcode 0x11
+# ----------------------------------------------------------------------------
+AND	0x11	0x00	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	bitwise AND
+BIC	0x11	0x08	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	bit clear (AND NOT): Rc = Ra & ~Rb
+CMOVLBS	0x11	0x14	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra<0> set; else Rc unchanged
+CMOVLBC	0x11	0x16	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra<0> clear; else Rc unchanged
+BIS	0x11	0x20	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	OR; canonical MOV pseudo-op (bis Rs, R31, Rd)
+CMOVEQ	0x11	0x24	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra == 0; else Rc unchanged
+CMOVNE	0x11	0x26	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra != 0; else Rc unchanged
+ORNOT	0x11	0x28	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	OR NOT: Rc = Ra | ~Rb
+XOR	0x11	0x40	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	bitwise XOR
+CMOVLT	0x11	0x44	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra < 0 (signed); else Rc unchanged
+CMOVGE	0x11	0x46	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra >= 0 (signed); else Rc unchanged
+EQV	0x11	0x48	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	equivalence (XNOR): Rc = ~(Ra ^ Rb)
+CMOVLE	0x11	0x64	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra <= 0 (signed); else Rc unchanged
+CMOVGT	0x11	0x66	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	conditional move if Ra > 0 (signed); else Rc unchanged
+
+# ----------------------------------------------------------------------------
+# Integer shift + byte manipulation -- opcode 0x12
+# ----------------------------------------------------------------------------
+# Shifts proper.
+SLL	0x12	0x39	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	shift left logical
+SRL	0x12	0x34	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	shift right logical
+SRA	0x12	0x3C	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	shift right arithmetic
+# ZAP/ZAPNOT -- per-byte mask under literal control.
+ZAP	0x12	0x30	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	zero per-byte where Rb<i> set
+ZAPNOT	0x12	0x31	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	zero per-byte where Rb<i> clear
+# Mask byte/word/long/quad -- low half family.
+MSKBL	0x12	0x02	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	mask byte low
+MSKWL	0x12	0x12	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	mask word low
+MSKLL	0x12	0x22	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	mask longword low
+MSKQL	0x12	0x32	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	mask quadword low
+# Mask byte/word/long/quad -- high half family.
+MSKWH	0x12	0x52	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	mask word high
+MSKLH	0x12	0x62	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	mask longword high
+MSKQH	0x12	0x72	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	mask quadword high
+# Extract -- low half family.
+EXTBL	0x12	0x06	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	extract byte low
+EXTWL	0x12	0x16	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	extract word low
+EXTLL	0x12	0x26	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	extract longword low
+EXTQL	0x12	0x36	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	extract quadword low
+# Extract -- high half family.
+EXTWH	0x12	0x5A	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	extract word high
+EXTLH	0x12	0x6A	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	extract longword high
+EXTQH	0x12	0x7A	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	extract quadword high
+# Insert -- low half family.
+INSBL	0x12	0x0B	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	insert byte low
+INSWL	0x12	0x1B	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	insert word low
+INSLL	0x12	0x2B	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	insert longword low
+INSQL	0x12	0x3B	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	insert quadword low
+# Insert -- high half family.
+INSWH	0x12	0x57	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	insert word high
+INSLH	0x12	0x67	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	insert longword high
+INSQH	0x12	0x77	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	insert quadword high
+
+# ----------------------------------------------------------------------------
+# Integer multiply -- opcode 0x13
+# ----------------------------------------------------------------------------
+MULL	0x13	0x00	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	32-bit multiply
+MULQ	0x13	0x20	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	64-bit multiply
+UMULH	0x13	0x30	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	unsigned multiply high (upper 64 bits of 128-bit product)
+
+# ----------------------------------------------------------------------------
+# Int <-> FP moves -- opcode 0x14 (ITFP)
+# ----------------------------------------------------------------------------
+ITOFS	0x14	0x004	ItFp	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsInt|S_WritesRc|S_WritesFp	integer -> FP single-precision move
+ITOFT	0x14	0x024	ItFp	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsInt|S_WritesRc|S_WritesFp	integer -> FP T-format move
+
+# ----------------------------------------------------------------------------
+# IEEE floating point arithmetic -- opcode 0x16 (FLTI)
+# ----------------------------------------------------------------------------
+# Each base op (ADDS/ADDT/SUBS/SUBT/MULS/MULT/DIVS/DIVT) has 16 modifier
+# variants combining rounding mode (chopped/minus-inf/nearest/dynamic)
+# crossed with trap mode (default/underflow/sw+underflow/sw+underflow+
+# inexact).  All variants of a given base op share a single leaf via
+# the leafBase column -- 16 GrainMaster rows route to one execAdds (etc.)
+# leaf, which inspects the modifier bits at runtime to apply the right
+# rounding and trap behaviour.
+#
+# The block below was emitted by codegen/expandFpVariants.py; re-run
+# that script to regenerate, extend the BASES table to add new ops,
+# extend the MODIFIERS table to add variants.
+
+# --- ADDS family (16 variants; leafBase=ADDS) ---
+ADDS_C	0x16	0x000	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (chopped)	ADDS
+ADDS_M	0x16	0x040	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (minus-inf)	ADDS
+ADDS	0x16	0x080	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (nearest)	ADDS
+ADDS_D	0x16	0x0C0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (dynamic)	ADDS
+ADDS_UC	0x16	0x100	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (underflow, chopped)	ADDS
+ADDS_UM	0x16	0x140	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (underflow, minus-inf)	ADDS
+ADDS_U	0x16	0x180	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (underflow, nearest)	ADDS
+ADDS_UD	0x16	0x1C0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (underflow, dynamic)	ADDS
+ADDS_SUC	0x16	0x500	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, chopped)	ADDS
+ADDS_SUM	0x16	0x540	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, minus-inf)	ADDS
+ADDS_SU	0x16	0x580	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, nearest)	ADDS
+ADDS_SUD	0x16	0x5C0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, dynamic)	ADDS
+ADDS_SUIC	0x16	0x700	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, inexact, chopped)	ADDS
+ADDS_SUIM	0x16	0x740	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, inexact, minus-inf)	ADDS
+ADDS_SUI	0x16	0x780	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, inexact, nearest)	ADDS
+ADDS_SUID	0x16	0x7C0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDS (sw, underflow, inexact, dynamic)	ADDS
+
+# --- ADDT family (16 variants; leafBase=ADDT) ---
+ADDT_C	0x16	0x020	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (chopped)	ADDT
+ADDT_M	0x16	0x060	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (minus-inf)	ADDT
+ADDT	0x16	0x0A0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (nearest)	ADDT
+ADDT_D	0x16	0x0E0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (dynamic)	ADDT
+ADDT_UC	0x16	0x120	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (underflow, chopped)	ADDT
+ADDT_UM	0x16	0x160	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (underflow, minus-inf)	ADDT
+ADDT_U	0x16	0x1A0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (underflow, nearest)	ADDT
+ADDT_UD	0x16	0x1E0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (underflow, dynamic)	ADDT
+ADDT_SUC	0x16	0x520	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, chopped)	ADDT
+ADDT_SUM	0x16	0x560	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, minus-inf)	ADDT
+ADDT_SU	0x16	0x5A0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, nearest)	ADDT
+ADDT_SUD	0x16	0x5E0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, dynamic)	ADDT
+ADDT_SUIC	0x16	0x720	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, inexact, chopped)	ADDT
+ADDT_SUIM	0x16	0x760	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, inexact, minus-inf)	ADDT
+ADDT_SUI	0x16	0x7A0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, inexact, nearest)	ADDT
+ADDT_SUID	0x16	0x7E0	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE ADDT (sw, underflow, inexact, dynamic)	ADDT
+
+# --- SUBS family (16 variants; leafBase=SUBS) ---
+SUBS_C	0x16	0x001	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (chopped)	SUBS
+SUBS_M	0x16	0x041	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (minus-inf)	SUBS
+SUBS	0x16	0x081	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (nearest)	SUBS
+SUBS_D	0x16	0x0C1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (dynamic)	SUBS
+SUBS_UC	0x16	0x101	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (underflow, chopped)	SUBS
+SUBS_UM	0x16	0x141	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (underflow, minus-inf)	SUBS
+SUBS_U	0x16	0x181	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (underflow, nearest)	SUBS
+SUBS_UD	0x16	0x1C1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (underflow, dynamic)	SUBS
+SUBS_SUC	0x16	0x501	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, chopped)	SUBS
+SUBS_SUM	0x16	0x541	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, minus-inf)	SUBS
+SUBS_SU	0x16	0x581	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, nearest)	SUBS
+SUBS_SUD	0x16	0x5C1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, dynamic)	SUBS
+SUBS_SUIC	0x16	0x701	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, inexact, chopped)	SUBS
+SUBS_SUIM	0x16	0x741	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, inexact, minus-inf)	SUBS
+SUBS_SUI	0x16	0x781	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, inexact, nearest)	SUBS
+SUBS_SUID	0x16	0x7C1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBS (sw, underflow, inexact, dynamic)	SUBS
+
+# --- SUBT family (16 variants; leafBase=SUBT) ---
+SUBT_C	0x16	0x021	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (chopped)	SUBT
+SUBT_M	0x16	0x061	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (minus-inf)	SUBT
+SUBT	0x16	0x0A1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (nearest)	SUBT
+SUBT_D	0x16	0x0E1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (dynamic)	SUBT
+SUBT_UC	0x16	0x121	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (underflow, chopped)	SUBT
+SUBT_UM	0x16	0x161	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (underflow, minus-inf)	SUBT
+SUBT_U	0x16	0x1A1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (underflow, nearest)	SUBT
+SUBT_UD	0x16	0x1E1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (underflow, dynamic)	SUBT
+SUBT_SUC	0x16	0x521	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, chopped)	SUBT
+SUBT_SUM	0x16	0x561	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, minus-inf)	SUBT
+SUBT_SU	0x16	0x5A1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, nearest)	SUBT
+SUBT_SUD	0x16	0x5E1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, dynamic)	SUBT
+SUBT_SUIC	0x16	0x721	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, inexact, chopped)	SUBT
+SUBT_SUIM	0x16	0x761	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, inexact, minus-inf)	SUBT
+SUBT_SUI	0x16	0x7A1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, inexact, nearest)	SUBT
+SUBT_SUID	0x16	0x7E1	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE SUBT (sw, underflow, inexact, dynamic)	SUBT
+
+# --- MULS family (16 variants; leafBase=MULS) ---
+MULS_C	0x16	0x002	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (chopped)	MULS
+MULS_M	0x16	0x042	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (minus-inf)	MULS
+MULS	0x16	0x082	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (nearest)	MULS
+MULS_D	0x16	0x0C2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (dynamic)	MULS
+MULS_UC	0x16	0x102	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (underflow, chopped)	MULS
+MULS_UM	0x16	0x142	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (underflow, minus-inf)	MULS
+MULS_U	0x16	0x182	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (underflow, nearest)	MULS
+MULS_UD	0x16	0x1C2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (underflow, dynamic)	MULS
+MULS_SUC	0x16	0x502	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, chopped)	MULS
+MULS_SUM	0x16	0x542	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, minus-inf)	MULS
+MULS_SU	0x16	0x582	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, nearest)	MULS
+MULS_SUD	0x16	0x5C2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, dynamic)	MULS
+MULS_SUIC	0x16	0x702	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, inexact, chopped)	MULS
+MULS_SUIM	0x16	0x742	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, inexact, minus-inf)	MULS
+MULS_SUI	0x16	0x782	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, inexact, nearest)	MULS
+MULS_SUID	0x16	0x7C2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULS (sw, underflow, inexact, dynamic)	MULS
+
+# --- MULT family (16 variants; leafBase=MULT) ---
+MULT_C	0x16	0x022	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (chopped)	MULT
+MULT_M	0x16	0x062	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (minus-inf)	MULT
+MULT	0x16	0x0A2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (nearest)	MULT
+MULT_D	0x16	0x0E2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (dynamic)	MULT
+MULT_UC	0x16	0x122	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (underflow, chopped)	MULT
+MULT_UM	0x16	0x162	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (underflow, minus-inf)	MULT
+MULT_U	0x16	0x1A2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (underflow, nearest)	MULT
+MULT_UD	0x16	0x1E2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (underflow, dynamic)	MULT
+MULT_SUC	0x16	0x522	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, chopped)	MULT
+MULT_SUM	0x16	0x562	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, minus-inf)	MULT
+MULT_SU	0x16	0x5A2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, nearest)	MULT
+MULT_SUD	0x16	0x5E2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, dynamic)	MULT
+MULT_SUIC	0x16	0x722	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, inexact, chopped)	MULT
+MULT_SUIM	0x16	0x762	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, inexact, minus-inf)	MULT
+MULT_SUI	0x16	0x7A2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, inexact, nearest)	MULT
+MULT_SUID	0x16	0x7E2	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE MULT (sw, underflow, inexact, dynamic)	MULT
+
+# --- DIVS family (16 variants; leafBase=DIVS) ---
+DIVS_C	0x16	0x003	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (chopped)	DIVS
+DIVS_M	0x16	0x043	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (minus-inf)	DIVS
+DIVS	0x16	0x083	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (nearest)	DIVS
+DIVS_D	0x16	0x0C3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (dynamic)	DIVS
+DIVS_UC	0x16	0x103	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (underflow, chopped)	DIVS
+DIVS_UM	0x16	0x143	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (underflow, minus-inf)	DIVS
+DIVS_U	0x16	0x183	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (underflow, nearest)	DIVS
+DIVS_UD	0x16	0x1C3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (underflow, dynamic)	DIVS
+DIVS_SUC	0x16	0x503	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, chopped)	DIVS
+DIVS_SUM	0x16	0x543	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, minus-inf)	DIVS
+DIVS_SU	0x16	0x583	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, nearest)	DIVS
+DIVS_SUD	0x16	0x5C3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, dynamic)	DIVS
+DIVS_SUIC	0x16	0x703	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, inexact, chopped)	DIVS
+DIVS_SUIM	0x16	0x743	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, inexact, minus-inf)	DIVS
+DIVS_SUI	0x16	0x783	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, inexact, nearest)	DIVS
+DIVS_SUID	0x16	0x7C3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVS (sw, underflow, inexact, dynamic)	DIVS
+
+# --- DIVT family (16 variants; leafBase=DIVT) ---
+DIVT_C	0x16	0x023	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (chopped)	DIVT
+DIVT_M	0x16	0x063	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (minus-inf)	DIVT
+DIVT	0x16	0x0A3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (nearest)	DIVT
+DIVT_D	0x16	0x0E3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (dynamic)	DIVT
+DIVT_UC	0x16	0x123	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (underflow, chopped)	DIVT
+DIVT_UM	0x16	0x163	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (underflow, minus-inf)	DIVT
+DIVT_U	0x16	0x1A3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (underflow, nearest)	DIVT
+DIVT_UD	0x16	0x1E3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (underflow, dynamic)	DIVT
+DIVT_SUC	0x16	0x523	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, chopped)	DIVT
+DIVT_SUM	0x16	0x563	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, minus-inf)	DIVT
+DIVT_SU	0x16	0x5A3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, nearest)	DIVT
+DIVT_SUD	0x16	0x5E3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, dynamic)	DIVT
+DIVT_SUIC	0x16	0x723	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, inexact, chopped)	DIVT
+DIVT_SUIM	0x16	0x763	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, inexact, minus-inf)	DIVT
+DIVT_SUI	0x16	0x7A3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, inexact, nearest)	DIVT
+DIVT_SUID	0x16	0x7E3	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE DIVT (sw, underflow, inexact, dynamic)	DIVT
+
+# --- IEEE compares (base form, T-format double precision; result is 2.0 or 0.0) ---
+CMPTEQ	0x16	0x0A5	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE compare equal (T)
+CMPTLT	0x16	0x0A6	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE compare less than (T)
+CMPTLE	0x16	0x0A7	FltIeee	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp|S_FpTrap	IEEE compare less or equal (T)
+
+# ----------------------------------------------------------------------------
+# FP logical and FPCR access -- opcode 0x17 (FLTL)
+# ----------------------------------------------------------------------------
+CPYS	0x17	0x020	FltLogical	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp	copy with sign of Ra
+CPYSN	0x17	0x021	FltLogical	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp	copy with negated sign of Ra
+CPYSE	0x17	0x022	FltLogical	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsRb|S_ReadsFp|S_WritesRc|S_WritesFp	copy sign+exp of Ra, fraction of Rb
+MT_FPCR	0x17	0x024	FltLogical	Fp	Fbox	S_FpFormat|S_ReadsRa|S_ReadsFp|S_FpcrWrite	move Ra to FPCR
+MF_FPCR	0x17	0x025	FltLogical	Fp	Fbox	S_FpFormat|S_WritesRc|S_WritesFp|S_FpcrRead	move FPCR to Rc
+
+# ----------------------------------------------------------------------------
+# Misc -- opcode 0x18
+# ----------------------------------------------------------------------------
+TRAPB	0x18	0x0000	Misc	Misc	Cbox	S_MiscFormat|S_TrapBarrier	trap barrier; serializes precise traps
+EXCB	0x18	0x0400	Misc	Misc	Cbox	S_MiscFormat|S_ExcBarrier	exception barrier
+MB	0x18	0x4000	Misc	Misc	Cbox	S_MiscFormat|S_Mb	memory barrier
+WMB	0x18	0x4400	Misc	Misc	Cbox	S_MiscFormat|S_Wmb	write memory barrier
+FETCH	0x18	0x8000	Misc	Misc	Mbox	S_MiscFormat|S_ReadsRb|S_ReadsInt|S_PrefetchOnly	prefetch hint
+ECB	0x18	0xE800	Misc	Misc	Cbox	S_MiscFormat|S_ReadsRb|S_ReadsInt|S_PrefetchOnly	evict cache block
+RPCC	0x18	0xC000	Misc	Misc	Ebox	S_MiscFormat|S_WritesRa|S_WritesInt|S_RpccLike|S_NoTrace	read cycle counter; non-deterministic
+RC	0x18	0xE000	Misc	Misc	Ebox	S_MiscFormat|S_WritesRa|S_WritesInt|S_NoTrace	read-and-set intrFlag IPR; old value -> Ra
+RS	0x18	0xF000	Misc	Misc	Ebox	S_MiscFormat|S_WritesRa|S_WritesInt|S_NoTrace	read-and-clear intrFlag IPR; old value -> Ra
+
+# ----------------------------------------------------------------------------
+# HW_MFPR -- opcode 0x19 (PALmode)
+# ----------------------------------------------------------------------------
+HW_MFPR	0x19	0x0	HwMfpr	Hw	PalBox	S_HwFormat|S_Privileged|S_IprRead|S_WritesRa|S_WritesInt	read internal processor register
+
+# ----------------------------------------------------------------------------
+# JMP class -- opcode 0x1A; 2-bit selector in [15:14]
+# ----------------------------------------------------------------------------
+JMP	0x1A	0x0	JmpClass	Jmp	Ibox	S_JmpFormat|S_ReadsRb|S_ReadsInt|S_WritesRa|S_WritesInt|S_ChangesPC|S_Uncond|S_Indirect	indirect jump
+JSR	0x1A	0x1	JmpClass	Jmp	Ibox	S_JmpFormat|S_ReadsRb|S_ReadsInt|S_WritesRa|S_WritesInt|S_ChangesPC|S_Uncond|S_Indirect|S_CallBased	indirect call
+RET	0x1A	0x2	JmpClass	Jmp	Ibox	S_JmpFormat|S_ReadsRb|S_ReadsInt|S_WritesRa|S_WritesInt|S_ChangesPC|S_Uncond|S_Indirect|S_RetBased	return; hint that target was pushed by JSR
+JSR_COROUTINE	0x1A	0x3	JmpClass	Jmp	Ibox	S_JmpFormat|S_ReadsRb|S_ReadsInt|S_WritesRa|S_WritesInt|S_ChangesPC|S_Uncond|S_Indirect|S_CallBased|S_RetBased	coroutine swap
+
+# ----------------------------------------------------------------------------
+# HW_LD -- opcode 0x1B (PALmode)
+# ----------------------------------------------------------------------------
+HW_LD	0x1B	0x0	HwLd	Hw	Mbox	S_HwFormat|S_Privileged|S_Load|S_ReadsRb|S_WritesRa|S_ReadsInt|S_WritesInt	PALmode load with hint bits
+
+# ----------------------------------------------------------------------------
+# FpTi extensions -- opcode 0x1C (BWX/CIX/MVI/FIX)
+# ----------------------------------------------------------------------------
+SEXTB	0x1C	0x00	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	sign-extend byte
+SEXTW	0x1C	0x01	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	sign-extend word
+CTPOP	0x1C	0x30	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	count population
+PERR	0x1C	0x31	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	pixel error: sum of abs byte differences across 8 lanes
+CTLZ	0x1C	0x32	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	count leading zeros
+CTTZ	0x1C	0x33	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	count trailing zeros
+UNPKBW	0x1C	0x34	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	unpack low 4 bytes of Rb into 4 zero-extended 16-bit lanes
+UNPKBL	0x1C	0x35	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	unpack low 2 bytes of Rb into 2 zero-extended 32-bit lanes
+PKWB	0x1C	0x36	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	pack low byte of each 16-bit lane of Rb into low halfword
+PKLB	0x1C	0x37	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	pack low byte of each 32-bit lane of Rb into low halfword
+MINSB8	0x1C	0x38	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane signed min, 8 byte lanes
+MINSW4	0x1C	0x39	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane signed min, 4 word lanes
+MINUB8	0x1C	0x3A	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane unsigned min, 8 byte lanes
+MINUW4	0x1C	0x3B	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane unsigned min, 4 word lanes
+MAXUB8	0x1C	0x3C	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane unsigned max, 8 byte lanes
+MAXUW4	0x1C	0x3D	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane unsigned max, 4 word lanes
+MAXSB8	0x1C	0x3E	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane signed max, 8 byte lanes
+MAXSW4	0x1C	0x3F	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane signed max, 4 word lanes
+
+# ----------------------------------------------------------------------------
+# HW_MTPR -- opcode 0x1D (PALmode)
+# ----------------------------------------------------------------------------
+HW_MTPR	0x1D	0x0	HwMtpr	Hw	PalBox	S_HwFormat|S_Privileged|S_IprWrite|S_ReadsRa|S_ReadsInt	write internal processor register
+
+# ----------------------------------------------------------------------------
+# HW_REI -- opcode 0x1E (PALmode return)
+# ----------------------------------------------------------------------------
+HW_REI	0x1E	0x0	HwRei	Hw	PalBox	S_HwFormat|S_Privileged|S_PalExit|S_ChangesPC|S_Uncond|S_NoTrace	return from PAL; resume EXC_ADDR
+
+# ----------------------------------------------------------------------------
+# HW_ST -- opcode 0x1F (PALmode)
+# ----------------------------------------------------------------------------
+HW_ST	0x1F	0x0	HwSt	Hw	Mbox	S_HwFormat|S_Privileged|S_Store|S_ReadsRa|S_ReadsRb|S_ReadsInt	PALmode store with hint bits
+
+# ----------------------------------------------------------------------------
+# Branch direct dispatch -- opcodes 0x30..0x3F
+# ----------------------------------------------------------------------------
+BR	0x30	0x0	Direct	Bra	Ibox	S_BraFormat|S_WritesRa|S_WritesInt|S_ChangesPC|S_Uncond|S_Branch|S_CallBased	unconditional branch with link in Ra
+BSR	0x34	0x0	Direct	Bra	Ibox	S_BraFormat|S_WritesRa|S_WritesInt|S_ChangesPC|S_Uncond|S_Branch|S_CallBased	branch to subroutine; pushes return PC
+BLBC	0x38	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if low bit of Ra is clear
+BEQ	0x39	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if Ra == 0
+BLT	0x3A	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if Ra < 0
+BLE	0x3B	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if Ra <= 0 (signed)
+BLBS	0x3C	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if low bit of Ra is set
+BNE	0x3D	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if Ra != 0
+BGE	0x3E	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if Ra >= 0
+BGT	0x3F	0x0	Direct	Bra	Ibox	S_BraFormat|S_ReadsRa|S_ReadsInt|S_ChangesPC|S_Branch	branch if Ra > 0 (signed)
+
+# ----------------------------------------------------------------------------
+# Miscellaneous Opcodes
+# ----------------------------------------------------------------------------
+AMASK	0x11	0x61	IntLogical	Op	Ebox	S_OpFormat|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	architecture mask: Rc <- Rb & ~supported_features
+IMPLVER	0x11	0x6C	IntLogical	Op	Ebox	S_OpFormat|S_WritesRc|S_WritesInt	report processor implementation version (EV6=2)
+
+# ----------------------------------------------------------------------------
+# PALcode --- Opcodes -- 0x00
+# ----------------------------------------------------------------------------
+MFPR_WHAMI	0x00	0x003F	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalTru64|S_PalVms	read CPU ID intrinsic; V4 is single-CPU so always returns 0 in R0
+MFPR_FEN	0x00	0x000B	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register FEN
+MFPR_ASN	0x00	0x0006	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register ASN
+MFPR_ESP	0x00	0x001E	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register ESP
+MFPR_IPL	0x00	0x000E	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register IPL
+MFPR_MCES	0x00	0x0010	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register MCES
+MFPR_PCBB	0x00	0x0012	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register PCBB
+MFPR_PRBR	0x00	0x0013	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register PRBR
+MFPR_PTBR	0x00	0x0015	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register PTBR
+MFPR_SCBB	0x00	0x0016	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register SCBB
+MFPR_SISR	0x00	0x0019	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register SISR
+MFPR_SSP	0x00	0x0020	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register SSP
+MFPR_SYSPTBR	0x00	0x0032	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register SYSPTBR
+MFPR_TBCHK	0x00	0x001A	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register TBCHK
+MFPR_USP	0x00	0x0022	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register USP
+MFPT_VIRBND	0x00	0x0030	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register VIRBND
+MFPR_VPTB	0x00	0x0029	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register VPTB
+MTPR_ASTEN	0x00	0x0026	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move to processor register ASTEN
+MTPR_ASTSR	0x00	0x0020	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move from processor register ASTSR
+MFPR_SSP	0x00	0x0027	Pal	Pal	PalBox	S_PalFormat|S_PalIntrinsic|S_WritesRa|S_WritesInt|S_PalVms	Move to processor register ASTSR
+
+# ============================================================================
+# End of first wave (~50 rows; exercises every dispatchKind and every box).
+# Subsequent waves to add: full INTA/INTL/INTS/INTM coverage (V3 had 80+
+# rows in opcodes 0x10-0x13), full FLTI coverage (V3 had ~150 FP rows
+# spanning all rounding-mode and trap-mode variants), full PAL function
+# code map for both personalities, and the remaining BWX/CIX/MVI/FIX
+# extensions in opcode 0x1C.  VAX FP at opcode 0x15 is intentionally
+# omitted -- 21264 raises FP_DISABLED on FLTV; primary[0x15] resolves
+# to OPCDEC.
+# ============================================================================

@@ -1,0 +1,135 @@
+[2026-06-11 18:55:18.138] [info] [SRMConsoleDevice.cpp:173] SRM Console: Listening on TCP port 10023 (requested 10023)
+[2026-06-11 18:55:18.139] [info] [SRMConsoleDevice.cpp:661] SRM Console: Launching PuTTY: putty.exe -raw -P 10023 -sessionlog d:/emulatr/traces/app_output_&Y&M&D&T.log localhost
+[2026-06-11 18:55:18.166] [info] [Machine.cpp:939] Machine::run: graceful-stop sentinel = D:\EmulatR\EmulatRAppUniV4\Emulatr\EMULATR_STOP (touch it to stop cleanly and flush flash NVRAM)
+[2026-06-11 18:55:18.267] [info] [SRMConsoleDevice.cpp:488] SRM Console: Client connected from ::1:15398
+[2026-06-11 18:55:38.705] [warning] [FaultEventLog.cpp:106] FAULT[0]: cyc=186786248 pc=0x0000000000013155 encoded=0x77e72d40 op=0x1d fault=3 (kFaultUnimplemented) palMode=1
+[2026-06-11 18:55:38.706] [warning] [FaultEventLog.cpp:106] FAULT[1]: cyc=186786386 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[2]: cyc=186786841 pc=0x0000000000008591 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[3]: cyc=186786881 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[4]: cyc=186786930 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[5]: cyc=186786970 pc=0x0000000000008591 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[6]: cyc=186787063 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[7]: cyc=186787127 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[8]: cyc=186789469 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.709] [warning] [FaultEventLog.cpp:106] FAULT[9]: cyc=186789508 pc=0x0000000000008591 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.710] [warning] [FaultEventLog.cpp:106] FAULT[10]: cyc=186789570 pc=0x0000000000008591 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.710] [warning] [FaultEventLog.cpp:106] FAULT[11]: cyc=186789616 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.710] [warning] [FaultEventLog.cpp:106] FAULT[12]: cyc=186789697 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.710] [warning] [FaultEventLog.cpp:106] FAULT[13]: cyc=186789871 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.710] [warning] [FaultEventLog.cpp:106] FAULT[14]: cyc=186789935 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.710] [warning] [FaultEventLog.cpp:106] FAULT[15]: cyc=186790280 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.710] [warning] [FaultEventLog.cpp:106] FAULT[16]: cyc=186791410 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.711] [warning] [FaultEventLog.cpp:106] FAULT[17]: cyc=186801074 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.711] [warning] [FaultEventLog.cpp:106] FAULT[18]: cyc=186801179 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.713] [warning] [FaultEventLog.cpp:106] FAULT[19]: cyc=186815414 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.713] [warning] [FaultEventLog.cpp:106] FAULT[20]: cyc=186815518 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.713] [warning] [FaultEventLog.cpp:106] FAULT[21]: cyc=186815606 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.713] [warning] [FaultEventLog.cpp:106] FAULT[22]: cyc=186815720 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:38.714] [warning] [FaultEventLog.cpp:106] FAULT[23]: cyc=186817537 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.095] [warning] [FaultEventLog.cpp:106] FAULT[24]: cyc=21168678543 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.099] [warning] [FaultEventLog.cpp:106] FAULT[25]: cyc=21168699845 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.099] [warning] [FaultEventLog.cpp:106] FAULT[26]: cyc=21168699943 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.178] [warning] [FaultEventLog.cpp:106] FAULT[27]: cyc=21430860118 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.178] [warning] [FaultEventLog.cpp:106] FAULT[28]: cyc=21430860215 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.178] [warning] [FaultEventLog.cpp:106] FAULT[29]: cyc=21430860378 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.179] [warning] [FaultEventLog.cpp:106] FAULT[30]: cyc=21430866383 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.184] [warning] [FaultEventLog.cpp:106] FAULT[31]: cyc=21430910225 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.185] [warning] [FaultEventLog.cpp:106] FAULT[32]: cyc=21430919226 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.186] [warning] [FaultEventLog.cpp:106] FAULT[33]: cyc=21430928227 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.187] [warning] [FaultEventLog.cpp:106] FAULT[34]: cyc=21430937228 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.188] [warning] [FaultEventLog.cpp:106] FAULT[35]: cyc=21430946257 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.189] [warning] [FaultEventLog.cpp:106] FAULT[36]: cyc=21430955258 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.190] [warning] [FaultEventLog.cpp:106] FAULT[37]: cyc=21430964259 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.191] [warning] [FaultEventLog.cpp:106] FAULT[38]: cyc=21430973260 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.192] [warning] [FaultEventLog.cpp:106] FAULT[39]: cyc=21430982261 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.193] [warning] [FaultEventLog.cpp:106] FAULT[40]: cyc=21430991262 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.194] [warning] [FaultEventLog.cpp:106] FAULT[41]: cyc=21431000263 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.195] [warning] [FaultEventLog.cpp:106] FAULT[42]: cyc=21431009264 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.196] [warning] [FaultEventLog.cpp:106] FAULT[43]: cyc=21431018293 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.197] [warning] [FaultEventLog.cpp:106] FAULT[44]: cyc=21431027294 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.198] [warning] [FaultEventLog.cpp:106] FAULT[45]: cyc=21431036295 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.200] [warning] [FaultEventLog.cpp:106] FAULT[46]: cyc=21431045296 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.203] [warning] [UnalignedEventLog.cpp:86] UNALIGN-FIXUP[0]: cyc=21431071196 pc=0x00000000000ae93c va=0x0000000000031b7d width=2 palMode=0
+[2026-06-11 18:55:39.203] [warning] [UnalignedEventLog.cpp:86] UNALIGN-FIXUP[1]: cyc=21431071257 pc=0x00000000000ae934 va=0x0000000000031b7d width=2 palMode=0
+[2026-06-11 18:55:39.203] [warning] [UnalignedEventLog.cpp:86] UNALIGN-FIXUP[2]: cyc=21431071259 pc=0x00000000000ae93c va=0x0000000000031b93 width=2 palMode=0
+[2026-06-11 18:55:39.204] [warning] [FaultEventLog.cpp:106] FAULT[47]: cyc=21431077219 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+[2026-06-11 18:55:39.204] [warning] [FaultEventLog.cpp:106] FAULT[48]: cyc=21431077308 pc=0x0000000000008321 encoded=0x6c845000 op=0x1b fault=14 (kFaultDtbMissDouble) palMode=1
+================================================================
+   ASA-EmulatR  V4.0-0  --  Alpha AXP (EV6 / 21264) Emulator
+   (c) 2025, 2026 eNVy Systems, Inc.    All rights reserved.
+   Project Architect: Timothy Peer
+   Licensed under the eNVy Systems Non-Commercial License v1.1
+   https://envysys.com
+================================================================
+
+
+PROFILE: retires=199999999968 cycles=418392455179 wall=20011.2s  instr/s=9994381  cyc/s=20907868
+PC       = 0x00000000001c69ec  palMode = false  halted = false  cycles = 418392455179
+lastFault= 5 (kFaultDtbMiss)    excAddr = 0x00000000001c6f10
+
+Integer regs:
+    R00=0x00000000000000ff R01=0x0000000000000000 R02=0x00000000001779e0 R03=0x0000000000000081
+    R04=0x0000000000032681 R05=0x0000000000000003 R06=0x0000000000000000 R07=0x0000000000000000
+    R08=0x0000000000000000 R09=0x0000000000000000 R10=0x0000000000000000 R11=0x0000000000000000
+    R12=0x0000000000000000 R13=0x0000000000000000 R14=0x0000000000000000 R15=0x0000000000000000
+    R16=0x00000801fc000080 R17=0x0000000000000000 R18=0x0000000000000000 R19=0x00000000001c7300
+    R20=0x00000801fc000000 R21=0x000000000003c468 R22=0x00000000001cc4c0 R23=0x0000000000000000
+    R24=0x000000000003c998 R25=0x0000000000000002 R26=0x000000000007f794 R27=0x00000000001c7300
+    R28=0x000000000003c948 R29=0x0000000000035620 R30=0x0000000000035620 R31=0x0000000000000000
+
+FP regs:
+    F00=0x0000000000000000 F01=0x0000000000000000 F02=0x0000000000000000 F03=0x0000000000000000
+    F04=0x0000000000000000 F05=0x0000000000000000 F06=0x0000000000000000 F07=0x0000000000000000
+    F08=0x0000000000000000 F09=0x0000000000000000 F10=0x0000000000000000 F11=0x0000000000000000
+    F12=0x0000000000000000 F13=0x0000000000000000 F14=0x0000000000000000 F15=0x0000000000000000
+    F16=0x0000000000000000 F17=0x0000000000000000 F18=0x0000000000000000 F19=0x0000000000000000
+    F20=0x0000000000000000 F21=0x0000000000000000 F22=0x0000000000000000 F23=0x0000000000000000
+    F24=0x0000000000000000 F25=0x0000000000000000 F26=0x0000000000000000 F27=0x0000000000000000
+    F28=0x0000000000000000 F29=0x0000000000000000 F30=0x0000000000000000 F31=0x0000000000000000
+
+IPRs:
+    ptbr=0x0  asn=0x0  va_ctl=0x2  i_ctl=0x300386  m_ctl=0x20
+    palBase=0x8000  excAddr=0x1c6f10
+    i_spe=0x0  m_spe=0x0  mode=Kernel  mm_stat=0x0  intrFlag=0x0
+    reservedCacheLine=0x1cc4c0  hasReservation=false
+
+Stop reason: MaxCyclesExceeded  at PC=0x00000000001c6f10  fault=5 (kFaultDtbMiss)
+
+Instruction-stream probes (10 words each):
+  fault_pc                       = 0x00000000001c69ec
+    +00  pa=0x00000000001c69ec  word=0x63ff4000
+    +04  pa=0x00000000001c69f0  word=0x6bfa8001
+    +08  pa=0x00000000001c69f4  word=0x30100000
+    +12  pa=0x00000000001c69f8  word=0x63ff4000
+    +16  pa=0x00000000001c69fc  word=0x6bfa8001
+    +20  pa=0x00000000001c6a00  word=0x461f0416
+    +24  pa=0x00000000001c6a04  word=0x221f001f
+    +28  pa=0x00000000001c6a08  word=0x0000000f
+    +32  pa=0x00000000001c6a0c  word=0xc3e00000
+    +36  pa=0x00000000001c6a10  word=0x63ff4000
+
+  fault_pc + R30  (Tim's idea)   = 0x00000000001fc00c
+    +00  pa=0x00000000001fc00c  word=0x24d6097d
+    +04  pa=0x00000000001fc010  word=0x486d9b3c
+    +08  pa=0x00000000001fc014  word=0x19f8d189
+    +12  pa=0x00000000001fc018  word=0xdf5a92e3
+    +16  pa=0x00000000001fc01c  word=0x20f39b22
+    +20  pa=0x00000000001fc020  word=0xe3bbe23c
+    +24  pa=0x00000000001fc024  word=0x90dff933
+    +28  pa=0x00000000001fc028  word=0x84a9d26b
+    +32  pa=0x00000000001fc02c  word=0x57f590f9
+    +36  pa=0x00000000001fc030  word=0xfe88f77e
+
+  (R30 & ~0x7FFF) | low15(faultPc)= 0x00000000000369ec
+    +00  pa=0x00000000000369ec  word=0xefefefef
+    +04  pa=0x00000000000369f0  word=0xefefefef
+    +08  pa=0x00000000000369f4  word=0xefefefef
+    +12  pa=0x00000000000369f8  word=0xefefefef
+    +16  pa=0x00000000000369fc  word=0xefefefef
+    +20  pa=0x0000000000036a00  word=0xefefefef
+    +24  pa=0x0000000000036a04  word=0xefefefef
+    +28  pa=0x0000000000036a08  word=0xefefefef
+    +32  pa=0x0000000000036a0c  word=0xefefefef
+    +36 [2026-06-12 00:28:49.411] [info] [SRMConsoleDevice.cpp:236] SRM Console: Stopped
+ pa=0x0000000000036a10  word=0xefefefef
+

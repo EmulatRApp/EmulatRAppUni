@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T00:04:03.086Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>DS10 -- SRM Boot, Commands &amp; SuperIO Controller</title>
+  <keywords>
+    <keyword>COM1</keyword>
+    <keyword>COM2</keyword>
+    <keyword>Cypress CY82C693</keyword>
+    <keyword>FDD</keyword>
+    <keyword>logical device</keyword>
+    <keyword>LPT1</keyword>
+    <keyword>SIO-TRACE</keyword>
+    <keyword>SRM boot</keyword>
+    <keyword>SRM commands</keyword>
+    <keyword>SuperIO</keyword>
+    <keyword>word-fold</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">DS10 -- SRM Boot, Commands &amp; SuperIO Controller</para>
+    </header>
+    <para styleclass="Normal">The DS10 firmware reference. SRM boot and the <text styleclass="Code Example">&gt;&gt;&gt;</text> command set are covered operationally in the Quick Start and Operating EmulatR chapters; this appendix records the DS10-specific SuperIO analysis -- the part of the platform that is unique reference material rather than general operation.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">SRM boot and commands (pointers)</para>
+    <para styleclass="Normal">Reaching the <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt and the boot sequence are described under Quick Start; the console command catalogue (<text styleclass="Code Example">show config</text>, <text styleclass="Code Example">show device</text>, <text styleclass="Code Example">boot</text>, <text styleclass="Code Example">set</text>, and the rest) is under Operating EmulatR. The notes below assume that context and focus on the SuperIO programming the firmware performs during initialization.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">SuperIO controller -- word-fold (confirmed)</para>
+    <para styleclass="Normal">The Cypress CY82C693 SuperIO is configured through 16-bit writes that fold an index byte and a data byte into one word: the low byte is the index, the high byte is the data. This byte order is locked and confirmed -- the 0x22 / 0x23 power-control writes carry their Table 61 default data bytes, and the configuration splits cleanly into <text styleclass="Code Example">port 0x3F0</text> (index) / <text styleclass="Code Example">port 0x3F1</text> (data):</para>
+    <para styleclass="Code Example">SIO-TRACE W port=0x3F0 val=0x60 [cfg] index 0x60</para>
+    <para styleclass="Code Example">SIO-TRACE W port=0x3F1 val=0x03 [cfg] data 0x03 (FDD base high)</para>
+    <para styleclass="Code Example">SIO-TRACE W port=0x3F0 val=0x70 [cfg] index 0x70</para>
+    <para styleclass="Code Example">SIO-TRACE W port=0x3F1 val=0x06 [cfg] data 0x06 (IRQ6)</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Logical device map</para>
+    <para styleclass="Normal">The firmware programs every logical device in turn (selecting each via index 0x07 = LDN, then base / IRQ / DMA / activate). The resulting assignment matches <text styleclass="Code Example">show config</text> exactly:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="5" colcount="5" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">LDN</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Device</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Base</text></para>
+        </td>
+        <td colspan="2">
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">IRQ / DMA</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">0</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Floppy (FDD)</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">0x03F0</text></para>
+        </td>
+        <td colspan="2">
+          <para styleclass="Normal">IRQ6 / DMA2 (Activate set)</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">3</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Parallel (LPT1)</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">0x03BC</text></para>
+        </td>
+        <td colspan="2">
+          <para styleclass="Normal">IRQ7</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">4</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Serial (COM1)</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">0x03F8</text></para>
+        </td>
+        <td colspan="2">
+          <para styleclass="Normal">IRQ4</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">5</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Serial (COM2)</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">0x02F8</text></para>
+        </td>
+        <td colspan="2">
+          <para styleclass="Normal">IRQ3</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The configuration is grounded end to end in the HRM trace: 93 SIO-TRACE config lines, every one splitting cleanly into index / data, with the FDD logical device landing at 0x03F0 / IRQ6 / DMA2. The SuperIO is properly modeled and the byte-fold is confirmed beyond doubt.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Appendix---DS10">Appendix - DS10</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="show-config">show config</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="Task-Matrix-_-TimeOut-Loops">Task Matrix / TimeOut Loops</link></para>
+  </body>
+</topic>

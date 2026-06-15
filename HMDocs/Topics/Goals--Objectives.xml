@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Goals &amp; Objectives</title>
+  <keywords>
+    <keyword>architectural correctness</keyword>
+    <keyword>Box</keyword>
+    <keyword>commit point</keyword>
+    <keyword>determinism</keyword>
+    <keyword>differential validation</keyword>
+    <keyword>explicit serialization</keyword>
+    <keyword>fidelity standard</keyword>
+    <keyword>fidelity-faithful</keyword>
+    <keyword>goals</keyword>
+    <keyword>objectives</keyword>
+    <keyword>PALcode</keyword>
+    <keyword>separation of concerns</keyword>
+    <keyword>SMP</keyword>
+    <keyword>SRM console</keyword>
+    <keyword>Writeback</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Goals &amp; Objectives</para></header>
+    <para styleclass="Normal">EmulatR is a full-system, cycle-based, high-fidelity emulator of the DEC Alpha AXP architecture. Its purpose is not to approximate an Alpha but to behave like one -- faithfully enough that the most demanding original software cannot tell the difference. This page sets out the single standard the project is held to and the priority-ordered goals every design decision serves.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The fidelity standard</para>
+    <para styleclass="Normal">EmulatR is governed by one overriding standard: it must behave like real Alpha hardware in every architecturally visible way, even when doing so complicates the implementation. This is applied uniformly across all subsystems -- the instruction set, memory translation, cache and coherency behavior, the PAL boundary, interrupt and exception delivery, device and DMA semantics, and multiprocessor ordering. A subsystem is correct only when no architecturally visible difference from hardware can be observed through it.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The test of fidelity is black-box and adversarial. The judges are not internal assertions but the most demanding guests available: the SRM console and PALcode exercise the privileged architecture directly, a booting operating system exercises the memory model, trap machinery, and device fabric under real workloads, and differential validation against a reference emulator checks behavior at the instruction and subsystem level. Fidelity here means architectural-semantic accuracy, not the reproduction of a particular chip's timing: EmulatR reproduces exactly what the architecture makes visible -- the cycle-based run loop, the precise point at which results and exceptions commit, the ordering guarantees and barriers, and the privileged state transitions.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Primary goals (in strict priority order)</para>
+    <para styleclass="Normal">EmulatR is designed around five primary goals. Every design decision is evaluated against them in this order; when two goals conflict, the higher-priority goal wins.</para>
+    <para styleclass="Normal"></para>
+    <list id="0" type="ol" listtype="decimal" formatstring="%0:s." format-charset="0" levelreset="true" legalstyle="false" startfrom="1" styleclass="Normal" style="font-family:Arial; font-size:10pt; color:#000000;">
+      <li styleclass="Normal"><text style="font-weight:bold;">Architectural correctness first.</text> The emulator models Alpha's architectural semantics, not its performance characteristics. Correctness is always prioritized over speed.</li>
+      <li styleclass="Normal"><text style="font-weight:bold;">Deterministic and debuggable execution.</text> Execution must be understandable, reproducible, and inspectable. One iteration of the run loop corresponds to one hardware clock cycle, enabling deterministic replay and debugging.</li>
+      <li styleclass="Normal"><text style="font-weight:bold;">Explicit serialization.</text> Ordering and synchronization are never implicit. All serialization is driven by architectural mechanisms -- the MB, WMB, EXCB, and TRAPB barriers, PAL entry, and exceptions -- and exceptions are delivered precisely at the architectural commit point, the Writeback stage.</li>
+      <li styleclass="Normal"><text style="font-weight:bold;">SMP as a first-class concern.</text> Multiprocessor behavior is fundamental to the design, not layered on afterward. Cross-CPU coordination is modeled with explicit barriers, reservation tracking, and IPI delivery.</li>
+      <li styleclass="Normal"><text style="font-weight:bold;">Separation of concerns.</text> Instruction decode, execution, memory access, coherency, privilege, and devices are isolated into well-defined functional domains (the "Boxes") with one-way dependency flow. No domain reaches into another's internal state.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Strategy: one set of objectives, four implementations</para>
+    <para styleclass="Normal">These objectives have been invariant across the entire history of the project. Four distinct implementations have been written; each changed the mechanism, never the goals. The current design (V4) is the first to satisfy all five at once -- it keeps a flat, shallow dispatch path for determinism and debuggability while resolving each instruction to a faithful, fully-architected execution leaf. The strategy throughout has been to let the implementation evolve toward the fixed standard, never to relax the standard to fit an implementation.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--What-is-EmulatR">What is EmulatR</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Overview--------------------">Architecture Overview</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Current-Development-Status--">Current Development Status</link></para>
+  </body>
+</topic>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Configuring</title>
+  <keywords>
+    <keyword>10023</keyword>
+    <keyword>cpuCount</keyword>
+    <keyword>DS10</keyword>
+    <keyword>ds10_platform.json</keyword>
+    <keyword>EmulatorSettings</keyword>
+    <keyword>EMULATR_CONSOLE_PORT</keyword>
+    <keyword>EMULATR_PLATFORM_CONFIG</keyword>
+    <keyword>EmulatrV4.ini</keyword>
+    <keyword>--firmware</keyword>
+    <keyword>firmwareImage</keyword>
+    <keyword>firmwareSha256</keyword>
+    <keyword>IniLoader</keyword>
+    <keyword>model</keyword>
+    <keyword>platformConfigPath</keyword>
+    <keyword>PlatformConfig</keyword>
+    <keyword>port</keyword>
+    <keyword>precedence</keyword>
+    <keyword>puttyPath</keyword>
+    <keyword>ROM</keyword>
+    <keyword>SRMConsole</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Configuring</para></header>
+    <para styleclass="Normal"><text style="font-weight:bold;">Configuration precedence (lowest to highest):</text> compiled-in struct defaults &lt; <text styleclass="Code Example">EmulatrV4.ini</text> &lt; command-line qualifiers. The committed ini drives a no-flag launch; a CLI qualifier overrides the ini for a single run. <text styleclass="Code Example">IniLoader</text> populates <text styleclass="Code Example">EmulatorSettings</text>, which is the single source of truth threaded to every consumer.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Settings</para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="7" colcount="5" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Field</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">ini Key</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Default</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Example</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">CLI / Env override</text></para></td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">model</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">[System]/model</text></para></td>
+        <td><para styleclass="Normal">DS10</para></td>
+        <td><para styleclass="Normal">ds10</para></td>
+        <td><para styleclass="Normal"></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">cpuCount</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">[System]/cpuCount</text></para></td>
+        <td><para styleclass="Normal">1</para></td>
+        <td><para styleclass="Normal"></para></td>
+        <td><para styleclass="Normal"></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">port</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">[SRMConsole]/port</text></para></td>
+        <td><para styleclass="Normal">10023</para></td>
+        <td><para styleclass="Normal"></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_CONSOLE_PORT</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">puttyPath</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">[SRMConsole]/puttyPath</text></para></td>
+        <td><para styleclass="Normal">putty.exe</para></td>
+        <td><para styleclass="Normal">C:\Program Files\PuTTY\putty.exe</para></td>
+        <td><para styleclass="Normal"></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">firmwareImage</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">[ROM]/firmwareImage</text></para></td>
+        <td><para styleclass="Normal">ds10_v7_3.exe</para></td>
+        <td><para styleclass="Normal"></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">--firmware</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">firmwareSha256</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">[ROM]/firmwareSha256</text></para></td>
+        <td><para styleclass="Normal"><text style="font-style:italic;">(empty -- integrity check skipped)</text></para></td>
+        <td><para styleclass="Normal"></para></td>
+        <td><para styleclass="Normal"></para></td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-style:italic;">Command-line qualifiers override the ini for a single run. Live today: </text><text styleclass="Code Example">--firmware</text><text style="font-style:italic;"> (firmware image path) and </text><text styleclass="Code Example">--mem</text><text style="font-style:italic;"> (memory size). Planned (locked): </text><text styleclass="Code Example">--console-port</text><text style="font-style:italic;">, </text><text styleclass="Code Example">--platform-config</text><text style="font-style:italic;">, </text><text styleclass="Code Example">--flash-path</text><text style="font-style:italic;">; the </text><text styleclass="Code Example">EMULATR_CONSOLE_PORT</text><text style="font-style:italic;"> / </text><text styleclass="Code Example">EMULATR_FLASH_ROM</text><text style="font-style:italic;"> / </text><text styleclass="Code Example">EMULATR_PLATFORM_CONFIG</text><text style="font-style:italic;"> environment variables remain as documented aliases.</text></para>
+    <para styleclass="Normal"><text style="font-style:italic;">Debug-only environment variables (</text><text styleclass="Code Example">EMULATR_IDE_TRACE</text><text style="font-style:italic;">, </text><text styleclass="Code Example">EMULATR_IIC_TRACE</text><text style="font-style:italic;">, </text><text styleclass="Code Example">EMULATR_FLASH_TRACE</text><text style="font-style:italic;">, </text><text styleclass="Code Example">EMULATR_NO_PUTTY</text><text style="font-style:italic;">) are diagnostic toggles, not configuration: they have no ini key, no CLI qualifier, and no precedence interaction.</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Bus configuration (platform manifest)</para>
+    <para styleclass="Normal">The bus configuration is loaded for the configured model. The platform file is selected from the model name as lower(model) + "_platform.json" (for example, DS10 gives <text styleclass="Code Example">ds10_platform.json</text>; ES40 and ES45 give <text styleclass="Code Example">es40_platform.json</text> and <text styleclass="Code Example">es45_platform.json</text>). An explicit override wins, in order: the <text styleclass="Code Example">EMULATR_PLATFORM_CONFIG</text> environment variable, then a <text styleclass="Code Example">platformConfigPath</text> ini key, then the derived name. A missing platform file is a hard error -- there is no silent fallback.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Current-Platform-Support">Current Platform Support</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing------------(moved)">Executing</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Environment-Variables-(EMULA">Environment Variables</link></para>
+  </body>
+</topic>

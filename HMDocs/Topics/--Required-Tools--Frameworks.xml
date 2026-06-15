@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:44:22.122Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Required Tools &amp; Frameworks</title>
+  <keywords>
+    <keyword>build prerequisites</keyword>
+    <keyword>C++20</keyword>
+    <keyword>CMake</keyword>
+    <keyword>EMULATR_CONSOLE_TRACE</keyword>
+    <keyword>Ghidra</keyword>
+    <keyword>MSVC</keyword>
+    <keyword>plink</keyword>
+    <keyword>PuTTY</keyword>
+    <keyword>Qt</keyword>
+    <keyword>RAW-TCP client</keyword>
+    <keyword>spdlog</keyword>
+    <keyword>terminal client</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Required Tools &amp; Frameworks</para>
+    </header>
+    <para styleclass="Normal">Tooling and libraries used by EmulatR. Exact version requirements are to be confirmed.</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">Compiler: MSVC with C++20 support. QtCreator, [TODO: confirm minimum toolset version.]</li>
+      <li styleclass="NotesBox">Build system: CMake. [TODO: confirm minimum version.]</li>
+      <li styleclass="NotesBox">Qt: used by the console / UI subsystem only -- the emulator core is deliberately Qt-free. [TODO: confirm version.]</li>
+      <li styleclass="NotesBox">spdlog: logging infrastructure (dedicated EMULATR_CONSOLE_TRACE channel). [TODO: confirm version.]</li>
+      <li styleclass="NotesBox">A terminal client for the console: PuTTY / plink (auto-launched), or any RAW-TCP client.</li>
+      <li styleclass="NotesBox">Optional: Ghidra, for SRM firmware reverse-engineering work.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Building-from-Source">Building from Source</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Dependencies----------------">Dependencies</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Ghidra">Ghidra</link></para>
+  </body>
+</topic>

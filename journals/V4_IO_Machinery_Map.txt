@@ -1,0 +1,241 @@
+================================================================================
+ V4 I/O Machinery Map -- interfaces, implementations, authorities, gaps
+================================================================================
+ Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+ Author:  Claude (Anthropic) with Timothy Peer, eNVy Systems Inc.
+ Date:    2026-06-03
+ Status:  LIVING DOCUMENT -- the I/O-side audit companion to
+          AXPBox_Reference_Scaffold.txt sec. 8 (register-side audit).
+          Update whenever a window, seam, or device changes.
+================================================================================
+
+1. PURPOSE
+
+  One map of every physical-address window, software seam, and device model
+  in V4 -- existing, stubbed, and missing -- each with its authority
+  citation.  Goals:
+
+    (a) "What absorbs this address?" becomes a table lookup, never a hunt
+        (the 2026-06-03 IIC stall hid for weeks behind a silent absorber).
+    (b) New device work (IIC, PCI walk, NIC, SCSI) is scheduled against an
+        explicit gap list instead of discovered by the next boot stall.
+    (c) Audit rule: every UNHANDLED log line and every silent float maps
+        to a row here, or the map is wrong.
+
+2. ROUTING MACHINERY (the call chain)
+
+  CPU LD/ST (MemDrainer / Ev6Translator, VA -> PA)
+    -> GuestMemory / ISystemBus
+    -> TsunamiChipset -- the SOLE PA decoder (arbiter model, landed
+       2026-05-22; GuestMemory is a dumb store).  Decode order:
+
+       1. PAL scratch carve-out   PA 0xFFF.FF00.0000 + 1 MB (top of 16 TB)
+          (TsunamiChipset.h kPalScratchBase) -- PALcode-private spill;
+          decoded ahead of everything.
+       2. DRAM                    isDramAddress() -> GuestMemory pages.
+       3. TIG flash window        PA 0x801.0000.0000, byte at 64-byte
+          stride, 128 MB extent (2 MB device x 64) -> FlashRom.
+          Authority: firmware xtig() mapping; AXPBox registration.
+       4. Chipset CSR windows     (sec. 3 table) -> Cchip / Dchip / Pchip
+          CSR handlers (Tsunami21272_RegisterMap.h).
+       5. Pchip dense I/O         per-port registry (IoPortRange list)
+          -> IIoPortHandler; UNREGISTERED ports -> Cypress fallback
+          (setIoPortHandler) which floats 0xFF reads / drops writes
+          SILENTLY.  <-- AUDIT ITEM, sec. 7.
+       6. Pchip config space      (CfgType0) -> registerPciDevice map
+          -> IPciDeviceHandler (config reads/writes only).
+       7. Pchip PCI MEMORY space  NO CLAIMANT REGISTRY EXISTS.  Reads and
+          writes fall through to "TsunamiPchip: UNHANDLED OUTER
+          READ/WRITE".  <-- GAP G3, sec. 6; the IIC controller lives here.
+       8. Else: NXM -- asynchronous per HRM 6-29: bus ReadDataError +
+          MISC<NXM> sticky latch + b_irq<0> (landed 2026-05-28; never a
+          synchronous MCHK).
+
+  Interrupt fabric (delivery side):
+    Cchip DIM0..3 / DRIR / MISC<ITINTR> latches; b_irq<0..3> per CPU;
+    interval timer FIRE (cycle-edge latch, intervalTimerShouldFire) is
+    decoupled from DELIVER (canAcceptInterrupt(22): relocation done,
+    palBase set, IER<EIEN2>, not PALmode) -> stageInterruptDivert
+    (Machine.cpp) -> PAL INTERRUPT entry palBase+0x680.
+    Authority: HRM ch. 6 (Cchip), ch. 10 CSRs; ISA-bridge interrupt is
+    DRIR<55> (PC264 pci_irq_table -- memory pc264-pci-irq map).
+
+  Console path (host seam):
+    Uart16550 (deviceLib/Tsunami/Uart16550.h) THR/LSR at COM1 ->
+    ConsoleManager backend -> SRMConsoleDevice (TCP, PuTTY autolaunch)
+    + stderr mirror.  Guest-visible state must stay host-independent
+    (determinism rule); RX input path is gap G2.
+
+3. PA WINDOW TABLE (absolute, single-Pchip DS10 view)
+
+  Window                          Base PA              Authority
+  ------------------------------  -------------------  ----------------------
+  DRAM                            0x000.0000.0000      HRM ch. 10 intro
+  TIGbus -- FLASH device only     0x801.0000.0000      firmware xtig(); AXPBox
+    (V4 models flash @ off 0;     (off 0..0x1F_FFFF)   (extent 128MB stride 64)
+     rest of TIGbus UNMODELED --  ----------------------------------------------
+     see gap G8 below)            CORRECTION 2026-06-03: the TIGbus is an 8-bit
+                                  peripheral bus (HRM 6.3), NOT just flash.
+                                  Flash is ONE device on it.  The firmware also
+                                  drives TIGbus CONTROL registers at high
+                                  offsets via outtig()/xtig():
+                                    off 0xE00004  -> system RESET register
+                                                     (console_restart, pc264.c)
+                                    off 0xC00028+id-> per-CPU START register
+                                                     (start_secondary, pc264.c)
+                                  xtig maps off -> PA; off 0xE00004 lands at
+                                  PA 0x801.3800.0100, in V4's UNMODELED gap
+                                  between the flash extent end (0x801.0800.0000)
+                                  and the Cchip CSR window (0x801.A000.0000).
+                                  This is gap G8.
+  Pchip0 PCI memory (dense)       0x800.0000.0000      HRM 10-45
+  Pchip0 PCI sparse mem/IO        (sparse offsets in   HRM 10-45 (unused by
+                                   RegisterMap.h)        V4 boot path so far)
+  Pchip0 CSRs (WSBA/WSM/TBA/      0x801.8000.0000      HRM 10-45
+    PCTL/PERROR/PERRMASK/TLBIA)
+  Cchip CSRs (CSC/AAR0-3/DIMx/    0x801.A000.0000      HRM 10-19; Cchip
+    DIRx/DRIR/MISC/TTR...)                               uniform surface
+                                                         (Phase B 2026-05-18)
+  Dchip CSRs (DSC/DSC2/DREV...)   0x801.B000.0000      HRM 10-41
+  Pchip0 IACK                     0x801.F800.0000      HRM 10-45
+  Pchip0 dense I/O (ISA ports)    0x801.FC00.0000      HRM 10-45
+  Pchip0 config Type0             0x801.FE00.0000      HRM 10-45; USPO-PCI
+                                                         spec ch. 6
+  Pchip1 mirror set               0x802/0x803....      HRM 10-45 (DS10: one
+                                                         Pchip; probes NXM)
+  PAL scratch (V4-internal)       0xFFF.FF00.0000      V4 design (not HW)
+
+4. SOFTWARE SEAMS (chipsetLib/IDeviceHandlers.h unless noted)
+
+  Seam                     Signature / mechanism             Consumers today
+  -----------------------  --------------------------------  -----------------
+  ISystemBus               chipset as sole PA decoder        GuestMemory,
+                                                              MemDrainer
+  IIoPortHandler           ioRead(port,width) /              Uart16550 x2,
+                           ioWrite(port,value,width)          Kbd8042Stub,
+                           via registerIoPortRange            ToyRtc, Cypress
+                           (TsunamiPchip.h:406)                (fallback)
+  IPciDeviceHandler        pciConfigRead/Write(reg,width)    Cypress 00:05.0
+                           via registerPciDevice(b,d,f)
+  TIG attach               direct decode in TsunamiChipset   FlashRom
+  Interrupt fabric         fireIntervalTimer / pendingIrq2 / Machine run loop
+                           clearPendingIrq2 / DIM/DRIR CSRs
+  Console backend          ConsoleManager + putChar capture  SRMConsoleDevice
+  MISSING: PCI MEM claim   fixed-range or BAR-tracked         IIC stub (now),
+    seam (gap G3)           claimants inside Pchip PciMem      NIC/SCSI (later)
+
+5. DEVICE INVENTORY
+
+  Device (silicon)          Window / ports        Authority                 V4 file                          Status
+  ------------------------  --------------------  ------------------------  -------------------------------  ----------------------
+  Cchip 21272-CA            0x801.A000.0000       HRM ch. 6, 10-19          chipsetLib (Cchip)               LIVE (uniform surface,
+                                                                                                              interval timer, MISC,
+                                                                                                              DIM/DRIR, AAR, NXM)
+  Dchip 21272-DA            0x801.B000.0000       HRM ch. 7, 10-41          chipsetLib (Dchip)               LIVE (CSR surface)
+  Pchip 21272-EA            0x801.8000.0000 +     HRM 10-45                 chipsetLib/TsunamiPchip.h        LIVE (CSRs, dense I/O,
+                            windows above                                                                     cfg map); PCI MEM
+                                                                                                              claimants = GAP G3
+  Flash AMD Am29F016 (TIG)  0x801.0000.0000       AMD datasheet; AXPBox     FlashRom (2026-06-02)            LIVE; needs
+                            stride 64                                                                         EMULATR_FLASH_ROM
+                                                                                                              backing for persist
+  ToyRtc MC146818           ports 0x70-0x71       Toy Specification;        deviceLib/Tsunami/ToyRtc.h       LIVE (2026-06-03);
+                                                  Cypress DS (decode)                                         deterministic clock
+  8042 keyboard ctrl        ports 0x60-0x64       MinimalIsaStub TODOs      deviceLib/Tsunami/               STUB (self-test pass
+                                                                            MinimalIsaStub.h                   only; no kbd input)
+  COM1/COM2 16550 (in       0x3F8-0x3FF,          SMSC FDC37C669 DS         deviceLib/Tsunami/Uart16550.h    LIVE TX; RX path =
+    SuperIO FDC37C669)      0x2F8-0x2FF            (SuperIO has NO RTC)                                       GAP G2
+  Cypress CY82C693          PCI 00:05.0 config    Cypress DS (Processor     chipsetLib/                      PLACEHOLDER: config
+    ISA bridge              + ISA port fallback    Support)                  Cypress_CY82C693ISABridge.h       bytes + 0xFF float;
+                                                                                                              SILENT ABSORBER
+                                                                                                              (audit rule sec. 7)
+  PCF8584 IIC controller    PCI MEM 0xFFFF0000    Philips PCF8584 DS;       (none)                           MISSING -- ACTIVE
+                            (S0) / 0xFFFF0001      apisrm iic_driver.c;                                       BLOCKER; spec'd in
+                            (S1); dummy reads      base proven from live                                      IIC_Stub_
+                            of port 0x80           image iic_write_csr                                        Specification.txt
+                                                   @0x81a68 (ldah -1 ->
+                                                   0xFFFF0000; source
+                                                   pc264_io.c says
+                                                   0xFFF80000 -- version
+                                                   drift, image wins)
+  DE500/21143 NIC           PCI (unknown slot)    dc287_def.h; DE500 DS     (none)                           MISSING, non-fatal.
+                                                                                                              NOTE 2026-06-03: the
+                                                                                                              old "unhandled
+                                                                                                              0xffff0000 = NIC SROM
+                                                                                                              bit-bang" hypothesis
+                                                                                                              is REFUTED -- those
+                                                                                                              writes are the IIC.
+  PCI enumeration / BARs    CfgType0 window       USPO-PCI spec ch. 6       (config map only)                MISSING (walk, BAR
+                                                                                                              sizing, INTx routing)
+  SCSI / storage            PCI + BARs            V1 scsiCoreLib            (none in V4)                     FUTURE (port V1 fabric
+                                                                                                              once BARs exist)
+  SRM console TCP bridge    host-side             V4 design                 deviceLib/SRMConsoleDevice.*     LIVE (PuTTY, session
+                                                                                                              logs, stderr mirror)
+
+6. GAP LIST (ranked for the path to P00>>>)
+
+  G1  PCF8584 IIC stub at PCI MEM 0xFFFF0000-1.  ACTIVE BLOCKER: powerup
+      loops 2 s/lap on LAB=1 decoded from the Pchip unhandled-PCI-mem
+      read float.  Spec complete (IIC_PCF8584_Specification.txt); depends
+      on G3-lite.
+  G2  UART RX input path (COM1 receive + LSR DR + interrupt or poll).
+      Required AT the prompt: yy_reset/read_with_prompt poll for input.
+      Without it the prompt prints but cannot hear.
+  G3  PCI MEM claim seam in TsunamiPchip (fixed-range registration is
+      enough for G1; BAR-tracked claims arrive with the PCI walk).
+      G3-lite (fixed range) is a prerequisite of G1 and ~30 lines.
+  G4  PCI bus walk + BAR machinery (USPO-PCI ch. 6) -- silences residual
+      probe noise; prerequisite for NIC/SCSI.  Non-fatal today.
+  G5  DE500/21143 NIC model -- after G4.
+  G6  SCSI fabric port from V1 -- after G4; the `>>>` boot-device work.
+  G7  8042 keyboard input (only if serial console proves insufficient
+      for the prompt; SRM falls back to COM1).
+  G8  TIGbus control registers (2026-06-03).  TIGbus is a peripheral bus,
+      not flash-only; firmware drives control regs at high offsets:
+      0xE00004 = system reset (console_restart), 0xC00028+id = per-CPU
+      start (start_secondary).  Today these fall in the unmodeled gap
+      between the flash extent and Cchip CSR -> halt.  NOTE: this is
+      DOWNSTREAM of the real blocker -- console_restart only runs because
+      build_dsrdb's fread already SYSFAULTed (see frontier note below).
+      A TIGbus control-register model (reset = restart-or-noop, CPU-start
+      = absorb for the single-CPU build) silences the symptom; the fread
+      SYSFAULT is the cause to fix first.
+
+8. CURRENT FRONTIER (2026-06-03, run console_iic_20260603-201433)
+
+  Furthest SRM boot to date.  Sequence:
+    powerup -> "64 Meg of system memory" -> memconfig -> build_hwrpb ->
+    build_dsrdb -> fread -> SYSFAULT (handler sysfault@0x1c62d8 dumps a
+    symbolized backtrace) -> console_restart -> "Initializing..." ->
+    outtig(0xE00004) TIGbus reset -> halt (PC=0x1c6304, cyc 22.14B).
+
+  Clean signals: ZERO UNHANDLED OUTER lines (IIC stub working); all faults
+  are routine kFaultDtbMissDouble TLB fills.  Flash seeding landed +
+  persisted but did NOT move this frontier (crash cycle byte-identical to
+  the pre-seeding run) -- it is an orthogonal correctness fix.
+
+  ROOT to investigate: WHY build_dsrdb's fread SYSFAULTs.  Plan +
+  gate PCs in journals/Fread_Sysfault_Investigation.txt.  The TIGbus
+  reset (G8) is the firmware's reaction, not the cause.
+
+7. AUDIT RULES (the "sealing" discipline)
+
+  A. No silent absorbers.  The Cypress ISA fallback and the Pchip
+     PCI-MEM fallthrough must each log unknown addresses ONCE per unique
+     address (throttled), so the next unmodeled device costs minutes,
+     not weeks.  (The IIC stall hid behind exactly this.)
+  B. Every claimed range cites an authority document in this map; every
+     row names its V4 file; every UNHANDLED line in a boot log must match
+     a MISSING row here -- if it does not, the map gets a new row first,
+     the code second.
+  C. Status transitions (MISSING -> STUB -> LIVE) happen via a spec
+     document per house process (Toy Specification and
+     IIC_PCF8584_Specification.txt are the precedents).
+  D. Width discipline: byte-lane devices float 0xFF on wide reads and
+     drop wide writes with a one-shot note (ToyRtc precedent).
+  E. Determinism: no device may consult host time or host I/O readiness
+     for guest-visible state (ToyRtc cyclesPerSecond pattern; UART RX
+     will need an injection-queue design honoring this).
+
+================================================================================
+ END
+================================================================================
