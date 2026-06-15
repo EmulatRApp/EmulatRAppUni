@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-14T21:51:59.492Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Connecting to the Console</title>
+  <keywords>
+    <keyword>10023</keyword>
+    <keyword>console</keyword>
+    <keyword>EMULATR_NO_PUTTY</keyword>
+    <keyword>localhost</keyword>
+    <keyword>plink</keyword>
+    <keyword>PuTTY</keyword>
+    <keyword>RAW TCP</keyword>
+    <keyword>TCP console</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Connecting to the Console</para>
+    </header>
+    <para styleclass="Normal">The emulator exposes a RAW TCP console (default <text styleclass="Code Example">localhost:10023</text>). Unless <text styleclass="Code Example">EMULATR_NO_PUTTY</text> is set, PuTTY is launched for you. To attach a client manually:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">plink -raw localhost -P 10023</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Full client coverage (PuTTY, plink, Tera Term, MobaXterm, netcat, telnet) is in the Console Connectivity chapter.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Loading-Firmware">Loading Firmware</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--TCP-Console-Overview">TCP Console Overview</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--PuTTY-_-Plink-_-TeraTerm-_-M">Terminal Clients</link></para>
+  </body>
+</topic>

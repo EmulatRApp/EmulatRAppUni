@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Storage Interconnect and Fabric</title>
+  <keywords>
+    <keyword>ATAPI</keyword>
+    <keyword>CY82C693</keyword>
+    <keyword>IDE</keyword>
+    <keyword>PCI hose</keyword>
+    <keyword>SCSI</keyword>
+    <keyword>storage fabric</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Storage Interconnect and Fabric</para></header>
+    <para styleclass="Normal">On the DS10 target the storage path is short and fixed: the EV6 reaches the PCI hose through the Pchip, the Cypress CY82C693 sits on PCI bus 0 (slot 5) as the PCI-to-ISA bridge and IDE controller, and the storage endpoints (the ATAPI CD-ROM and any ATA disk) hang off the CY82C693 IDE channel. There is no separate storage switch or expander -- the "fabric" is just the IDE channel and its master / slave units.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">SCSI (the <text styleclass="Code Example">dka</text> path) and the legacy DEC interconnects are reference material for other platforms; on the DS10 they are not part of the active fabric. See SCSI Devices and the legacy-bus page for those.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--IDE-Devices">IDE Devices</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--SCSI-Devices">SCSI Devices</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--SDI-Devices-_-DSSI-Devices-_">SDI / DSSI / ST506 Devices</link></para>
+  </body>
+</topic>

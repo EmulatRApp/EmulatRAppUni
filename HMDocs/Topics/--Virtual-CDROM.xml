@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="Under Construction" lasteditedby="tim" modified="2026-06-15T11:22:27.036-07:00" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Virtual CDROM</title>
+  <keywords>
+    <keyword>ATAPI</keyword>
+    <keyword>dqa0</keyword>
+    <keyword>ISO</keyword>
+    <keyword>media</keyword>
+    <keyword>option firmware</keyword>
+    <keyword>RUN/STOP</keyword>
+    <keyword>virtual CDROM</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Virtual CDROM</para></header>
+    <para styleclass="Normal"><text styleclass="Code Example">dqa0</text> (&quot;EMULATR VIRTUAL CDROM&quot;) is the virtual optical device the firmware probes for option firmware during power-up. When no media is present it reports &quot;no media present or is disabled via the RUN/STOP switch&quot;.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">An ISO image is supplied (not created) through a manifest storage entry: an ATAPI / CD-ROM <text styleclass="Code Example">type</text> with the <text styleclass="Code Example">media</text> set to the ISO file. The optical device is read-only, so <text styleclass="Code Example">create_if_missing</text> never applies to it. ISO contents are read through the ISO-9660 path (see ISO-9660 PFD).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text style="font-style:italic;">[TODO: confirm the exact manifest type/key for attaching an ISO to dqa0 against the current build.]</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--ATAPI-Devices">ATAPI Devices</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--ISO-9660-PFD-(CD001)">ISO-9660 PFD (CD001)</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Create-Guest-Disk-Storage---">Create Guest Disk Storage</link></para>
+  </body>
+</topic>

@@ -1,0 +1,164 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-14T21:43:29.387Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Feature Matrix</title>
+  <keywords>
+    <keyword>.axpsnap</keyword>
+    <keyword>ATAPI</keyword>
+    <keyword>CPU pipeline</keyword>
+    <keyword>CY82C693</keyword>
+    <keyword>dqa0</keyword>
+    <keyword>DTB</keyword>
+    <keyword>EV6</keyword>
+    <keyword>Feature Matrix</keyword>
+    <keyword>Flash</keyword>
+    <keyword>HALT</keyword>
+    <keyword>IDE</keyword>
+    <keyword>IIC</keyword>
+    <keyword>ITB</keyword>
+    <keyword>NVRAM</keyword>
+    <keyword>PALcode</keyword>
+    <keyword>PCF8584</keyword>
+    <keyword>PuTTY</keyword>
+    <keyword>SCSI</keyword>
+    <keyword>snapshot</keyword>
+    <keyword>SRM</keyword>
+    <keyword>SuperIO</keyword>
+    <keyword>TCP console</keyword>
+    <keyword>TLB</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Feature Matrix</para>
+    </header>
+    <para styleclass="Normal">Subsystem status as of June 2026. This reflects the DS10 target; status is expected to evolve and should be reconfirmed against the current build.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="11" colcount="3" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Subsystem</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Status</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Notes</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">CPU pipeline (EV6) + TLB</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Working</para>
+        </td>
+        <td>
+          <para styleclass="Normal">128 ITB + 128 DTB; PALcode relocation in place.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">SRM firmware boot to &gt;&gt;&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Working</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Reaches the interactive console prompt.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">TCP console server</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Working</para>
+        </td>
+        <td>
+          <para styleclass="Normal">RAW TCP; PuTTY auto-launch.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">Snapshot save / restore</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Working</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">.axpsnap</text>; autoload-newest, marker capture.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">SuperIO (FDC / COM / LPT)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Working</para>
+        </td>
+        <td>
+          <para styleclass="Normal">CY82C693 SuperIO word-fold confirmed.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">IDE / ATAPI virtual CD-ROM</para>
+        </td>
+        <td>
+          <para styleclass="Normal">In progress</para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="Code Example">dqa0</text> enumeration gap under investigation.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">IIC (PCF8584)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Under investigation</para>
+        </td>
+        <td>
+          <para styleclass="Normal">S1 returns <text styleclass="Code Example">0x01</text> where firmware expects <text styleclass="Code Example">0x00</text>.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">Flash / NVRAM persistence</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Under investigation</para>
+        </td>
+        <td>
+          <para styleclass="Normal">&quot;Flash ROM writes are disabled&quot; -- see Known Limitations.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">boot / OS load (auto_action BOOT)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Planned</para>
+        </td>
+        <td>
+          <para styleclass="Normal">HALT is the only fully implemented action.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">SCSI</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Planned</para>
+        </td>
+        <td>
+          <para styleclass="Normal">[TODO: confirm -- no SCSI HBA currently modeled.]</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Current-Development-Status--">Current Development Status</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Current-Platform-Support">Current Platform Support</link></para>
+  </body>
+</topic>

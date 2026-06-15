@@ -1,0 +1,1145 @@
+================================================================================
+PROPOSAL FOR CONSIDERATION
+Tsunami / Typhoon Chipset Interface Architecture for EmulatR
+ES40 / ES45 SRM Bring-Up and Memory Routing Model
+ASCII(128)
+================================================================================
+
+Document Purpose
+----------------
+
+This proposal presents a recommended architecture for integrating the
+Tsunami / Typhoon chipset model into EmulatR for AlphaServer ES40 / ES45
+SRM firmware execution.
+
+The goal is to provide:
+
+    1. Correct SRM execution behavior
+    2. Clean architectural separation
+    3. Scalable ES40 -> ES45 growth
+    4. Maintainable ownership boundaries
+    5. Accurate physical address routing
+    6. Reduced debugging complexity
+
+This proposal is based on observed SRM behavior, Alpha AXP memory
+semantics, Tsunami chipset responsibilities, and emulator maintainability.
+
+================================================================================
+1. Problem Statement
+================================================================================
+
+Current Question
+----------------
+
+How should EmulatR route memory accesses after VA -> PA translation?
+
+Specifically:
+
+    Should chipset MMIO and CSR decoding occur inside GuestMemory?
+
+or
+
+    Should a PhysicalBus route physical addresses to platform-specific
+    interfaces?
+
+Additionally:
+
+    Should PhysicalBus directly expose:
+
+        CChip
+        DChip
+        PChip0
+        PChip1
+
+or
+
+    Should PhysicalBus route only to a single TsunamiChipset object,
+    allowing chipset-internal decode?
+
+Observation
+-----------
+
+SRM firmware is platform-aware.
+
+SRM does not execute against:
+
+    CPU + RAM only
+
+Instead, SRM expects:
+
+    chipset CSRs
+    PCI hose routing
+    ROM aliases
+    interrupt fabric
+    console UART
+    DMA windows
+    PCI enumeration
+
+As soon as relocation begins, SRM starts interacting with chipset
+registers.
+
+If chipset responses are missing or invalid:
+
+    execution diverges
+
+often resulting in:
+
+    fetch from uninitialized memory
+    incorrect branches
+    apparent firmware corruption
+    execution escape into empty address space
+
+This behavior strongly suggests that SRM failures after relocation are
+often:
+
+    platform routing failures
+
+rather than:
+
+    CPU execution failures
+
+================================================================================
+2. Architectural Recommendation
+================================================================================
+
+Recommendation Summary
+----------------------
+
+Recommended hierarchy:
+
+    AlphaCPU
+        ->
+    MemorySubsystem
+        ->
+    PhysicalBus
+        ->
+        GuestMemory
+        FirmwareROM
+        TsunamiChipset
+        InvalidRegion
+
+Then internally:
+
+    TsunamiChipset
+        ->
+        CChip
+        DChip
+        PChip0
+        PChip1
+
+The PhysicalBus should remain responsible for:
+
+    coarse system routing
+
+The Tsunami chipset should remain responsible for:
+
+    chipset-internal routing
+
+This mirrors actual ES40 / ES45 platform behavior.
+
+================================================================================
+3. Why GuestMemory Should Remain Flat
+================================================================================
+
+GuestMemory should remain:
+
+    fast
+    flat
+    contiguous
+    cache-friendly
+    RAM-only
+
+GuestMemory should NOT become responsible for:
+
+    chipset decode
+    MMIO
+    PCI windows
+    UART
+    CSR routing
+    platform behavior
+
+Recommended role:
+
+    Physical DRAM backing store only
+
+Conceptually:
+
+GOOD:
+
+    GuestMemory == RAM bytes
+
+BAD:
+
+    GuestMemory == platform interconnect
+
+Mixing chipset decode into RAM management introduces architectural
+coupling and significantly increases debugging complexity.
+
+================================================================================
+4. Recommended PhysicalBus Responsibilities
+================================================================================
+
+The PhysicalBus should perform only coarse-grained routing.
+
+Recommended top-level physical regions:
+
+    Region 0:
+        DRAM
+
+    Region 1:
+        ROM / FLASH
+
+    Region 2:
+        CHIPSET
+
+    Region 3:
+        INVALID / MACHINE CHECK
+
+Example conceptual routing:
+
+    CPU
+        ->
+    Physical Address
+        ->
+    PhysicalBus
+            ->
+            RAM
+            ROM
+            CHIPSET
+            INVALID
+
+This keeps routing logic minimal and deterministic.
+
+Example:
+
+    if RAM
+        route RAM
+
+    else if ROM
+        route ROM
+
+    else if CHIPSET
+        route Tsunami
+
+    else
+        machine check
+
+This architecture minimizes top-level branching.
+
+================================================================================
+5. Why Tsunami Should Own Internal Decode
+================================================================================
+
+Alternative Considered
+----------------------
+
+PhysicalBus directly exposes:
+
+    CChip
+    DChip
+    PChip0
+    PChip1
+
+This approach was evaluated and rejected.
+
+Reason:
+
+    it violates ownership boundaries.
+
+The CPU does NOT know:
+
+    "this address belongs to hose 1"
+
+The CPU only produces:
+
+    Physical Address (PA)
+
+The chipset determines meaning.
+
+Real hardware model:
+
+    CPU
+        ->
+    EV6 system bus
+        ->
+    Tsunami / Typhoon
+            ->
+            CChip
+            DChip
+            PChip0
+            PChip1
+
+Therefore:
+
+    chipset PA decode belongs inside chipset logic.
+
+NOT:
+
+    global bus logic.
+
+Recommended design:
+
+    PhysicalBus
+        ->
+    TsunamiChipset
+            ->
+            CChip
+            DChip
+            PChip0
+            PChip1
+
+================================================================================
+6. ES40 / ES45 Hose Considerations
+================================================================================
+
+ES40 and ES45 contain:
+
+    PChip0
+    PChip1
+
+representing:
+
+    PCI Hose 0
+    PCI Hose 1
+
+The V4 register map already documents both.
+
+Recommendation:
+
+    expose both hoses internally to Tsunami
+
+NOT:
+
+    as top-level PhysicalBus regions.
+
+Reason:
+
+    hose ownership is chipset behavior.
+
+The chipset should internally determine:
+
+    PA range
+        ->
+    PChip0
+
+or
+
+    PA range
+        ->
+    PChip1
+
+This naturally supports:
+
+    ES40
+    ES45
+    Typhoon evolution
+
+without changing PhysicalBus behavior.
+
+================================================================================
+7. Typhoon Scalability Consideration
+================================================================================
+
+Future Problem
+--------------
+
+Typhoon behavior diverges from Tsunami.
+
+If PhysicalBus owns chipset internals, routing eventually becomes:
+
+    if (isTyphoon)
+    if (isES45)
+    if (secondHoseEnabled)
+
+This contaminates global routing.
+
+Recommended abstraction:
+
+    IChipset
+        ->
+        TsunamiChipset
+
+        TyphoonChipset
+
+PhysicalBus remains unchanged.
+
+Example:
+
+    chipset->read(pa)
+
+    chipset->write(pa)
+
+This provides cleaner long-term maintainability.
+
+================================================================================
+8. Register Ownership and Pipeline Semantics
+================================================================================
+
+Important Architectural Rule
+----------------------------
+
+The chipset MUST NOT directly modify:
+
+    iReg[0-31]
+    fReg[0-31]
+
+Register updates remain CPU-owned.
+
+Correct flow:
+
+    instruction executes
+        ->
+    VA computed
+        ->
+    VA -> PA translation
+        ->
+    PhysicalBus
+        ->
+    Tsunami
+        ->
+    memory/MMIO response
+        ->
+    MEM stage receives value
+        ->
+    WB stage commits register update
+
+Example:
+
+    LDQ R16, 0(R1)
+
+Flow:
+
+    EX:
+        calculate address
+
+    MEM:
+        chipset->read(pa)
+
+    WB:
+        R16 <- returned value
+
+The chipset supplies data only.
+
+The CPU pipeline commits architectural state.
+
+This preserves:
+
+    traps
+    faults
+    replay correctness
+    machine checks
+    retirement ordering
+
+================================================================================
+9. Recommended Tsunami Internal Regions
+================================================================================
+
+Initial internal decode recommendation:
+
+    CCHIP CSR
+    DCHIP CSR
+    PCHIP0 CSR
+    PCHIP1 CSR
+
+Later additions:
+
+    PCI sparse space
+    PCI dense space
+    PCI config space
+    interrupt windows
+    DMA windows
+    console UART
+    hose ownership logic
+
+This allows staged implementation.
+
+================================================================================
+10. Engineering Order of Operations
+================================================================================
+
+PHASE 1
+SRM Execution to ">>>"
+----------------------
+
+Goal:
+
+    Reach SRM console prompt
+
+PhysicalBus:
+
+    RAM
+    ROM
+    CHIPSET
+
+Tsunami:
+
+    CChip
+    DChip
+    PChip0
+    PChip1
+    UART
+
+Expected outcome:
+
+    SRM executes
+    relocates
+    accesses chipset
+    emits console output
+
+Critical milestone:
+
+    >>> prompt
+
+================================================================================
+PHASE 2
+PCI Enumeration
+================================================================================
+
+Add:
+
+    PCI config space
+    sparse windows
+    dense windows
+
+Expected outcome:
+
+    SRM device discovery
+
+Example:
+
+    SCSI
+    NIC
+    VGA
+
+Fake enumeration responses acceptable initially.
+
+================================================================================
+PHASE 3
+Operating System Boot
+================================================================================
+
+Add:
+
+    interrupts
+    DMA
+    timer behavior
+    hose ownership
+    translation windows
+
+Goal:
+
+    OpenVMS
+    Tru64
+    advanced SRM functionality
+
+================================================================================
+11. Proposed Debug Instrumentation
+================================================================================
+
+Recommendation:
+
+    Add PhysicalBus trace
+
+Example:
+
+    BUS READ:
+        PA=0000000000901200
+        TARGET=RAM
+
+    BUS READ:
+        PA=00001FC0000100
+        TARGET=ROM
+
+    BUS READ:
+        PA=0000080180000100
+        TARGET=CHIPSET
+
+Then inside Tsunami:
+
+    TSUNAMI READ:
+        TARGET=PCHIP1
+        CSR=WSBA0
+
+This should significantly simplify SRM divergence debugging.
+
+Expected benefit:
+
+    first incorrect CSR route becomes immediately visible.
+
+================================================================================
+12. Final Recommendation
+================================================================================
+
+Recommended architecture:
+
+    PhysicalBus
+        ->
+    TsunamiChipset
+        ->
+    CChip
+    DChip
+    PChip0
+    PChip1
+
+Key principles:
+
+    GuestMemory remains RAM-only
+
+    PhysicalBus performs coarse routing
+
+    Tsunami owns chipset decode
+
+    PChips own hose behavior
+
+    CPU pipeline owns register commit
+
+This proposal most closely matches:
+
+    Alpha AXP architectural behavior
+    Tsunami / Typhoon ownership boundaries
+    SRM firmware expectations
+    long-term ES40 / ES45 scalability
+
+Recommendation status:
+
+    STRONGLY RECOMMENDED FOR CONSIDERATION
+
+================================================================================
+ADDENDUM A
+HOT PATH PERFORMANCE CONSIDERATIONS
+Tsunami / Typhoon Chipset Interface for EmulatR
+ASCII(128)
+================================================================================
+
+Document Purpose
+----------------
+
+This addendum supplements:
+
+    Proposal for Consideration:
+    Tsunami / Typhoon Chipset Interface Architecture for EmulatR
+
+The purpose of this addendum is to address:
+
+    hot path performance
+    interface call depth
+    routing overhead
+    branch predictability
+    instruction fetch efficiency
+    memory access optimization
+
+This addendum does NOT replace the architectural recommendation.
+
+Instead, it refines implementation details to preserve emulator
+performance while maintaining architectural correctness.
+
+================================================================================
+1. Problem Statement
+================================================================================
+
+Concern
+-------
+
+The proposed architecture introduces layered routing:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    TsunamiChipset
+        ->
+    XChip
+            ->
+            Device
+
+Example:
+
+    PhysicalBus
+        ->
+    Tsunami
+        ->
+    PChip0
+
+Concern:
+
+    increased interface stack depth
+
+especially because memory access exists on the hottest execution path.
+
+The emulator may execute:
+
+    millions to billions
+
+of memory operations.
+
+Question:
+
+    Will multiple routing layers materially degrade performance?
+
+================================================================================
+2. Conclusion Summary
+================================================================================
+
+Recommendation
+--------------
+
+The proposed architecture remains recommended.
+
+However:
+
+    RAM accesses SHOULD bypass chipset decode.
+
+Final recommendation:
+
+HOT PATH:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    GuestMemory
+
+SLOW PATH:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    TsunamiChipset
+        ->
+        XChip
+        ->
+        Device
+
+This preserves:
+
+    architectural separation
+
+while minimizing:
+
+    hot path overhead
+
+================================================================================
+3. Stack Depth Versus Actual Performance
+================================================================================
+
+Observation
+-----------
+
+Call stack depth alone is generally NOT the primary performance concern.
+
+Modern compilers aggressively inline predictable code paths.
+
+Example conceptual chain:
+
+    PhysicalBus
+        ->
+    Tsunami
+        ->
+    PChip0
+
+may NOT result in:
+
+    call
+    call
+    call
+
+at runtime.
+
+With:
+
+    AXP_ALWAYS_INLINE
+    noexcept
+    link-time optimization
+
+the compiler may flatten the path into a branch tree.
+
+Therefore:
+
+    0 -> PhysicalBus
+    1 -> Tsunami
+    2 -> XChip
+
+is generally acceptable.
+
+Actual performance risks are more likely to come from:
+
+    virtual dispatch
+    branch misprediction
+    cache misses
+    pointer chasing
+    poor memory locality
+
+rather than:
+
+    stack depth
+
+================================================================================
+4. Primary Optimization Requirement
+================================================================================
+
+Critical Recommendation
+-----------------------
+
+RAM accesses SHOULD NOT traverse Tsunami.
+
+BAD:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    Tsunami
+        ->
+    RAM
+
+This causes every instruction fetch and memory load to incur
+chipset decode overhead.
+
+GOOD:
+
+    CPU
+        ->
+    PhysicalBus
+            ->
+            RAM FAST PATH
+
+or
+
+    CPU
+        ->
+    PhysicalBus
+            ->
+            Tsunami
+
+for chipset/MMIO accesses.
+
+Reason
+------
+
+During SRM and operating system execution:
+
+    the overwhelming majority of accesses are RAM
+
+Examples:
+
+    instruction fetches
+    stack operations
+    firmware execution
+    PAL workspace
+    relocation copies
+    heap accesses
+    normal loads/stores
+
+Expected ratio:
+
+    approximately 95%+
+
+Therefore:
+
+    RAM must remain the fastest possible path.
+
+================================================================================
+5. Recommended PhysicalBus Routing Model
+================================================================================
+
+Recommended top-level routing:
+
+    RAM
+    ROM
+    CHIPSET
+    INVALID
+
+Implementation guidance:
+
+    RAM first
+
+because:
+
+    RAM dominates execution frequency.
+
+Recommended conceptual flow:
+
+    if RAM
+        direct GuestMemory access
+
+    else if ROM
+        ROM access
+
+    else if CHIPSET
+        Tsunami decode
+
+    else
+        machine check
+
+This provides:
+
+    predictable branching
+    better CPU branch prediction
+    lower latency
+
+================================================================================
+6. Hot Path Versus Slow Path
+================================================================================
+
+Recommended execution split:
+
+HOT PATH
+---------
+
+Expected majority of operations.
+
+Flow:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    GuestMemory
+
+Includes:
+
+    instruction fetch
+    data load/store
+    PAL workspace
+    SRM relocation
+    stack traffic
+
+Optimization priority:
+
+    MAXIMUM
+
+Expected characteristics:
+
+    flat pointer arithmetic
+    contiguous memory
+    minimal branching
+    cache-friendly
+
+SLOW PATH
+----------
+
+Expected minority of operations.
+
+Flow:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    TsunamiChipset
+        ->
+        CChip
+        DChip
+        PChip0
+        PChip1
+        UART
+        PCI
+        Device
+
+Includes:
+
+    MMIO
+    CSR accesses
+    PCI enumeration
+    interrupt routing
+    ROM aliases
+    UART activity
+    DMA windows
+
+Optimization priority:
+
+    correctness first
+
+================================================================================
+7. Virtual Interface Considerations
+================================================================================
+
+Recommendation
+--------------
+
+Avoid virtual dispatch on the hot path.
+
+Avoid:
+
+    IMemoryMappedDevice*
+
+for high-frequency reads and writes.
+
+Reason:
+
+    vtable indirection
+    branch unpredictability
+    pointer chasing
+    reduced cache locality
+
+Preferred approach:
+
+    direct member access
+
+Example conceptual:
+
+GOOD:
+
+    m_cchip.read(pa)
+
+BAD:
+
+    m_devices[index]->read(pa)
+
+Reason:
+
+    chipset composition is fixed
+
+The emulator targets:
+
+    known hardware
+
+rather than:
+
+    arbitrary dynamic hardware discovery.
+
+Recommendation:
+
+    fixed composition
+    compile-time ownership
+    inlining-friendly design
+
+================================================================================
+8. Recommended Compilation Strategy
+================================================================================
+
+Suggested attributes:
+
+    AXP_HOT
+    AXP_ALWAYS_INLINE
+    noexcept
+
+for:
+
+    PhysicalBus::read()
+    PhysicalBus::write()
+    TsunamiChipset::read()
+    TsunamiChipset::write()
+
+Reason:
+
+    encourages branch flattening
+    improves locality
+    reduces call overhead
+
+Expected result:
+
+The compiler may collapse:
+
+    PhysicalBus
+        ->
+    Tsunami
+        ->
+    PChip
+
+into optimized branch logic.
+
+================================================================================
+9. Architectural Clarification
+================================================================================
+
+Clarification to Main Proposal
+------------------------------
+
+The proposal architecture remains:
+
+    PhysicalBus
+        ->
+    TsunamiChipset
+            ->
+            CChip
+            DChip
+            PChip0
+            PChip1
+
+However:
+
+    RAM accesses are implementation-specialized.
+
+Meaning:
+
+Architecturally:
+
+    PhysicalBus owns:
+        RAM
+        ROM
+        CHIPSET
+
+Implementation-wise:
+
+    RAM bypasses chipset decode.
+
+The chipset interface exists for:
+
+    MMIO
+    CSR windows
+    PCI windows
+    UART
+    interrupt fabric
+    ROM aliases
+    platform-specific routing
+
+NOT:
+
+    normal RAM access
+
+================================================================================
+10. Final Recommendation
+================================================================================
+
+Architectural recommendation remains unchanged:
+
+    PhysicalBus
+        ->
+    TsunamiChipset
+            ->
+            internal chips
+
+Performance refinement:
+
+    RAM SHOULD bypass Tsunami.
+
+Final execution model:
+
+HOT PATH:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    GuestMemory
+
+SLOW PATH:
+
+    CPU
+        ->
+    PhysicalBus
+        ->
+    Tsunami
+        ->
+        XChip
+        ->
+        Device
+
+Expected outcome:
+
+    clean architecture
+
+    SRM correctness
+
+    ES40 / ES45 scalability
+
+    significantly lower hot-path overhead
+
+Recommendation status:
+
+    STRONGLY RECOMMENDED FOR CONSIDERATION
+
+================================================================================
+

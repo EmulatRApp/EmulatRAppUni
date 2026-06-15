@@ -1,0 +1,447 @@
+<!--
+============================================================================
+20260604_serial_console_interrupt_design.md -- COM1 16550 + Device-Interrupt
+Console Unblock: Design Notes
+============================================================================
+Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
+Licensed under eNVy Systems Non-Commercial License v1.1
+
+Project Architect: Timothy Peer
+AI Collaboration:  Claude (Anthropic)
+
+Commercial use prohibited without separate license.
+Contact:        peert@envysys.com  |  https://envysys.com
+Documentation:  https://timothypeer.github.io/ASA-EMulatR-Project/
+============================================================================
+-->
+
+# COM1 16550 + Device-Interrupt Console Unblock -- Design Notes
+
+**Status:** DRAFT (web variant). Design plan only; no code in this
+document. Cowork turns each section into diffs against the live tree,
+fills the [COWORK: ...] placeholders with verified line numbers, and
+decides the kCpuStateVersion question before any serialization-touching
+edit lands.
+
+**Goal of the work:** reach the `P00>>>` console prompt and accept typed
+input. Both halves are unblocked by one wire -- an asserted COM1 UART
+interrupt delivered through the Cchip device-interrupt path.
+
+---
+
+## Section 0: The gate this design closes
+
+Prior open question: is the SRM console getc/putc polled or
+interrupt-driven? If polled, a register-only 16550 model reaches the
+prompt with no interrupt plumbing. That shortcut is now CLOSED -- the
+path is interrupt-driven. Three trace facts settle it:
+
+1. Steady-state idle never touches the UART. A full captured tick of
+   the post-rwp steady state (75K retires, window 160.859B-160.860B)
+   shows zero accesses to COM1 0x3F8-0x3FF. The only I/O in the tick is
+   two LDBUs of the unrelated 0xFFFF0001 IIC/NIC poke and one inb(0x80)
+   delay-port read. A polled getc would show periodic LSR (0x3FD) or
+   RBR (0x3F8) reads here; there are none.
+
+2. The shell blocks on a semaphore, not a loop. In the
+   yyreset -> idle window, read_with_prompt (0x70448) descends through
+   the file layer (0x5a650) into a kernel wait primitive (JSR 0xb0f08)
+   with R16=0x3f23e00 (an input semaphore); the scheduler swaps to
+   krn$_idle and the shell process never runs again in the window.
+   RBR is never read (LDBU counts in-window: LSR x198, MSR x199,
+   RBR x0; all LSR/MSR reads belong to the boot-time polled qprintf
+   output path, which ends before yy_reset).
+
+3. The driver ends in interrupt mode. It toggles IER 0x00 / 0x03
+   ninety-eight times during the polled-output phase and ends at
+   IER=0x03 (RX-data-available + THR-empty enabled) immediately before
+   blocking -- a driver handing the line to its ISR.
+
+Consequence: only an asserted UART interrupt
+(ISA IRQ4 -> Cypress bridge -> DRIR<55> -> Cchip EI -> device line)
+can post the input semaphore at 0x3f23e00 and wake the shell.
+The register model (Increment 1) and the device-EI path (Increment 2)
+are therefore both on the critical path; there is no polled-only
+milestone.
+
+---
+
+## Section 1: The interrupt line is combinational, not edge-driven
+
+This is the single most important correctness requirement and is NOT
+deferrable. At hand-off the driver wrote IER=0x03 with THR already
+empty (boot output drained). A real 16550 asserts the THR-empty
+interrupt on that write (IIR -> 0x02); the TX ISR fires and drains the
+software output ring where `P00>>>` is queued. If the model raises
+THR-empty only on a TX-complete transition (an edge when the shift
+register empties), it MISSES the enable-while-already-empty case and
+the prompt stays stuck even after DRIR/EI is wired.
+
+The UART interrupt line MUST be a level-sensitive combinational
+function of (IER & LSR), re-evaluated on every event that can change
+either operand:
+
+```
+// Recompute on: write IER, write THR, write FCR (FIFO reset),
+//               RX enqueue, read IIR, read RBR, read LSR.
+// All bit names are 16550 register fields, not CPU IPRs.
+
+uart_int_pending =
+      (IER.ERBFI & LSR.DR)        // 0x01 enable & data-ready  -> RX-avail
+    | (IER.ETBEI & LSR.THRE)      // 0x02 enable & THR-empty    -> THR-empty
+    | (IER.ELSI  & LSR.<errbits>) // 0x04 enable & line-status  -> DEFERRED
+    | (IER.EDSSI & MSR.<delta>);  // 0x08 enable & modem-status -> DEFERRED
+```
+
+Companion requirement -- IIR priority + clear-on-read, or the ISR
+storms / never re-arms:
+
+- IIR reports the highest-priority pending source, with FIFO bits
+  <7:6> = 11 set (so reads present as 0xC0 | code), consistent with
+  the FIFOs-on advertisement already emitted:
+    line-status   IIR code 0x06   priority 1 (highest)   [DEFERRED]
+    RX-avail      IIR code 0x04   priority 2
+    char-timeout  IIR code 0x0C   priority 2             [DEFERRED]
+    THR-empty     IIR code 0x02   priority 3
+    modem-status  IIR code 0x00   priority 4             [DEFERRED]
+- Reading IIR clears a pending THR-empty source.
+- Reading RBR clears RX-avail.
+- Writing THR clears THR-empty (and, with the line empty + ETBEI set,
+  re-asserts -- see the storm guard in Section 5).
+- The ISR reads IIR to dispatch; that read MUST lower the line for the
+  serviced source or the line storms. Conversely, each clearing read
+  MUST re-run the combinational eval so the line re-arms for the next
+  byte.
+
+---
+
+## Section 2: 16550 complete register surface (Increment 1)
+
+Model the silicon: the full register set is present with correct
+storage / RO / W1C and correct polled-read semantics. FIFO trigger
+levels, char-timeout, line-status, and modem-status INTERRUPTS are
+shallow behavior, tracked by the unwired-TODO table in Section 3 per
+the CchipPhaseA resolution (4) discipline. "Complete surface, shallow
+behavior" -- not "minimal surface."
+
+Register map (COM1 base 0x3F8; DLAB in LCR<7> selects divisor latch):
+
+```
+off   DLAB=0 read   DLAB=0 write   DLAB=1
+0x3F8 RBR           THR            DLL
+0x3F9 IER           IER            DLM
+0x3FA IIR           FCR            (IIR/FCR)
+0x3FB LCR           LCR            LCR
+0x3FC MCR           MCR            MCR
+0x3FD LSR (RO)      --             LSR
+0x3FE MSR (RO)      --             MSR
+0x3FF SCR           SCR            SCR
+```
+
+Behavior depth for THIS milestone:
+- RBR/THR: RX-avail driven by the injection queue (Section 4); THR
+  modeled as instantaneous TX into the output ring (storm guard in
+  Section 5).
+- IER: full storage of bits 3:0; feeds the combinational line.
+- IIR/FCR: IIR priority + clear-on-read per Section 1; FCR FIFO-enable
+  and reset bits honored; trigger-level bits stored, no trigger
+  effect (TODO).
+- LCR: full storage (word length, stop, parity, DLAB, break).
+- MCR: full storage; OUT2 is an ACTIVE delivery gate (standard PC/AT
+  Southbridge wiring: the UART INTRPT pin reaches the ISA IRQ line
+  through a tri-state buffer enabled by OUT2; the Cypress bridge keeps
+  this). GATE THE DELIVERY, NOT IIR: OUT2 does not affect the 16550
+  internal interrupt logic, so IIR still reports pending sources with
+  OUT2=0 (a polling driver must still see them). AND OUT2 in only at
+  the DRIR assert boundary (Section 4, Seam 1):
+    isa_irq4 = uart_int_pending AND MCR.OUT2   -> DRIR<55>
+  [COWORK: VALIDATE before arming the gate -- confirm from the hand-off
+  window that the driver writes MCR with bit 3 (OUT2, 0x08; typically
+  0x0B = DTR|RTS|OUT2) at or before the IER=0x03 write. Add MCR (0x3FC)
+  writes to the existing LSR/MSR/RBR count. If the driver never sets
+  OUT2, an active gate masks the interrupt we are trying to fire and
+  reintroduces the stuck prompt -- do not arm the gate until the MCR
+  write is confirmed.]
+- LSR: DR from queue, THRE/TEMT from the instantaneous-TX model,
+  error bits stored (no error injection path yet).
+- MSR: storage; no modem-delta interrupt (TODO).
+- SCR: scratch, plain storage.
+
+[COWORK: confirm the UART model file/library and include-guard name,
+e.g. <DIR>_UART16550_H; add the ADR-0001 source header to the new
+.h/.cpp; record the new file in the build target.]
+
+---
+
+## Section 3: Unwired-TODO register table (pre-stub)
+
+Goes in the UART model header per the house rule (header table +
+greppable `// TODO(unwired): ...` line comment at each shallow site;
+both removed in the same edit that lands the wiring).
+
+```
+// ============================================================================
+// TODO Register Table -- unwired or partially-wired behavior
+// ============================================================================
+// FCR.trigger  -- trigger-level bits <7:6> stored; RX-avail asserts on
+//                 >=1 byte regardless of programmed trigger. Wire when a
+//                 driver programs a non-default trigger level.
+// IIR 0x0C     -- char-timeout interrupt not asserted; RX-avail (0x04)
+//                 covers the traced driver. Wire when the FIFO timeout
+//                 path is exercised.
+// IIR 0x06     -- line-status interrupt (ELSI) not asserted; LSR error
+//                 bits store but raise nothing. Wire when an error
+//                 injection path exists.
+// IIR 0x00     -- modem-status interrupt (EDSSI) not asserted; MSR
+//                 stores but raises nothing. Wire when modem-control
+//                 lines are exercised.
+// ============================================================================
+//
+// MCR.OUT2 is NOT in this table: it is full behavior (active delivery
+// gate, Section 2 / Seam 1), pending only the one-time hand-off MCR
+// write validation, not a behavior stub.
+```
+
+---
+
+## Section 4: Device-interrupt delivery seam list (Increment 2)
+
+This is net-new plumbing. It does NOT reuse the interval timer's
+b_irq<2> aggregation: the timer rides i_intim_l -> b_irq<2> (EI level
+22) via a direct cpu-field poke and bypasses DRIR/DIM. COM1 rides the
+device path: DRIR<55> -> AND DIMn -> DIRn -> b_irq<1> (EI level 23).
+
+Naming hazard -- two registers both called "IER," both must be open:
+- UART IER (offset 0x3F9): the 16550 enable, RX+THR (0x03 observed).
+- CPU HW_IER (IPR 0x010A), EIEN field: the 21264 external-interrupt
+  enable. Device line is EI level 23; per the 2026-05-19 Phase D map
+  (irqLevel -> IER bit via 57 - irqLevel) that is bit 34 = EIEN<1>.
+Name them apart in code/comments (e.g. uartIer vs cpu.ier / EIEN).
+A COM1 interrupt that sets DRIR but finds EIEN<1> masked is correctly
+dropped; if the two IERs are conflated in the trace this will read as
+a bug.
+
+Seam-by-seam (each edit gets a header FILE N / FUNCTION / CHANGE block
+and an inline comment at the changed line, per the house rule):
+
+```
+SEAM 1  UART -> Cchip assert
+  When (uart_int_pending AND MCR.OUT2) rises, call the Cchip
+  device-interrupt assert for the COM1 line; when it falls, deassert.
+  OUT2 is the board-level delivery gate (Section 2); it gates this
+  assert only, never the IIR computation.
+  raiseDeviceInterrupt(55):  DRIR |= (1 << 55)
+  lowerDeviceInterrupt(55):  DRIR &= ~(1 << 55)
+  File: [COWORK: UART model .cpp, line N]
+  Calls into: chipsetLib/TsunamiCchip.h  [COWORK: line N]
+
+SEAM 2  Cchip DRIR/DIM re-eval -> b_irq<1>
+  On DRIR change OR DIMn write, recompute per CPU:
+    DIRn   = DRIR & DIMn
+    irq1   = (DIRn & 0x00ffffffffffffff) != 0   // device, level 23
+    irq0   = (DIRn & 0xfc00000000000000) != 0   // error,  level 30
+  Drive the device EI request line from irq1.
+  NOTE: AXPBox stores DIM without re-running the eval (it re-evals on
+  the next interrupt() call). V4 SHOULD re-eval on the DIM write too,
+  for predictable side-effect ordering (V4 determinism mandate).
+  File: chipsetLib/TsunamiCchip.h  [COWORK: read/write switch line N]
+
+SEAM 3  EI request latch -> canAcceptInterrupt -> divert
+  Device line presented as EI level 23. canAcceptInterrupt(23) gates on
+  (cpu.ier & EIEN<1>) AND IPL-permits AND NOT palMode. On accept, the
+  existing divert mechanism (the one the timer exercises) delivers.
+  File: Machine.cpp  [COWORK: canAcceptInterrupt, near the 694-698
+  region noted in the profile; verify the IRQ-to-IPL map row for
+  device=23]
+
+SEAM 4  HW_IER storage (already landed 2026-05-19 Phase D)
+  Confirm execHwMfpr/execHwMtpr HW_IER read/store cpu.ier and that
+  EIEN<1> (bit 34) is reachable. No change expected; verify only.
+  File: palBoxLib/grains/PalEntries.cpp  [COWORK: verify line N]
+```
+
+[COWORK: confirm whether DRIR/DIM storage from the CchipPhaseA spec
+surface has the assert/eval BEHAVIOR wired yet, or only storage. If
+storage-only, Seams 1-2 are the wiring; if partially wired, reconcile
+with the existing TODO(unwired) entries in TsunamiCchip.h.]
+
+---
+
+## Section 5: Deterministic RX injection queue (Increment 3)
+
+Shape (mirrors the interval-timer tick accounting):
+- A single-producer / single-consumer queue. The TCP backend thread is
+  the sole producer; it enqueues raw bytes asynchronously. This is the
+  ONLY place threading enters the serial path -- keep the surface to
+  this one queue, nothing else crossing the boundary (minimal-Qt /
+  std-first threading rule).
+- The CPU side is the sole consumer and drains the queue ONLY at the
+  step() boundary, never mid-instruction. On drain: push the byte to
+  RBR, set LSR.DR, re-run the combinational eval (Section 1).
+- Each enqueued byte is stamped with the cycle at which it becomes
+  visible. For live interactive use the stamp is "next boundary." For
+  replay the stamp comes from a recorded injection schedule.
+
+Determinism trade-off to NAME in the spec (V4 mandate): host keystroke
+ARRIVAL is nondeterministic, but CONSUMPTION is deterministic given a
+fixed injection schedule. Replay determinism therefore requires the
+injection schedule to be RECORDED and replayed, not regenerated from
+live host timing.
+
+Snapshot-anchoring convention (required, or replay-from-snapshot breaks
+silently): sidecar stamps are ABSOLUTE cycle counts. A snapshot restore
+re-bases the consumer's next-due pointer to the first stamp
+>= restored_cycle. Without this, a replay that starts from a mid-stream
+snapshot injects at the wrong cycles. This is the price of decoupling
+the schedule from the snapshot (Section 9); it is cheap as long as it
+is written down and tested. [COWORK: confirm the sidecar lives beside
+the snapshot, carries the cycle base it was recorded against, and that
+restore performs the re-base.]
+
+Storm guard for instantaneous TX (also a named determinism point):
+TX is modeled instantaneous, so THRE re-asserts the moment the TX ISR
+returns; with ETBEI still set and the ring empty this is a same-cycle
+storm. The driver normally clears ETBEI when its ring empties, so
+faithful clear-on-IIR-read + faithful IER storage lets the driver's own
+logic terminate it. The model-side guard: re-evaluate the computed line
+ONLY at the step() boundary and deliver AT MOST ONE interrupt edge per
+boundary -- the same discipline as RX injection, extended to the
+TX-complete / THRE re-eval.
+
+---
+
+## Section 6: 8259 coherent-poll stub as insurance (Increment 4)
+
+Open question the closed gate does NOT answer: does the SRM
+device-interrupt handler resolve the source via the 8259
+(OCW3 poll at 0x20 / 0xA0, INTA, or ELCR at 0x4D0-0x4D1) or off DIRn
+with a DRIR-keyed dispatch table? Now that b_irq<1> can assert, this
+is directly observable.
+
+Recommendation: do NOT gate Increment 2 on the answer. Stub the 8259
+with a coherent OCW3-poll register that returns IRQ4 when DRIR<55> is
+asserted, so the handler resolves correctly whether or not it polls.
+Then, after the post-assert trace:
+- handler touches 0x20/0xA0/0x4D0: PROMOTE the stub to the minimal
+  surface the handler actually reads.
+- handler dispatches off DIRn only: DELETE the stub.
+This is cheap insurance against the failure mode where the handler
+polls, gets a spurious read, and dispatches IRQ7-spurious instead of
+the COM1 ISR.
+
+[COWORK: after Seam 3 is live, capture the first b_irq<1> handler entry
+and record which I/O ports it reads before dispatch.]
+
+---
+
+## Section 7: Data fidelity flags
+
+- DRIR<55> is BOARD wiring, not 21272 HRM. The 21272 HRM defines
+  DRIR<55:0> as 56 generic device lines; which bit the ISA/SIO bridge
+  output lands on is in the board/system manual. Mark the constant
+  _PROVISIONAL and verify against the board manual before it becomes a
+  C2 device-interrupt decode match. A wrong bit is silent dropped
+  interrupts. [COWORK: cite the board manual section once verified.]
+- UART IER vs CPU HW_IER: distinct registers, distinct names in code
+  (Section 4). EIEN<1> = bit 34, EI level 23, per 2026-05-19 Phase D.
+
+---
+
+## Section 8: Test plan (two-step, sources validated independently)
+
+The prompt and the typed echo ride the same wire but different 16550
+sources; validate them separately so a regression in one cannot mask
+the other.
+
+```
+TEST 1  THRE wire -> prompt drains, zero keyboard input
+  Setup:  Seams 1-4 live; EIEN<1> enabled; combinational line asserts
+          THR-empty on the IER=0x03 write with THR already empty.
+  Expect: `P00>>>` appears at the console with ZERO RX activity
+          (no RBR reads, no injection). Fully guest-generated ->
+          deterministic. This is the cheapest gate and isolates the
+          device-EI plumbing + THRE line from the injection queue.
+  Check:  doctest CHECK only (exceptions disabled in V4).
+
+TEST 2  RX-avail wire -> typed echo
+  Setup:  Test 1 passing; inject one keystroke through the
+          cycle-stamped queue.
+  Expect: RX-avail asserts -> input semaphore at 0x3f23e00 posts ->
+          shell wakes -> reads RBR -> echoes.
+  Check:  doctest CHECK; assert RBR read count goes 0 -> 1 in-window
+          and the echo byte reaches the output ring.
+```
+
+[COWORK: add the assertions against live symbol addresses; confirm the
+semaphore address 0x3f23e00 is still current in the snapshot under
+test.]
+
+---
+
+## Section 9: Snapshot / serialization
+
+RESOLVED (2026-06-04). Split the state by what it is:
+
+1. Injection queue contents + replay schedule -> SIDECAR, never in any
+   snapshot. They are an input stream, not machine state; snapshotting
+   them conflates "what the machine is" with "what the operator typed"
+   and churns the version every time the injection mechanism changes.
+   Anchoring convention in Section 5.
+
+2. UART hardware-visible registers (RBR/THR latch, IER, IIR/FCR config,
+   LCR, MCR, LSR, MSR, SCR, divisor) -> the IO/DEVICE snapshot section
+   (the existing I/O structural maps), NOT CpuState. The UART is a
+   device; CpuState holds CPU registers/IPRs. So kCpuStateVersion is
+   likely untouched; the version that may move is the IO-map's.
+   [COWORK: confirm the UART block's home and which version field
+   governs it.]
+
+Padding-reuse guard (if the UART block is squeezed into existing
+IO-map padding rather than appended with a version bump): a legacy
+snapshot reads those bytes as zero, and zero is WRONG for LSR --
+THRE=0,TEMT=0 means the model believes TX is permanently busy and the
+next putc blocks forever. Reuse padding ONLY with (a) a discriminator
+(key off the existing version field or spend one "uart_present" bit)
+and (b) a load-time default that forces LSR.THRE|TEMT (and sane
+IER/MCR) when the block reads as legacy-zero. Reusing padding on trust
+is a latent wedge.
+
+Bump-cost reframe: the `>>>` prompt snapshots that CLAUDE.md protects
+do not exist yet -- reaching the prompt is the goal of this work. What
+a version bump actually invalidates is the intermediate BOOT snapshots
+used to fast-forward during iteration. That is a real but bounded cost
+(regenerate one boot snapshot, eat the boot cycles). Weigh: clean
+IO-map version bump (one regen) vs guarded padding reuse (no regen, but
+carry the discriminator+default permanently). The V4 fidelity house
+style leans to the clean bump unless boot-snapshot regen is painfully
+slow; the guarded-padding path is legitimate if the guard is written.
+[COWORK: make the call and record it here with the regen cost measured.]
+
+---
+
+## Section 10: Sequencing summary
+
+1. 16550 complete register surface (Section 2) + the combinational
+   (IER & LSR) line with IIR priority / clear-on-read (Section 1).
+   The line semantics are the unstick and are NOT deferrable.
+2. Device-interrupt delivery (Section 4): DRIR<55> -> DIM -> b_irq<1>
+   -> EI level 23 -> EIEN<1> gate -> divert. New plumbing.
+3. Deterministic RX injection queue (Section 5).
+4. 8259 coherent-poll stub (Section 6); promote-or-delete after trace.
+5. Tests (Section 8): prompt-drains-no-input, then typed-echo.
+
+---
+
+## Cross-references
+
+- Chipset CSR surface + unwired-TODO discipline:
+  CchipPhaseA_Design_Notes.md
+- HRM-vs-AXPBox interrupt-path profile: Tsunami_HRM_vs_AXPBox_Profile.md
+  (1.3 device interrupts; 1.2 timer; canAcceptInterrupt gate)
+- HW_IER / EIEN gating, IRQ-to-IPL map: 20260519_boot_path_cleared.md
+  (Phase D)
+- HRM (Tsunami/Typhoon 21272): EC-RE2CA-TE Rev 4.0, 21 Oct 1999
+  (6.3 TIGbus and Interrupts; 10.2.2.7-8 DIRn / DRIR)
+- Board interrupt wiring (DRIR<55> assignment): [COWORK: board/system
+  manual section -- ES45/Titan-class]

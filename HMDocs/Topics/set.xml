@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T10:58:51.139Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>set</title>
+  <keywords>
+    <keyword>full_powerup_diags</keyword>
+    <keyword>memory_test</keyword>
+    <keyword>NVRAM</keyword>
+    <keyword>oem_string</keyword>
+    <keyword>set</keyword>
+    <keyword>show</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">SRM - set</para>
+    </header>
+    <para styleclass="Normal"><text styleclass="Code Example">set</text> changes a console variable and persists it to the flash / NVRAM image; <text styleclass="Code Example">show</text> reads it back. Example session:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">&gt;&gt;&gt;set oem_string snapshot</para>
+    <para styleclass="Code Example">&gt;&gt;&gt;set memory_test none</para>
+    <para styleclass="Code Example">&gt;&gt;&gt;set full_powerup_diags off</para>
+    <para styleclass="Code Example">&gt;&gt;&gt;show memory_test</para>
+    <para styleclass="Code Example">memory_test none</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Setting <text styleclass="Code Example">memory_test none</text> and <text styleclass="Code Example">full_powerup_diags off</text> shortens the power-up self-test -- useful for faster iteration (see Slow Boot).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--SRM-Environment-Variables">SRM Environment Variables</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Firmware-Hangs-_-Slow-Boot-_">Slow Boot</link></para>
+  </body>
+</topic>

@@ -1,0 +1,31 @@
+Bash
+
+Executions
+
+EMULATR_NO_PUTTY=1 EMULATR_CONSOLE_SNAPSHOT=1 \
+  ./out/build/release/Emulatr.exe --firmware firmware/ds10_v7_3.exe \
+  --no-autoload --autosnapshot off \
+  --snapshot-on-pc 0x44518 --snapshot-name-tag coldgct_ide \
+  --max-cycles 30000000000 \
+  > /d/EmulatR/traces/coldgct_ide_$(date +%Y%m%d-%H%M%S).log 2>&1 &
+  
+  
+cd /d/EmulatR/EmulatRAppUniV4/Emulatr
+EMULATR_CONSOLE_SNAPSHOT=1 ./out/build/relwithdebinfo/Emulatr.exe \
+  --firmware firmware/ds10_v7_3.exe \
+  --autosnapshot off  2> run_oemsnap.log
+  
+Detached Process Command Syntax:
+
+cd /d/EmulatR/EmulatRAppUniV4/Emulatr
+EMULATR_CONSOLE_SNAPSHOT=1 nohup ./out/build/relwithdebinfo/Emulatr.exe \
+  --firmware firmware/ds10_v7_3.exe \
+  --autosnapshot off  > run_oemsnap.log 2>&1 &
+disown
+echo "pid=$!"
+  
+  
+To Kill:
+
+kill $(pgrep -f Emulatr.exe)        # or, Windows-native:
+taskkill //IM Emulatr.exe //F 

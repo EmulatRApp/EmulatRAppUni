@@ -1,0 +1,145 @@
+================================================================================
+ build_dsrdb fread SYSFAULT -- investigation plan (windowed trace + Ghidra)
+================================================================================
+ Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+ Author:  Claude (Anthropic) with Timothy Peer, eNVy Systems Inc.
+ Date:    2026-06-03
+ Status:  INVESTIGATION DESIGN -- no V4 code changes.  Diagnostic-only
+          run config (snapshot replay + gated trace), then Ghidra.
+================================================================================
+
+1. WHAT WE KNOW (run console_iic_20260603-201433)
+
+  - Furthest SRM boot to date: powerup -> "64 Meg of system memory" ->
+    memconfig -> build_hwrpb -> build_dsrdb -> fread -> SYSFAULT.
+  - The SRM's own SYSFAULT handler (sysfault @ 0x1c62d8; the print
+    "SYSFAULT CPU0 - pc = 001c62e8" is sysfault+0x10) caught it and
+    dumped a symbolized backtrace:
+        PD 0016F520 (fread)        running when the fault hit
+        0007D0DC  build_dsrdb+0x94 (the fread call site return addr)
+        0005C54C  build_hwrpb+0x22c
+        00083970  memconfig+0x258
+        0006F198  powerup+0xa8
+  - After the dump, console_restart() printed "Initializing..." and issued
+    outtig(0xE00004) -- a TIGbus system RESET V4 does not model -> halt
+    at PC=0x1c6304, cyc 22,136,858,548.
+  - ALL logged faults are routine kFaultDtbMissDouble (pc=0x8321, the PAL
+    TLB-fill handler) -- NORMAL servicing, NOT the SYSFAULT.  Zero
+    UNHANDLED OUTER lines (IIC stub working).
+  - The SYSFAULT is therefore an exception the firmware's SCB classifies
+    as fatal -- NOT a V4 unmodeled-PA fault (those would log UNHANDLED)
+    and NOT a routine TLB miss.  Candidate classes: ACV (access
+    violation on an unmapped/over-range VA inside fread), an alignment
+    fault, or an OPCDEC/illegal path.  The window trace will name it.
+
+  Symbol anchors (from the embedded symbol table, decompressed image):
+        build_dsrdb   entry 0x7d048   (call site ret 0x7d0dc = +0x94)
+        fread         entry 0x5a510
+        fopen         entry 0x59cd8
+        fseek         entry 0x5a890
+        build_hwrpb   entry 0x5c320
+        memconfig     entry 0x83718
+        sysfault      entry 0x1c62d8  (SCB fatal-exception handler)
+        console_restart entry 0x7cd70
+        outtig        entry 0x7ff00 ; xtig 0x7fe70
+
+2. WHY A FULL COLD-BOOT TRACE IS THE WRONG TOOL
+
+  The SYSFAULT is at ~cyc 21.47B.  A full retire trace from cyc 0 would
+  be terabyte-class (prior break.trc files hit 194 GB and 441 GB).
+  Tim's proposal (2026-06-03) is correct: replay from a near-frontier
+  snapshot and gate the trace to the build_dsrdb window -- ~10-30M
+  instructions at most, Ghidra-ingestible.
+
+3. WINDOWED-TRACE RECIPE
+
+  Step A -- anchor snapshot (replay, do NOT re-grind 21B cycles):
+    The periodic autosaver writes snapshots\auto_*_<cycle>.axpsnap every
+    ~10M cycles.  Pick the newest one strictly BEFORE the SYSFAULT, e.g.
+    auto_*_21400000000.axpsnap (cyc 21.40B).  Autoload picks the latest
+    by mtime, so either (a) point the run at a snapshots dir containing
+    only that file, or (b) copy it to a predig_ prefix (non-pruneable,
+    autoloaded first).  Replays to the frontier in seconds.
+
+  Step B -- gate full-complement trace to the build_dsrdb window:
+    BreakpointSink gate:
+        open  = 0x7d048   (build_dsrdb entry)
+        close = 0x1c62d8  (sysfault entry -- fault caught)
+        revolutions = 1   (single pass; build_dsrdb runs once)
+    Override via s_gateOpenPc / s_gateClosePc / s_revolutionsRemaining
+    before the run (the BreakpointSink already supports this; see
+    reference_breakpoint_sink).  This captures every retired instruction
+    from build_dsrdb entry through the fread fault and stops at the
+    handler -- full GPRs + ea/val per memory op.
+
+  Step C -- enable the standard --trace as a coarse backstop only if the
+    gated capture misses the entry (e.g. build_dsrdb already running at
+    snapshot time -- pick an earlier snapshot if so).
+
+  Determinism guard: the SYSFAULT cycle is identical across the seeded
+  and unseeded runs, so the replay is reproducible; if the windowed run's
+  fault cycle differs from 21.47B, the snapshot/gate is off, not the bug.
+
+4. WHAT TO EXTRACT (the questions the window answers)
+
+  Q1. The exact faulting instruction: PC, encoded, op, and the fault code
+      V4 raised (ACV / alignment / OPCDEC / DtbMiss-that-didn't-fill).
+      -> the last BRK line before the gate's close marker.
+  Q2. The faulting effective address (ea= field) and whether it is a VA
+      that should map (DRAM) or an over-range / null pointer.
+  Q3. What fread was reading: walk back from the fread entry (0x5a510)
+      to the FILE* argument build_dsrdb passed (R16 at the call site
+      0x7d0dc).  fread dereferences fp->ip->... ; a null or garbage fp
+      member produces a bad-VA load -> ACV.  This mirrors the earlier
+      fclose(&spl_kernel) class of bug: a FILE built from an unpopulated
+      device/inode.
+  Q4. WHICH file/device build_dsrdb opened: trace the fopen (0x59cd8)
+      that produced the fp, and the name string it was handed.  Source
+      pc264.c build_dsrdb has a DS20E branch that does
+      fopen("iic_rcm_nvram0","srb") + fseek(0x11) + fread -- the shipped
+      DS10 image may take an analogous nvram/eerom path.  If the file is
+      an unbacked NVRAM/eerom device, the fp's data pointer is null and
+      fread walks off it.
+
+5. GHIDRA HANDOFF
+
+  With the window .trc + the symbol table, in Ghidra:
+    - Rebase to the decompressed image (load base 0x8000; file = PA-0x8000).
+    - Apply the embedded symbol names (ApplySrmSymbols workflow,
+      reference_srm_ghidra_symbol_recovery): name[i] <-> desc[i-1],
+      entry = *(desc+8).
+    - Disassemble build_dsrdb (0x7d048): identify the fopen target string,
+      the fseek offset, and the fread destination + count.  Cross-check
+      against pc264.c build_dsrdb (version drift expected; image wins).
+    - The faulting load's source register chain (from the .trc) maps to a
+      fp->member deref; Ghidra names the struct field.
+
+6. LIKELY OUTCOMES + PRE-AGREED DIRECTION (decide AFTER the trace)
+
+  H1  fread faults because build_dsrdb opened an UNBACKED NVRAM/eerom
+      device (fp data ptr null) -> the fix is to back that device (like
+      the eerom/flash work), NOT to model TIGbus reset.  Most likely
+      given the fopen-driven path and the fclose(&spl_kernel) precedent.
+  H2  fread faults on an over-range VA computed from a bad header byte
+      read out of flash/nvram -> data-content fix (correct nvram seed).
+  H3  A genuine V4 exception-delivery bug (ACV/alignment mis-raised on a
+      legal access) -> pipeline/PAL fix; least likely (boot got this far
+      cleanly), but the window's fault-code field settles it immediately.
+
+  Only AFTER the window names the cause do we choose; the TIGbus reset
+  model (machinery-map gap G8) is deferred -- it is the firmware's
+  reaction to the fault, not the cause, and modeling it would only let
+  the box "reset" in a loop rather than reach >>>.
+
+7. STATUS / SEQUENCING
+
+  [x] Frontier identified + logged (V4_IO_Machinery_Map.txt sec. 8, G8)
+  [ ] Pick anchor snapshot ~cyc 21.40B; promote to predig_ if desired
+  [ ] Gated windowed trace (open 0x7d048 / close 0x1c62d8, 1 revolution)
+  [ ] Extract Q1-Q4 from the .trc
+  [ ] Ghidra: disassemble build_dsrdb, name the fopen target + fault field
+  [ ] Choose H1/H2/H3 fix; design note before code
+
+================================================================================
+ END
+================================================================================

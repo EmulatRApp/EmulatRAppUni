@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="Under Construction" modified="2026-06-15T11:45:04.337Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Firmware Requirements</title>
+  <keywords>
+    <keyword>ds10_v7_3.exe</keyword>
+    <keyword>--firmware</keyword>
+    <keyword>firmware integrity check</keyword>
+    <keyword>firmware path resolution</keyword>
+    <keyword>firmwareImage</keyword>
+    <keyword>firmwareSha256</keyword>
+    <keyword>ROM</keyword>
+    <keyword>SRM firmware image</keyword>
+    <keyword>SRM V7.3</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Firmware Requirements</para>
+    </header>
+    <para styleclass="Normal">EmulatR requires an SRM console firmware image to execute. The DS10 reference image is an SRM V7.3 build (<text styleclass="Code Example">ds10_v7_3.exe</text>).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The image is selected in precedence order:</para>
+    <para styleclass="NotesBox"> --firmware &lt;path&gt; on the command line (overrides the ini for a single run); or</para>
+    <para styleclass="NotesBox"> the [ROM]/firmwareImage ini key (default: ds10_v7_3.exe).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Path gotcha:</text> the ini value is the bare file name (no <text styleclass="Code Example">firmware/</text> prefix) and resolves against the current working directory. Launch from the Emulatr root, or pass an explicit <text styleclass="Code Example">--firmware firmware/ds10_v7_3.exe</text>.</para>
+    <para styleclass="Normal">Optional integrity check: set <text styleclass="Code Example">[ROM]/firmwareSha256</text> to verify the image at load. When empty, the integrity check is skipped.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">[TODO: document firmware provenance, licensing, and the set of supported SRM versions.]</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--First-Startup">First Startup</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Loading-Firmware">Loading Firmware</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Building-from-Source">Building from Source</link></para>
+  </body>
+</topic>

@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-14T21:13:44.327Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Example styles.</title>
+  <body>
+    <header>
+      <para styleclass="Heading1">Example styles.</para>
+    </header>
+    <para styleclass="Heading1">Heading 1</para>
+    <para styleclass="Heading2">Heading 2</para>
+    <para styleclass="Heading3">Heading 3</para>
+    <para styleclass="Normal">normal</para>
+    <para styleclass="Normal"><text styleclass="Code Example">code and console display info</text></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Page Links. <link displaytype="text" defaultstyle="true" type="topiclink" href="--What-is-EmulatR">What is EmulatR</link></para>
+  </body>
+</topic>

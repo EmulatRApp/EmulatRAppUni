@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Addressing</title>
+  <keywords>
+    <keyword>ASN</keyword>
+    <keyword>DTB</keyword>
+    <keyword>Ev6Translator</keyword>
+    <keyword>ITB</keyword>
+    <keyword>kseg</keyword>
+    <keyword>PTE</keyword>
+    <keyword>SPAM</keyword>
+    <keyword>SPAMShardManager</keyword>
+    <keyword>superpage</keyword>
+    <keyword>TLB</keyword>
+    <keyword>TlbEpoch</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Addressing</para></header>
+    <para styleclass="Normal">Virtual-to-physical translation is performed by <text styleclass="Code Example">Ev6Translator</text> (mmuLib) exactly as the EV6 architecture specifies. In PAL mode the address bypasses translation (VA = PA). Otherwise the translator applies the canonical virtual-address window check and the superpage (kseg) mapping; an address that is neither a superpage nor a resident mapping returns an ITB or DTB miss for the PAL fill handler.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The translation buffers (SPAM)</para>
+    <para styleclass="Normal">The ITB and DTB are modeled by the <text style="font-weight:bold;">SPAM</text> cache -- Set-Partitioned Associative Memory -- as <text styleclass="Code Example">SPAMShardManager</text> instances that live in <text styleclass="Code Example">CpuState</text> (<text styleclass="Code Example">itbMgr</text> and <text styleclass="Code Example">dtbMgr</text>). Each is 16 shards by 8 ways = 128 entries: the manager hashes a lookup tag to pick a shard, and the shard does a short way-scan. The buffers are CPU-local by design -- each CpuState owns its own pair, and cross-CPU invalidation (in a future SMP build) would go through IPI machinery.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Invalidation is lazy (epoch-based)</para>
+    <para styleclass="Normal">Rather than walk and clear entries, invalidation bumps a counter (<text styleclass="Code Example">TlbEpoch</text>): a full flush (TBIA) advances a global counter and a per-process flush (TBIAP) advances a process counter, so a flush is O(1) and a stale entry simply fails its liveness test at the next lookup. Targeted single-entry flushes (TBIS / TBISI / TBISD) clear one slot. The page-table-entry format (<text styleclass="Code Example">Ev6PteFormat</text>) carries the protection, granularity-hint, and fault bits the guest expects, and translation faults are delivered precisely at the Writeback stage.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Memory----------------------">Memory</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Overview--------------------">Overview</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Addressing--TLB">Addressing &amp; TLB (appendix)</link></para>
+  </body>
+</topic>

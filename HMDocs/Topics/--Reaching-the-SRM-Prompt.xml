@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:45:28.617Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Reaching the SRM Prompt</title>
+  <keywords>
+    <keyword>auto_action</keyword>
+    <keyword>FRU</keyword>
+    <keyword>GCT</keyword>
+    <keyword>HALT</keyword>
+    <keyword>LFU</keyword>
+    <keyword>memory sizing</keyword>
+    <keyword>PCI probe</keyword>
+    <keyword>power-up</keyword>
+    <keyword>SRM prompt</keyword>
+    <keyword>UPD</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Reaching the SRM Prompt</para>
+    </header>
+    <para styleclass="Normal">After launch the firmware proceeds through power-up to the console. The visible sequence is:</para>
+    <para styleclass="Normal"></para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">Banner and memory sizing (e.g.,&quot;1024 Meg of system memory&quot;).</li>
+      <li styleclass="NotesBox">PCI / ISA probe; GCT / FRU initialization at 3f32000.</li>
+      <li styleclass="NotesBox">Option-firmware scan of the CD / floppy devices.</li>
+      <li styleclass="NotesBox">The Loadable Firmware Update (LFU) utility -- the UPD&gt; prompt. From here, exit returns to the console, or update srm refreshes firmware.</li>
+      <li styleclass="NotesBox">System / disk testing, then the interactive &gt;&gt;&gt; prompt.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">A full annotated transcript is in Example - Performance. By default the console halts at <text styleclass="Code Example">&gt;&gt;&gt;</text> (<text styleclass="Code Example">auto_action = HALT</text>).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Clean-Shutdown">Clean Shutdown</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="4_3-SRM-Console">SRM Console</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="4_6-Firmware-Update-Utility-(L">Firmware Update Utility (LFU)</link></para>
+  </body>
+</topic>

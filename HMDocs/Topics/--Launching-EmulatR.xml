@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-14T21:51:50.116Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Launching EmulatR</title>
+  <keywords>
+    <keyword>--autosnapshot</keyword>
+    <keyword>cold boot</keyword>
+    <keyword>Emulatr.exe</keyword>
+    <keyword>EMULATR_NO_AUTOLOAD</keyword>
+    <keyword>--firmware</keyword>
+    <keyword>--max-cycles</keyword>
+    <keyword>--no-autoload</keyword>
+    <keyword>run.log</keyword>
+    <keyword>snapshot</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Launching EmulatR</para>
+    </header>
+    <para styleclass="Normal">Launch from the Emulatr root. A genuine cold boot (no snapshot restore), quiet, is:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">cd /d/EmulatR/EmulatRAppUniV4/Emulatr</para>
+    <para styleclass="Code Example">EMULATR_NO_AUTOLOAD=1 ./out/build/relwithdebinfo/Emulatr.exe \</para>
+    <para styleclass="Code Example">  --firmware firmware/ds10_v7_3.exe --autosnapshot off 2&gt; run.log</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Omit <text styleclass="Code Example">EMULATR_NO_AUTOLOAD</text> to restore the newest snapshot instead of cold-booting. Diagnostics are written to the redirected stderr (<text styleclass="Code Example">run.log</text>).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Common launch modes</para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Autoload to the prompt in seconds</text> -- drop <text styleclass="Code Example">--no-autoload</text> so the newest <text styleclass="Code Example">&gt;&gt;&gt;</text> snapshot is restored:</para>
+    <para styleclass="Code Example">./out/build/relwithdebinfo/Emulatr.exe --firmware firmware/ds10_v7_3.exe --autosnapshot off</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Bounded headless cold boot</text> -- determinism / step-correctness over a few minutes (covers decompression and early init):</para>
+    <para styleclass="Code Example">EMULATR_NO_PUTTY=1 ./out/build/relwithdebinfo/Emulatr.exe \</para>
+    <para styleclass="Code Example">  --firmware firmware/ds10_v7_3.exe --no-autoload --autosnapshot off \</para>
+    <para styleclass="Code Example">  --max-cycles 2000000000 2&gt; run_cold.log</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">See the Environment Variables reference for the full set of launch gates.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Connecting-to-the-Console">Connecting to the Console</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Environment-Variables-(EMULA">Environment Variables</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--First-Startup">First Startup</link></para>
+  </body>
+</topic>

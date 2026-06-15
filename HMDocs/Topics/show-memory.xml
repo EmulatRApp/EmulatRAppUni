@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T10:58:42.457Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>show memory</title>
+  <keywords>
+    <keyword>1024 MB</keyword>
+    <keyword>--mem</keyword>
+    <keyword>memory array</keyword>
+    <keyword>memorySize</keyword>
+    <keyword>show memory</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">SRM - show memory</para>
+    </header>
+    <para styleclass="Normal">The memory array is reported in the configuration table:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">Array # Size Base Addr</para>
+    <para styleclass="Code Example"> 0 1024 MB 000000000</para>
+    <para styleclass="Code Example">Total Good Memory = 1024 MBytes, Total Bad Pages = 0</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The default system memory is 1024 MB (set by <text styleclass="Code Example">[System] memorySize</text> in the ini); the size can be overridden at launch with <text styleclass="Code Example">--mem</text>.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="show-config">show config</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Configuring----------(moved-">Configuring</link></para>
+  </body>
+</topic>

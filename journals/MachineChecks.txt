@@ -1,0 +1,588 @@
+
+Response 1. 
+I would recommend a middle-ground approach:
+
+    Add MachineCheck infrastructure NOW.
+    Deliver real PAL machine checks LATER.
+
+In other words:
+
+    Phase 1: soft machine check
+    Phase 3: architectural machine check
+
+I would absolutely add:
+
+    kFaultMachineCheck
+
+to the V4 fault enum now.
+
+Reason:
+
+The absence of a fault type later causes architectural contamination.
+
+You end up with fault handling spread across hot-path logic:
+
+    OutOfRange
+    UnhandledMMIO
+    TODO
+    UnknownPA
+
+Instead:
+
+    Every invalid PA already becomes:
+    MachineCheckCandidate
+
+even if delivery is stubbed.
+
+That gives you architectural continuity.
+
+Recommended model
+=================
+
+Phase 1 (SRM bring-up)
+----------------------
+
+For unimplemented MMIO:
+
+- log warning
+- return safe value
+- mark recoverable fault state
+- continue
+
+NO PAL entry yet.
+NO trap delivery yet.
+
+Example:
+
+    BUS WARNING:
+    Unimplemented PA read
+    PA=0000080180000040
+    Target=PCHIP0
+    Returning 0
+
+And internally:
+
+    slot.boxResult.setFault(
+        FaultCode::kFaultMachineCheckSoft);
+
+or:
+
+    kFaultMachineCheck
+        +
+    deferred delivery
+
+This gives you observability.
+
+Very important for SRM.
+
+Because SRM sometimes probes things that are absent.
+
+You do NOT want:
+
+    hard crash emulator
+
+during early bring-up.
+
+SRM may intentionally read:
+
+- missing PCI BAR
+- optional hose
+- unused config register
+
+Returning:
+
+    0
+
+is often enough to continue boot.
+
+Especially during:
+
+    device discovery
+
+
+Additional considerations
+=========================
+
+1. Recoverable vs fatal classification
+--------------------------------------
+
+You probably want two conceptual layers:
+
+    Bus/Platform fault classification
+    +
+    Architectural delivery policy
+
+Example:
+
+    enum class FaultSeverity {
+        Recoverable,
+        Fatal
+    };
+
+Recoverable examples:
+- probing absent MMIO
+- optional hose access
+- unused PCI config space
+
+Fatal examples:
+- malformed sparse-space decode
+- impossible CSR alignment
+- corrupted DMA translation state
+- protocol violations
+
+This becomes useful later when implementing:
+- SRM tolerances
+- OS-specific behavior
+- debug assertions
+- PAL retry semantics
+
+Without this separation, all machine checks become equally destructive.
+
+
+2. Distinguish "unimplemented" from "unmapped"
+----------------------------------------------
+
+These are architecturally different.
+
+Unimplemented:
+    valid target exists
+    register/function missing
+
+Unmapped:
+    no responder on the fabric
+
+Example:
+
+    PCHIP CSR offset unknown
+        !=
+    no chipset device decoded
+
+This distinction becomes important later for:
+- diagnostics
+- PAL syndrome construction
+- MM_STAT generation
+- bus-level debugging
+
+Suggested internal classification:
+
+    kFaultNoDevice
+    kFaultBadCSR
+    kFaultProtocol
+    kFaultMachineCheck
+
+even if all collapse into:
+    MachineCheck
+architecturally.
+
+
+3. Avoid hidden success paths
+-----------------------------
+
+Returning 0 is pragmatic.
+
+But it should NEVER look like a true success internally.
+
+Meaning:
+
+BAD:
+
+    response.success = true;
+    response.data = 0;
+
+GOOD:
+
+    response.success = false;
+    response.data = 0;
+    response.fault = kFaultMachineCheck;
+
+Otherwise later:
+- replay logic
+- retirement logic
+- PAL delivery
+- debug traces
+
+become inconsistent.
+
+
+4. Preserve precise-fault capability
+------------------------------------
+
+Even if delivery is deferred, preserve enough metadata NOW to support precise exceptions later.
+
+Minimum useful metadata:
+
+    struct FaultInfo {
+        FaultCode code;
+        uint64_t pa;
+        AccessType access;
+        uint8_t size;
+        bool write;
+        bool speculative;
+    };
+
+You will want this later for:
+- EXC_ADDR
+- MM_STAT
+- retry logic
+- PAL frame generation
+- debug traces
+
+If metadata is omitted now, Phase 3 becomes invasive.
+
+
+5. Speculative accesses matter
+------------------------------
+
+Alpha implementations may perform speculative reads.
+
+Some accesses should:
+- log only once
+- suppress repeated warnings
+- avoid fatal escalation
+
+Otherwise traces become unusable.
+
+Recommended:
+
+    if (fault.speculative)
+        downgrade logging;
+
+Very important once caches and prefetch behavior appear.
+
+
+6. Separate architectural faults from emulator assertions
+---------------------------------------------------------
+
+Do NOT use machine checks for emulator invariants.
+
+Example:
+
+BAD:
+
+    unreachable decode path
+        ->
+    machine check
+
+GOOD:
+
+    assert()/fatal for emulator corruption
+    machine check for guest-visible faults
+
+Architectural faults are guest-visible behavior.
+Assertions are emulator correctness failures.
+
+Mixing them becomes painful later.
+
+
+7. DMA-originated faults will eventually matter
+------------------------------------------------
+
+Eventually:
+- PCI DMA
+- scatter/gather
+- IOMMU windows
+- Pchip translations
+
+may fault independently of CPU-issued loads/stores.
+
+So consider whether fault ownership is:
+
+    CPU transaction
+or
+    fabric transaction
+
+from the beginning.
+
+This affects:
+- logging
+- attribution
+- interrupt generation
+- future chipset modeling
+
+
+Where should MachineCheck originate?
+====================================
+
+Not in Tsunami.
+Not in GuestMemory.
+Not in PhysicalBus.
+
+It should originate in:
+
+    MEM stage completion
+
+Architecturally the access fault occurs as a result of a completed memory transaction.
+
+Meaning:
+
+    hw_ld
+    hw_st
+    IFetch
+
+receive a response:
+
+    success
+    or
+    fault
+
+The pipeline owns exception delivery.
+
+Recommended flow:
+
+    EX:
+        compute PA
+
+    MEM:
+        bus access
+
+    MEM Result:
+        success
+        or
+        MachineCheckCandidate
+
+    WB:
+        suppress register commit
+        schedule trap delivery
+
+Very Alpha-like.
+
+The bus should NOT do:
+
+    throw MachineCheck();
+
+or:
+
+    cpu.enterPAL();
+
+That couples platform to CPU.
+
+Instead:
+
+    Bus returns:
+
+    MemoryResponse
+    {
+        success = false;
+        fault = kFaultMachineCheck;
+        data = 0;
+    }
+
+Then pipeline decides.
+
+That preserves ordering.
+
+Example:
+
+    LDQ R5, badPA
+
+MEM:
+
+    response.fault = kFaultMachineCheck
+
+WB:
+
+    R5 NOT committed
+    trap scheduled
+
+This is architecturally correct.
+
+
+Suggested phased implementation
+===============================
+
+Phase 1 (Recommended)
+---------------------
+
+Add enum now:
+
+    kFaultMachineCheck
+
+Add soft handling:
+
+    warning log
+    return 0
+    continue execution
+
+No PAL yet.
+No EXC_ADDR yet.
+No MM_STAT yet.
+No MCHK vector yet.
+
+Purpose:
+
+    reach SRM shell and continue platform bring-up
+
+
+Phase 2
+-------
+
+Escalation support.
+
+Track:
+- fault pending
+- faulting PA
+- access type
+- read/write
+- size
+
+Still optional PAL delivery.
+
+
+Phase 3 (Architectural)
+-----------------------
+
+Full Alpha machine check.
+
+MEM stage:
+
+    fault
+        ->
+    pipeline flush
+        ->
+    PAL entry
+
+Populate:
+- EXC_ADDR
+- MM_STAT
+- MCHK frame
+- PAL shadow state
+
+Transfer:
+- PC -> machine check vector
+- architectural restart state
+
+This aligns with:
+- SRM
+- OpenVMS
+- Tru64
+
+
+Implementation Note
+===================
+
+Unmapped or unimplemented physical address accesses
+SHOULD conceptually represent Machine Check candidates.
+
+During early SRM bring-up (Phase 1), accesses MAY
+return zero and emit diagnostic logging rather than
+triggering architectural machine-check delivery.
+
+The V4 fault model SHOULD nevertheless include:
+
+    kFaultMachineCheck
+
+to preserve forward architectural compatibility.
+
+Full PAL-based machine-check delivery, including:
+- EXC_ADDR
+- MM_STAT
+- PAL entry
+- pipeline flush
+
+is deferred to later implementation phases.
+
+This gives you:
+
+- correct architecture now
+- practical SRM progress now
+- no redesign later
+
+Response 2.
+
+I’d lean toward treating this as a decode-policy question inside the Cchip model, not an SRM quirk.
+
+The interesting part is the address:
+
+- PA 0x801A2070000
+- relative to Cchip CSR base, that’s +0x02070000 (≈ 32 MB + 448 KB)
+
+That is far outside the flat CSR map shown in the Tsunami/Typhoon HRM §10.2, where the documented Cchip registers occupy only a tiny low-offset window.
+
+So there are really only three plausible explanations:
+
+1. SRM intentionally uses mirrored/per-CPU CSR windows
+2. The platform decode aliases high bits away before reaching Cchip
+3. Bad address formation somewhere upstream
+
+Given Alpha/Tsunami’s SMP design, (1) is actually pretty believable. The 21272 fabric already has node/CPU-oriented register semantics in several places, and SRM commonly accesses implementation-defined aliases rather than the architecturally “pretty” base addresses Linux uses.
+
+The key architectural question is:
+
+    Does the Cchip own the CPU/bank-select decode,
+    or is the address normalized before dispatch?
+
+From the HRM wording around “per-CPU” and mirrored regions in §10.2, I’d interpret the high bits as part of the Cchip CSR decode itself, meaning:
+
+- low bits select the CSR
+- some upper field selects CPU/bank/mirror instance
+
+So for emulation, the cleanest long-term model is probably:
+
+    effective_reg = offset & CSR_MASK
+    cpu_sel       = extract(highbits)
+
+with the Cchip internally routing to:
+- shared registers
+- per-CPU interrupt state
+- per-bank DIMM state
+- etc.
+
+The address you saw is suggestive because:
+- 0x02000000 looks very much like a region-select stride
+- the remaining 0x70000 looks like a structured subwindow, not random garbage
+
+That does not smell like a wild pointer.
+
+Recommended implementation strategy
+
+Phase 1
+-------
+Implement:
+- only the documented CSR set
+- strict decode
+- loud warnings on unknown offsets
+
+Example:
+
+    warn("TsunamiCchip: unknown CSR access offset=%#llx", off);
+
+but do not fatal unless SRM depends on the access succeeding.
+
+Also add instrumentation to print:
+- raw PA
+- normalized offset candidate
+- inferred CPU/bank fields
+
+because SRM will quickly reveal whether those accesses are systematic.
+
+Phase 2
+-------
+If SRM consistently accesses:
+
+    base + N*stride + csr_offset
+
+then formalize:
+- per-CPU mirrors
+- bank aliases
+- mirrored interrupt blocks
+
+inside TsunamiCchip.
+
+That avoids prematurely baking in the wrong decode model.
+
+One thing I would not do initially is silently mask the address down. That can hide genuine bugs in:
+- Pyxis/Tsunami address translation
+- KSEG handling
+- sparse-space assembly
+- SRM PALcode emulation
+
+and you lose visibility immediately.
+
+So my preference would be:
+
+    strict documented CSR map + telemetry first,
+    then add mirror decode once SRM access patterns prove it’s real.
+
+The trace you described already feels more like “undocumented mirror stride” than “bogus access,” though.
+
+

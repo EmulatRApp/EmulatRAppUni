@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T00:08:41.990Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>DispatchTables</title>
+  <keywords>
+    <keyword>decode</keyword>
+    <keyword>DispatchKind</keyword>
+    <keyword>DispatchTables.cpp</keyword>
+    <keyword>g_primaryTable</keyword>
+    <keyword>opcode</keyword>
+    <keyword>primary table</keyword>
+    <keyword>secondary table</keyword>
+    <keyword>subDecode</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">DispatchTables</para>
+    </header>
+    <para styleclass="Normal">The dispatch tables are how the Decode stage turns a raw instruction word into a grain leaf. They are generated into <text styleclass="Code Example">DispatchTables.cpp</text> from the master table, so the decode path is data, not a hand-written switch.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Primary and secondary tables</para>
+    <para styleclass="Normal">The top-level lookup is <text styleclass="Code Example">g_primaryTable</text>, indexed by the 6-bit primary opcode. Many Alpha opcodes are not fully decoded by that field alone -- arithmetic, floating point, the HW_MxPR instructions, and the PAL group all carry a sub-function in lower bits. For those, the primary entry points at a secondary (sparse) table keyed by the row&apos;s <text styleclass="Code Example">subDecode</text> value, so the full decode is a primary index followed, where needed, by a sparse secondary lookup. The Decode stage performs exactly that: read the opcode, index the primary table, and follow the sub-decode where the kind requires it, yielding the grain leaf that the Execute stage will invoke.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Dispatch kinds</para>
+    <para styleclass="Normal">Each instruction is classified by a <text styleclass="Code Example">DispatchKind</text> that names its decode family and selects which secondary table (if any) applies. The canonical set covers the integer families <text styleclass="Code Example">IntArith</text>, <text styleclass="Code Example">IntLogical</text>, <text styleclass="Code Example">IntMul</text>, and <text styleclass="Code Example">IntShift</text>; the floating-point families <text styleclass="Code Example">FltIeee</text>, <text styleclass="Code Example">FltVax</text>, <text styleclass="Code Example">FltLogical</text>, <text styleclass="Code Example">ItFp</text>, and <text styleclass="Code Example">FpTiExt</text>; the privileged / hardware kinds <text styleclass="Code Example">HwLd</text>, <text styleclass="Code Example">HwSt</text>, <text styleclass="Code Example">HwMfpr</text>, <text styleclass="Code Example">HwMtpr</text>, <text styleclass="Code Example">HwRei</text>, and <text styleclass="Code Example">Pal</text>; and the control / miscellaneous kinds <text styleclass="Code Example">Direct</text>, <text styleclass="Code Example">JmpClass</text>, and <text styleclass="Code Example">Misc</text>, plus a <text styleclass="Code Example">Reserved</text> sentinel. A name helper (<text styleclass="Code Example">dispatchKindName()</text>) is generated alongside the enum for trace and diagnostics.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Because the tables are generated, adding or correcting an instruction is a table edit plus a regeneration, not a hand change to decode logic -- the same source-of-truth discipline as the rest of grainFactoryLib. A row with no implemented leaf resolves to a stub (which logs and does not compute) or, if there is no row at all, the opcode takes a decode fault (OPCDEC).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--grainFactoryLib">grainFactoryLib</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Execution-_-Boot-Internals">Execution / Boot Internals</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Execution-Flight-Plan-------">Execution Flight Plan </link></para>
+  </body>
+</topic>

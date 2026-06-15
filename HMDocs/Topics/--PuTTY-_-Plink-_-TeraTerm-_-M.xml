@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-14T22:28:57.976Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Terminal Clients</title>
+  <keywords>
+    <keyword>connection refused</keyword>
+    <keyword>MobaXterm</keyword>
+    <keyword>netcat</keyword>
+    <keyword>Plink</keyword>
+    <keyword>PuTTY</keyword>
+    <keyword>RAW TCP</keyword>
+    <keyword>telnet</keyword>
+    <keyword>Tera Term</keyword>
+    <keyword>troubleshooting</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Terminal Clients</para>
+    </header>
+    <para styleclass="Normal">Connection steps for the common clients. In every case the target is <text styleclass="Code Example">localhost</text> port <text styleclass="Code Example">10023</text> (or a remote host and the port the instance was started with), using a RAW connection.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Plink</para>
+    <para styleclass="Code Example">plink -raw localhost -P 10023 # local</para>
+    <para styleclass="Code Example">plink -raw 192.168.1.50 -P 10023 # remote</para>
+    <para styleclass="Code Example">plink -v -raw localhost -P 10023 -log emulator.log # verbose + session log</para>
+    <para styleclass="Normal">Useful arguments: <text styleclass="Code Example">-raw</text> (raw TCP stream), <text styleclass="Code Example">-P &lt;port&gt;</text> (TCP port), <text styleclass="Code Example">-v</text> (verbose diagnostics), <text styleclass="Code Example">-log &lt;file&gt;</text> (save session log).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">PuTTY</para>
+    <para styleclass="Normal">Launch PuTTY, set Host Name <text styleclass="Code Example">localhost</text> and Port <text styleclass="Code Example">10023</text>, choose Connection type <text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Raw</text>, then press Open. For a remote instance use its IP in place of <text styleclass="Code Example">localhost</text>.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Tera Term</para>
+    <para styleclass="Normal">New connection, select <text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">TCP/IP</text>, Host <text styleclass="Code Example">localhost</text>, TCP Port <text styleclass="Code Example">10023</text>, then connect.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">MobaXterm</para>
+    <para styleclass="Normal">Session, then a Network session: Remote host <text styleclass="Code Example">localhost</text>, Port <text styleclass="Code Example">10023</text>, Protocol TCP, then connect.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Netcat (Linux / macOS)</para>
+    <para styleclass="Code Example">nc localhost 10023 # local</para>
+    <para styleclass="Code Example">nc 192.168.1.50 10023 # remote</para>
+    <para styleclass="Normal">Useful for scripting and automated testing.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Telnet</para>
+    <para styleclass="Normal">Some telnet clients connect (<text styleclass="Code Example">telnet localhost 10023</text>), but because EmulatR uses a raw socket and performs no Telnet option negotiation, a raw-capable client (PuTTY Raw, Plink <text styleclass="Code Example">-raw</text>, Tera Term TCP/IP, MobaXterm TCP) is preferred.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Verifying the connection</para>
+    <para styleclass="Normal">After connecting you should see console output -- a banner, the <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt, or an in-progress power-up sequence -- depending on the current emulator state.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Troubleshooting</para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Connection refused:</text> verify EmulatR is running, the console server is enabled, and the port number is correct.</para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Connection timeout:</text> verify firewall configuration and the host address, and that the listener is active.</para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">No console output:</text> verify the boot has progressed, console output is enabled, and you are on the right port.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--TCP-Console-Overview">TCP Console Overview</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Console-Connection-Issues---">Console Connection Issues</link></para>
+  </body>
+</topic>

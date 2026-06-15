@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Software Verify</title>
+  <keywords>
+    <keyword>call graph</keyword>
+    <keyword>hot path</keyword>
+    <keyword>Performance Validator</keyword>
+    <keyword>profiler</keyword>
+    <keyword>profiling</keyword>
+    <keyword>Software Verify</keyword>
+    <keyword>step loop</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Software Verify</para></header>
+    <para styleclass="Normal">Software Verify (Software Verify Limited) makes a family of C/C++ analysis tools for Windows; the one used in EmulatR development is Performance Validator, a sampling and instrumenting profiler. It is the tool used to find where the emulator spends its time so optimization effort lands on the code that matters.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">What it provides</para>
+    <para styleclass="Normal">Performance Validator attributes run time to functions and lines and presents call graphs and call trees, so a hot path is visible rather than guessed. For an instruction-set emulator this is essential: a small number of routines dominate execution, and a few percent shaved off the inner loop is worth more than any amount of tuning elsewhere.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">How it is used here</para>
+    <para styleclass="Normal">Profiling confirmed that the pipeline driver's per-instruction <text styleclass="Code Example">step()</text> is the overwhelming majority of run time (on the order of 82 percent), which is why that loop ships optimized and the -O0 debug build is gated behind a separate CMake option. It also quantified the cold-boot decompression spin and the bounded firmware wait loops -- the measurements behind the performance items elsewhere in this documentation. The profiler is a developer tool only; it is not involved in running the emulator.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Execution-_-Boot-Internals">Execution / Boot Internals</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--CMake-Macro-Guards----------">CMake Macro Guards</link></para>
+  </body>
+</topic>

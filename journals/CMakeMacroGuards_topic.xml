@@ -1,0 +1,279 @@
+<topic template="Default" modified="2026-06-10T11:20:00.000-07:00" lasteditedby="tim" version="3">
+  <title>CMake Macro Guards</title>
+  <keywords>
+    <keyword>AXP_EXEC_TRACE</keyword>
+    <keyword>build configuration</keyword>
+    <keyword>build options</keyword>
+    <keyword>CMake macro guards</keyword>
+    <keyword>compile-time guards</keyword>
+    <keyword>diagnostics-default-off</keyword>
+    <keyword>EMULATR_CHIPSET_DIAG</keyword>
+    <keyword>EMULATR_CHIPSET_DIAG_ON</keyword>
+    <keyword>EMULATR_DEBUG_STEP</keyword>
+    <keyword>EMULATR_DIAGNOSTIC_LOGGING</keyword>
+    <keyword>EMULATR_MEMDIAG</keyword>
+    <keyword>EMULATR_PA_DUMP</keyword>
+    <keyword>EMULATR_PLATFORM_CONFIG</keyword>
+    <keyword>EMULATR_USE_OS_PAGES</keyword>
+    <keyword>RelWithDebInfo</keyword>
+    <keyword>SPDLOG_ACTIVE_LEVEL</keyword>
+    <keyword>target_compile_definitions</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">CMake Macro Guards</para>
+    </header>
+    <para styleclass="Normal">This page enumerates the compile-time macro guards defined by the EmulatR V4 root CMakeLists.txt: the CMake option that controls each one, its default state, the build configurations in which it is actually defined, and the code facility it gates. The authoritative source is always the root CMakeLists.txt and the header named in the Source column; this page is a navigation aid, not a substitute.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Gating convention</para>
+    <para styleclass="Normal">Each guard follows the same two-stage pattern. A CMake option() declares a cache toggle with a default; an if() block then emits the corresponding -D definition on the Emulatr target. Several guards wrap the definition in a generator-expression predicate so the macro is suppressed in Release even when the option is ON:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:&apos;Courier New&apos;; font-size:9pt; color:#000000;">$&lt;$&lt;NOT:$&lt;CONFIG:Release&gt;&gt;:EMULATR_CHIPSET_DIAG=1&gt;</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The operational consequence: the three diagnostic guards (CHIPSET_DIAG, DIAGNOSTIC_LOGGING, PA_DUMP) are present in Debug and RelWithDebInfo but never in Release, regardless of the option value. To get diagnostics in an optimized build, use RelWithDebInfo, not Release. The two non-predicated guards (USE_OS_PAGES, DEBUG_STEP) are defined in every configuration whenever their option is ON.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-weight:bold;">Diagnostics-default-off rule (2026-06-10):</text> compiled-in does NOT mean emitting. A diagnostic facility may be present in a Debug/RelWithDebInfo build yet stay SILENT at runtime until the execution explicitly requests it for that run. CSR diagnostics, for example, default muted and are enabled per run via EMULATR_CHIPSET_DIAG_ON (see below). New diagnostics must follow this convention: compile-guarded (absent in Release) AND runtime default-off (opt in per run).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Compile-time guards (option-controlled)</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="6" colcount="6" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Guard</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Option default</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Defined in (option ON)</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Effect when defined</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Source of truth</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Mirrored to tests</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_CHIPSET_DIAG</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">ON</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Debug, RelWithDebInfo (not Release)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Wires the CSR_LOG_R / CSR_LOG_W macros so chipset CSR accesses can narrate chip:reg, R/W, value, offset, cpu, cycle. Zero overhead in Release. Compiled in for Debug/RelWithDebInfo but DEFAULT SILENT at runtime (diagnostics-default-off rule): opt in per run via the EMULATR_CHIPSET_DIAG_ON env var, no rebuild.</para>
+        </td>
+        <td>
+          <para styleclass="Normal">chipsetLib/CsrDiag.h</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Yes (same not-Release predicate)</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_USE_OS_PAGES</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">ON</para>
+        </td>
+        <td>
+          <para styleclass="Normal">All configurations (incl. Release)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Selects the OS-backed page allocator (VirtualAlloc on Windows, mmap MAP_ANONYMOUS on POSIX) over the calloc fallback, giving demand-paged commits so the resident set tracks touched memory rather than configured capacity.</para>
+        </td>
+        <td>
+          <para styleclass="Normal">memoryLib/GuestMemory.cpp</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Yes (unconditional)</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_DEBUG_STEP</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">OFF</para>
+        </td>
+        <td>
+          <para styleclass="Normal">All configurations (when ON)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Compiles PipelineDriver::step at -O0 (pragma optimize off) so the optimizer does not elide locals during single-step debugging. SLOW: this gates the ~82%-of-runtime hot loop. PERF #0 (2026-06-10) flipped the default to OFF; it was previously always -O0. Turn ON only to debug step().</para>
+        </td>
+        <td>
+          <para styleclass="Normal">pipelineLib/PipelineDriver.h</para>
+        </td>
+        <td>
+          <para styleclass="Normal">No</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_DIAGNOSTIC_LOGGING</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">ON</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Debug, RelWithDebInfo (not Release)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Compiles in the centralized log facility. Per-subsystem streams (Cbox, Unalign, IntervalTimer, Snapshot, PalRelocation, ChipsetCsr, StepD, Misc) become runtime-toggleable via --log-disable, --log-only, --log-verbose, --log-file. Expands to ((void)0) in Release, so call sites evaluate no arguments. Per the diagnostics-default-off rule, streams are silent until explicitly enabled per run.</para>
+        </td>
+        <td>
+          <para styleclass="Normal">coreLib/LogSubsystem.h</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Yes (same not-Release predicate)</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_PA_DUMP</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">ON</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Debug, RelWithDebInfo (not Release)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Compiles in the physical-address disassembly dump facility: the DUMP_PA and DUMP_DISASM macros plus the AppOptions --dump-disasm flag. Used during bring-up to inspect firmware-decompressed PAL bytes without capturing a full retire trace.</para>
+        </td>
+        <td>
+          <para styleclass="Normal">coreLib/PaDump.h</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Yes (same not-Release predicate)</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Manually-toggled guard (no option)</para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_MEMDIAG</text> is not an option(). It is a hand-edited add_compile_definitions line in the root CMakeLists.txt that is currently commented out (disabled 2026-06-01). When uncommented it emits an fprintf+fflush per retired instruction (PipelineDriver.h MEMDIAG-I, plus MEMDIAG-MTPR), which throttles throughput roughly 900x (down to ~10K cyc/s) in dense PAL TB-fill regions. It was the DS10 TB-fill debug scaffold; re-enable only by uncommenting that line when the diagnostic is needed again.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Always-on project definitions</para>
+    <para styleclass="Normal">These are set unconditionally (no option gate) and are listed for completeness; they are not toggles in the usual sense.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="3" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Definition</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">State</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">AXP_EXEC_TRACE</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Always on, main executable only (not the test target)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Enables the AXP execution-trace instrumentation on the Emulatr target. Set unconditionally in the main target_compile_definitions block.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">SPDLOG_HEADER_ONLY / FMT_HEADER_ONLY</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Always on (both targets)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Makes every spdlog/fmt symbol inline so no find_package() or link target is required; matches the V1/V3 known-good header-only wiring.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">SPDLOG_ACTIVE_LEVEL</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Config-dependent: TRACE in Debug; INFO in Release and RelWithDebInfo</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Elides log calls below the active level at the preprocessor, so debug/trace logging is zero cost in optimized builds.</para>
+          <para styleclass="Normal"></para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Related runtime controls (NOT compile guards)</para>
+    <para styleclass="Normal">These share the EMULATR_ prefix but are runtime environment variables or configure-time cache strings, not preprocessor #ifdef guards. They are documented here only to keep the boundary explicit.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="3" style="border-width:0px; border-spacing:0px; cell-border-width:0px; border-style:none; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Name</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Kind</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Purpose</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_CHIPSET_DIAG_ON</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Env var</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Set to 1 to ENABLE CSR diagnostic output for this run; default is silent. Runtime opt-in companion to the EMULATR_CHIPSET_DIAG compile guard, per the diagnostics-default-off rule. (Inverted 2026-06-10 from the former EMULATR_CHIPSET_DIAG_OFF opt-out.)</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_PLATFORM_CONFIG</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">Env var</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Overrides the path to the platform device manifest (ds10_platform.json). Default is the CWD-relative file next to the executable. A missing or invalid file is non-fatal: Machine falls back to the compiled-in default DS10 manifest.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">EMULATR_DEBUG_ARGS / EMULATR_DEBUG_WORKDIR</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal">CMake cache string</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Pre-fills the command-line arguments and working directory the Visual Studio / VS Code debugger uses on F5. Configure-time only; not a code guard.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Usage</para>
+    <para styleclass="Normal">Override any option at configure time with -D. Examples:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:&apos;Courier New&apos;; font-size:9pt; color:#000000;">cmake -DEMULATR_CHIPSET_DIAG=OFF ... # compile out CSR diag entirely</text></para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:&apos;Courier New&apos;; font-size:9pt; color:#000000;">cmake -DEMULATR_USE_OS_PAGES=OFF ... # force the calloc allocator</text></para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:&apos;Courier New&apos;; font-size:9pt; color:#000000;">cmake -DEMULATR_DEBUG_STEP=ON ... &#160;# compile step() at -O0 (SLOW; debug only)</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">CSR diagnostics are compiled in for Debug/RelWithDebInfo but silent by default. To turn them ON for a run on an already-built binary, set the environment variable instead of reconfiguring:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-family:&apos;Courier New&apos;; font-size:9pt; color:#000000;">set EMULATR_CHIPSET_DIAG_ON=1</text></para>
+    <para styleclass="Normal"></para>
+  </body>
+</topic>

@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T10:57:19.161Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>TCP Console Overview</title>
+  <keywords>
+    <keyword>console port</keyword>
+    <keyword>console server</keyword>
+    <keyword>EMULATR_CONSOLE_PORT</keyword>
+    <keyword>EMULATR_NO_PUTTY</keyword>
+    <keyword>multiple instances</keyword>
+    <keyword>netstat</keyword>
+    <keyword>port 10023</keyword>
+    <keyword>PuTTY auto-launch</keyword>
+    <keyword>RAW TCP socket</keyword>
+    <keyword>remote host</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">TCP Console Overview</para>
+    </header>
+    <para styleclass="Normal">EmulatR serves the console over a RAW TCP socket -- no Telnet option negotiation. Defaults:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">Host: localhost</para>
+    <para styleclass="Code Example">Port: 10023</para>
+    <para styleclass="Code Example">Protocol: RAW TCP</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Override the port with <text styleclass="Code Example">EMULATR_CONSOLE_PORT</text> (the auto-launched PuTTY follows the port). Suppress the PuTTY auto-launch with <text styleclass="Code Example">EMULATR_NO_PUTTY</text>; the listen socket still comes up for your own client. For a remote host, replace <text styleclass="Code Example">localhost</text> with its hostname or IP.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Port <text styleclass="Code Example">10023</text> is only the default -- the listener can bind any available TCP port. This is what makes running several instances at once practical: give each its own port (10023, 10024, 10025, and so on) so their consoles do not collide. Pick a free port above the privileged range (1024 and up); confirm it is free before binding:</para>
+    <para styleclass="Code Example">netstat -ano | grep &lt;port&gt;</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">When connecting, point the client at the same port the instance was started with.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--PuTTY-_-Plink-_-TeraTerm-_-M">Terminal Clients</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing-Two-Instances">Executing Two Instances</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Configuring----------(moved-">Configuring</link></para>
+  </body>
+</topic>

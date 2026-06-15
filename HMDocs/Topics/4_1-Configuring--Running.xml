@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:45:48.075Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Configuring &amp; Running</title>
+  <keywords>
+    <keyword>concurrent instances</keyword>
+    <keyword>configuring</keyword>
+    <keyword>performance</keyword>
+    <keyword>platform manifest</keyword>
+    <keyword>running</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Configuring &amp; Running</para>
+    </header>
+    <para styleclass="Normal">How the emulated machine is configured by its platform manifest, and the ways to launch a run -- a quiet cold boot, a traced boot, a long unattended run, or two instances side by side.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">In this section</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">Configuring -- the per-model platform manifest and its key settings.</li>
+      <li styleclass="NotesBox">Executing -- run scenarios beyond the basic launch: traced boots, unattended runs, performance harvesting.</li>
+      <li styleclass="NotesBox">Executing Two Instances -- running two instances safely from one directory.</li>
+      <li styleclass="NotesBox">Example - Performance -- an annotated boot transcript.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Configuring----------(moved-">Configuring</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing------------(moved)">Executing</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Launching-EmulatR">Launching EmulatR</link></para>
+  </body>
+</topic>

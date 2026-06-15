@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:52:23.994Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Addressing &amp; TLB</title>
+  <keywords>
+    <keyword>ASM</keyword>
+    <keyword>ASN</keyword>
+    <keyword>canonical VA</keyword>
+    <keyword>DTB</keyword>
+    <keyword>epoch invalidation</keyword>
+    <keyword>Ev6Translator</keyword>
+    <keyword>ITB</keyword>
+    <keyword>kseg</keyword>
+    <keyword>SPAMShardManager</keyword>
+    <keyword>superpage</keyword>
+    <keyword>TBIA</keyword>
+    <keyword>TBIAP</keyword>
+    <keyword>TBIS</keyword>
+    <keyword>TlbEpoch</keyword>
+    <keyword>translation buffer</keyword>
+    <keyword>VA_CTL</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Addressing &amp; TLB</para>
+    </header>
+    <para styleclass="Normal">This appendix is the implementation-level companion to the Addressing page. It walks the V4 translation path from a virtual address to a physical address, then describes the translation-buffer front end and the epoch scheme that makes a TLB flush a single counter bump. The authoritative reference is the Alpha Architecture Reference Manual (sections 4.1.6 / 4.1.7) and the 21264 Hardware Reference Manual; the V4 code lives in <text styleclass="Code Example">mmuLib/Ev6Translator.h</text> and <text styleclass="Code Example">pteLib/</text>.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The translator</para>
+    <para styleclass="Normal"><text styleclass="Code Example">Ev6Translator</text> is not an object -- its entry points are static functions that take a <text styleclass="Code Example">CpuState const&amp;</text> as the first argument, so per-CPU state travels through CpuState rather than a translator instance. The MEM stage calls one of three entry points depending on the memory effect a leaf packed onto its BoxResult at EX:</para>
+    <para styleclass="Normal"></para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">translateData -- a data load or store, no alignment check.</li>
+      <li styleclass="NotesBox">translateDataAligned -- a data load or store with a size-class alignment check (1/2/4/8 bytes).</li>
+      <li styleclass="NotesBox">translateInstruction -- an instruction fetch (longword-aligned, consults the I-side superpage enables).</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Each returns a <text styleclass="Code Example">TranslationResult</text>. On Success the caller&apos;s <text styleclass="Code Example">pa_out</text> holds the physical address; any other value is a translation fault that the MEM drainer converts to a fault code (<text styleclass="Code Example">mmuLib::toFaultCode</text>) and uses to short-circuit the register-file commit.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Translation path (data stream)</para>
+    <para styleclass="Normal">For a normal load or store, <text styleclass="Code Example">translateData</text> proceeds in this order:</para>
+    <para styleclass="Normal"></para>
+    <list id="1" type="ol" listtype="decimal" formatstring="&#37;&#48;&#58;&#115;&#46;" format-charset="DEFAULT_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="Normal" style="font-family:&apos;Segoe UI&apos;; font-size:11pt; color:#000000;">
+      <li styleclass="Normal">-<text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Explicitly-physical accesses bypass upstream.</text> HW_LD / HW_ST / LDQP / STQP are tagged physical and the MEM drainer sets pa = va before ever calling the translator. Importantly, EV6 PAL mode does NOT blanket-disable D-stream translation -- a normal load or store in PAL mode still translates. (An earlier blanket PAL bypass mis-mapped VMS system-space kernel-stack addresses and was removed.)</li>
+      <li styleclass="Normal">-<text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Canonical VA check.</text> VA_CTL bit 1 selects 48-bit VA mode when set, otherwise 43-bit mode. In 43-bit mode VA&lt;63:43&gt; must sign-extend VA&lt;42&gt;; in 48-bit mode VA&lt;63:48&gt; must sign-extend VA&lt;47&gt;. A non-canonical address faults before any TLB lookup.</li>
+      <li styleclass="Normal">-<text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Kseg / superpage detection.</text> The three SPE bits (on M_CTL for data, I_CTL for instructions) gate three kernel-only superpage modes. SPE[2] maps VA&lt;43:13&gt; directly to PA when VA&lt;47:46&gt; = 0b10; SPE[1] and SPE[0] cover the other two windows. A kseg-shaped address from non-kernel mode is an access violation; a non-kseg address falls through.</li>
+      <li styleclass="Normal">-<text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">DTB lookup.</text> On a live hit, the PTE permission bits are checked and PA is composed as <text styleclass="Code Example">(PFN &lt;&lt; 13) | (VA &amp; 0x1FFF)</text>. On a miss the result is <text styleclass="Code Example">DtbMiss</text>, which the drainer maps to <text styleclass="Code Example">kFaultDtbMiss</text>; PALcode&apos;s DTB-miss handler refills the buffer (HW_MTPR DTB_TAG0 / DTB_PTE0) and the access retries.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The instruction path mirrors this with a 4-byte alignment check (PC bit 0 is the PALmode flag and is masked before the check), the I-side SPE bits, and an ITB lookup that misses to <text styleclass="Code Example">kFaultItbMiss</text>. The EV6 base page is 8 KiB (shift 13); a PA is 44 bits wide.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The translation buffers (SPAM)</para>
+    <para styleclass="Normal">Each CpuState owns its own pair of <text styleclass="Code Example">SPAMShardManager</text> front ends -- one ITB, one DTB. A manager holds an array of <text styleclass="Code Example">SPAMBucket</text> shards, the epoch state, and a small hash that picks a shard from the tag. In <text styleclass="Code Example">CpuState</text> the two managers are instantiated as <text styleclass="Code Example">SPAMShardManager&lt;16, 8&gt;</text> -- 16 shards by 8 ways = 128 entries each, matching the architectural EV6 ITB and DTB size (the shard count and ways are template parameters, so the geometry can be retuned without touching the lookup path). Its public surface mirrors the architectural operations: <text styleclass="Code Example">lookup</text> (one per access), <text styleclass="Code Example">insert</text> (the miss handler / HW_MTPR ITB_PTE / DTB_PTE), the three invalidate operations, and <text styleclass="Code Example">clear</text> for cold boot. Because translation buffers are CPU-local by construction, the manager carries no synchronization primitives; any future SMP cross-CPU invalidation would arrive through IPI machinery processed on the target CPU&apos;s own thread.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Epoch invalidation</para>
+    <para styleclass="Normal">A naive TLB would walk every entry on a flush. V4 instead keeps two counters in the manager and stamps both into every entry at insert time. A flush of all entries is then a single counter bump; entries become stale the instant their stamped value fails to match the live counter on the next lookup. The mapping from PALcode flush operations is:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="3" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Operation</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Action</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Lazy?</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">TBIA</para>
+        </td>
+        <td>
+          <para styleclass="Normal">bump globalEpoch (invalidates everything)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">yes</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">TBIAP</para>
+        </td>
+        <td>
+          <para styleclass="Normal">bump processEpoch (ASM=1 global entries survive)</para>
+        </td>
+        <td>
+          <para styleclass="Normal">yes</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">TBIS / TBISI / TBISD</para>
+        </td>
+        <td>
+          <para styleclass="Normal">locate the matching entry, clear it in place</para>
+        </td>
+        <td>
+          <para styleclass="Normal">no (targeted)</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The liveness test applied at lookup is: an entry is live when its globalEpoch matches the manager&apos;s globalEpoch AND either the entry is ASM-global or its processEpoch matches. The ASM arm encodes the architecture&apos;s rule that an ASM=1 (global) mapping survives TBIAP. The counters are plain 64-bit integers, not atomics -- at one bump per 100 ns a 64-bit counter takes roughly 58,000 years to wrap, so wrap is not handled; a manager reset zeroes both counters and clears every shard if it ever matters.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Addressing------------------">Addressing</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Memory-Map--IPRs">Memory Map &amp; IPRs</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Execution-_-Boot-Internals">Execution / Boot Internals</link></para>
+  </body>
+</topic>

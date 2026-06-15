@@ -1,0 +1,263 @@
+================================================================================
+ IIC Stub Specification -- PCF8584 I2C-bus controller for the DS10 (V4)
+================================================================================
+ Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+ Author:  Claude (Anthropic) with Timothy Peer, eNVy Systems Inc.
+ Date:    2026-06-03
+ Status:  DESIGN -- no code rides with this document.  Implementation begins
+          only after review and the Step-0 base-address determination.
+================================================================================
+
+1. PROBLEM STATEMENT
+
+  Cold boot (run 20260603-182029) clears the nvram frontier, then powerup
+  stalls indefinitely in the IIC (I2C) subsystem.  Evidence:
+
+    - PCSAMPLE profile: PAL INTERRUPT entry (0x8680) / krn$_wait (0x77074)
+      with ra=0x7bafc = krn$_micro_delay+0xa4, every sample, ~11 modeled
+      seconds and unbounded.
+    - powerup stack (snapshot auto_*_32762474504): powerup+0x7c ->
+      iic_init+0x2b0 -> iic_rw_common+0x1b0 -> inportb / krn$_sleep /
+      krn$_wait / krn$_micro_delay, iic_poll_pid present.
+    - Driver mechanics (apisrm ref iic_driver.c, WEBBRICK path): each
+      master transaction arms a 2000 ms timer (IIC_MAS_TIMEOUT) and waits;
+      a status read decoding LAB=1 (lost arbitration) triggers controller
+      reset + krn$_micro_delay(1000) + retry, with no retry bound visible.
+      Two modeled seconds per lap matches the observed burn rate.
+    - Zero "unhandled port" log lines: the CSR reads are HANDLED by some
+      existing V4 device returning a float value.  0xFF decodes as
+      S1 = {PIN=1, STS=1, BER=1, LRB=1, AAS=1, LAB=1, BB=1}: LAB=1 ->
+      the unbounded lost-arbitration loop.  Prime suspect for the silent
+      handler: the Cypress CY82C693 placeholder (ioRead returns 0xFF).
+
+  Remedy: model a minimal-but-silicon-true PCF8584 whose status sequences
+  make every probe terminate FAST with "no slave ACK", so iic_init marks
+  nodes absent and powerup proceeds toward shell creation (rwp / yyreset
+  checkpoints).
+
+2. REFERENCES
+
+  - Processor Support\Philips PCF8584-I2C Controller.txt  (authoritative;
+    REFERENCE_INDEX.md section 3 entry lists landmark line numbers)
+  - apisrm ref iic_driver.c (WEBBRICK = DS10 path), iic_def.h
+  - journals\AXPBox_Reference_Scaffold.txt sec. 8 (audit discipline)
+  - Toy Specification / ToyRtc.h -- the device-pattern precedent
+    (IIoPortHandler seam, deterministic, header-only deviceLib device)
+
+3. STEP 0 -- CSR BASE DISCOVERY  [RESOLVED 2026-06-03]
+
+  The PCF8584 presents two byte registers: S0-area (A0=0) and S1 (A0=1).
+  iic_def.h: IIC_DATA = 0, IIC_STATUS = 1 (offsets).
+
+  RESULT: the controller is NOT on ISA I/O ports.  It sits in Pchip0
+  PCI DENSE MEMORY space:
+
+      S0-area (data)     PCI mem 0xFFFF0000   (PA 0x800.FFFF.0000)
+      S1 (control/status) PCI mem 0xFFFF0001  (PA 0x800.FFFF.0001)
+      + dummy reads of ISA port 0x80 after each access (ESC chip-select
+        toggle; absorbed by the Cypress fallback, harmless).
+
+  Evidence chain:
+    (a) Source: pc264_io.c iic_write_csr/iic_read_csr use
+        outmemb/inmemb(0, 0xfff80000 | addr) -- PCI memory primitive.
+        (Source constant 0xFFF80000 is STALE relative to the shipped
+        DS10 image -- version drift.)
+    (b) Shipped image (authoritative): iic_write_csr resolves via the
+        embedded symbol table to entry 0x81a68; its prologue executes
+        `ldah R1, -0x1(R31)` = 0xFFFF0000.  Image wins: base 0xFFFF0000.
+    (c) Boot-log corroboration: the long-standing "TsunamiPchip:
+        UNHANDLED OUTER WRITE offset=0x0000ffff0001 value=0x80/0xc0/
+        0x5b/0x15/0xa3..." lines are exactly the PCF8584 init/probe
+        bytes (PIN reset 0x80, IIC_INIT 0xC0, own-address 0x5B, clock
+        0x15, START 0xC5 family).  The old DE500-tulip SROM hypothesis
+        (memory project_pci_enum_unhandled_ffff0000) is REFUTED.
+
+  Consequence: today V4 has NO PCI-memory claimant seam -- these
+  accesses fall through to the Pchip UNHANDLED path; reads float, and
+  the floated status decodes as LAB=1 -> the unbounded retry loop.
+
+4. REGISTER MODEL
+
+  Two ports (base+0 data-area, base+1 control/status), byte-only, mirroring
+  the ToyRtc width discipline (wide reads float 0xFF, wide writes dropped,
+  one-shot stderr note).
+
+  Register file behind the ports (datasheet sec. 6.8, Table 4):
+    S0   data/shift register          R/W (stub: see state machine)
+    S0'  own-address register         R/W plain byte (selected ES0=0,ES1=0,ES2=0)
+    S1   control(W) / status(R)       see below
+    S2   clock register               R/W plain byte (5 bits significant)
+    S3   interrupt vector register    R/W plain byte
+
+  S1 WRITE (control):  PIN ES0 ES1 ES2 ENI STA STO ACK   (bit7..bit0)
+    - PIN=1 write: software reset of status flags (datasheet 6.8.1.1).
+    - ES0..ES2 select which register base+0 addresses (Table 5 in spec;
+      stub implements the four used by the driver: S0', S0, S2, S3).
+    - STA=1: initiate START + address transmission (state machine below).
+    - STO=1: STOP; return to idle.
+    - ENI/ACK: stored; no behavioral effect in v1 (driver uses polled
+      mode on DS10; int_flag rides the control writes but the stub never
+      raises an interrupt line).
+    Driver constants for cross-check (iic_def.h): IIC_START=0xC5,
+    IIC_STOP=0xC3, IIC_INIT=0xC0, IIC_ACK=0xC1.
+
+  S1 READ (status):    PIN  0  STS BER LRB AAS LAB BB    (bit7..bit0)
+    Reset state (datasheet 6.10): PIN=1, BB=1 (bus FREE), all else 0.
+    BB semantics: 1 = free, 0 = busy (datasheet 6.8.2.7).
+    The stub NEVER sets LAB, BER, STS, AAS, AD0 -- those bits feed the
+    driver's unbounded/error paths.  LRB=1 is the workhorse: "last
+    received bit = 1" = no slave acknowledged.
+
+5. TRANSACTION STATE MACHINE (v1: empty bus, instant completion)
+
+  State IDLE      S1 reads {PIN=1, BB=1}.
+    S1 write STA=1 (e.g. 0xC5) when a slave address byte is in S0:
+        -> state ADDR_DONE   (address "transmitted", no device answered)
+  State ADDR_DONE S1 reads {PIN=0, BB=0, LRB=1}   -- completion + NAK
+    S0 read:  returns 0xFF (no transmitter), PIN -> 1 per datasheet
+              receiver semantics; state unchanged.
+    S1 write STO=1 (e.g. 0xC3): -> IDLE (PIN=1, BB=1).
+    S1 write PIN=1 / IIC_INIT (0xC0): status flags reset -> IDLE.
+
+  Completion is INSTANT (the very next S1 read after STA shows PIN=0).
+  Fidelity note, per [[v4-scope-discipline]]: a real 90 kHz address
+  cycle is ~100 us; v1 deliberately skips modeled bus timing.  If a
+  later consumer measures transfer duration, add a cycle-derived delay
+  using the ToyRtc cyclesPerSecond pattern -- design seam, not v1 work.
+
+  Deliberately absent in v1: slave devices (every address NAKs), LED
+  node writes (accepted, absorbed), second bus (IIC_VECTOR1/2 -- only if
+  Step 0 finds a second registered base), interrupts, long-distance mode.
+
+5A. V2 -- SLAVE EEPROM EMULATION (2026-06-03, post-v1 evidence)
+
+  WHY: the v1 empty bus cleared powerup but the DS10 firmware HARD-
+  REQUIRES the RCM NVRAM EEPROMs: build_dsrdb does
+  fopen("iic_rcm_nvram0","srb") + fseek(0x11) + fread(&type,1,1,fp);
+  iic_open's bus transaction to node 0xC0 NAK'd, fopen returned NULL,
+  the firmware passed it unchecked to fread, and fread's own NULL guard
+  BSR'd to sysfault(0x64) -- proven instruction-by-instruction in the
+  gated window trace 20260603-204941_break.trc (gate open 0x7d048,
+  close 0x1c62d8, 1 revolution, ~12.6K retires).
+
+  ACK'd DEVICE SET (apisrm iic_driver.c iic_node_list, WEBBRICK rows;
+  scope = the no-content-check RCM bank only; module EEPROMs 0xA0-0xAC
+  carry check bytes and stay NAK'd = "module absent" until evidence
+  demands them):
+      0xC0  iic_rcm_nvram0      256-byte EEPROM, zero-filled default
+      0xC2  iic_rcm_nvram1               "
+      0xC4  iic_rcm_nvram2               "
+      0xC6  iic_rcm_nvram3               "
+      0xC8  iic_rcm_nvram4               "
+      0xCA  iic_rcm_nvram5               "
+      0xCC  iic_rcm_nvram6               "
+      0xCE  iic_rcm_nvram7               "
+  Zero content is deliberate: build_dsrdb's discriminator byte (offset
+  0x11) of 0 selects the base system type.  A seeding accessor exists
+  for future content needs.
+
+  DRIVER-PROVEN PROTOCOL CONTRACT (iic_service, WEBBRICK):
+    P1  After an ACK'd address or data byte, S1 status reads 0x00
+        EXACTLY (driver: `if (status.word != 0x00) -> msg_failure`).
+    P2  Read streams are PIPELINED on real silicon: the first S0 read
+        after a read-address is a DUMMY; the driver stores it at
+        buffer[0] and the next read OVERWRITES it.  The stub returns
+        0xFF for the dummy, then data[offset++] per subsequent read.
+    P3  When the master writes IIC_NACK (0xC0 = PIN|ES0, ACK bit clear)
+        during an active read, the NEXT S1 read must be 0x08 (LRB=1) --
+        the driver's done test accepts 0x08 (or 0x11) at count
+        completion.
+    P4  IIC_NACK / IIC_ACK (0xC0/0xC1) written MID-TRANSACTION are ack
+        control, NOT a software reset: the PIN-write status reset of
+        sec. 5 applies only in the Idle phase.  (0xC0 is also IIC_INIT
+        when idle -- context disambiguates.)
+    P5  Address-phase NAK keeps the v1 contract: status 0x08 (LRB) ->
+        WRITE_DIR service sees nonzero -> msg_failure -> fopen NULL ->
+        absent-device semantics WITHOUT the 2 s lost-arb loop (LAB
+        stays 0 always).
+
+  STATE MACHINE (extends sec. 5):
+    Phase Idle:       v1 semantics (S0-area register file, PIN reset).
+    S1 write STA=1:   addr = last S0 byte; node = addr & 0xFE;
+                      known node -> phase = (addr&1) ? ReadData
+                                                     : WriteData,
+                        status 0x00, dummy flag reset, first-write
+                        flag set;
+                      unknown   -> phase AddrNak, status 0x08.
+    Phase WriteData:  S0 write #1 = EEPROM internal offset (1-byte
+                      addressing); subsequent S0 writes store
+                      data[offset++ mod 256].  Status stays 0x00.
+    Phase ReadData:   S0 read #1 = dummy 0xFF; subsequent reads return
+                      data[offset++ mod 256].  Status 0x00 until P3's
+                      NACK -> 0x08.
+    S1 write STO=1:   any phase -> Idle (PIN|BB).
+    Repeated START:   STA while active re-addresses from the last S0
+                      byte (write-offset -> read-stream turnaround).
+    EEPROM offset:    persists on the device between transactions
+                      (hardware-true; each read is preceded by a
+                      write-offset transaction anyway).
+
+6. DRIVER-PATH VERIFICATION TABLE (what v1 must satisfy)
+
+  Driver path (iic_driver.c)        Stub behavior            Outcome
+  --------------------------------  -----------------------  ----------------
+  iic_reg_test / ireg_test          S0'/S2/S3 plain          PASS (controller
+    (write/readback patterns)         readback                 "present")
+  iic_busb (busy test)              S1.BB=1 when idle        not busy -> ok
+  iic_rw_common address phase       PIN=0 + LRB=1 after STA  NAK -> node
+                                                               absent, FAST
+  lost-arb loop (while msg_lost_     LAB never set            loop never
+    arb + micro_delay(1000))                                    entered
+  2 s misr_t timeout wait           iic_poll_rt sees PIN=0   sem posted long
+                                      promptly                 before timeout
+  iic_init node scan                every node NAKs          all inodes
+    (iic_node_list)                                            skipped/absent
+  LED writes (IIC_LED_TYPE)         writes absorbed          no stall
+
+  Acceptance: replay from the pre-stall snapshot (or cold boot) passes
+  iic_init within ~millions of cycles instead of billions; CKPT ledger
+  watches rwp (read_with_prompt, 0x70448) and yyreset (0x44518) as the
+  success signals downstream.
+
+7. V4 INTEGRATION PLAN (post-review; revised for the PCI-MEM finding)
+
+  Prerequisite (G3-lite, per V4_IO_Machinery_Map.txt gap list): a
+  fixed-range PCI MEMORY claimant seam on TsunamiPchip --
+
+      registerPciMemRange(uint64_t start, uint64_t endExclusive,
+                          IIoPortHandler* h)
+
+    reusing IIoPortHandler with the in-window offset passed as the
+    "port" (both registers fit in 16 bits of offset only if rebased;
+    pass offset - start instead, so the handler sees 0 and 1).  Decoded
+    in TsunamiPchip's PCI-mem path BEFORE the UNHANDLED fallthrough.
+    ~30 lines; also the future carrier for BAR-tracked claims (G4).
+
+  - deviceLib/Tsunami/IicPcf8584.h -- header-only, include guards,
+    house header comment, line comments, hex case labels, ASCII(128).
+  - Implements IIoPortHandler semantics (read/write, byte-only) against
+    rebased offsets 0x0 (S0-area) and 0x1 (S1).
+  - TsunamiChipset::wireDevices(): registerPciMemRange(0xFFFF0000,
+    0xFFFF0002, &m_iic).  The dummy port-0x80 reads stay with the
+    Cypress fallback (harmless by design).
+  - Doctests (CHECK only): reset state read; reg_test pattern readback;
+    the literal driver sequence (write addr to S0, S1<-0xC5, poll S1 ==
+    PIN0/BB0/LRB1, S1<-0xC3, S1 == PIN1/BB1); the iic_chip_reset byte
+    sequence (0x80/0x5B/0xA0/0x18/0xC1 family) leaves the stub IDLE;
+    wide-access float/drop; determinism (two instances, identical byte
+    streams).
+  - No Machine.cpp coupling (no cycle source needed in v1).
+
+8. RELATED WORK QUEUED BEHIND THIS
+
+  - DIVERT-REI ledger refinement: qualify the savedPc match with SP (or
+    PCBB) to eliminate the context-switch false positives observed at
+    0x1c6788/0x1c6564 before promoting to the Mode A oracle.
+  - EMULATR_FLASH_ROM backing in the build directory (operational, no
+    code) -- firmware "Flash ROM writes are disabled" message to be
+    re-checked with backing present.
+  - Scaffold sec. 8 audits R1-R3 remain open; unaffected by this device.
+
+================================================================================
+ END
+================================================================================

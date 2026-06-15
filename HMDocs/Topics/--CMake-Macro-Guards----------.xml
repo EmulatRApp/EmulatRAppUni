@@ -1,0 +1,136 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T00:09:55.398Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>CMake Macro Guards</title>
+  <keywords>
+    <keyword>CMake option</keyword>
+    <keyword>compile guard</keyword>
+    <keyword>diagnostic build</keyword>
+    <keyword>EMULATR_BOOTSTRAP_ITB_BYPASS</keyword>
+    <keyword>EMULATR_CHIPSET_DIAG</keyword>
+    <keyword>EMULATR_DEBUG_STEP</keyword>
+    <keyword>EMULATR_DIAGNOSTIC_LOGGING</keyword>
+    <keyword>EMULATR_FP_SOFTFLOAT</keyword>
+    <keyword>EMULATR_MEMDIAG</keyword>
+    <keyword>EMULATR_PA_DUMP</keyword>
+    <keyword>EMULATR_TRACE_HOOKS</keyword>
+    <keyword>EMULATR_USE_OS_PAGES</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">CMake Macro Guards</para>
+    </header>
+    <para styleclass="Normal">A number of EmulatR behaviors are selected at build time through CMake options that define compile-guard macros, rather than at run time. This keeps diagnostic and debug scaffolding out of the shipping hot path: a guard that is off compiles to nothing. The options are set in the CMake configuration (for example through Qt Creator) and define the matching <text styleclass="Code Example">EMULATR_*</text> macro for the build.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Build / behavior options</para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="2" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Guard</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_DEBUG_STEP</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Restores an -O0 build of the per-instruction pipeline step for single-step debugging. Off by default so the hot loop ships optimized.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_FP_SOFTFLOAT</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Selects the SoftFloat compute backend for floating point instead of the native host path, for bit-exact host-independent results.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_USE_OS_PAGES</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Selects the OS-page (VirtualAlloc / mmap) backing mode for guest memory.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Diagnostic / trace guards</para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="8" colcount="2" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Guard</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Effect</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_TRACE_HOOKS</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Compiles in the per-step trace hooks used to capture an execution trace.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_MEMDIAG</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Compiles in the memory-diagnostic instrumentation (the cycle-windowed fetch / load / store dumps).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_CHIPSET_DIAG</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Enables chipset-level diagnostic output.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_DIAGNOSTIC_LOGGING</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Enables the broader diagnostic logging path.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_PA_DUMP</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Compiles in physical-address dump instrumentation.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_BOOTSTRAP_ITB_BYPASS</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Debug only: bypasses the ITB for the known reset / PAL entry page during bring-up. Must be removed before relying on permission bits or ASN isolation.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">EMULATR_TRACE_CONSOLE / EMULATR_ISADIAG</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Console-trace and ISA-diagnostic channels.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">The default build leaves the diagnostic guards off; they are turned on only when chasing a specific problem, because the instrumentation they add (especially the memory and trace hooks) is heavy enough to change runtime substantially. Runtime behavior that does not need a recompile is controlled instead by the <text styleclass="Code Example">EMULATR_*</text> environment variables.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Building-from-Source">Building from Source</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="Qt-Creator">Qt Creator</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Environment-Variables-(EMULA">Environment Variables (EMULATR_*)</link></para>
+  </body>
+</topic>

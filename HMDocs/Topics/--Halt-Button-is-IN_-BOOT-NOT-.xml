@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" status="" lasteditedby="tim" modified="2026-06-15T00:00:00.000Z" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Halt Button is IN, BOOT NOT POSSIBLE</title>
+  <keywords>
+    <keyword>auto_action</keyword>
+    <keyword>b dqa1</keyword>
+    <keyword>BOOT NOT POSSIBLE</keyword>
+    <keyword>halt button</keyword>
+    <keyword>halt gate</keyword>
+    <keyword>halt switch</keyword>
+    <keyword>pmem</keyword>
+    <keyword>RUN/STOP</keyword>
+  </keywords>
+  <body>
+    <header><para styleclass="Heading1">Halt Button is IN, BOOT NOT POSSIBLE</para></header>
+    <para styleclass="Heading2">Symptom</para>
+    <para styleclass="Normal">At power-up the console prints "Halt Button is IN, AUTO_ACTION ignored", and at the <text styleclass="Code Example">&gt;&gt;&gt;</text> prompt any boot attempt (for example <text styleclass="Code Example">b dqa1</text>) is refused with "Halt Button is IN, BOOT NOT POSSIBLE".</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">What it means</para>
+    <para styleclass="Normal">The firmware reads the front-panel RUN/STOP (halt) switch and finds it asserted (IN). A halted machine refuses to boot and ignores <text styleclass="Code Example">auto_action</text> -- on real hardware you would release the halt switch to allow a boot.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">In EmulatR</para>
+    <para styleclass="Normal">This halt gate is under active investigation, and it is the current reason a boot at <text styleclass="Code Example">&gt;&gt;&gt;</text> does not yet proceed. The exact source the firmware tests for the halt condition is being pinned with an armed hardware trace before any fix is written. The <text styleclass="Code Example">e pmem:80130000FF8</text> read below returning <text styleclass="Code Example">7FFFFFFFFFFFFFFF</text> is part of that diagnostic (it arms the trace). A representative session:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">AlphaServer DS10 268 MHz Console V7.3-2, Feb 27 2007 13:25:53</para>
+    <para styleclass="Code Example">Halt Button is IN, AUTO_ACTION ignored</para>
+    <para styleclass="Code Example">&gt;&gt;&gt; e pmem:80130000FF8</para>
+    <para styleclass="Code Example">pmem:      80130000FF8 7FFFFFFFFFFFFFFF</para>
+    <para styleclass="Code Example">&gt;&gt;&gt; b dqa1</para>
+    <para styleclass="Code Example">Halt Button is IN, BOOT NOT POSSIBLE</para>
+    <para styleclass="Code Example">&gt;&gt;&gt;</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Until the halt source is modeled, this message on a boot attempt is expected. Progress is tracked in Current Development Status.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Current-Development-Status--">Current Development Status</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="4_7-Guest-Boot----------------">Guest Boot</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="boot">boot</link></para>
+  </body>
+</topic>

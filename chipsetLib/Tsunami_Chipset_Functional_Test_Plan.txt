@@ -1,0 +1,471 @@
+# Tsunami Chipset Functional Surface Test Plan
+
+**Sibling to:** `Tsunami_Chipset_Architecture.md`, `Tsunami_Chipset_Cowork_ActionPlan.md`
+**Purpose:** Enumerate every functional interface the chipset exposes (or must coordinate with) for the rest of the emulator to plug into. For each interface, define the deterministic test contract that proves the hook works.
+
+---
+
+## What this is, and what it isn't
+
+The architecture doc named the three realms (Cchip, Dchip, Pchip) and the side-effect buses between them. The action plan ordered the work into seven tickets. Neither one stepped back and asked: *what is the complete set of things the rest of the emulator will need from the chipset?*
+
+This document is that step back. It lists every **functional surface** — every named hook, callback, or registration API the chipset will eventually need to expose — and gives each one a deterministic test contract. The register-level tests in the action plan tickets are a subset of these (specifically, the MMIO dispatch surface). The rest are surfaces that aren't yet planned and will need their own tickets.
+
+The point is not to design the surfaces here. The HRM and the architecture doc design them. The point is to ensure every surface is *testable* before it gets implemented, and that we know the full surface area before we commit to a phase ordering for the remaining work.
+
+**Scope boundaries:**
+- **In scope:** any interface the chipset owns or coordinates.
+- **Adjacent:** interfaces that touch the chipset but live mostly elsewhere (e.g. CPU reservations).
+- **Out of scope:** things mentioned but not the chipset's job (e.g. file-backed storage device implementation — the chipset only provides the bus and the IRQ line).
+
+Each surface entry below is tagged accordingly.
+
+---
+
+## How to read each surface entry
+
+```
+### Surface N — short name                                    [in scope | adjacent | out of scope]
+What it is: one paragraph on what the interface does.
+Owners: which realm(s) hold the state.
+Interface sketch: the conceptual hook signature (not final API).
+Determinism strategy: what makes a test against this surface reproducible.
+Test contracts: concrete assertions the test must check.
+Ticket coverage: which action plan ticket exercises it, or "unplanned."
+```
+
+---
+
+## Category A — Address space surfaces
+
+### Surface 1 — CPU MMIO dispatch                                              [in scope]
+**What it is:** The single entry point through which any CPU MMIO load or store reaches the chipset. The chipset routes by PA to the correct realm (Cchip / Dchip / Pchip0 / Pchip1 / PCI memory / PCI config / PCI IACK / PCI I/O).
+**Owners:** `TsunamiChipset` holds the dispatch table; realms hold per-register state.
+**Interface sketch:** `mmioRead(pa, width) -> uint64`, `mmioWrite(pa, value, width)`.
+**Determinism strategy:** No clock, no atomics in the dispatch itself. Construct the chipset, issue reads, assert exact values. Gap regions return 0 deterministically.
+**Test contracts:**
+- Each documented address range routes to exactly one realm.
+- Gap regions (between ranges) return 0 and log a warning, do not crash.
+- Width parameter is honored (byte access to MMIO is illegal on Alpha; reject or log).
+- Reads from any RO offset never have side effects on internal state (idempotency).
+**Ticket coverage:** Ticket 1.
+
+---
+
+### Surface 2 — PCI configuration space dispatch                               [in scope]
+**What it is:** PCI Type 0 config cycles arriving at the Pchip's config window (`0x801.FE00.0000` for Pchip0) decode into (slot, function, register) and dispatch to a registered `IPciDeviceHandler` — or return `0xFFFFFFFF` for empty slots.
+**Owners:** `TsunamiPchip` per instance.
+**Interface sketch:** `pchip.registerDevice(slot, func, IPciDeviceHandler*)`, `pchip.readConfig(pa)`, `pchip.writeConfig(pa, value)`.
+**Determinism strategy:** Register a `FakePciDevice` returning programmed values; assert dispatch reaches the right handler at the right register offset.
+**Test contracts:**
+- Slot decode: PA bits `<15:11>` select slot 0–31.
+- Function decode: PA bits `<10:8>` select function 0–7.
+- Register decode: PA bits `<7:2>` select 4-byte aligned register 0x00–0xFC.
+- Unregistered (slot, function) → `0xFFFFFFFF` on read, write silently dropped.
+- Type 1 cycles (for bus > 0) decode correctly even if the test only validates the decode, not the bridge forwarding.
+**Ticket coverage:** Ticket 5 covers slot 0 (Cypress). Other slots are unplanned.
+
+---
+
+### Surface 3 — PCI I/O space dispatch (sparse and dense)                      [in scope]
+**What it is:** Alpha provides two PCI I/O windows: sparse (byte/word granular, with byte-lane and transfer-length encoded into PA bits) and dense (longword-aligned only). The chipset decodes the PA into (pci_port, byte_lane, transfer_len) and dispatches to whoever owns that port range — almost always the Cypress ISA bridge for legacy ports.
+**Owners:** `TsunamiPchip` decodes; ISA bridge (via PciDeviceHandler) owns the port-range table for `0x000–0xFFFF`.
+**Interface sketch:** `pchip.readSparseIO(pa) -> value`, `pchip.readDenseIO(pa) -> value`, `isaBridge.registerPortRange(start, end, IIoPortHandler*)`.
+**Determinism strategy:** Use the `SparseSpace` decode helpers already in `Tsunami21272_RegisterMap.h`; test the encode/decode round-trip independently of any device.
+**Test contracts:**
+- Encoding sparse PA for (port=0x3F8, byte_lane=0, xfer_len=byte) round-trips to the same triple on decode.
+- Reading sparse I/O at the UART's port range reaches the UART handler.
+- Dense I/O longword access reaches the same handler with byte_lane=0, len=longword.
+- Port read with no registered handler returns 0xFF (ISA bus floating-line convention).
+**Ticket coverage:** Unplanned. Should become Ticket 6.
+
+---
+
+### Surface 4 — PCI memory space dispatch                                      [in scope]
+**What it is:** After BAR programming, each PCI device claims a region of the Pchip's 4 GB PCI memory window (`0x800.0000.0000–0x800.FFFF.FFFF` for Pchip0). The chipset decodes the PA against programmed BARs and dispatches to the device.
+**Owners:** `TsunamiPchip` holds the BAR-to-device map.
+**Interface sketch:** Device responds to `pciConfigWrite(BAR_offset, base)` and the Pchip rebuilds the dispatch table; `pchip.readPciMem(pa)` / `writePciMem(pa, value)` route based on table.
+**Determinism strategy:** Register a fake device, write to its BAR0 via config space, then read at the programmed PA and confirm the fake device sees the read.
+**Test contracts:**
+- BAR0 write of `0xF0000000` causes subsequent memory reads at PA `0x800.F000.0000` to reach that device.
+- Memory reads outside any BAR return 0xFFFFFFFF (PCI master abort convention).
+- Bridge-side BAR sizing protocol: write all-ones, read back gets the size mask.
+**Ticket coverage:** Unplanned. Likely Ticket 7 alongside DMA.
+
+---
+
+### Surface 5 — PCI interrupt acknowledge (IACK)                               [in scope]
+**What it is:** Legacy 8259-style PCI INTA cycle. CPU reads from the Pchip's IACK address (`0x801.F800.0000`), the Pchip drives a PCI INTA cycle, the highest-priority PIC returns its vector. Mostly used by SRM and early kernel before APIC-style routing is set up.
+**Owners:** `TsunamiPchip` initiates the cycle; ISA bridge's 8259 PIC returns the vector.
+**Interface sketch:** `pchip.readIack() -> vector`, internally calls `pic.acknowledgeInterrupt()`.
+**Determinism strategy:** Stage a known IRQ in the fake PIC, perform an IACK read, assert the returned vector.
+**Test contracts:**
+- Reading IACK address with no pending IRQ returns spurious vector (0xFF or platform-specific).
+- Reading IACK with IRQ 0 (timer) pending returns vector 0x00 + base.
+- IACK clears the in-service bit on the PIC.
+**Ticket coverage:** Unplanned. Tied to 8259 PIC implementation (deferred until OS boot).
+
+---
+
+## Category B — Interrupt and signaling surfaces
+
+### Surface 6 — Device interrupt input (DRIR assertion)                        [in scope]
+**What it is:** Any device that lives behind the chipset (PCI device, ISA device via the bridge, internal chipset event) needs to raise an IRQ. The chipset routes that into a specific bit of the Cchip's `DRIR` register.
+**Owners:** `TsunamiCchip` holds DRIR; `TsunamiChipset` provides the routing API.
+**Interface sketch:** `chipset.raisePciInterrupt(pchipId, intxLine)`, `chipset.raiseIsaInterrupt(irq)`, `chipset.raiseChipsetEvent(eventType)`. Each maps to a specific DRIR bit per HRM §6.3.
+**Determinism strategy:** Call the API, read DRIR via MMIO, assert the right bit is set. No threading.
+**Test contracts:**
+- `raisePciInterrupt(0, 0)` sets DRIR bit corresponding to Pchip0 INTA (per HRM table).
+- `raisePciInterrupt(1, 3)` sets DRIR bit for Pchip1 INTD.
+- `raiseIsaInterrupt(4)` (UART Com1) sets the correct DRIR bit through the ISA cascade.
+- Multiple simultaneous raises OR together correctly (atomic fetch_or).
+- A corresponding `lower*` API clears the same bit.
+**Ticket coverage:** Ticket 3 covers PCI INTx. ISA cascade is unplanned.
+
+---
+
+### Surface 7 — CPU interrupt output (b_irq lines)                             [in scope]
+**What it is:** Each emulated CPU has b_irq<5:0> input lines mapped to IPL levels. The chipset's job is to drive these lines based on `DRIR & DIM[n]` for that CPU, with priority encoding. The CPU loop polls these.
+**Owners:** `TsunamiCchip` computes; CPU model consumes.
+**Interface sketch:** `chipset.cchip().readDIR(cpuId) -> uint64` is already there. A higher-level `chipset.pendingIpl(cpuId) -> int` may help. Alternatively the CPU calls `readDIR(cpuId)` directly and does the priority encoding itself.
+**Determinism strategy:** Set up DRIR/DIM state explicitly, call the read, assert the right b_irq bits.
+**Test contracts:**
+- DRIR has interval timer bit set + DIM0 includes that bit → CPU 0 sees b_irq<2> asserted.
+- DRIR has IPI bit set + DIM1 includes that bit → CPU 1 sees b_irq<3> asserted.
+- DIM[n] = 0 → CPU n sees no interrupts even if DRIR has bits set.
+- Lowering interrupts is reflected on next read (no caching).
+**Ticket coverage:** Ticket 3.
+
+---
+
+### Surface 8 — Inter-processor interrupts (IPI)                               [in scope]
+**What it is:** A CPU writes `IIC[n]` to deliver an IPI to CPU n. The target CPU sees it as a specific interrupt line (typically IPL 3 / b_irq<3>).
+**Owners:** `TsunamiCchip` holds IIC state.
+**Interface sketch:** Today the CPU does `chipset.mmioWrite(IIC[n] PA, vector)`. The Cchip's `write()` already routes to `sendIPI(targetCpu, value)`.
+**Determinism strategy:** Write to IIC[1] from "CPU 0 context," then read DIR1 from "CPU 1 context," assert IPI bit set.
+**Test contracts:**
+- Write to IIC[1] sets the IPI bit in DRIR (or in a dedicated IPI register, per HRM).
+- DIM[1] must include the IPI bit for CPU 1 to see it.
+- IPI is per-target: writing IIC[1] does not affect CPU 0's view.
+- IPI clears when the target acknowledges (usually by reading some register or writing back).
+**Ticket coverage:** Unplanned (briefly noted in action plan Phase 9). Should be Ticket 8.
+
+---
+
+### Surface 9 — Interval timer (architectural OS heartbeat)                    [in scope]
+**What it is:** A fixed-frequency timer in the Cchip TIG block asserts b_irq<2> at the kernel's HZ rate (typically 1024 Hz on Alpha). Drives `jiffies` and scheduler ticks.
+**Owners:** `TsunamiCchip` (TTR programming, tick counter).
+**Interface sketch:** `chipset.step(cycles)` advances; internally `cchip.tickIntervalTimer(cycles)` asserts DRIR bit when interval crossed.
+**Determinism strategy:** No wall clock. Tests inject exact cycle counts via `step()`.
+**Test contracts:**
+- Step less than interval → no assertion.
+- Step exactly to interval boundary → one assertion.
+- Step 3× interval → exactly 3 assertions (no drift, no lost ticks).
+- Interval is programmable via TTR; changing TTR mid-run takes effect on the next interval.
+**Ticket coverage:** Ticket 4.
+
+---
+
+### Surface 10 — High-resolution / cycle counter timer                         [adjacent]
+**What it is:** The Alpha CPU has the `RPCC` instruction returning a 64-bit cycle counter. The chipset doesn't own this — it lives in the CPU's IPR file — but the chipset's `step()` and the CPU's RPCC must agree on cycle count.
+**Owners:** CPU model (not chipset). Mentioned here because of the coordination.
+**Interface sketch:** `chipset.step(cycles)` is called from the CPU loop; the same `cycles` value advances both.
+**Determinism strategy:** Single source of truth (the CPU's instruction counter), passed to chipset on each quantum.
+**Test contracts:** *(none owned by chipset)*. Integration test: CPU executes RPCC, then chipset.step(N), then RPCC again, difference equals N.
+**Ticket coverage:** N/A (CPU model concern).
+
+---
+
+## Category C — DMA and memory surfaces
+
+### Surface 11 — DMA address translation (direct-mapped)                       [in scope]
+**What it is:** A PCI device performing DMA submits a PCI address. The Pchip checks against the four WSBA/WSM windows; if a window matches and scatter-gather is disabled, the system address is computed as `TBA<34:n> : pciAddr<n-1:2>` where n depends on the window size.
+**Owners:** `TsunamiPchip` (WSBA/WSM/TBA storage, translation logic).
+**Interface sketch:** `pchip.translatePciAddress(pciAddr) -> (sysAddr, valid)`.
+**Determinism strategy:** Program WSBA/WSM/TBA via MMIO; call translate; assert exact system address. No device needed.
+**Test contracts:**
+- For each window size in HRM Table 105 (1MB through 2GB), the right number of address bits come from TBA vs PCI address.
+- A PCI address outside any window → translation returns `(0, valid=false)`.
+- A PCI address inside a disabled window (WSBA bit 0 = 0) → not translated.
+- The window-hole (PCTL.HOLE) excludes 512K-1M from all windows.
+**Ticket coverage:** Unplanned. Ticket 7.
+
+---
+
+### Surface 12 — DMA address translation (scatter-gather)                      [in scope]
+**What it is:** Same as Surface 11, but when WSBA.SG bit is set, the translation goes through a page table in system memory. The Pchip fetches an 8-byte PTE, validates it, and computes the system address from the PTE.
+**Owners:** `TsunamiPchip` (translation logic + TLB).
+**Interface sketch:** `pchip.translatePciAddress(pciAddr)` (same as Surface 11 — caller doesn't distinguish).
+**Determinism strategy:** Place a known PTE in mock memory; program TBA to point at it; translate; assert.
+**Test contracts:**
+- PTE with valid bit set → translation succeeds and yields PTE-derived system address.
+- PTE with valid bit clear → SGE (scatter-gather error) raised; PERROR captures it.
+- TLB hit (second access to same page) doesn't re-fetch PTE.
+- TLBIV invalidates one entry; TLBIA invalidates all.
+- PCTL.PTEVRFY enabled → PTE fetched twice and compared; mismatch → error.
+**Ticket coverage:** Unplanned. Ticket 7.
+
+---
+
+### Surface 13 — Reservation / lock coherence (LDx_L / STx_C)                  [adjacent]
+**What it is:** Alpha's load-locked / store-conditional pair. Each CPU has a `lock_flag` and `lock_address` in its IPR file. The chipset's role is to broadcast invalidation: when *any* CPU writes to memory, every *other* CPU whose `lock_address` matches the write must have its `lock_flag` cleared. On real silicon this is the system bus snoop protocol.
+**Owners:** CPU model holds the lock state; chipset is the broadcast point.
+**Interface sketch:** `chipset.broadcastWriteSnoop(writerCpuId, addr, len)` → for each other CPU, calls back into its lock-tracking subsystem.
+**Determinism strategy:** Set lock_address on CPU 1; CPU 0 writes through chipset to that address; assert CPU 1's lock_flag is now cleared.
+**Test contracts:**
+- Lock on CPU 0 at addr X; CPU 1 writes Y (Y != X) → CPU 0 lock survives.
+- Lock on CPU 0 at addr X; CPU 1 writes X → CPU 0 lock clears.
+- Lock on CPU 0 at addr X; CPU 0 itself writes X → CPU 0 lock state is implementation-defined (HRM allows lock to survive).
+- DMA write from PCI through Pchip to addr X → also invalidates CPU locks on X.
+**Ticket coverage:** Unplanned. Important for SMP correctness — should be its own ticket before any multi-CPU OS boot.
+
+---
+
+### Surface 14 — Memory presence detect (SPD)                                  [in scope]
+**What it is:** The Cchip's MPD register reflects the I²C / SPD bus state — which DIMM slots are populated. The SRM uses this to discover memory before reading AAR registers.
+**Owners:** `TsunamiCchip` (MPD register, internal slot-populated mask).
+**Interface sketch:** `chipset.setDimmPresent(slot, bool)` at construction. Reads via MMIO.
+**Determinism strategy:** Construct with a known DIMM topology, read MPD, assert bit pattern.
+**Test contracts:**
+- All 8 slots populated → MPD = 0xFF.
+- Half-populated (slots 0,2,4,6) → MPD = 0x55.
+- No DIMMs → MPD = 0x00 and CSC reflects no memory (which would cause SRM to halt cleanly, not spin).
+**Ticket coverage:** Already done in Cchip reset (`m_mpd = 0xFF`). Test is unplanned.
+
+---
+
+## Category D — Configuration and discovery surfaces
+
+### Surface 15 — Platform identity                                             [in scope]
+**What it is:** The chipset tells the rest of the system *what it is*: variant (Tsunami/Typhoon), platform (ES40/ES45/etc.), CPU count, memory size, revision levels.
+**Owners:** `TsunamiChipset` (variant, platform, model); `Cchip` (CSC, MISC); `Dchip` (DREV).
+**Interface sketch:** `chipset.variant()`, `chipset.platform()`, `chipset.model()`, `chipset.cpuCount()`, `chipset.memorySize()`. Plus the MMIO-visible CSC/MISC/DREV.
+**Determinism strategy:** Construct with explicit parameters; assert all accessors and all MMIO reads agree.
+**Test contracts:**
+- `TsunamiChipset(Platform::ES45, 4, 8GB)` → variant=Typhoon, model="ES45", DREV=0x20, CSC CPU mask=0x0F.
+- `TsunamiChipset(Platform::ES40, 2, 4GB)` → variant=Tsunami, model="ES40", DREV=0x10, CSC CPU mask=0x03.
+- Cross-realm consistency: `cchip.variant() == dchip.variant() == pchip.variant() == chipset.variant()`.
+**Ticket coverage:** Ticket 1.5.
+
+---
+
+### Surface 16 — Memory topology discovery                                     [in scope]
+**What it is:** SRM walks AAR0–3 to build the HWRPB memory cluster map. Each AAR must encode (valid, base address, size, row/bank organization) per HRM Tables 10-14 (Tsunami) and 10-15 (Typhoon).
+**Owners:** `TsunamiCchip` (AAR registers, `computeAAR` logic).
+**Interface sketch:** Read-only via MMIO. No external write API; AARs are programmed by chipset reset based on `memSizeBytes` constructor argument.
+**Determinism strategy:** Construct with various memory sizes, read AARs, assert bit-exact encoding.
+**Test contracts:** *(detailed in action plan Ticket 2)*.
+**Ticket coverage:** Ticket 2.
+
+---
+
+### Surface 17 — PCI bus enumeration                                           [in scope]
+**What it is:** The Pchip exposes a way for SRM/OS to walk all (slot, function) tuples and discover what's registered. Mostly implicit (just config reads), but useful to have an enumerator for diagnostics.
+**Owners:** `TsunamiPchip`.
+**Interface sketch:** `pchip.forEachDevice([](slot, func, IPciDeviceHandler*){...})` for diagnostics; not part of the SRM-facing API.
+**Determinism strategy:** Register three devices; enumerate; assert three callbacks in correct order.
+**Test contracts:**
+- Empty Pchip enumerates zero devices.
+- After `registerDevice(0,0,X)` and `registerDevice(5,0,Y)`, enumeration yields exactly those two.
+- Enumeration order is stable across runs (sorted by slot then function).
+**Ticket coverage:** Unplanned. Easy add-on to Ticket 5.
+
+---
+
+### Surface 18 — SMP topology and per-CPU context                              [in scope]
+**What it is:** Each CPU read from MISC returns its *own* CPU ID in bits `<1:0>`. This requires the chipset to know which CPU is making the access. On real hardware this is signaled via the CAPbus master ID; in emulation it's a context parameter.
+**Owners:** `TsunamiCchip` (knows CPU count); `TsunamiChipset::mmioRead` (must accept caller CPU ID).
+**Interface sketch:** `chipset.mmioRead(pa, width, cpuId)`. The dispatch passes `cpuId` to the Cchip for MISC reads.
+**Determinism strategy:** Issue reads as "from CPU 0" and "from CPU 1"; assert MISC reflects each correctly.
+**Test contracts:**
+- CPU 0 reads MISC → bits `<1:0>` = 0.
+- CPU 3 reads MISC → bits `<1:0>` = 3.
+- CSC reads are CPU-agnostic (same value regardless of caller).
+**Ticket coverage:** Unplanned. Important for SMP, easy to add to Ticket 1.
+
+---
+
+## Category E — Lifecycle surfaces
+
+### Surface 19 — System reset                                                  [in scope]
+**What it is:** A power-on or system reset signal that returns all chipset state to documented defaults.
+**Owners:** All three realms have `reset()` methods.
+**Interface sketch:** `chipset.reset()` → fans out to all realms.
+**Determinism strategy:** Construct, mutate state via writes, call reset, read back, assert defaults.
+**Test contracts:**
+- All RW registers return to HRM-documented power-on values.
+- DRIR clears.
+- All DIM[n] clear.
+- PCI device handlers stay registered (devices have their own reset signal — see Surface 20).
+**Ticket coverage:** Implicit in existing `reset()` implementations. Test is unplanned — easy add.
+
+---
+
+### Surface 20 — PCI bus reset (SPRST)                                         [in scope]
+**What it is:** Software writes to the Pchip's SPRST register to assert PCI RST# for ~1 ms. All PCI devices on that bus reset.
+**Owners:** `TsunamiPchip` (initiates); each registered device must support reset.
+**Interface sketch:** `IPciDeviceHandler::pciReset()`. Pchip iterates registered devices and calls each.
+**Determinism strategy:** Register a fake device with a reset flag; write SPRST; assert flag set on all registered devices.
+**Test contracts:**
+- Write to SPRST register triggers `pciReset()` on every registered device on that Pchip.
+- SPRST on Pchip0 does *not* reset Pchip1 devices.
+**Ticket coverage:** Unplanned. Ticket 5 sets up the registration model.
+
+---
+
+### Surface 21 — Power management / ACPI                                       [in scope]
+**What it is:** The Cchip's PWR register handles ACPI sleep states (S0..S5). Used by the OS for suspend/resume; mostly stub-able for emulator.
+**Owners:** `TsunamiCchip` (PWR register, sleep state).
+**Interface sketch:** Write to PWR transitions the system state. The chipset emits a callback when state changes.
+**Determinism strategy:** Write known sleep value to PWR; assert internal state and any registered callback fires.
+**Test contracts:**
+- Write to PWR transitioning to S3 fires a registered listener.
+- Reads of PWR return the current state.
+**Ticket coverage:** Unplanned. Phase 10 in architecture doc.
+
+---
+
+### Surface 22 — Error capture and reporting                                   [in scope]
+**What it is:** Errors (NXM, PCI parity, ECC, master abort, scatter-gather error) are captured by the realm that detects them and possibly promoted across realms. PERROR is W1C in the Pchip. NXM source ends up in Cchip MISC.
+**Owners:** All realms generate errors; `TsunamiChipset` routes cross-realm promotion.
+**Interface sketch:** `chipset.reportNxm(pa, sourceCode)`, `pchip.captureError(type, pa)`. Errors latch first-only (subsequent errors lost).
+**Determinism strategy:** Trigger known error condition; assert capture; W1C clear; assert second error captures.
+**Test contracts:**
+- PCI master abort on Pchip0 sets PERROR.NDS bit.
+- Writing 1 to PERROR.NDS clears it (W1C semantics).
+- Second error after clear is captured.
+- Second error before clear is ignored (latch holds first).
+- Error with PERRMASK bit clear raises interrupt to Cchip DRIR.
+- NXM detected by Pchip promotes to Cchip MISC.NXM_SRC.
+**Ticket coverage:** Unplanned. Phase 8 in architecture doc.
+
+---
+
+## Category F — Device-adjacent surfaces
+
+### Surface 23 — Serial / UART (COM1, COM2)                                    [adjacent]
+**What it is:** Two NS16550-compatible UARTs at standard PC port addresses (`0x3F8`, `0x2F8`). The UART device itself lives in your serial-device module; the chipset's job is to make sure I/O port reads/writes reach it through the Pchip and ISA bridge, and that its IRQ assertion reaches DRIR.
+**Owners:** Serial device (out of chipset scope); ISA bridge dispatches I/O ports; chipset routes the IRQ.
+**Interface sketch:** Register the UART as a port-range handler on the ISA bridge for `0x3F8–0x3FF`. Wire UART's IRQ output to `chipset.raiseIsaInterrupt(4)`.
+**Determinism strategy:** Use a fake UART with deterministic responses (LSR always returns 0x60, RBR returns programmed byte). Issue I/O reads via the full PA, assert the fake sees the right register.
+**Test contracts:**
+- Read of LSR via sparse I/O at PA decoding to port `0x3FD` returns 0x60 (THRE + TEMT, transmitter empty).
+- Write to THR at port `0x3F8` reaches the fake UART with the byte.
+- UART asserting its IRQ propagates to DRIR via ISA cascade.
+**Ticket coverage:** Unplanned. Ticket 6 (when ISA I/O dispatch lands).
+
+---
+
+### Surface 24 — Storage controller hookup                                     [out of scope]
+**What it is:** SCSI HBAs (Qlogic 1040, Symbios 8x5x) are PCI devices that live in slots. The chipset doesn't know they're storage controllers — they're just PCI devices that DMA to memory and assert PCI IRQs.
+**Owners:** Storage device module.
+**Interface sketch:** Same as any other PCI device: register at (slot, func), respond to config space, DMA via Surface 11/12, IRQ via Surface 6.
+**Determinism strategy:** *(N/A from chipset side — storage tests live in their own module).*
+**Test contracts:** *(none owned by chipset)*. Integration: a registered storage handler at slot 5 Pchip0 sees its config reads, DMA cycles, and IRQ assertions wire correctly through chipset surfaces.
+**Ticket coverage:** N/A.
+
+---
+
+### Surface 25 — Mailboxes / SRM communication regions                         [out of scope]
+**What it is:** SRM uses well-known memory regions (HWRPB, console interface block, etc.) to pass parameters to the OS. These are plain memory regions with software conventions — no chipset hardware involved.
+**Owners:** SRM image and the OS.
+**Interface sketch:** N/A.
+**Determinism strategy:** N/A.
+**Ticket coverage:** N/A.
+
+---
+
+### Surface 26 — TIG / front-panel GPIO                                        [in scope, low priority]
+**What it is:** The TIG bus carries front-panel LED control, fan tach inputs, and other GPIO. Mostly stubbed; SRM writes during boot for indicator LEDs.
+**Owners:** `TsunamiCchip` (TTR, TDR registers).
+**Interface sketch:** Reads/writes stored; optional callback for "LED state changed."
+**Determinism strategy:** Write TDR, assert internal state and (if registered) callback fired.
+**Test contracts:**
+- TDR writes are stored.
+- TTR writes update the interval timer's frequency (cross-references Surface 9).
+**Ticket coverage:** Partial (TTR via Surface 9 in Ticket 4). TDR/LEDs unplanned.
+
+---
+
+## Coverage matrix — surfaces vs. action plan tickets
+
+| Surface | Name | Ticket | Status |
+|---------|------|--------|--------|
+| 1 | CPU MMIO dispatch | T1 | Planned |
+| 2 | PCI config dispatch | T5 (partial) | Planned |
+| 3 | PCI I/O dispatch | — | **Unplanned → propose T6** |
+| 4 | PCI memory dispatch | — | **Unplanned → propose T7** |
+| 5 | PCI IACK | — | Deferred (needs 8259) |
+| 6 | Device IRQ in (DRIR) | T3 (PCI only) | Partial |
+| 7 | CPU IRQ out (b_irq) | T3 | Planned |
+| 8 | IPI | — | **Unplanned → propose T8** |
+| 9 | Interval timer | T4 | Planned |
+| 10 | RPCC coordination | — | Adjacent (CPU model) |
+| 11 | DMA direct-mapped | — | **Unplanned → T7** |
+| 12 | DMA scatter-gather | — | **Unplanned → T7** |
+| 13 | Reservation snoop | — | **Unplanned → propose T9 (SMP)** |
+| 14 | DIMM presence | T0 reset | Test unplanned |
+| 15 | Platform identity | T1.5 | Planned |
+| 16 | Memory topology (AAR) | T2 | Planned |
+| 17 | PCI enumeration | — | Easy add to T5 |
+| 18 | SMP per-CPU context | — | Easy add to T1 |
+| 19 | System reset | implicit | Test unplanned |
+| 20 | PCI bus reset (SPRST) | — | Add to T5 |
+| 21 | Power management | — | Phase 10 |
+| 22 | Error capture | — | **Unplanned → propose T10** |
+| 23 | UART hookup | — | **Unplanned → T6** |
+| 24 | Storage hookup | — | Out of chipset scope |
+| 25 | Mailboxes | — | Out of chipset scope |
+| 26 | TIG / front panel | T4 (TTR) | Mostly unplanned |
+
+**Summary:** 26 surfaces total. 15 are in scope and require chipset work. 6 are planned in T0–T5; 9 are unplanned and need additional tickets (T6 ISA/UART, T7 DMA, T8 IPI, T9 reservations, T10 error capture, plus several smaller add-ons).
+
+---
+
+## Test infrastructure recommendations
+
+These surfaces share infrastructure. Building the fixtures once pays back across every test in the matrix.
+
+### Fixture 1 — `FakePciDevice`
+Implements `IPciDeviceHandler` with programmable responses. Records every config read/write, every memory access, every DMA. Used by Surfaces 2, 4, 17, 20.
+
+```cpp
+struct FakePciDevice : IPciDeviceHandler {
+    std::vector<std::tuple<uint8_t, uint32_t, uint8_t>> configReads;
+    std::map<uint8_t, uint32_t> configRegs;
+    bool wasReset = false;
+
+    uint32_t pciConfigRead(uint8_t reg, uint8_t width) override {
+        configReads.emplace_back(reg, configRegs[reg], width);
+        return configRegs[reg];
+    }
+    void pciConfigWrite(uint8_t reg, uint32_t value, uint8_t width) override {
+        configRegs[reg] = value;
+    }
+    void pciReset() override { wasReset = true; }
+};
+```
+
+### Fixture 2 — `FakeIoPortDevice`
+Same idea for ISA I/O ports. Used by Surfaces 3, 23.
+
+### Fixture 3 — `FakeCpu`
+A minimal CPU stand-in that holds an IPL, a `cpuId`, and an interrupt-poll callback. The chipset can drive its `b_irq` lines. Used by Surfaces 7, 8, 13.
+
+### Fixture 4 — Deterministic memory
+A flat `std::vector<uint8_t>` representing system memory, with `read(pa, len)` and `write(pa, len)`. Used by Surfaces 11, 12, 13.
+
+### Fixture 5 — Cycle injector
+A free function `runCycles(chipset, N)` that splits N into chunks and calls `chipset.step(chunk)` deterministically. Used by Surface 9 and any test involving timer-driven side effects.
+
+These five fixtures cover every test in the matrix. They should land alongside Ticket 0 (test infrastructure) so subsequent tickets can use them.
+
+---
+
+## Recommended next move
+
+The architecture doc + the original 7 tickets cover ~40% of the functional surface. This document reveals the other ~60% — most of it concentrated in DMA, ISA/UART, error capture, and SMP coherence. Those areas don't need to land *before* SRM boot, but they need to be on the planning radar so we don't paint ourselves into a corner with API choices that don't extend.
+
+The cheapest immediate move is to expand the action plan with the four proposed tickets (T6–T10 above), each scoped the same way as the existing tickets, and to land the five test fixtures alongside Ticket 0. That gives Cowork a complete map of the chipset's hookable surface, with deterministic test contracts for every entry.
+
+Whether you want me to draft those four additional tickets now or hold them for a later session is your call.

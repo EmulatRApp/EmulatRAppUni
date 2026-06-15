@@ -1,0 +1,646 @@
+Below is a consolidated **indexed design specification** of everything we’ve discussed this session, rewritten into a single coherent architecture document for your ES45 / Alpha SRM emulation, pipeline model, aliasing behavior, and execution framework.
+
+---
+
+Attempt to leverage previous development: Project sources: EmulatRAppUni & EmulatRPOC
+- High Performant
+- Support 6 stage Pipeline
+- Fidelity Accurate
+- Clearly idenfify (directly or through inference) Firmware Address Realms - We should at a minimum maintain a document
+    of record of learnings thought empircal tests and inference.
+- Support Box Support (Alpha EV6 best effort fidelity)
+- Minimize / mitigate code bloat.
+
+Documented as defined here are recommendations - open to discussion.  My understanding may lack clarity for
+proper execution of this project.
+
+The project is also a learning vehicle to better understand the Alpha Architecture for EV6.
+
+Code Conventions:
+-  Limit character set to ASCII(128) or equivalent.  This project does not use extended character sets. By doing so, creates significant delays and edits to compatible ASCII(128) character set.
+
+
+Grain contract : InstructionGrain = immutable execution unit
+Contains:
+
+opcode / function
+decoded operands
+side-effect function pointer table
+fault metadata slots
+
+- InstructionGrain is produced in stage 1–2
+Decode emits InstructionGrain
+Grain becomes execution unit
+InstructionGrain = immutable execution unit - try to avoid vTables
+
+--
+Box Defined: a policy + execution orchestrator for grains
+Boxes manage:
+
+dispatch of grain execution
+side effects
+fault injection
+PAL dispatch
+IRQ signaling
+pipeline stall decisions
+
+Box
+ ├── execute(grain)
+ ├── handleFault()
+ ├── callPal()
+ ├── raiseIRQ()
+ ├── memoryEffects()
+ └── registerUpdates()
+
+Pipeline:
+Pipeline stages
+[0] IF  - Instruction Fetch
+[1] DE  - Decode
+[2] GR  - Grain resolution
+[3] EX  - Execute
+[4] MEM - Memory
+[5] WB  - Writeback
+
+1. Grain executes
+2. Effects emitted
+3. Box resolves priority
+4. Pipeline updated
+
+grainFactory:
+Function Table Model: functionTable[opcode][functionCode]
+- Function tables do NOT own pipeline state
+- Grain executes → produces effect set → Box commits effects
+
+
+-----
+Fault / CALL_PAL / IRQ Dispatch
+FAULT
+CALL_PAL
+IRQ
+TRAP
+
+-- FAULT > CALL_PAL > IRQ > NORMAL
+
+Ownership rule?
+
+Registers are NOT modified by:
+
+decode
+fetch
+grain construction
+
+ONLY by:
+
+Box commit phase
+execute stage result commit (or Mem - we tested this earlier)
+
+Notes for consideration: ES45 / Alpha Emulator Architecture — Unified Execution & Memory
+
+---
+
+ **0. Scope**
+
+This document defines:
+
+* Physical vs guest memory aliasing rules (ES45/SRM behavior)
+* I-cache / IBox fetch semantics during boot
+* SRM decompression + relocation behavior
+* HW_LD/HW_ST execution model correctness
+* Pipeline + InstructionGrain execution model
+* Box-based execution orchestration
+* Fault, CALL_PAL, IRQ dispatch integration
+* Memory consistency contract across stages
+* Register side-effect ownership rules
+
+---
+
+ **1. Core Architectural Insight (Root Cause of Observed Behavior)**
+
+ 1.1 Observed phenomenon
+
+* Stub executed at 0x900004
+* Execution enters loop at 0x9003ec
+* HW_LD returns **zeros from 0x900000 region**
+* Copy loop writes zeros into destination region
+* Execution eventually HALTs via corrupted control flow
+
+---
+
+ 1.2 Key conclusion
+
+The system is exhibiting:
+
+> **Split-view memory semantics:**
+
+* IBox fetch sees one memory domain
+* HW_LD/HW_ST see another
+
+This is NOT correct ES45 behavior.
+
+---
+
+ **2. ES45 Memory Model (Correct Interpretation)**
+
+ 2.1 Physical memory is single-sourced
+
+There is exactly one truth:
+
+
+GuestMemory (DRAM model)
+
+
+No dual banks. No shadow RAM.
+
+---
+
+ 2.2 Correct aliasing rule (ES45-style)
+
+ES45 does NOT implement bidirectional write aliasing between:
+
+
+0x900000 region
+0x600000 region
+0x000000 region
+
+
+Instead:
+
+ ✔ Valid behavior:
+
+| Region   | Meaning                          |
+| -------- | -------------------------------- |
+| 0x000000 | normal DRAM (PAL mirror region)  |
+| 0x600000 | PAL base region (SRM target)     |
+| 0x900000 | boot ROM / loader staging region |
+
+These are:
+
+> **distinct physical addresses unless explicitly mapped**
+
+---
+
+ 2.3 Critical correction
+
+ ❌ WRONG MODEL (caused current bug risk):
+
+* 0x900000 ↔ 0x600000 aliasing in both directions
+* write at one modifies the other automatically
+
+ ✔ CORRECT MODEL:
+
+Only ONE of these may apply:
+
+ Option A (ES45-like ROM staging)
+
+
+IBox fetch:
+    reads from ROM image (immutable backing store)
+
+HW_LD/HW_ST:
+    operate only on GuestMemory
+
+
+OR
+
+ Option B (hardware memory map alias)
+
+
+MMU maps region → same DRAM page
+(no special emulator logic required)
+
+
+---
+
+ **3. IBox / I-Cache Semantics (Critical Fix)**
+
+ 3.1 Correct interpretation
+
+During SRM boot:
+
+> IBox behaves like a cached fetch engine, NOT memory
+
+Thus:
+
+
+Instruction Fetch:
+    comes from I-cache / ROM backing image
+
+Data Access:
+    comes from GuestMemory
+
+
+---
+
+ 3.2 Required emulator rule
+
+ ✔ Fetch path isolation
+
+
+IF (boot / ROM phase active):
+    fetchInstruction(pa) → m_payloadData (immutable snapshot)
+ELSE:
+    fetchInstruction(pa) → GuestMemory
+
+
+---
+
+ 3.3 Important restriction
+
+> HW_LD / HW_ST must NEVER read from payload buffer
+
+They operate ONLY on GuestMemory.
+
+---
+
+ **4. SRM Boot / Decompression Behavior**
+
+ 4.1 Observed behavior
+
+At runtime:
+
+* Stub executes at 0x900004
+* Copy loop uses:
+
+  * R2 = 0x900000 (source)
+  * R0 = 0x600000 (destination)
+* R1 = 4MB
+
+---
+
+4.2 Correct interpretation
+
+This is NOT a pure copy loop.
+
+It is:
+
+> **Firmware relocation + staging transformation**
+
+Likely intent:
+
+
+Stage 1: boot stub executes from ROM region
+Stage 2: decompress PALcode
+Stage 3: relocate PALcode into palBase
+Stage 4: jump into palBase (JSR 0x6005c0)
+
+
+---
+
+ 4.3 Key insight
+
+The loop reads:
+
+
+0x900000 region = boot image (source data)
+0x600000 region = execution target
+
+
+BUT:
+
+> 0x900000 is NOT supposed to be mutated during execution
+
+---
+
+ **5. Correct Memory Contract (CRITICAL SECTION)**
+
+ 5.1 Three-tier memory model
+
+ Tier 1: ROM backing store (immutable)
+
+
+m_payloadData
+
+
+ Tier 2: Guest RAM
+
+
+GuestMemory
+
+
+ Tier 3: I-cache view (optional abstraction)
+
+
+Instruction fetch cache
+
+
+---
+
+ 5.2 Required invariant
+
+
+IBox(fetch) != HW_LD/HW_ST view
+
+
+But both must agree on architectural correctness.
+
+---
+
+ **6. REQUIRED FIX: No Shadow Writes Between Regions**
+
+ 6.1 Absolutely forbidden model
+
+
+write(0x600000) → automatically writes 0x000000
+write(0x900000) → automatically writes 0x600000
+
+
+This causes:
+
+* self-corruption loops
+* HALT injection
+* fake PAL execution failure
+
+---
+
+ 6.2 Correct model
+
+
+GuestMemory is authoritative
+
+Aliases are handled ONLY by MMU mapping tables, not logic hooks
+
+
+---
+
+ **7. Pipeline Model (Preserved 6-stage design)**
+
+ 7.1 Pipeline stages
+
+
+[0] IF  - Instruction Fetch
+[1] DE  - Decode
+[2] GR  - Grain resolution
+[3] EX  - Execute
+[4] MEM - Memory
+[5] WB  - Writeback
+
+
+---
+
+ 7.2 Key design decision
+
+ ✔ InstructionGrain is produced in stage 1–2
+
+* Decode emits InstructionGrain
+* Grain becomes execution unit
+
+---
+
+ 7.3 Grain contract
+
+
+InstructionGrain = immutable execution unit
+
+
+Contains:
+
+* opcode / function
+* decoded operands
+* side-effect function pointer table
+* fault metadata slots
+
+---
+
+ **8. Box Model (Execution Orchestration Layer)**
+
+ 8.1 Definition
+
+A Box is:
+
+> a policy + execution orchestrator for grains
+
+---
+
+ 8.2 Responsibilities
+
+Boxes manage:
+
+* dispatch of grain execution
+* side effects
+* fault injection
+* PAL dispatch
+* IRQ signaling
+* pipeline stall decisions
+
+---
+
+ 8.3 Structure
+
+
+Box
+ ├── execute(grain)
+ ├── handleFault()
+ ├── callPal()
+ ├── raiseIRQ()
+ ├── memoryEffects()
+ └── registerUpdates()
+
+
+---
+
+ **9. Function Table Model (Key Idea from Your Design)**
+
+ 9.1 Concept
+
+A 2D dispatch table:
+
+
+functionTable[opcode][functionCode]
+
+
+Each entry:
+
+
+grain_executor_function*
+
+
+---
+
+ 9.2 Execution semantics
+
+Each function:
+
+* executes instruction semantics
+* triggers side effects
+* updates registers
+* signals faults if needed
+
+---
+
+ 9.3 Important constraint
+
+> Function tables do NOT own pipeline state
+
+They are **pure execution policies**
+
+---
+
+ **10. Side Effects Model**
+
+ 10.1 All side effects belong to Box layer
+
+Includes:
+
+* register updates
+* memory writes
+* PAL transitions
+* exception generation
+* pipeline stall insertion
+
+---
+
+ 10.2 Execution contract
+
+
+Grain executes → produces effect set → Box commits effects
+
+
+NOT:
+
+
+Grain directly mutates system state
+
+
+---
+
+ **11. Fault / CALL_PAL / IRQ Dispatch**
+
+ 11.1 Unified model
+
+All non-normal control flow becomes:
+
+
+EffectRequest
+
+
+Types:
+
+* FAULT
+* CALL_PAL
+* IRQ
+* TRAP
+
+---
+
+ 11.2 Handling order
+
+
+1. Grain executes
+2. Effects emitted
+3. Box resolves priority
+4. Pipeline updated
+
+
+---
+
+ 11.3 Priority rule
+
+
+FAULT > CALL_PAL > IRQ > NORMAL
+
+
+---
+
+ **12. Register Model**
+
+ 12.1 Ownership rule
+
+Registers are NOT modified by:
+
+* decode
+* fetch
+* grain construction
+
+ONLY by:
+
+* Box commit phase
+* execute stage result commit
+
+---
+
+ 12.2 Special registers
+
+* PC handled in IF/DE boundary
+* R26 used for PAL base
+* R31 constant zero
+
+---
+
+ **13. JSR / PAL Transition Semantics**
+
+ 13.1 Correct interpretation of observed JSR
+
+
+JSR R0 = 0x6005c0
+
+
+Means:
+
+* enter PAL execution region
+* switch execution context
+* NOT memory relocation
+
+---
+
+ 13.2 Important clarification
+
+JSR does NOT imply:
+
+* memory copy
+* alias activation
+* ROM mutation
+
+It is purely:
+
+> control transfer into PALcode region
+
+---
+
+ **14. Final Architectural Fix Summary**
+
+ 14.1 Root fix required
+
+You must enforce:
+
+ ✔ Single memory truth
+
+
+GuestMemory ONLY
+
+
+ ✔ Separate instruction fetch domain
+
+
+IBox fetch uses ROM snapshot OR cache view
+
+
+ ✔ No cross-address shadow writes
+
+
+0x900000 ≠ 0x600000 unless MMU says so
+
+
+---
+
+ 14.2 Why your current anomaly happens
+
+Because:
+
+* HW_LD sees GuestMemory (zeros)
+* IBox sees payload buffer OR inconsistent mapping
+* Copy loop self-interacts due to alias confusion
+
+---
+
+ **15. Recommended Immediate Action Plan**
+
+1. Remove any “write shadowing” between PA regions
+2. Split fetch path from data path
+3. Introduce explicit ROM backing store (immutable)
+4. Ensure HW_LD/HW_ST always go through GuestMemory
+5. Make IBox a *separate instruction source view*
+6. Audit PAL base mapping (0x600000 region)
+
+---
+
+Just tell me where you want to go next.

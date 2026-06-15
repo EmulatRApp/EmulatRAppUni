@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "comment": "EmulatR disk-type catalog. Keyed by drive model; reference-generated descriptors for mkdisk.py (image creation) and, later, the C++ ATA IDENTIFY / SCSI INQUIRY. total_sectors is authoritative (x bytes_per_sector = capacity); CHS is derived to a legal form at IDENTIFY time. mscp_* fields are carried for a future SCSI/MSCP (dka) path and ignored by the ATA/IDE (dqa) path. verified=false means geometry/identity is nominal and should be firmed up from a spec sheet. Companion: config/dec_disk_media_types.tsv (geometry + VMS/SRM device-name prefixes).",
+  "drives": {
+    "EMULATR-DISK-4G": {
+      "class": "disk", "transport": "ata",
+      "bytes_per_sector": 512, "total_sectors": 8388608,
+      "vendor": "EMULATR", "product": "EMULATR VIRTUAL DISK", "revision": "1.0",
+      "description": "Synthetic 4 GB ATA install target", "verified": true
+    },
+    "EMULATR-DISK-9G": {
+      "class": "disk", "transport": "ata",
+      "bytes_per_sector": 512, "total_sectors": 18874368,
+      "vendor": "EMULATR", "product": "EMULATR VIRTUAL DISK", "revision": "1.0",
+      "description": "Synthetic 9 GB ATA install target", "verified": true
+    },
+    "RRD46": {
+      "class": "cdrom", "transport": "atapi",
+      "bytes_per_sector": 2048, "total_sectors": 0,
+      "vendor": "DEC", "product": "RRD46   (C) DEC", "revision": "1337",
+      "removable": true, "read_only": true,
+      "description": "DEC RRD46 ATAPI CD-ROM", "verified": false
+    },
+    "RZ28": {
+      "class": "disk", "transport": "scsi",
+      "bytes_per_sector": 512, "total_sectors": 4110480,
+      "vendor": "DEC", "product": "RZ28     (C) DEC", "revision": "0000",
+      "mscp_media_class": "DK", "mscp_media_name": "RZ28",
+      "description": "DEC RZ28 2.1 GB SCSI (ST32550N class)", "verified": false
+    },
+    "RZ29": {
+      "class": "disk", "transport": "scsi",
+      "bytes_per_sector": 512, "total_sectors": 8407200,
+      "vendor": "DEC", "product": "RZ29     (C) DEC", "revision": "0000",
+      "mscp_media_class": "DK", "mscp_media_name": "RZ29",
+      "description": "DEC RZ29 4.2 GB SCSI", "verified": false
+    },
+    "ST373405LCV": {
+      "class": "disk", "transport": "scsi",
+      "bytes_per_sector": 512, "total_sectors": 143374741,
+      "vendor": "SEAGATE", "product": "ST373405LCV", "revision": "0200",
+      "mscp_media_class": "DK", "mscp_media_name": "ST373405LCV",
+      "description": "SEAGATE ST373405LCV 73 GB U320 SCSI", "verified": false
+    }
+  }
+}

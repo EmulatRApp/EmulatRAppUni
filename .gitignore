@@ -1,0 +1,97 @@
+# ============================================================================
+# .gitignore -- EmulatR V4
+# ============================================================================
+# Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+# Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
+# Licensed under eNVy Systems Non-Commercial License v1.1
+# ============================================================================
+
+# Visual Studio / MSVC per-user state -----------------------------------------
+.vs/
+*.vcxproj.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.sdf
+*.opensdf
+
+* text=auto
+*.exe binary
+*.rom binary
+*.bin binary
+*.xlsx binary
+*.axpsnap binary
+
+# Qt Creator per-user state ---------------------------------------------------
+*.user
+*.user.*
+.qtcreator/
+CMakeLists.txt.user
+CMakeLists.txt.user.*
+
+# CMake / build outputs -------------------------------------------------------
+build/
+build-*/
+out/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+.cmake/
+
+# Compiler outputs ------------------------------------------------------------
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.gch
+*.pch
+*.tlog
+*.lastbuildstate
+
+# Trace, snapshot, and runtime artifacts --------------------------------------
+Trace Output/
+traces/
+*.log
+*.lst
+*.axpsnap
+
+# Project-specific runtime data -----------------------------------------------
+firmware/
+
+HMDocs/__history/
+
+# Editor backups --------------------------------------------------------------
+*.bak
+*.bak.*
+*-bak
+*.orig
+*~
+*.swp
+*.swo
+
+# OS junk ---------------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Linux / FUSE mount cruft (Cowork sandbox) -----------------------------------
+.fuse_hidden*
+
+# Other tooling ---------------------------------------------------------------
+.vscode/
+.idea/
+*.tmp
+core
+core.*

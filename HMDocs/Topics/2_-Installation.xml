@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T11:44:15.627Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Installation</title>
+  <keywords>
+    <keyword>build</keyword>
+    <keyword>CMake</keyword>
+    <keyword>firmware</keyword>
+    <keyword>Installation</keyword>
+    <keyword>MSVC</keyword>
+    <keyword>Qt</keyword>
+    <keyword>SRM</keyword>
+    <keyword>tools</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Installation</para>
+    </header>
+    <para styleclass="Normal">This chapter covers obtaining the tools, building EmulatR from source, supplying an SRM firmware image, and the first launch. Build specifics are marked with [TODO] where they still need to be confirmed against the current project files.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">In this section</para>
+    <list id="0" type="ul" listtype="bullet" formatstring="&#183;" format-charset="SYMBOL_CHARSET" levelreset="true" legalstyle="false" startfrom="1" styleclass="NotesBox" style="font-family:Symbol; font-size:11pt; color:#000000;">
+      <li styleclass="NotesBox">Required Tools and Frameworks -- the compiler, build system, and libraries.</li>
+      <li styleclass="NotesBox">Building from Source -- configuring and building the binary.</li>
+      <li styleclass="NotesBox">Firmware Requirements -- supplying the SRM console image.</li>
+      <li styleclass="NotesBox">First Startup -- the first launch through to the prompt.</li>
+    </list>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Required-Tools--Frameworks">Required Tools and Frameworks</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Building-from-Source">Building from Source</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Firmware-Requirements">Firmware Requirements</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--First-Startup">First Startup</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="3_-Quick-Start----------------">Quick Start</link></para>
+  </body>
+</topic>

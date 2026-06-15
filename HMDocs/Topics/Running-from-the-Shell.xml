@@ -1,0 +1,207 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="../helpproject.xsl" ?>
+<topic template="Default" modified="2026-06-15T10:54:57.698Z" lasteditedby="tim" version="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../helpproject.xsd">
+  <title>Running EmulatR from the Shell</title>
+  <keywords>
+    <keyword>--autosnapshot</keyword>
+    <keyword>background process</keyword>
+    <keyword>bash</keyword>
+    <keyword>command line</keyword>
+    <keyword>console log</keyword>
+    <keyword>disown</keyword>
+    <keyword>EMULATR_TRACE_DIR</keyword>
+    <keyword>--firmware</keyword>
+    <keyword>forked process</keyword>
+    <keyword>--log-file</keyword>
+    <keyword>--max-cycles</keyword>
+    <keyword>--mem</keyword>
+    <keyword>--no-autoload</keyword>
+    <keyword>nohup</keyword>
+    <keyword>run directory</keyword>
+    <keyword>switches</keyword>
+    <keyword>tee</keyword>
+    <keyword>--trace</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Running EmulatR from the Shell</para>
+    </header>
+    <para styleclass="Normal">EmulatR is a console application driven from a command line. The standard execution shell is <text styleclass="Code Example">bash</text> -- the project&apos;s own launch and trace scripts are bash, and the examples here assume it (on Windows, a bash shell such as Git Bash / MSYS, where the disk appears as <text styleclass="Code Example">/d/EmulatR</text>). Everything below is run from the run directory.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The run directory</para>
+    <para styleclass="Normal">The run directory is the folder that holds the built executable. CMake&apos;s post-build step lays it out so the program and its inputs sit together:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">&lt;run&gt;/ Emulatr.exe the emulator</para>
+    <para styleclass="Code Example"> firmware/ SRM images (e.g. ds10_v7_3.exe)</para>
+    <para styleclass="Code Example"> tools/ deployed bash helpers (trace_halt.sh, ...)</para>
+    <para styleclass="Code Example"> EmulatrV4.ini settings (memorySize, paths, ...)</para>
+    <para styleclass="Code Example"> ds10_flash.rom persisted NVRAM / flash</para>
+    <para styleclass="Code Example"> snapshots/ saved machine states (.axpsnap)</para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">Always launch from this directory (<text styleclass="Code Example">cd &lt;run&gt;</text> first), because the default firmware path and the ini are resolved relative to the current directory. The bundled scripts in <text styleclass="Code Example">tools/</text> compute the run-dir root from their own location (<text styleclass="Code Example">$SCRIPT_DIR/..</text>) and <text styleclass="Code Example">cd</text> there before running.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Basic invocation</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">cd /d/EmulatR/&lt;run&gt;</para>
+    <para styleclass="Code Example">./Emulatr.exe --firmware firmware/ds10_v7_3.exe</para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">With no <text styleclass="Code Example">--firmware</text>, the image falls back to <text styleclass="Code Example">[Rom] firmwareImage</text> in the ini; with no <text styleclass="Code Example">--mem</text>, memory falls back to <text styleclass="Code Example">[System] memorySize</text> in the ini (1024 MB by default), and only then to the built-in 64 MiB default. The command line always wins over the ini.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Command-line switches</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="14" colcount="2" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Switch</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Meaning</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--firmware &lt;path&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Firmware image to load (resolved against the run directory).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--firmware-format auto|raw|srm</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Override image-format detection (default auto -- SRM if the <text styleclass="Code Example">.exe</text> signature scan succeeds, else raw).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--mem &lt;bytes&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Guest memory size in bytes (e.g. <text styleclass="Code Example">1073741824</text> for 1 GiB).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--load-pa &lt;addr&gt; / --start-pa &lt;addr&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Physical load address and execution start address (hex or decimal; start-pa low bit sets PAL mode).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--max-cycles &lt;N&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Cap the run loop at N cycles (default unbounded).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--pal-mode</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Force PAL mode at reset.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--no-autoload</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Suppress autoload of the newest snapshot -- forces a genuine cold boot.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--autosnapshot on|off</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Toggle periodic <text styleclass="Code Example">auto_*.axpsnap</text> saves (off avoids the disk cost on a long cold boot).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--snapshot-on-pc &lt;pc[,pc...]&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Capture a one-shot snapshot when the CPU retires at the given PC(s).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--dump-disasm &lt;pa&gt;:&lt;count&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Disassemble count instructions at a PA after load, before the run starts.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--trace &lt;dec,machine&gt;</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Install the trace sink writing the decode and machine listing logs.</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--log-disable / --log-only / --log-verbose / --log-file</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Tune the log subsystem (see Logging below).</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Code Example">--help</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Print the usage text and exit.</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Logging</para>
+    <para styleclass="Normal">The simplest log is the console transcript, captured with <text styleclass="Code Example">tee</text> so it is both shown and saved:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">./Emulatr.exe --firmware firmware/ds10_v7_3.exe 2&gt;&amp;1 | tee run_$(date +%Y%m%d_%H%M%S).console.log</para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">The log subsystem is filtered per channel. Show only certain subsystems, silence noisy ones, or send a channel to its own file:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">./Emulatr.exe --firmware firmware/ds10_v7_3.exe --log-only ide,iic</para>
+    <para styleclass="Code Example">./Emulatr.exe --firmware firmware/ds10_v7_3.exe --log-disable chipset</para>
+    <para styleclass="Code Example">./Emulatr.exe --firmware firmware/ds10_v7_3.exe --log-file ide=logs/ide.log</para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">Retire / instruction traces are written to the directory named by <text styleclass="Code Example">EMULATR_TRACE_DIR</text>; <text styleclass="Code Example">EMULATR_TRACE_WINDOW=1</text> arms a windowed sink so a cold boot does not emit a multi-gigabyte stream. A typical traced cold boot:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">export EMULATR_TRACE_DIR=/d/EmulatR/traces; mkdir -p &quot;$EMULATR_TRACE_DIR&quot;</para>
+    <para styleclass="Code Example">export EMULATR_TRACE_WINDOW=1</para>
+    <para styleclass="Code Example">./Emulatr.exe --no-autoload --firmware firmware/ds10_v7_3.exe 2&gt;&amp;1 | tee cold_$(date +%H%M%S).log</para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">The full list of <text styleclass="Code Example">EMULATR_*</text> runtime variables (console port, flash path, idle warp, trace controls) is on the Environment Variables page.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Running as a forked / background process</para>
+    <para styleclass="Normal">Because the console is a RAW TCP server (reached by a terminal client over <text styleclass="Code Example">EMULATR_CONSOLE_PORT</text>), the emulator does not need the controlling terminal and can run detached. Launch it in the background, capture its output to a file, and note the process id:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">./Emulatr.exe --firmware firmware/ds10_v7_3.exe &gt; run.log 2&gt;&amp;1 &amp;</para>
+    <para styleclass="Code Example">echo &quot;emulatr pid = $!&quot;</para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">To survive the shell closing, use <text styleclass="Code Example">nohup</text> and <text styleclass="Code Example">disown</text>, then connect from a separate terminal client:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">nohup ./Emulatr.exe --firmware firmware/ds10_v7_3.exe &gt; run.log 2&gt;&amp;1 &amp; disown</para>
+    <para styleclass="Code Example"># then, from anywhere: putty -raw 127.0.0.1 -P 10023 (or any RAW-TCP client)</para>
+    <para styleclass="Code Example"></para>
+    <para styleclass="Normal">Stop a detached instance cleanly by ending its console session or signalling the captured pid; avoid a hard kill during a flash write, which can corrupt <text styleclass="Code Example">ds10_flash.rom</text>. To run two instances from one directory, give each its own flash and console port so they do not collide:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Code Example">EMULATR_FLASH_ROM=flash_b.rom EMULATR_CONSOLE_PORT=10024 \</para>
+    <para styleclass="Code Example"> ./Emulatr.exe --firmware firmware/ds10_v7_3.exe &gt; run_b.log 2&gt;&amp;1 &amp;</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Environment-Variables-(EMULA">Environment Variables (EMULATR_*)</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Executing-Two-Instances">Executing Two Instances</link></para>
+    <para styleclass="Normal"><link displaytype="text" defaultstyle="true" type="topiclink" href="--Configuring----------(moved-">Configuring</link></para>
+  </body>
+</topic>
