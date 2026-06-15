@@ -37,7 +37,7 @@
 
 #ifndef FPBOXLIB_VAX_FLOAT_H
 #define FPBOXLIB_VAX_FLOAT_H
-
+ 
 #include <cstdint>
 #if defined(_MSC_VER)
 #  include <intrin.h>   // _umul128 / __umulh -- MSVC has no __int128
