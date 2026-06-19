@@ -1,0 +1,25 @@
+{
+  "manifest_version": 1,
+  "platform": "DS25",
+  "comment": "STAGED -- NOT YET BOOTABLE. DS25 is a Titan (21274) machine (dual EV68). Same caveat as es45_platform.json: EmulatR's TitanChipset is a scaffold and Machine.cpp has no Titan selection seam yet, so model=DS25 will not produce a faithful DS25 until the Titan path is completed (journals/20260616_titan_21274_interface.md). Kept ready. Real DS25 = Titan, ALi M1543C south bridge, dual EV68. PCI topology _PROVISIONAL. Strict JSON: no // or /* */ comments -- use comment fields.",
+  "iic_devices": [
+    { "name": "iic_system0", "address": "0x70", "class": "status", "byte": "0x00" },
+    { "name": "iic_system1", "address": "0x72", "class": "status", "byte": "0x00" },
+    { "name": "iic_smb0", "address": "0xA2", "class": "fru_eeprom",
+      "manufacturer": "HP", "model": "DS25", "part_class": "54-", "serial": "" },
+    { "name": "iic_cpu0", "address": "0xA4", "class": "fru_eeprom",
+      "manufacturer": "HP", "model": "EV68", "part_class": "54-", "serial": "" },
+    { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 }
+  ],
+  "pci_devices": [
+    { "name": "isa_bridge", "model": "cypress_isa", "hose": 0, "bus": 0, "slot": 5, "func": 0,
+      "vendor": "0x1080", "device": "0xc693", "class_code": "0x060100",
+      "comment": "STAND-IN (real DS25 south bridge = ALi M1543C). Placeholder until the ALi model + Titan path land.",
+      "option_rom": false, "interrupt_pin": 0 },
+    { "name": "de500_tulip", "model": "generic", "hose": 0, "bus": 0, "slot": 7, "func": 0,
+      "vendor": "0x1011", "device": "0x0019", "class_code": "0x020000",
+      "bars": [ { "index": 0, "kind": "io", "size": "0x80" },
+                { "index": 1, "kind": "mem", "size": "0x80" } ],
+      "option_rom": false, "interrupt_pin": 1 }
+  ]
+}

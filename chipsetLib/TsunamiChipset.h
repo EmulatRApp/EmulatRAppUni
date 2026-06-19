@@ -13,6 +13,7 @@
 #include "TsunamiPchip.h"
 #include "TsunamiTig.h"     // TIG-bus device register file (smir/halt/ipcr/arbiter)
 #include "Cypress_CY82C693ISABridge.h"
+#include "AliM1543C.h"   // ES40/ES45 south bridge (ALi M1543C) -- model-gated in wireDevices()
 #include "deviceLib/Tsunami/Uart16550.h"
 #include "deviceLib/Tsunami/MinimalIsaStub.h"  // Kbd8042Stub (2026-05-28 unblocker; RTC stub superseded)
 #include "deviceLib/Tsunami/ToyRtc.h"          // MC146818 TOY clock + CMOS (2026-06-03)
@@ -167,6 +168,7 @@ public:
         //
         // REMOVAL TRIGGER: delete when LSR-wedge diagnostic is closed.
         // ================================================================
+#if EMULATR_BRINGUP_PROBES
         {
             static std::atomic<bool> s_fired{ false };
             bool const isUartPa =
@@ -186,6 +188,7 @@ public:
                 // __debugbreak();  // 2026-05-28: muted post-verification; probe still emits stderr marker.
             }
         }
+#endif
 
         // ----------------------------------------------------------------
         // PCI IACK intercept (2026-06-04, design Section 6 promotion).
@@ -557,12 +560,27 @@ public:
 
 private:
 
-    void wireDevices() noexcept {
-        // 1. Register the Cypress bridge in the PCI device map
-        m_pchip.registerPciDevice(0, 5, 0, &m_cypress); // CY82C693 ISA bridge
+    // South-bridge selection (2026-06-17): the DS10/DS20 (PC264) use the
+    // Cypress CY82C693; the ES40/ES45 use the ALi M1543C.  Gated on the model
+    // string so the working DS10/DS20 path is byte-identical (default =
+    // Cypress when model is empty/DS10/DS20).  ES40 is Tsunami silicon, so
+    // only the south bridge differs -- everything else in wireDevices() (the
+    // ISA devices at fixed ports) is bridge-agnostic and reused.
+    static bool isAliPlatform(const std::string& model) noexcept {
+        return model == "ES40" || model == "ES45" || model == "DS25";
+    }
 
-        // 2. Wire the I/O port handler interface
-        m_pchip.setIoPortHandler(&m_cypress);
+    void wireDevices() noexcept {
+        // 1. Register the south bridge (func0) in the PCI device map, and wire
+        //    it as the I/O-port fallback handler.  ALi for ES40/ES45, else
+        //    Cypress (DS10/DS20).
+        if (isAliPlatform(m_model)) {
+            m_pchip.registerPciDevice(0, 5, 0, &m_ali);     // ALi M1543C ISA bridge (0x10B9/0x1533)
+            m_pchip.setIoPortHandler(&m_ali);
+        } else {
+            m_pchip.registerPciDevice(0, 5, 0, &m_cypress); // CY82C693 ISA bridge (0x1080/0xC693)
+            m_pchip.setIoPortHandler(&m_cypress);
+        }
 
         m_pchip.registerIoPortRange(0x3F8, 0x400, &m_com1); // COM1
         m_pchip.registerIoPortRange(0x2F8, 0x300, &m_com2); // COM2
@@ -720,6 +738,7 @@ private:
     // Pchip0 in wireDevices().  Declared after m_pchip so it constructs
     // first (the Pchip registries hold raw pointers into these members).
     Cy82C693IsaBridge m_cypress;
+    AliM1543C         m_ali;       // ES40/ES45 south bridge; wired only when isAliPlatform(m_model)
     Uart16550         m_com1{ nullptr, 0x3F8, "COM1" };
     Uart16550         m_com2{ nullptr, 0x2F8, "COM2" };
 

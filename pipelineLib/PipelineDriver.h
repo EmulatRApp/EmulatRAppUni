@@ -226,6 +226,7 @@ struct PipelineDriver
         // instruction word, GP(R29), RA(R26). Purpose: match runtime text against
         // the static decompressed ROM (expect PA, not VA, to match) + lock GP.
         // Window = [entry-before, entry+after]; ~2 compares/instr, bounded output.
+#if EMULATR_BRINGUP_PROBES
         {
             constexpr uint64_t kProbeEntry = 0xaa461cf2ull;  // captured UART-entry cyc
             constexpr uint64_t kProbeBefore = 20;             // your "20 before"
@@ -243,6 +244,7 @@ struct PipelineDriver
                 std::fflush(stderr);
             }
         }
+#endif
         // ---- END TEMP probe ----
 
         // ---- TEMP one-shot trace-window arm 2026-06-01 (REMOVE after capture) ----
@@ -438,6 +440,7 @@ struct PipelineDriver
         // every ~4M cycles: if it clusters at a few PCs -> another delay/spin loop (warpable);
         // if it ranges widely -> real work (memory test/probe, must run, don't warp). Also
         // shows the caller of the rscc wrapper if that's where it sits. REMOVE after.
+#if EMULATR_BRINGUP_PROBES
         if ((cpu.cycleCount & 0x3FFFFFull) == 0) {   // every 4,194,304 cycles
             std::fprintf(stderr, "PCSAMPLE cyc=%llu pc=0x%llx pal=%d ra=0x%llx\n",
                 static_cast<unsigned long long>(cpu.cycleCount),
@@ -446,6 +449,7 @@ struct PipelineDriver
                 static_cast<unsigned long long>(cpu.intReg[26]));
             std::fflush(stderr);
         }
+#endif
         // ---- END periodic PC sampler ----
 
 #if EMULATR_MEMDIAG
@@ -1200,6 +1204,7 @@ private:
                 // the faulting fetch VA translateInstruction latched):
                 //   bad miss  -> grain.pc=0, cpu.va=0x1c699c  (cpu.va = the fix)
                 //   normal miss-> grain.pc == cpu.va          (cpu.va won't regress)
+#if EMULATR_BRINGUP_PROBES
                 if (r.faultCode == coreLib::kFaultItbMiss &&
                     cpu.cycleCount >= 189564000ull &&
                     cpu.cycleCount <= 189565200ull) {
@@ -1219,6 +1224,7 @@ private:
                         // __debugbreak();  // uncomment to halt live in VS here
                     }
                 }
+#endif
 
                 cpu.excAddr =
                     basePc | (cpu.inPalMode() ? uint64_t{1} : uint64_t{0});

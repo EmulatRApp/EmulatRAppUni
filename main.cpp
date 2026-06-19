@@ -633,9 +633,10 @@ int main(int argc, char* argv[])
     // Run.  CHANGE 2026-06-08 (TEP / Claude, task #10): wall-clock the run
     // and emit a PROFILE line so cold-boot-to->>> throughput is measurable.
     // ------------------------------------------------------------------
-    auto const profT0 = std::chrono::steady_clock::now();
+    [[maybe_unused]] auto const profT0 = std::chrono::steady_clock::now();
     systemLib::StopReason const sr = mach.run(opts.maxCycles);
-    auto const profT1 = std::chrono::steady_clock::now();
+    [[maybe_unused]] auto const profT1 = std::chrono::steady_clock::now();
+#if EMULATR_BRINGUP_PROBES
     double             const profSecs    = std::chrono::duration<double>(profT1 - profT0).count();
     unsigned long long const profCycles  = static_cast<unsigned long long>(mach.cpu().cycleCount);
     unsigned long long const profRetires = static_cast<unsigned long long>(traceLib::RetireProfiler::totalRetires());
@@ -645,6 +646,7 @@ int main(int argc, char* argv[])
               << "  instr/s=" << (profSecs > 0.0 ? static_cast<unsigned long long>(profRetires / profSecs) : 0ull)
               << "  cyc/s="   << (profSecs > 0.0 ? static_cast<unsigned long long>(profCycles  / profSecs) : 0ull)
               << '\n';
+#endif
 
     // ------------------------------------------------------------------
     // Post-mortem dump to stdout.
@@ -665,6 +667,7 @@ int main(int argc, char* argv[])
     // think it is.  Skipped on clean halts -- only useful for fault
     // post-mortems.
     // ------------------------------------------------------------------
+#if EMULATR_BRINGUP_PROBES
     if (sr != systemLib::StopReason::HaltedClean) {
         auto const& cpu = mach.cpu();
         auto& memory    = mach.memory();
@@ -716,6 +719,7 @@ int main(int argc, char* argv[])
             std::cout << '\n';
         }
     }
+#endif
 
     return sr == systemLib::StopReason::HaltedClean ? 0 : 1;
 }

@@ -183,6 +183,7 @@ public:
             // Forensic: throttled stderr for unhandled Dchip reads.  See
             // TsunamiCchip.h's matching block for posture / rationale.
             CSR_LOG_R("Dchip", "UNKNOWN", 0, offset, cpuId, kPhaseBNoCycle);
+#if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -199,6 +200,7 @@ public:
                              static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
+#endif
             return 0;
         }
         }
@@ -241,6 +243,7 @@ public:
         default: {
             // Forensic: throttled stderr for unhandled Dchip writes.
             CSR_LOG_W("Dchip", "UNKNOWN", value, offset, cpuId, kPhaseBNoCycle);
+#if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -258,6 +261,7 @@ public:
                              static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
+#endif
             break;
         }
         }

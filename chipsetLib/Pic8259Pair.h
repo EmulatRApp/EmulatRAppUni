@@ -432,6 +432,7 @@ private:
             break;
         default:
             // Rotate / set-priority ops -- TODO table; log once.
+#if EMULATR_BRINGUP_PROBES
             {
                 static std::atomic<bool> s_logged{false};
                 if (!s_logged.exchange(true, std::memory_order_acq_rel)) {
@@ -442,6 +443,7 @@ private:
                     std::fflush(stderr);
                 }
             }
+#endif
             break;
         }
     }
@@ -478,6 +480,7 @@ private:
     // --------------------------------------------------------------------
     static void logFirstIcw(bool master, uint8_t v) noexcept
     {
+#if EMULATR_BRINGUP_PROBES
         static std::atomic<bool> s_logged{false};
         if (!s_logged.exchange(true, std::memory_order_acq_rel)) {
             std::fprintf(stderr,
@@ -489,6 +492,9 @@ private:
                          (v & 0x08) ? "level" : "edge");
             std::fflush(stderr);
         }
+#else
+        (void)master; (void)v;
+#endif
     }
 
     static void logFirstUnmask(bool master, uint8_t oldImr,
@@ -497,6 +503,7 @@ private:
         // Log the first OCW1 that UNMASKS IRQ4 on the master -- the
         // serial driver's hand-off event (design doc TEST 1 anchor).
         if (!master) return;
+#if EMULATR_BRINGUP_PROBES
         bool const wasMasked = (oldImr & 0x10) != 0;
         bool const nowOpen   = (newImr & 0x10) == 0;
         if (wasMasked && nowOpen) {
@@ -510,10 +517,14 @@ private:
                 std::fflush(stderr);
             }
         }
+#else
+        (void)oldImr; (void)newImr;
+#endif
     }
 
     static void logFirstEoi(bool master, uint8_t v) noexcept
     {
+#if EMULATR_BRINGUP_PROBES
         static std::atomic<bool> s_logged{false};
         if (!s_logged.exchange(true, std::memory_order_acq_rel)) {
             std::fprintf(stderr,
@@ -522,6 +533,9 @@ private:
                          static_cast<unsigned>(v));
             std::fflush(stderr);
         }
+#else
+        (void)master; (void)v;
+#endif
     }
 
     // --------------------------------------------------------------------

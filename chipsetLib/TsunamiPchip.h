@@ -497,6 +497,7 @@ public:
         //
         // REMOVAL TRIGGER: delete when LSR-wedge diagnostic is closed.
         // ================================================================
+#if EMULATR_BRINGUP_PROBES
         {
             static std::atomic<bool> s_fired{false};
             bool const isUartOff =
@@ -514,6 +515,7 @@ public:
                 // __debugbreak();  // 2026-05-28: muted post-verification; probe still emits stderr marker.
             }
         }
+#endif
 
         // PCI sparse memory: offset 0x100000000 - 0x13FFFFFFF
         if (offset >= 0x100000000ULL && offset < 0x140000000ULL)
@@ -560,6 +562,7 @@ public:
             //
             // REMOVAL TRIGGER: delete when LSR-wedge diagnostic is closed.
             // ============================================================
+#if EMULATR_BRINGUP_PROBES
             {
                 static std::atomic<bool> s_fired{false};
                 bool const isUartPort = (port == 0x3F8) || (port == 0x3FD);
@@ -576,6 +579,7 @@ public:
                     // __debugbreak();  // 2026-05-28: muted post-verification; probe still emits stderr marker.
                 }
             }
+#endif
 
             return readIoPort(port, width);
         }
@@ -609,6 +613,7 @@ public:
         // does not recognise at all.  Distinct from the readCSR/writeCSR
         // unknown-register paths, which only fire when offset IS in CSR
         // space but the specific register is unmodelled.
+#if EMULATR_BRINGUP_PROBES
         {
             static std::atomic<uint64_t> s_cnt{0};
             const uint64_t               n = s_cnt.fetch_add(1, std::memory_order_relaxed);
@@ -635,6 +640,7 @@ public:
                 std::fflush(stderr);
             }
         }
+#endif
 
         return 0;
     }
@@ -712,6 +718,7 @@ public:
         // that land here are completely lost -- V4 has no model for the
         // address range -- so logging them is the only way to surface the
         // firmware's intent.
+#if EMULATR_BRINGUP_PROBES
         {
             static std::atomic<uint64_t> s_cnt{0};
             const uint64_t               n = s_cnt.fetch_add(1, std::memory_order_relaxed);
@@ -739,6 +746,7 @@ public:
                 std::fflush(stderr);
             }
         }
+#endif
     }
 
 
@@ -861,6 +869,7 @@ public:
                 // PCI device probing and ISA-bridge access go through it.  Phase B
                 // also routes the event through the CSR_LOG_R sink.
                 CSR_LOG_R("Pchip", "UNKNOWN", 0, offset, cpuId, kPhaseBNoCycle);
+#if EMULATR_BRINGUP_PROBES
                 static std::atomic<uint64_t> s_cnt{0};
                 const uint64_t               n = s_cnt.fetch_add(1, std::memory_order_relaxed);
                 if (n < 32)
@@ -884,6 +893,7 @@ public:
 
                     std::fflush(stderr);
                 }
+#endif
                 return 0;
             }
         }
@@ -1027,6 +1037,7 @@ public:
                 // Forensic: throttled stderr for unhandled Pchip CSR writes.
                 // Phase B also routes the event through the CSR_LOG_W sink.
                 CSR_LOG_W("Pchip", "UNKNOWN", value, offset, cpuId, kPhaseBNoCycle);
+#if EMULATR_BRINGUP_PROBES
                 static std::atomic<uint64_t> s_cnt{0};
                 const uint64_t               n = s_cnt.fetch_add(1, std::memory_order_relaxed);
                 if (n < 32)
@@ -1047,6 +1058,7 @@ public:
                                  static_cast<unsigned long long>(n + 1));
                     std::fflush(stderr);
                 }
+#endif
                 break;
             }
         }
@@ -1175,6 +1187,7 @@ private:
         //
         // REMOVAL TRIGGER: delete when LSR-wedge diagnostic is closed.
         // ================================================================
+#if EMULATR_BRINGUP_PROBES
         {
             static std::atomic<bool> s_fired{false};
             bool const isUartPort = (port == 0x3F8) || (port == 0x3FD);
@@ -1191,6 +1204,7 @@ private:
                 // __debugbreak();  // 2026-05-28: muted post-verification; probe still emits stderr marker.
             }
         }
+#endif
 
         for (const auto& range : m_ioPortRegistry)
         {
@@ -1210,6 +1224,7 @@ private:
         //
         // REMOVAL TRIGGER: delete when LSR-wedge diagnostic is closed.
         // ================================================================
+#if EMULATR_BRINGUP_PROBES
         {
             static std::atomic<bool> s_fired{false};
             bool const isUartPort = (port == 0x3F8) || (port == 0x3FD);
@@ -1226,6 +1241,7 @@ private:
                 // __debugbreak();  // 2026-05-28: muted post-verification; probe still emits stderr marker.
             }
         }
+#endif
 
         // Suppress noise for ports the firmware reads as ISA timing
         // delays or POST diagnostics we don't model.  ISA convention:
@@ -1236,11 +1252,13 @@ private:
         //                 satisfies both uses; firmware ignores value.
         // TODO: replace with a registered no-op ISA handler (matches
         // 0x60/64, 0x70/71 pattern) when we add the ISA POST device.
+#if EMULATR_BRINGUP_PROBES
         bool const isKnownSilentPort = (port == 0x0080);
         if (!isKnownSilentPort) {
             std::fprintf(stderr,
                 "TsunamiPchip: I/O read unhandled port 0x%04x\n", port);
         }
+#endif
 
         return 0xFFULL;     // ISA default for unconnected ports
     }

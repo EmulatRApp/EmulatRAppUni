@@ -126,3 +126,76 @@
   Non-Commercial License v1.1; needs the user to declare which is authoritative.
   Contact left obfuscated (`peert (at) envysys.com`). Doc/admin session — no
   code/test landings.
+
+## 01:07 — Console-output gating (EMULATR_BRINGUP_PROBES) + LinkedIn milestone post
+- **Working on:** Active session (`local_30e23842`, "Directory d:/emulatr request").
+  Two threads, both complete: (1) auditing/cleaning bring-up console spam behind a
+  new compile-time switch; (2) drafting the LinkedIn announcement of the `>>>`
+  milestone. Current focus is finalizing the LinkedIn post text.
+- **Done since last checkpoint:** (1) Added CMake option **`EMULATR_BRINGUP_PROBES`
+  (default OFF)** in `CMakeLists.txt`, mirroring the diagnostics-off pattern; gated
+  **~45 probe print sites across 12 files** behind `#if EMULATR_BRINGUP_PROBES` so
+  they compile out (zero hot-path cost; rebuild with `-DEMULATR_BRINGUP_PROBES=ON`
+  to restore). Gated: per-step CPU probes (`PCSAMPLE`, `PCWIN`, `ITBMISS-PROBE`),
+  memory watchpoints, `UARTBP#1–#10`, `HALTPROBE`, Pchip/Cchip/Dchip
+  `UNHANDLED`/`UNKNOWN` throttle spam, interval-timer + `b_irq<0>/<1>` divert logs,
+  Step-D trigger, `CSERVE`/`REI-PROBE`/`HW_REI`/`DIVERT-REI` PAL probes,
+  `HW_PAL_BASE` line, end-of-run `PROFILE`/instruction-stream/RetireProfiler dumps.
+  **Only prints wrapped** — functional divert logic, ledger bookkeeping, `R31`
+  re-zero left intact. Kept ON: init banner/device-registration/FlashRom messaging,
+  snapshot-save messages, genuine errors, `dumpStopReason`/`dumpCpuState` exit
+  report. Verified `#if`-family vs `#endif` balance per file with the **Grep/file
+  tools** (PipelineDriver.h 13/13, MemDrainer.h 13/13, TsunamiPchip.h 10/10,
+  PalEntries.cpp 14/14, Uart16550.h 6/6, Machine.cpp 6/6, Pic8259Pair.h 5/5,
+  main.cpp 4/4, etc. — all balanced). (2) Iterated the LinkedIn post to a final
+  draft the user approved on framing/tone: DS10, EV6/EV67 21264/21264A + 21272
+  Tsunami, cold-boots stock SRM 7.3 to `>>>`, `show config/memory/pal/version`
+  correct; "~7 months / three versioned attempts"; trillions of guest instructions
+  under the test-and-trace harness; PCI I/O bus + IDE/ATAPI "in the build"; next
+  platforms DS20/ES40/ES45; goal = boot OpenVMS + Tru64/OSF. Source/docs URLs:
+  github.com/EmulatRApp/EmulatRAppUni and emulatrapp.github.io/EmulatRAppUni/.
+- **Open / next:** User deciding whether to have the final post saved as a `.md`
+  to copy from vs pasting from chat. Post not yet published to LinkedIn. CMake
+  reconfigure + release rebuild still needed to actually register the new option
+  and confirm a quiet `Emulatr.exe`.
+- **Watch-outs:** **Bash D: mount served stale/truncated copies** during this
+  session (main.cpp showed 718 lines ending `std:` vs real 726 ending `}`) — the
+  `#if/#endif` "imbalance" was a mount artifact, not real; file/Grep tools are the
+  source of truth (reaffirms the file-tool-only rule). **Compile not run here** —
+  `#if/#endif` balance verified but the build is the final arbiter of the gating.
+  Accuracy guardrail on the post: OpenVMS/Tru64 framed as *goal*, PCI/IDE-ATAPI as
+  *"in the build"* not complete (device enumeration is still the active frontier).
+  No code/test landings beyond the source edits; no rebuild/run executed.
+
+## 03:06 — SRM `>>>` supported-command catalogue + revised LinkedIn draft (15mo/3 rewrites)
+- **Working on:** Same active session (`local_30e23842`). LinkedIn post thread
+  continued: pinned down the authoritative list of SRM `>>>` commands EmulatR
+  actually carries through to correct output, then reviewed a user-rewritten,
+  longer post draft. No files written this segment — discussion/advisory only.
+- **Done since last checkpoint:** Pulled the verified command set from the HMDocs
+  "Common Commands" / "SRM Boot/Commands" topics (Grep + Read). Settled
+  **working set:** `show config` / `show device` / `show memory` / `show pal` /
+  `show version` / `show <var>`, `set <var> <value>` (persisted to emulated NVRAM),
+  `examine`(`e`) and `deposit`(`d`) (mem/IPR/GPR read-write — promoted into the
+  working set on the user's explicit confirmation), `help` / `?`. **Caveat set:**
+  `boot` parsed but resolves to **HALT** (no bootable disk / PCI walk yet — next
+  milestone); **LFU / `update srm`** runs against emulated flash. Flagged that the
+  user's "evaluate" wording maps to SRM `examine`, not a literal evaluator.
+  Reviewed the user's new post draft (hook "15 months. 3 complete architectural
+  rewrites. Trillions of instructions executed."; full command bullet list;
+  "fault hidden 21 billion cycles deep"; `boot`→HALT honesty) and gave notes.
+- **Open / next:** Post still unpublished. Open user decisions: (a) reconcile the
+  **timeline number** now public — earlier draft said "~7 months", new draft says
+  **15 months** (load-bearing in the hook; pick one); (b) re-add the **GitHub +
+  docs URLs into the body** (LinkedIn de-ranks comment-only links) —
+  github.com/EmulatRApp/EmulatRAppUni and emulatrapp.github.io/EmulatRAppUni/;
+  (c) images — recommended leading with a `show config` terminal screenshot as the
+  thumbnail, optional carousel (prompt → config → DS10 block diagram). Standing
+  offer: drive EmulatR to `>>>` and capture real `show config`/`device`/`memory`
+  transcripts + screenshots for the post.
+- **Watch-outs:** Accuracy nits raised on the draft — "PCI I/O bus and IDE/ATAPI
+  **already built out**" overstates (IDE/ATAPI still in-progress per the status
+  table; prefer "in the build"). Timeline inconsistency (7 vs 15 months) is the
+  one factual item to lock before publishing. Doc/advisory session — no code,
+  test, or file landings; CMake reconfigure + release rebuild from the prior
+  `EMULATR_BRINGUP_PROBES` work still outstanding.

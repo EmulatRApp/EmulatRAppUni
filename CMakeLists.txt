@@ -232,11 +232,11 @@ add_executable(Emulatr ${EMULATR_SOURCES}
     grainFactoryLib/codegen/genGrains.py grainFactoryLib/codegen/README.md
     coreLib/ProcessorVariant.h
     coreLib/alpha_int_byteops.h coreLib/alpha_int_helpers.h coreLib/axp_attributes_core.h coreLib/bitutils.h coreLib/BoxResult.h coreLib/CBoxState.h coreLib/CpuState.h coreLib/DispatchEntry.h coreLib/ExecCtx.h coreLib/HW_IPR.h coreLib/InstructionGrain.h coreLib/IprBank.h coreLib/OpcDec.cpp coreLib/PipelineSlot.h coreLib/ProcessorVariant.h coreLib/README.md coreLib/VA_types.h
-    chipsetLib/chipset_adapter.h chipsetLib/IDeviceHandlers.h chipsetLib/Cypress_CY82C693ISABridge.h 
+    chipsetLib/chipset_adapter.h chipsetLib/IDeviceHandlers.h chipsetLib/Cypress_CY82C693ISABridge.h chipsetLib/AliM1543C.h
     chipsetLib/Tsunami21272_RegisterMap.h chipsetLib/Tsunami21272_CsrSpec.h chipsetLib/CsrDiag.h chipsetLib/CsrDiag.cpp 
     chipsetLib/TsunamiCchip.h 
     chipsetLib/Pic8259Pair.h
-    chipsetLib/TsunamiChipset.cpp chipsetLib/TsunamiChipset.h chipsetLib/FlashRom.cpp chipsetLib/FlashRom.h chipsetLib/TsunamiDchip.h chipsetLib/TsunamiPchip.h chipsetLib/TsunamiVariant.h deviceLib/Tsunami/IsaBridge.h deviceLib/Tsunami/Uart16550.h deviceLib/scsi/ScsiTypes.h deviceLib/scsi/ScsiSenseData.h deviceLib/scsi/ScsiCommand.h deviceLib/scsi/VirtualScsiDevice.h deviceLib/scsi/VirtualIsoDevice.h deviceLib/Tsunami/Cy82C693Ide.h deviceLib/ConsoleManager.cpp deviceLib/ConsoleManager.h deviceLib/device_core_inl.h deviceLib/deviceLib_global.h deviceLib/global_ConsoleManager.cpp deviceLib/global_ConsoleManager.h deviceLib/global_SRMEnvStore.cpp deviceLib/global_SRMEnvStore.h deviceLib/IBootDevice.h deviceLib/IConsoleDevice.h deviceLib/OPA_Console_Config.h deviceLib/SRMConsole.cpp deviceLib/SRMConsole.h deviceLib/SRMConsoleDevice.cpp deviceLib/SRMConsoleDevice.h deviceLib/SRMEnvStore.cpp deviceLib/SRMEnvStore.h deviceLib/StdoutConsoleBackend.cpp deviceLib/StdoutConsoleBackend.h
+    chipsetLib/TsunamiChipset.cpp chipsetLib/TsunamiChipset.h chipsetLib/FlashRom.cpp chipsetLib/FlashRom.h chipsetLib/TsunamiDchip.h chipsetLib/TsunamiPchip.h chipsetLib/TsunamiVariant.h chipsetLib/Titan21274_CsrSpec.h chipsetLib/TitanPchip.h chipsetLib/TitanChipset.h deviceLib/Tsunami/IsaBridge.h deviceLib/Tsunami/Uart16550.h deviceLib/scsi/ScsiTypes.h deviceLib/scsi/ScsiSenseData.h deviceLib/scsi/ScsiCommand.h deviceLib/scsi/VirtualScsiDevice.h deviceLib/scsi/VirtualIsoDevice.h deviceLib/Tsunami/Cy82C693Ide.h deviceLib/ConsoleManager.cpp deviceLib/ConsoleManager.h deviceLib/device_core_inl.h deviceLib/deviceLib_global.h deviceLib/global_ConsoleManager.cpp deviceLib/global_ConsoleManager.h deviceLib/global_SRMEnvStore.cpp deviceLib/global_SRMEnvStore.h deviceLib/IBootDevice.h deviceLib/IConsoleDevice.h deviceLib/OPA_Console_Config.h deviceLib/SRMConsole.cpp deviceLib/SRMConsole.h deviceLib/SRMConsoleDevice.cpp deviceLib/SRMConsoleDevice.h deviceLib/SRMEnvStore.cpp deviceLib/SRMEnvStore.h deviceLib/StdoutConsoleBackend.cpp deviceLib/StdoutConsoleBackend.h
     coreLib/LoggingMacros.h
     deviceLib/ControllerConfig.h)
 
@@ -397,6 +397,29 @@ if(EMULATR_PA_DUMP)
     target_compile_definitions(Emulatr PRIVATE
         $<$<NOT:$<CONFIG:Release>>:EMULATR_PA_DUMP=1>
     )
+endif()
+
+# ----------------------------------------------------------------------------
+# EMULATR_BRINGUP_PROBES -- compile gate for ad-hoc bring-up scaffolding.
+# ----------------------------------------------------------------------------
+# Over bring-up, many one-off probes were left in the run path emitting raw
+# fprintf(stderr) on EVERY run: per-step CPU samplers (PCSAMPLE/PCWIN/
+# ITBMISS-PROBE), memory watchpoints (*-LOAD/STORE-WATCH, spurious-commit
+# ASSERTs), chipset/UART breakpoint traces (UARTBP#n, HALTPROBE), the Pchip
+# UNHANDLED OUTER READ/WRITE narration, the interrupt/timer divert + injection
+# logs, the CSERVE/REI/DIVERT-REI PAL probes, and the end-of-run PROFILE /
+# RetireProfiler histogram dumps.  None are needed for a normal run and several
+# sit on the 82%-of-runtime hot loop.  DEFAULT OFF per the diagnostics-default-
+# off rule (2026-06-15): a normal build emits only initialization messaging,
+# snapshot-save notices, and genuine error messages.  Build
+# -DEMULATR_BRINGUP_PROBES=ON to bring the scaffolding back for debugging.
+# Compile gate (not a runtime flag) so the hot-path probes cost zero when off.
+option(EMULATR_BRINGUP_PROBES
+       "Compile in ad-hoc bring-up probe/trace prints (noisy; for debugging)"
+       OFF)
+
+if(EMULATR_BRINGUP_PROBES)
+    target_compile_definitions(Emulatr PRIVATE EMULATR_BRINGUP_PROBES=1)
 endif()
 
 # ----------------------------------------------------------------------------
@@ -565,6 +588,8 @@ set(EMULATR_TEST_SOURCES
     tests/deviceLib/test_uart16550_interrupts.cpp
     # 2026-06-04: Cypress 8259 pair + device-IRQ chain, Increment 2
     tests/chipsetLib/test_pic8259.cpp
+    #2026-06-19 - Added SMP Determinism Harness - tests
+    tests/schedLib/smp_harness_tests.cpp
     # ...
 )
 
@@ -705,6 +730,16 @@ set(EMULATR_FIRMWARE_FILES
     "firmware/Es45/es45_v7_3.exe"
     # 2026-06-03: DS10 (webbrick) SRM -- the primary cold-boot target
     "firmware/ds10_v7_3.exe"
+    # 2026-06-16: multi-platform SRM console images for the halt-button
+    # generalization + firmware test matrix.  ES40/DS20 are Tsunami (runnable
+    # now); DS25/ES45 are Titan (boot pending the TitanChipset path -- see
+    # journals/20260616_titan_21274_interface.md).  2026-06-17: es40_v7_3.exe
+    # copied into firmware/ and set as firmwareImage in EmulatrV4.ini; the
+    # es40cv_v7_3.exe "cv" variant is also present (add a row to deploy it).
+    "firmware/es40_v7_3.exe"
+    "firmware/ds20_v7_3.exe"
+    "firmware/ds25_v7_3.exe"
+    "firmware/es45_v7_3.exe"
 )
 
 foreach(_fwfile ${EMULATR_FIRMWARE_FILES})
@@ -792,6 +827,28 @@ add_custom_command(TARGET Emulatr POST_BUILD
     COMMENT "[Emulatr] copy platform manifest: ${_platform_manifest}"
     VERBATIM
 )
+
+# 2026-06-16: additional platform manifests for the firmware test matrix.
+# The runtime selects <lower(model)>_platform.win (Windows) next to the exe,
+# so set model=ES40 / DS20 in EmulatrV4.ini to drive these.  Only the Tsunami
+# platforms (ES40, DS20) are deployed -- DS25/ES45 are Titan and not yet
+# bootable (their _platform.json files exist in-source as staged manifests).
+# Windows-only deploy: these manifests ship as .win (plain JSON content).
+if(WIN32)
+    set(EMULATR_EXTRA_PLATFORM_MANIFESTS
+        "es40_platform.win"
+        "ds20_platform.win"
+    )
+    foreach(_pm ${EMULATR_EXTRA_PLATFORM_MANIFESTS})
+        add_custom_command(TARGET Emulatr POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_SOURCE_DIR}/${_pm}"
+                    "$<TARGET_FILE_DIR:Emulatr>/${_pm}"
+            COMMENT "[Emulatr] copy platform manifest: ${_pm}"
+            VERBATIM
+        )
+    endforeach()
+endif()
 
 # ----------------------------------------------------------------------------
 # windeployqt -- copy Qt runtime DLLs alongside the executable
