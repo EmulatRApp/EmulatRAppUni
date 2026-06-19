@@ -156,6 +156,10 @@ set(EMULATR_SOURCES
     systemLib/Snapshot.cpp
     systemLib/PlatformConfig.h
     systemLib/PlatformConfig.cpp
+    schedLib/SmpHarness.h
+    schedLib/SmpDrivers.h
+    schedLib/AlphaCpuAgent.h
+    schedLib/AlphaCpuAgent.cpp
     mmuLib/UnalignedEventLog.h
     mmuLib/UnalignedEventLog.cpp
     mmuLib/CboxEventLog.h
@@ -560,6 +564,10 @@ set(EMULATR_TEST_SOURCES
     systemLib/SrmLoader.cpp
     systemLib/CpuStateDump.cpp
     systemLib/Machine.cpp
+    # Machine.cpp now drives the SMP harness on the EMULATR_DISPATCH path, so the
+    # AlphaCpuAgent vtable / out-of-line virtuals must be compiled into this
+    # target to resolve at link (same reason StdoutConsoleBackend.cpp is here).
+    schedLib/AlphaCpuAgent.cpp
     deviceLib/StdoutConsoleBackend.cpp
     # 2026-05-29: Machine now owns SRMConsoleDevice for its COM1 sink
     # (Qt-based TCP listen server with PuTTY auto-launch).  Tests don't
@@ -686,7 +694,9 @@ if(MSVC)
         $<$<CONFIG:Debug>:/Ob0>
         $<$<CONFIG:Debug>:/JMC>
         $<$<CONFIG:Debug>:/Oy->
-        $<$<CONFIG:RelWithDebInfo>:/Oy->
+        $<$<CONFIG:Debug>:/EHsc>
+        $<$<CONFIG:Release>:/EHsc>
+        $<$<CONFIG:RelWithDebInfo>:/EHsc>
     )
 endif()
 

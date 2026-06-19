@@ -46,9 +46,17 @@ public:
 
     void run(Dispatcher& d, Tick untilTick) override {
         while (d.clock().now() < untilTick) {
+            bool anyRunnable = false;
             for (IAgent* a : d.agents())
-                if (a->runnable())
+                if (a->runnable()) {
+                    anyRunnable = true;
                     a->step(d.quantum());
+                }
+            // The correct terminating condition for a driver: when no agent can
+            // run (all halted/parked) there is no more work -- stop, do not spin
+            // the clock to untilTick.  This is what lets a dispatcher-driven boot
+            // match legacy run()'s break-on-halt.
+            if (!anyRunnable) break;
             d.syncPhase();
             d.clock().advance(d.quantum());
         }
@@ -82,7 +90,12 @@ public:
         auto onBarrier = [&d, untilTick, &done]() noexcept {
             d.syncPhase();
             d.clock().advance(d.quantum());
-            if (d.clock().now() >= untilTick)
+            // Terminate at the cycle cap OR when no agent can still run (all
+            // halted/parked) -- the correct terminating condition for a driver.
+            bool anyRunnable = false;
+            for (IAgent* a : d.agents())
+                if (a->runnable()) { anyRunnable = true; break; }
+            if (d.clock().now() >= untilTick || !anyRunnable)
                 done.store(true, std::memory_order_relaxed);
         };
 
