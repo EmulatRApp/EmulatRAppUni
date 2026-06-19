@@ -175,6 +175,18 @@ public:
     // afterwards (halted = false), false if it halted on this tick.
     bool step() noexcept;
 
+    // One per-cycle iteration of the run loop: the verbatim body of
+    // Machine::run's for-loop (sentinel poll + step() + snapshot/predig
+    // bookkeeping + IDLEWARP + interval-timer FIRE/DELIVER + the b_irq
+    // diverts + synthetic INTERRUPT injection).  Returns false to BREAK the
+    // loop (stop sentinel or CPU halt), true to continue.  `i` is the loop
+    // ordinal (== legacy run()'s counter), used only for the coarse stop-
+    // sentinel poll cadence.  Shared by the legacy Machine::run loop and the
+    // dispatcher-driven AlphaCpuAgent so both run the IDENTICAL body -- the
+    // Phase-1 byte-identical-boot acceptance gate
+    // (journals/20260619_alphacpuagent_phase1_design.md).
+    bool stepCycle(uint64_t i) noexcept;
+
     // Run until halted or maxCycles reached.  Classifies the stop and
     // returns it; cpu() and memory() are observable post-run for the
     // post-mortem dump.
@@ -443,6 +455,12 @@ private:
 
     // Optional non-owning trace sink, forwarded into PipelineDriver.
     traceLib::TraceSink*     m_traceSink = nullptr;
+
+    // Graceful-stop sentinel path, resolved once in run()'s setup and read by
+    // stepCycle()'s coarse poll.  Was a run()-local; promoted to a member so
+    // the per-cycle body (stepCycle) reads it without re-resolving the path
+    // each cycle.  (2026-06-19, AlphaCpuAgent Phase-1 extraction.)
+    std::filesystem::path    m_stopSentinel;
 
     // ------------------------------------------------------------------
     // Snapshot auto-save state.

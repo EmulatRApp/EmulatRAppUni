@@ -452,21 +452,34 @@ private:
     {
         memoryLib::BusResult br = bus.read(pa, r.memSize);
 
-        // ---- CONFIRM: CPU1-alive rendezvous flag at PA 0xBFFC (2026-06-18) ----
-        // ROOT CAUSE of the DS20 boot stall: the boot CPU busy-polls
-        // *(int32*)0xBFFC for the magic 0xCAFEBEEF -- the secondary-CPU
-        // liveness handshake (FUN_0007ecb0 <- timer_check FUN_0007d9d8).  V4
-        // models only CPU0, so the flag is never written and boot hangs right
-        // after "Flash ROM writes are disabled".  Arm EMULATR_CPU1_ALIVE=1 to
-        // satisfy the poll and confirm DS20 advances into the eerom/memory
-        // POST.  CONFIRMATION HACK -- replace with a faithful secondary-CPU
-        // rendezvous (write 0xCAFEBEEF at the real start point) once proven.
+        // ---- PLATFORM LEVER: ISP vs SILICON execution path (2026-06-19) ----
+        // One knob, one truth: env -> 0xBFFC answer -> firmware platform().
+        // apisrm pc264.c platform() reads *(int32*)0xBFFC: == 0xCAFEBEEF =>
+        // ISP_MODEL (pre-silicon SIMULATOR paths -- the firmware skips the
+        // real-hardware timing/probe/IDE steps V4 does not yet model, so the
+        // SRM reaches >>>); any other value => REAL_HW (the faithful AXPBox-
+        // level path, currently unmodeled -> stalls).  EmulatR claims ISP by
+        // presenting the flag HERE as a READ-INTERCEPT, never a deposit: 0xBFFC
+        // sits at image offset 0x3FFC and is overwritten by the SRM self-
+        // decompressor, so a one-time store would not survive to platform().
+        // EMULATR_PLATFORM: unset or "isp" => ISP (default; reaches >>>);
+        // "silicon" => REAL_HW (no intercept; the REAL_HW-readiness probe path).
+        // Supersedes EMULATR_CPU1_ALIVE.  Do NOT add a second host sim/silicon
+        // flag -- the firmware's own platform() is the single source of truth.
         // The LDL sign-extends 0xCAFEBEEF to match the firmware's constant.
         {
-            static bool const s_cpu1Alive =
-                (std::getenv("EMULATR_CPU1_ALIVE") != nullptr);
-            if (s_cpu1Alive && pa == 0x000000000000BFFCull) {
-                br.data = 0xCAFEBEEFull;
+            static bool const s_isp = [] {
+                char const* const p = std::getenv("EMULATR_PLATFORM");
+                if (p == nullptr) return true;          // default: ISP path
+                // exact "silicon" selects REAL_HW; any other value stays ISP
+                char const* const sel = "silicon";
+                for (int i = 0;; ++i) {
+                    if (p[i] != sel[i]) return true;    // differs   -> ISP
+                    if (sel[i] == '\0') return false;   // full match -> SILICON
+                }
+            }();
+            if (s_isp && pa == 0x000000000000BFFCull) {
+                br.data = 0xCAFEBEEFull;                // platform() => ISP_MODEL
             }
         }
         // ---- TEMP load-watch on 0x3c970 (find the tick-counter poll loop) 2026-06-02 ----

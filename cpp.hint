@@ -3,3 +3,4 @@
 // For more information see https://go.microsoft.com/fwlink/?linkid=865984
 #define AXP_FLATTEN __attribute__((flatten))
 #define AXP_FLATTEN
+#define TEST_CASE(name) DOCTEST_TEST_CASE(name)

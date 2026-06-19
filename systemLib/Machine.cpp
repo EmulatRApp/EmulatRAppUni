@@ -16,6 +16,9 @@
 #include "mmuLib/CboxEventLog.h"
 #include "mmuLib/UnalignedEventLog.h"
 #include "pipelineLib/PipelineDriver.h"
+#include "schedLib/SmpHarness.h"
+#include "schedLib/SmpDrivers.h"
+#include "schedLib/AlphaCpuAgent.h"
 #include "systemLib/FirmwareLoader.h"
 #include "systemLib/Snapshot.h"
 #include "systemLib/SrmLoader.h"
@@ -982,43 +985,115 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
     // absolute path is logged so the touch target is unambiguous regardless
     // of launch cwd (cf. task #3 cwd-pinning).  Pre-cleared at entry so a
     // stale sentinel from a prior run cannot stop this one.
-    std::filesystem::path stopSentinel;
+    // m_stopSentinel is a member (was a run()-local) so the per-cycle body in
+    // stepCycle() can read it.  Resolved once here, per run().
     {
         char const* envp = std::getenv("EMULATR_STOP_FILE");
-        stopSentinel = (envp && *envp) ? std::filesystem::path(envp)
-                                       : std::filesystem::path("EMULATR_STOP");
+        m_stopSentinel = (envp && *envp) ? std::filesystem::path(envp)
+                                         : std::filesystem::path("EMULATR_STOP");
         std::error_code ec;
-        std::filesystem::path const abs = std::filesystem::absolute(stopSentinel, ec);
-        if (!ec) stopSentinel = abs;
+        std::filesystem::path const abs = std::filesystem::absolute(m_stopSentinel, ec);
+        if (!ec) m_stopSentinel = abs;
         std::error_code rmec;
-        std::filesystem::remove(stopSentinel, rmec);
+        std::filesystem::remove(m_stopSentinel, rmec);
         SPDLOG_INFO("Machine::run: graceful-stop sentinel = {} "
                     "(touch it to stop cleanly and flush flash NVRAM)",
-                    stopSentinel.string());
+                    m_stopSentinel.string());
     }
-    static constexpr uint64_t kStopPollMask = 0xFFFFFULL;  // poll ~every 1M steps
+    // Match PipelineDriver::run() semantics: maxCycles caps the number of
+    // step() iterations, not the cycleCount delta.  Each iteration runs the
+    // shared per-cycle body stepCycle(i), which returns false to BREAK (stop
+    // sentinel or CPU halt).  The legacy loop here and the dispatcher-driven
+    // AlphaCpuAgent call the IDENTICAL stepCycle -- the Phase-1 byte-identical
+    // boot acceptance gate.
+    // PHASE-1 DISPATCHER PATH (gated; legacy is the default).  EMULATR_DISPATCH
+    // routes the per-cycle stepCycle() through the SMP harness: one
+    // AlphaCpuAgent under SequentialDriver, which calls the IDENTICAL
+    // stepCycle(i).  A clean boot here is the step-3 byte-identical gate for the
+    // dispatcher path; until it passes, the unset default keeps the legacy
+    // direct loop.  After it passes, this becomes the default and the legacy
+    // loop is deleted in a separate commit.  (See
+    // journals/20260619_alphacpuagent_phase1_design.md.)
+    static bool const s_useDispatcher = (std::getenv("EMULATR_DISPATCH") != nullptr);
+    if (s_useDispatcher) {
+        emulatr::smp::Dispatcher    disp(/*quantum*/ 1);
+        emulatr::smp::AlphaCpuAgent agent(*this, /*cpuId*/ 0);
+        disp.addAgent(&agent);
+        disp.setDriver(std::make_unique<emulatr::smp::SequentialDriver>());
+        disp.run(maxCycles);
+    } else {
+        for (uint64_t i = 0; i < maxCycles; ++i)
+            if (!stepCycle(i)) break;
+    }
 
-    // Match PipelineDriver::run() semantics: maxCycles caps the number
-    // of step() iterations, not the cycleCount delta.  Halt-on-step
-    // short-circuits early.
-    for (uint64_t i = 0; i < maxCycles; ++i) {
+    // Save-on-halt.  Independent of the periodic counter so it always
+    // fires when execution stops (kFaultHalt, kFault*, or any other
+    // halted state).  Distinct filename prefix so prune does not evict
+    // halt captures alongside periodic auto-saves.
+    if (m_autoSnapshotEnabled && m_cpu.halted) {
+        std::ostringstream name;
+        uint64_t const ts =
+            static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
+        name << "auto_halt_" << ts << "_" << m_cpu.cycleCount << kSnapshotExtension;
+
+        std::error_code ec;
+        std::filesystem::create_directories(m_snapshotDir, ec);
+        (void) systemLib::save(*this, m_snapshotDir / name.str(), "halt");
+    }
+
+    // Notify the trace sink that the run has ended, so it can dump
+    // its lookback ring and write a RUN END marker.  Unconditional --
+    // works for clean halts, faults, and max-cycles stops.
+    if (m_traceSink) {
+        m_traceSink->onRunEnd(m_cpu);
+    }
+
+    // Boot profiler (2026-06-05): end-of-run histogram dump.  Cheap
+    // (one ASCII file), and the data is exactly the "where did the
+    // silent boot cycles go" answer.  Threshold guards against doctest
+    // litter: every Machine-running test case would otherwise drop a
+    // 35-retire profile into the traces dir (observed 2026-06-05).
+    // Real runs retire billions; 100K is comfortably below any run
+    // worth profiling and above any test.
+#if EMULATR_BRINGUP_PROBES
+    if (traceLib::RetireProfiler::totalRetires() >= 100000) {
+        traceLib::RetireProfiler::dump("run_end");
+    }
+#endif
+
+    return classifyStop(m_cpu);
+}
+
+
+// ============================================================================
+// stepCycle -- one per-cycle iteration of Machine::run's loop, relocated
+// verbatim 2026-06-19 (AlphaCpuAgent Phase 1).  Returns false to BREAK the
+// loop (stop sentinel or CPU halt), true to continue.  Shared by the legacy
+// run() loop above and the dispatcher-driven AlphaCpuAgent so both execute
+// the IDENTICAL body -- the Phase-1 byte-identical-boot acceptance gate.  `i`
+// is the loop ordinal, used only for the coarse stop-sentinel poll cadence.
+// ============================================================================
+bool Machine::stepCycle(uint64_t i) noexcept
+{
+    static constexpr uint64_t kStopPollMask = 0xFFFFFULL;  // poll ~every 1M steps
         // Graceful-stop poll (task #9): cheap existence check on a coarse
         // cadence; a clean break lets ~Machine's forceFlush persist NVRAM.
         if ((i & kStopPollMask) == 0) {
             std::error_code sec;
-            if (std::filesystem::exists(stopSentinel, sec)) {
+            if (std::filesystem::exists(m_stopSentinel, sec)) {
                 SPDLOG_INFO("Machine::run: stop sentinel seen -- clean exit at cycle {}",
                             static_cast<unsigned long long>(m_cpu.cycleCount));
                 std::error_code rmec;
-                std::filesystem::remove(stopSentinel, rmec);  // consume it
-                break;
+                std::filesystem::remove(m_stopSentinel, rmec);  // consume it
+                return false;   // BREAK the run loop (was `break;` pre-extraction)
             }
         }
         // step() invokes PipelineDriver::step() which retires zero or
         // more instructions and updates m_cpu.cycleCount.  Returns
         // false when the CPU halted on this tick.
         if (!step()) {
-            break;
+            return false;   // CPU halted -> BREAK the run loop (was `break;`)
         }
 
         // ---- Option-A console-triggered snapshot --------------------------------
@@ -1207,6 +1282,8 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
         // 0x3c970 -- no out-of-band rewrite, so counter-polling loops stay coherent.
         // PC window covers the krn$_idle loop (PCSAMPLE showed ra=0x7bad8 / 0x7bafc /
         // 0x7bb04); narrow it against the >>> RetireProfiler idle bucket once known.
+        // process-global static (one instance per process); revisit under the
+        // threaded driver, where agent threads would share this getenv result.
         static bool const s_idleTickWarp = (std::getenv("EMULATR_IDLEWARP") != nullptr);
         if (s_idleTickWarp) {
             uint64_t const idlePc = m_cpu.pcAddr();
@@ -1215,6 +1292,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
                 && !chipsetLib::intervalTimerShouldFire(m_cpu.cycleCount)) {
                 uint64_t const c0 = m_cpu.cycleCount;
                 m_cpu.cycleCount  = (c0 | Tsunami21272::Spec::kCchipTimerMask) + 1;
+                // process-global static; revisit under the threaded driver.
                 static uint64_t s_warpLog = 0;
                 if ((s_warpLog++ & 0x3FFull) == 0) {     // throttle 1/1024
                     std::fprintf(stderr,
@@ -1248,6 +1326,8 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             // otherwise drown other diagnostics.  First 32 fires loud, then a
             // summary every 64K.  Matches the CBOX/UNALIGN throttle policy.
 #if EMULATR_BRINGUP_PROBES
+            // process-global static; revisit under the threaded driver
+            // (shared across agent threads -> contention/correctness).
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -1361,6 +1441,8 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             // loud, then a summary every 64K -- matches the timer-divert
             // throttle policy directly above.
 #if EMULATR_BRINGUP_PROBES
+            // process-global static; revisit under the threaded driver
+            // (shared across agent threads -> contention/correctness).
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -1434,6 +1516,8 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             && canAcceptInterrupt(23))
         {
 #if EMULATR_BRINGUP_PROBES
+            // process-global static; revisit under the threaded driver
+            // (shared across agent threads -> contention/correctness).
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
          //   int const vec = m_chipset.acknowledgeDeviceInterrupt();
@@ -1538,45 +1622,8 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             // happened.  A caller that needs a second injection re-arms.
             m_injectInterruptFired = true;
         }
-    }
 
-    // Save-on-halt.  Independent of the periodic counter so it always
-    // fires when execution stops (kFaultHalt, kFault*, or any other
-    // halted state).  Distinct filename prefix so prune does not evict
-    // halt captures alongside periodic auto-saves.
-    if (m_autoSnapshotEnabled && m_cpu.halted) {
-        std::ostringstream name;
-        uint64_t const ts =
-            static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count());
-        name << "auto_halt_" << ts << "_" << m_cpu.cycleCount << kSnapshotExtension;
-
-        std::error_code ec;
-        std::filesystem::create_directories(m_snapshotDir, ec);
-        (void) systemLib::save(*this, m_snapshotDir / name.str(), "halt");
-    }
-
-    // Notify the trace sink that the run has ended, so it can dump
-    // its lookback ring and write a RUN END marker.  Unconditional --
-    // works for clean halts, faults, and max-cycles stops.
-    if (m_traceSink) {
-        m_traceSink->onRunEnd(m_cpu);
-    }
-
-    // Boot profiler (2026-06-05): end-of-run histogram dump.  Cheap
-    // (one ASCII file), and the data is exactly the "where did the
-    // silent boot cycles go" answer.  Threshold guards against doctest
-    // litter: every Machine-running test case would otherwise drop a
-    // 35-retire profile into the traces dir (observed 2026-06-05).
-    // Real runs retire billions; 100K is comfortably below any run
-    // worth profiling and above any test.
-#if EMULATR_BRINGUP_PROBES
-    if (traceLib::RetireProfiler::totalRetires() >= 100000) {
-        traceLib::RetireProfiler::dump("run_end");
-    }
-#endif
-
-    return classifyStop(m_cpu);
+    return true;
 }
 
 
