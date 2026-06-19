@@ -363,6 +363,7 @@ public:
         // REMOVAL TRIGGER: delete when the readRegister-default-0xFF
         // source is identified and fixed.
         // ================================================================
+#if EMULATR_BRINGUP_PROBES
         if (static_cast<uint16_t>(port - m_basePort) > 7) {
             static std::atomic<uint64_t> s_cnt{0};
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
@@ -377,6 +378,7 @@ public:
                 std::fflush(stderr);
             }
         }
+#endif
 
         const uint8_t reg = static_cast<uint8_t>(port - m_basePort);
         return readRegister(reg);
@@ -392,6 +394,7 @@ public:
     {
         // UARTBP#10 -- write-side twin of UARTBP#9 above; same removal
         // trigger.  Logs the intact port + value before reg truncation.
+#if EMULATR_BRINGUP_PROBES
         if (static_cast<uint16_t>(port - m_basePort) > 7) {
             static std::atomic<uint64_t> s_cnt{0};
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
@@ -407,6 +410,7 @@ public:
                 std::fflush(stderr);
             }
         }
+#endif
 
         const uint8_t reg = static_cast<uint8_t>(port - m_basePort);
         writeRegister(reg, static_cast<uint8_t>(value & 0xFF));
@@ -459,6 +463,7 @@ public:
             // UARTBP#9 companion -- default-case hit with the (wrapped)
             // reg value.  The intact port is in the ioRead log above.
             // Same removal trigger.
+#if EMULATR_BRINGUP_PROBES
             {
                 static std::atomic<uint64_t> s_cnt{0};
                 uint64_t const n =
@@ -473,6 +478,7 @@ public:
                     std::fflush(stderr);
                 }
             }
+#endif
             return 0xFF;
         }
     }
@@ -532,6 +538,7 @@ public:
         default:
             // UARTBP#10 companion -- default-case hit on the write side
             // with the (wrapped) reg + value.  Same removal trigger.
+#if EMULATR_BRINGUP_PROBES
             {
                 static std::atomic<uint64_t> s_cnt{0};
                 uint64_t const n =
@@ -548,6 +555,7 @@ public:
                     std::fflush(stderr);
                 }
             }
+#endif
             break;
         }
     }
@@ -784,6 +792,7 @@ private:
      */
     void writeMCR(uint8_t value) noexcept
     {
+#if EMULATR_BRINGUP_PROBES
         static std::atomic<bool> s_loggedFirstWrite{false};
         if (!s_loggedFirstWrite.exchange(true, std::memory_order_acq_rel)) {
             std::fprintf(stderr,
@@ -794,6 +803,7 @@ private:
                          (value & kMCR_OUT2) ? 1 : 0);
             std::fflush(stderr);
         }
+#endif
         m_mcr = value & 0x1F;       // only low 5 bits valid
     }
 

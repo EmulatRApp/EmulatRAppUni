@@ -1,0 +1,38 @@
+{
+  "manifest_version": 1,
+  "platform": "ES40",
+  "comment": "EmulatR ES40 platform device manifest (Tsunami 21272, EV6, up to 4 CPU; boot uniprocessor with cpuCount=1). Created 2026-06-16 for the halt-button generalization test (es40cv_v7_3.exe). KNOWN DIVERGENCES the test will expose: (1) the REAL ES40 south bridge is the ALi M1543C, NOT the Cypress CY82C693 modeled here -- the Cypress is a STAND-IN so the ISA/UART console path works; the ES40 SRM probes the ALi at its own BDF/config and may diverge during south-bridge init. (2) ES40 is dual-Pchip (hose 1 populated); EmulatR models Pchip1 as a coarse all-ones mirror. (3) ES40 boots on-board Symbios/QLogic SCSI, not IDE; the IDE/ATAPI here is a DS10-style stand-in. (4) PCI slot/BDF topology is _PROVISIONAL (DS10-derived) -- exact ES40 BDF needs an ES40 PCICFG trace. The halt-button check itself is chipset-level (TIG smir, TIG+0x40), independent of the above, which is why this manifest is sufficient to reach the halt stage. Strict JSON: no // or /* */ comments -- use comment fields.",
+  "iic_devices": [
+    { "name": "iic_system0", "address": "0x70", "class": "status", "byte": "0x00" },
+    { "name": "iic_system1", "address": "0x72", "class": "status", "byte": "0x00" },
+    { "name": "iic_smb0", "address": "0xA2", "class": "fru_eeprom",
+      "manufacturer": "DEC", "model": "ES40", "part_class": "54-", "serial": "" },
+    { "name": "iic_cpu0", "address": "0xA4", "class": "fru_eeprom",
+      "manufacturer": "DEC", "model": "EV6", "part_class": "54-", "serial": "" },
+    { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 }
+  ],
+  "pci_devices": [
+    { "name": "isa_bridge", "model": "cypress_isa", "hose": 0, "bus": 0, "slot": 5, "func": 0,
+      "vendor": "0x1080", "device": "0xc693", "class_code": "0x060100",
+      "comment": "STAND-IN: real ES40 south bridge is ALi M1543C (vendor 0x10b9, device 0x1533 bridge / 0x1533+0x1543 funcs). EmulatR has no ALi model yet; the Cypress stand-in carries the ISA/UART/PIC console path at standard ports.",
+      "option_rom": false, "interrupt_pin": 0 },
+    { "name": "ide", "model": "cypress_ide", "hose": 0, "bus": 0, "slot": 5, "func": 1,
+      "vendor": "0x1080", "device": "0xc693", "class_code": "0x010100",
+      "comment": "STAND-IN IDE/ATAPI (DS10-style). ES40 boots on-board SCSI; this carries dqa0/dqa1 for parity with the DS10 harness.",
+      "option_rom": false, "interrupt_pin": 0,
+      "storage": [
+        { "channel": 0, "unit": 0, "lun": 0, "type": "ata_disk",
+          "model": "EMULATR VIRTUAL DISK", "media": "",
+          "comment": "primary master = dqa0. media = bare image FILENAME resolved against [Storage] diskDir; empty = no disk." },
+        { "channel": 0, "unit": 1, "lun": 0, "type": "atapi_cdrom",
+          "model": "EMULATR VIRTUAL CDROM", "media": "",
+          "comment": "primary slave = dqa1, ATAPI CD. media empty = no disc loaded." }
+      ] },
+    { "name": "de500_tulip", "model": "generic", "hose": 0, "bus": 0, "slot": 7, "func": 0,
+      "vendor": "0x1011", "device": "0x0019", "class_code": "0x020000",
+      "comment": "On-board DE500-AA (DECchip 21143 tulip). Slot _PROVISIONAL (DS10-derived).",
+      "bars": [ { "index": 0, "kind": "io", "size": "0x80" },
+                { "index": 1, "kind": "mem", "size": "0x80" } ],
+      "option_rom": false, "interrupt_pin": 1 }
+  ]
+}

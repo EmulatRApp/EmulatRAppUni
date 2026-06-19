@@ -358,6 +358,7 @@ public:
             m_dim[i].store(0, std::memory_order_relaxed);
             m_iic[i].store(0, std::memory_order_relaxed);
             m_pendingIrq2[i].store(false, std::memory_order_relaxed);
+            m_pendingIrq3[i].store(false, std::memory_order_relaxed);
             m_mpr[i] = 0;
         }
         m_prben = 0xFFFFFFFFFFFFFFFFULL;
@@ -496,14 +497,47 @@ public:
         m_pendingIrq2[cpuId].store(false, std::memory_order_relaxed);
     }
 
+    /**
+     * @brief Query the per-CPU b_irq<3> latch (interprocessor-interrupt pending).
+     * @param cpuId  CPU index in [0, kMaxCPUs).
+     * Direct analog of pendingIrq2(); polled per retire by Machine::run.
+     */
+    inline bool pendingIrq3(int cpuId) const noexcept
+    {
+        return m_pendingIrq3[cpuId].load(std::memory_order_relaxed);
+    }
+
+    /**
+     * @brief Clear the per-CPU b_irq<3> latch.
+     * @param cpuId  CPU index in [0, kMaxCPUs).
+     *
+     * Call sites mirror clearPendingIrq2(): Machine::run at IPI divert-fire,
+     * and miscWriteW1C() when firmware W1C's MISC<IPINTR<8+cpuId>>.
+     */
+    inline void clearPendingIrq3(int cpuId) noexcept
+    {
+        m_pendingIrq3[cpuId].store(false, std::memory_order_relaxed);
+    }
+
 
     // ========================================================================
     // b_irq<0> -- Error class (Phase B-NXMA, 2026-05-28)
     // ========================================================================
     //
-    // Per HRM 6.3.1 / Chapter 6 b_irq<3:0> -> internal IPL mapping table:
+    // b_irq<3:0> -> internal IPL mapping.  NOTE: this is a 21264 + PALcode
+    // convention, NOT a 21272 Cchip fact -- the chipset HRM has no IPL
+    // content (the earlier "HRM 6.3.1" citation here was wrong; 6.3.1 is the
+    // device/error b_irq<1:0> delivery section).  Source is the 21264 HRM
+    // interrupt section + the firmware PAL.  2026-06-18 the IPI delivery is
+    // now CONFIRMED from the PC264 OSF PAL source (apisrm ref
+    // ev6_osf_pc264_pal.mar IPL table): IRQ<3>=interprocessor maps to EI[3] /
+    // IER bit 36 (IRQ_IP=8, EV6__IER__EIEN__S=33 -> bit 36) and sits at the
+    // SAME IPL as the clock (IPL 5).  Machine::run delivers it via
+    // canAcceptInterrupt(21), which selects IER bit 36 (the descriptive "IPL"
+    // numbers below are a separate V4 priority label, NOT the canAcceptInterrupt
+    // irqLevel scale -- in that scale err=24, dev=23, clk=22, IP=21):
     //
-    //   b_irq<3>  IPI                IPL 20
+    //   b_irq<3>  IPI                IPL 20  (descriptive only; gate = 21)
     //   b_irq<1>  Device / PCI / ISA IPL 21
     //   b_irq<2>  Interval timer     IPL 22
     //   b_irq<0>  System error class IPL 23   <-- this method
@@ -879,6 +913,7 @@ public:
             // event through the CSR_LOG_R sink so the chipset diagnostic
             // stream sees UNKNOWN accesses uniformly.
             CSR_LOG_R("Cchip", "UNKNOWN", 0, offset, cpuId, kPhaseBNoCycle);
+#if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -895,6 +930,7 @@ public:
                              static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
+#endif
             return 0;
         }
         }
@@ -1088,6 +1124,7 @@ public:
             // is interpretable without cross-referencing other logs.  Phase
             // B also routes the event through the CSR_LOG_W sink.
             CSR_LOG_W("Cchip", "UNKNOWN", value, offset, cpuId, kPhaseBNoCycle);
+#if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -1105,6 +1142,7 @@ public:
                              static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
+#endif
             break;
         }
         }
@@ -1281,6 +1319,23 @@ private:
                 stagedW1CW1S &= ~(abtMask | abwMask);
             }
 
+            // ----------------------------------------------------------
+            // 2026-06-18: HRM 10.2.2.3 -- IPREQ -> IPINTR set.
+            // ----------------------------------------------------------
+            // Writing 1 to MISC<IPREQ<12+n>> (WO) "sets the corresponding
+            // bit in the IPINTR" -- UNCONDITIONALLY (HRM verbatim).  IPREQ
+            // (15:12) maps to IPINTR (11:8): the SAME >>4 shift distance as
+            // the ABT->ABW promote above, but deliberately WITHOUT its
+            // `oldAbt == 0` arbitration gate -- an IPI set must always
+            // re-assert, even while a prior IPINTR bit is still pending.
+            // IPREQ is WO (in WO_MASK) so it does not persist; only this
+            // IPINTR side effect does.  The b_irq<3> latch assert is hooked
+            // after the CAS, below (mirrors the ITINTR/m_pendingIrq2 split).
+            uint64_t const ipreqSet = writeVal & mask(MISC::IPREQ);
+            if (ipreqSet != 0) {
+                stagedW1CW1S |= (ipreqSet >> 4) & mask(MISC::IPINTR);
+            }
+
             uint64_t const newVal =
                 (stagedW1CW1S & ~MISC::WO_MASK) | (old & MISC::WO_MASK);
             if (m_misc.compare_exchange_weak(old, newVal,
@@ -1343,14 +1398,42 @@ private:
         //
         // 2026-05-30: MISC::ACL clear + ABT/ABW arbitration auto-promotion
         // are now WIRED inside the CAS loop above (HRM 12.2 Cchip Firmware
-        // Initialization Sequence).  Side-effect dispatch for the remaining
-        // arbitration / IPI / device-suppression bits stays TODO.
+        // Initialization Sequence).  2026-06-18: the IPI side effects are now
+        // WIRED below.  Side-effect dispatch for the remaining
+        // device-suppression bit stays TODO.
         //
-        // TODO(unwired): if (writeVal & Spec::mask(MISC::IPINTR)) bits
-        //                cleared per cpuId, deassert b_irq<3>(cpuId).
-        // TODO(unwired): if (writeVal & Spec::mask(MISC::IPREQ)) bits
-        //                set, set matching IPINTR bits + assert
-        //                b_irq<3>(target cpus).
+        // -----------------------------------------------------------------
+        // 2026-06-18: IPI delivery side effects (mirror the ITINTR/b_irq<2>
+        // split above).  The IPREQ->IPINTR storage set already happened in
+        // the CAS loop; here we drive the per-CPU b_irq<3> latch.
+        // -----------------------------------------------------------------
+        // IPREQ write -> assert b_irq<3> for each targeted CPU.  SET loop is
+        // bounded by m_cpuCount (exactly like fireIntervalTimer) so a stray
+        // write to a non-configured target bit cannot leave an unpolled
+        // latch stuck -- Machine::run polls only configured CPUs.
+        uint64_t const ipreqFire = writeVal & mask(MISC::IPREQ);
+        if (ipreqFire != 0) {
+            for (int n = 0; n < m_cpuCount && n < kMaxCPUs; ++n) {
+                uint64_t const reqBit = uint64_t{1} << (MISC::IPREQ.lsb + n);
+                if ((ipreqFire & reqBit) != 0) {
+                    m_pendingIrq3[n].store(true, std::memory_order_release);
+                }
+            }
+        }
+        // IPINTR W1C -> deassert b_irq<3>.  The CAS already cleared the
+        // stored IPINTR bit (it is in W1C_MASK); this drops the matching
+        // latch.  kMaxCPUs bound is fine here -- clearing a non-configured
+        // CPU's latch is harmless (mirrors the ITINTR clear loop above).
+        uint64_t const ipintrClears = writeVal & mask(MISC::IPINTR);
+        if (ipintrClears != 0) {
+            for (int n = 0; n < kMaxCPUs; ++n) {
+                uint64_t const cpuBit = uint64_t{1} << (MISC::IPINTR.lsb + n);
+                if ((ipintrClears & cpuBit) != 0) {
+                    clearPendingIrq3(n);
+                }
+            }
+        }
+
         // TODO(unwired): if (writeVal & Spec::mask(MISC::DEVSUP)) bits
         //                set, suppress device IRQ (irq<1>) until next
         //                TIG poll completion for matching cpus.
@@ -1512,6 +1595,18 @@ private:
     // pending edge.  Reset clears all entries to false.
     // ========================================================================
     std::array<std::atomic<bool>, kMaxCPUs> m_pendingIrq2{};
+
+    // ========================================================================
+    // Per-CPU b_irq<3> latch (interprocessor-interrupt pending edge).
+    // ========================================================================
+    // Direct analog of m_pendingIrq2 for the IPI path: set when firmware
+    // writes MISC<IPREQ<12+n>> (which also sets MISC<IPINTR<8+n>>), cleared
+    // by clearPendingIrq3(n) at divert time in Machine::run or by
+    // miscWriteW1C() when firmware W1C's MISC<IPINTR<8+n>>.  NOT serialized
+    // (transient edge state); reset clears all entries to false.  Mirrors the
+    // already-wired ITINTR/b_irq<2> timer path.  Wired 2026-06-18.
+    // ========================================================================
+    std::array<std::atomic<bool>, kMaxCPUs> m_pendingIrq3{};
 
     // ========================================================================
     // Per-CPU registers (atomic)

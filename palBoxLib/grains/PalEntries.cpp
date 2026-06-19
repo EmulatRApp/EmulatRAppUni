@@ -363,7 +363,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     // "fix" it to LDQP (cross-namespace contamination; see the
     // provisional-values house rule).
     // ------------------------------------------------------------------
-    auto cserveFuncName = [](uint64_t f) noexcept -> char const* {
+    [[maybe_unused]] auto cserveFuncName = [](uint64_t f) noexcept -> char const* {
         switch (f) {
             case 0x08: return "SET_HWE";
             case 0x09: return "CLEAR_HWE";
@@ -393,6 +393,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         }
     };
 
+#if EMULATR_BRINGUP_PROBES
     std::fprintf(stderr,
         "CSERVE entry: func=%llu (0x%llx) %s  pc=0x%llx grainPc=0x%llx "
         "excAddr=0x%llx palBase=0x%llx palMode=%d mode=%u cyc=%llu\n",
@@ -414,6 +415,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             i + 2, static_cast<unsigned long long>(c.cpu->intReg[i + 2]),
             i + 3, static_cast<unsigned long long>(c.cpu->intReg[i + 3]));
     }
+#endif
 
     switch (funcCode) {
 
@@ -576,6 +578,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             // 0x45 JUMP_TO_ARC, 0x65 MP_WORK_REQUEST.  (0x08/0x09, 0x3F, and
             // 0x40-0x44 now have explicit cases and no longer reach default.)
 
+#if EMULATR_BRINGUP_PROBES
             std::fprintf(stderr,
                 "CSERVE Defaulted - UnImplemented: func=%llu (0x%llx) %s  pc=0x%llx grainPc=0x%llx "
                 "excAddr=0x%llx palBase=0x%llx palMode=%d mode=%u cyc=%llu\n",
@@ -589,6 +592,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                 static_cast<int>(c.cpu->inPalMode()),
                 static_cast<unsigned>(c.cpu->mode),
                 static_cast<unsigned long long>(c.cpu->cycleCount));
+#endif
             return r;                // R0 untouched, no fault
         }
     }
@@ -1611,7 +1615,7 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         // snapshots so we can correlate against the source register
         // identified in the encoded instruction.  Rare event; cost
         // negligible.  Remove once the post-fix runs prove stable.
-#ifndef AXP_EXEC_TRACE
+#if !defined(AXP_EXEC_TRACE) && EMULATR_BRINGUP_PROBES
         std::fprintf(stderr,
             "DEBUG: HW_MTPR HW_PAL_BASE pc=0x%016llx  "
             "old=0x%016llx -> new=0x%016llx  cycle=%llu\n"
@@ -1990,6 +1994,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
     // cap.  rawTarget is the PC this HW_REI resumes at: 0x1c699c => HW_REI fine
     // (the ITB-miss excAddr latch was the bug, H1); 0 => HW_REI mis-targeted
     // (H2), and STACKED/REGISTER + Rb show which source was zero.
+#if EMULATR_BRINGUP_PROBES
     if (c.cpu->cycleCount >= 189564000ull && c.cpu->cycleCount <= 189565200ull
         && c.cpu->inPalMode() && !resumeInPal) {
         static int s_reiProbe = 0;
@@ -2011,6 +2016,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
             std::fflush(stderr);
         }
     }
+#endif
 
     // PAL-mode bit comes off the resume target's low bit; this
     // matches V1's behaviour and is the documented PALmode-truth on
@@ -2023,6 +2029,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
     // (bit-0 / offset mishandling under PALmode==PC<0>), putting the console at
     // a non-kseg VA -> the 0x60222c self-check halt.  Log every actual mode
     // change with its target so a malformed drop target is visible.  Capped.
+#if EMULATR_BRINGUP_PROBES
     {
         bool const wasPal = c.cpu->inPalMode();
         if (wasPal != resumeInPal) {
@@ -2044,6 +2051,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
             }
         }
     }
+#endif
     coreLib::setPalMode(*c.cpu, resumeInPal);
 
     // TEMP DIAGNOSTIC (DIVERT-REI register ledger compare) -- REMOVE AFTER
@@ -2067,6 +2075,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
                 uint64_t const now = c.cpu->intReg[rn];
                 if (was != now) {
                     ++bad;
+#if EMULATR_BRINGUP_PROBES
                     std::fprintf(stderr,
                         "DIVERT-REI MISMATCH R%02d was=0x%016llx now=0x%016llx "
                         "savedPc=0x%llx divertCyc=%llu reiCyc=%llu\n",
@@ -2077,6 +2086,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
                         static_cast<unsigned long long>(
                             palDiag::g_divertPendingCyc[s]),
                         static_cast<unsigned long long>(c.cpu->cycleCount));
+#endif
                 }
             }
             if (bad == 0) {
@@ -2085,6 +2095,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
                 static int s_clean = 0;
                 if (s_clean < 8) {
                     ++s_clean;
+#if EMULATR_BRINGUP_PROBES
                     std::fprintf(stderr,
                         "DIVERT-REI CLEAN savedPc=0x%llx divertCyc=%llu "
                         "reiCyc=%llu\n",
@@ -2092,6 +2103,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
                         static_cast<unsigned long long>(
                             palDiag::g_divertPendingCyc[s]),
                         static_cast<unsigned long long>(c.cpu->cycleCount));
+#endif
                 }
             }
             std::fflush(stderr);

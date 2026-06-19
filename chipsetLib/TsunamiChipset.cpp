@@ -78,6 +78,7 @@ BusResult TsunamiChipset::read(uint64_t pa, uint8_t width) noexcept {
     //
     // REMOVAL TRIGGER: delete when LSR-wedge diagnostic is closed.
     // ====================================================================
+#if EMULATR_BRINGUP_PROBES
     {
         static std::atomic<bool> s_fired{false};
         if (isUartBpPa(pa) &&
@@ -92,6 +93,7 @@ BusResult TsunamiChipset::read(uint64_t pa, uint8_t width) noexcept {
             // __debugbreak();  // 2026-05-28: muted post-verification; probe still emits stderr marker.
         }
     }
+#endif
 
     // PAL scratchpad carve-out -- decoded first so it never reaches a window.
     if (isPalScratchAddr(pa)) {
@@ -140,6 +142,7 @@ BusResult TsunamiChipset::read(uint64_t pa, uint8_t width) noexcept {
         // (0x801_3000_0000 .. +0x1000) announces PA + value, so the firmware's
         // halt-state read is caught even un-armed.  Silence during `b dqa1`
         // => the halt read is the impure DRAM flag, not MMIO.  Throttled.
+#if EMULATR_BRINGUP_PROBES
         if (pa >= 0x80130000000ULL && pa < 0x80130001000ULL && v != 0) {
             static std::atomic<int> s_haltProbeN{ 0 };
             if (s_haltProbeN.fetch_add(1, std::memory_order_relaxed) < 64) {
@@ -151,6 +154,7 @@ BusResult TsunamiChipset::read(uint64_t pa, uint8_t width) noexcept {
                 std::fflush(stderr);
             }
         }
+#endif
         return { BusStatus::Ok, v };
     }
     // ----------------------------------------------------------------
@@ -178,6 +182,7 @@ BusResult TsunamiChipset::read(uint64_t pa, uint8_t width) noexcept {
     //
     // REMOVAL TRIGGER: delete when LSR-wedge diagnostic is closed.
     // ====================================================================
+#if EMULATR_BRINGUP_PROBES
     {
         static std::atomic<bool> s_fired{false};
         if (isUartBpPa(pa) &&
@@ -191,6 +196,7 @@ BusResult TsunamiChipset::read(uint64_t pa, uint8_t width) noexcept {
             // __debugbreak();  // 2026-05-28: muted post-verification; probe still emits stderr marker.
         }
     }
+#endif
 
     reportNxm(pa, /*sourceCode*/ 0);
     return { .status = BusStatus::Ok, .data = ~uint64_t{0} };

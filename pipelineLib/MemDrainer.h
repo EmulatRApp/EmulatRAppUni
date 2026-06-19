@@ -246,6 +246,7 @@ struct MemDrainer
         // returning regWriteIdx=31 with a non-zero value AND an
         // off-by-one MEM-drainer that committed it.
         if (cpu.intReg[31] != 0) {
+#if EMULATR_BRINGUP_PROBES
             std::fprintf(stderr,
                 "ASSERT: R31 != 0 -- pc=0x%016llx encoded=0x%08x "
                 "intReg[31]=0x%016llx cycle=%llu\n",
@@ -253,6 +254,7 @@ struct MemDrainer
                 static_cast<unsigned>(slot.grain.encoded),
                 static_cast<unsigned long long>(cpu.intReg[31]),
                 static_cast<unsigned long long>(cpu.cycleCount));
+#endif
             cpu.intReg[31] = 0;   // re-zero so subsequent reads stay clean
         }
     }
@@ -448,12 +450,31 @@ private:
                                 coreLib::PAType         pa,
                                 bool                    isLocked) noexcept
     {
-        memoryLib::BusResult const br = bus.read(pa, r.memSize);
+        memoryLib::BusResult br = bus.read(pa, r.memSize);
+
+        // ---- CONFIRM: CPU1-alive rendezvous flag at PA 0xBFFC (2026-06-18) ----
+        // ROOT CAUSE of the DS20 boot stall: the boot CPU busy-polls
+        // *(int32*)0xBFFC for the magic 0xCAFEBEEF -- the secondary-CPU
+        // liveness handshake (FUN_0007ecb0 <- timer_check FUN_0007d9d8).  V4
+        // models only CPU0, so the flag is never written and boot hangs right
+        // after "Flash ROM writes are disabled".  Arm EMULATR_CPU1_ALIVE=1 to
+        // satisfy the poll and confirm DS20 advances into the eerom/memory
+        // POST.  CONFIRMATION HACK -- replace with a faithful secondary-CPU
+        // rendezvous (write 0xCAFEBEEF at the real start point) once proven.
+        // The LDL sign-extends 0xCAFEBEEF to match the firmware's constant.
+        {
+            static bool const s_cpu1Alive =
+                (std::getenv("EMULATR_CPU1_ALIVE") != nullptr);
+            if (s_cpu1Alive && pa == 0x000000000000BFFCull) {
+                br.data = 0xCAFEBEEFull;
+            }
+        }
         // ---- TEMP load-watch on 0x3c970 (find the tick-counter poll loop) 2026-06-02 ----
         // The tick-delay grinds without warping; log the PC that READS 0x3c970 (the poll
         // loop) plus the loaded value and R6 (the would-be target). Prints when the PC or
         // R6 changes, capped, so we see: single big-target wait vs many small waits vs a
         // different poll PC than 0x7c314. REMOVE after we locate the loop.
+#if EMULATR_BRINGUP_PROBES
         if (pa == 0x000000000003c970ull) {
             static uint64_t s_lwLastPc = ~0ull;
             static uint64_t s_lwLastR6 = ~0ull;
@@ -473,6 +494,7 @@ private:
                 std::fflush(stderr);
             }
         }
+#endif
         // ---- END TEMP load-watch ----
 
         // ---- TEMP fclose-chain watch 2026-06-03 -- REMOVE once the toy
@@ -488,6 +510,7 @@ private:
         //   PC 0x5a2d4  LDQ R26,0x8(R27)   PV+8        (code entry)
         // Native-mode PCs (no PAL bit).  Unthrottled by design: we need
         // the LAST fclose before a halt; volume is a few lines per fclose.
+#if EMULATR_BRINGUP_PROBES
         {
             uint64_t const wpc = cpu.pc;
             if (wpc == 0x5a278ull || wpc == 0x5a2c4ull ||
@@ -504,6 +527,7 @@ private:
                 std::fflush(stderr);
             }
         }
+#endif
         // ---- END TEMP fclose-chain watch ----
         if (br.status != memoryLib::BusStatus::Ok) {
             r.faultCode = coreLib::kFaultBusError;

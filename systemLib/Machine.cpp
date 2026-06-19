@@ -314,7 +314,13 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
     // makeCom1Cfg() above; m_com1Backend's ctor then snapshots that
     // populated value into its own m_config member.
     , m_com1Backend(m_consoleCfg)
-    , m_chipset(ChipsetVariant::Tsunami, /*cpuCount*/ 1, memSize)
+    // 2026-06-17: construct the chipset from the ini model string (the existing
+    // model-string ctor) instead of a hardcoded Tsunami/1.  This populates the
+    // chipset's m_model so wireDevices() can select the correct south bridge
+    // (Cypress for DS10/DS20, ALi M1543C for ES40/ES45) and uses the ini
+    // cpuCount.  DS10 -> Tsunami, cpuCount 1: byte-identical to the prior line.
+    // (m_settings is initialized above, so .system is valid here.)
+    , m_chipset(m_settings.system.model, m_settings.system.cpuCount, memSize)
     , m_mmio()
 {
     // Bring up the TCP listen socket, launch PuTTY, migrate the backend
@@ -737,12 +743,14 @@ void Machine::onBeforeFetch(uint64_t pa) noexcept
     // 05-18 to reflect detect-only semantics: V1's PAL byte-copy was
     // disabled after the forensic trace proved it was destroying
     // firmware-written PAL bytes at trigger PC.
+#if EMULATR_BRINGUP_PROBES
     std::fprintf(stderr,
                  "DEBUG: Step D PAL relocation TRIGGER (copy DISABLED) -- "
                  "trigger pa=0x%016llx  targetPalBase=0x%016llx  cycle=%llu\n",
                  static_cast<unsigned long long>(pa),
                  static_cast<unsigned long long>(m_srmDescriptor.palBase()),
                  static_cast<unsigned long long>(m_cpu.cycleCount));
+#endif
 }
 
 
@@ -1239,6 +1247,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             // Throttled stderr -- timer divert at ~954 Hz on a long run would
             // otherwise drown other diagnostics.  First 32 fires loud, then a
             // summary every 64K.  Matches the CBOX/UNALIGN throttle policy.
+#if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -1264,6 +1273,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
                              static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
+#endif
 
             // TEMP DIAGNOSTIC (DIVERT-REI register ledger, fill) -- REMOVE
             // AFTER the fclose(&spl_kernel) corruption is root-caused.
@@ -1291,6 +1301,31 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             // sys__int_clk (counts the tick) -- NOT EI[0]/sys__int_err.
             stageInterruptDivert(m_cpu, uint64_t{1} << 35);
             m_chipset.cchip().clearPendingIrq2(0);
+            divertedThisCycle = true;
+        }
+
+        // ------------------------------------------------------------------
+        // b_irq<3> -- Interprocessor interrupt (IPI).  Wired 2026-06-18.
+        // ------------------------------------------------------------------
+        // Mirrors the b_irq<2> interval-timer divert above.  Authoritative
+        // mapping from the PC264 OSF PAL (apisrm ref ev6_osf_pc264_pal.mar
+        // IPL table): IRQ<3>=interprocessor sits at the SAME IPL as the clock
+        // (IPL 5) and maps to ISUM/IER EI[3] -- IRQ_IP=8 (bit 3 of the IE
+        // field) and EV6__IER__EIEN__S=33, so bit 33+3 = 36.
+        // canAcceptInterrupt(21) selects IER bit 36 (57-21), i.e. it delivers
+        // IFF the guest has the interprocessor EIEN bit enabled at its current
+        // IPL -- the faithful per-source gate (NOT 20, which would select bit
+        // 37 = performance counter 0).  Single-CPU (cpuId 0) like the timer;
+        // mutex via divertedThisCycle.  Source for the b_irq<3> latch is the
+        // Cchip IPREQ->IPINTR path wired in TsunamiCchip.h the same day.
+        if (!divertedThisCycle
+            && canAcceptInterrupt(21)
+            && m_chipset.cchip().pendingIrq3(0)) {
+            // EI[3] = IRQ_IP (interprocessor); ISUM bit 36.  Routes the SRM
+            // PAL INTERRUPT vector (palBase + kEntry_INTERRUPT) to its
+            // interprocessor-interrupt handler.
+            stageInterruptDivert(m_cpu, uint64_t{1} << 36);
+            m_chipset.cchip().clearPendingIrq3(0);
             divertedThisCycle = true;
         }
 
@@ -1325,6 +1360,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             // would otherwise drown other diagnostics.  First 32 fires
             // loud, then a summary every 64K -- matches the timer-divert
             // throttle policy directly above.
+#if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
             if (n < 32) {
@@ -1348,6 +1384,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
                              static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
+#endif
 
             // EI[0] = IRQ_ERR (system error / NXM class); ISUM bit 33.
             stageInterruptDivert(m_cpu, uint64_t{1} << 33);
@@ -1396,6 +1433,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
             && m_chipset.cchip().pendingIrq1(0)
             && canAcceptInterrupt(23))
         {
+#if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
          //   int const vec = m_chipset.acknowledgeDeviceInterrupt();
@@ -1416,6 +1454,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
                              "Machine: %llu b_irq<1> diverts (loud-stderr muted past 32)", static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
+#endif
 
             // EI[1] = IRQ_DEV (device / PCI / ISA class); ISUM bit 34.
             stageInterruptDivert(m_cpu, uint64_t{1} << 34);
@@ -1531,9 +1570,11 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
     // 35-retire profile into the traces dir (observed 2026-06-05).
     // Real runs retire billions; 100K is comfortably below any run
     // worth profiling and above any test.
+#if EMULATR_BRINGUP_PROBES
     if (traceLib::RetireProfiler::totalRetires() >= 100000) {
         traceLib::RetireProfiler::dump("run_end");
     }
+#endif
 
     return classifyStop(m_cpu);
 }
