@@ -135,35 +135,19 @@ struct CpuState
 
 
     // ------------------------------------------------------------------
-    // Per-CPU hardware identifier (WHAMI).
+    // SMP slot index / WHAMI (Phase 2) -- the ONE source of truth.
     // ------------------------------------------------------------------
-    // mCpuId is this CPU's hardware slot number as published in the HWRPB
-    // per-CPU slot (deviceLib::hwrpb::CpuType).  It is the value PALcode
-    // reports for "Who Am I?": CSERVE$WHAMI and the MFPR_WHAMI CALL_PAL
-    // both return it (see palBoxLib/grains/PalEntries.cpp).  V4 is
-    // uniprocessor today, so it stays 0 (the primary); an MP profile will
-    // assign a distinct id per CPU at construction via setCpuId().
-    //
-    // Encapsulated behind accessors (not a bare field) so the WHAMI read
-    // paths depend on cpuId() rather than a hard-coded 0 -- MP support can
-    // then change the source without touching every call site.
-    // TODO(whami-cpuid): route PalEntries WHAMI returns through cpuId().
-    // Default-initialized so the snapshot POD blob stays deterministic
-    // (matches every other CpuState member).
-    deviceLib::hwrpb::CpuType mCpuId = {};
-    [[nodiscard]] AXP_ALWAYS_INLINE deviceLib::hwrpb::CpuType cpuId() const noexcept { return mCpuId; }
-    [[nodiscard]] AXP_ALWAYS_INLINE void setCpuId(deviceLib::hwrpb::CpuType c)  noexcept { mCpuId = c; }
-
-    // ---- SMP slot index (Phase 2 STEP 1b -- trace/log cpuId tag source) ----
     // cpuSlot is the per-CPU SLOT (0..cpu_count-1) the harness assigns this
-    // agent.  It is DISTINCT from mCpuId above: mCpuId is typed as the processor
-    // MODEL enum (CpuType: EV6=8 ...) -- the wrong abstraction for "which CPU" --
-    // and is dormant (setCpuId is never called; WHAMI is hardcoded 0).  The
-    // trace/diagnostic cpuId tag is sourced from THIS field, NOT cpuId().
-    // Default 0 = the single agent today; STEP 4 (CpuState ownership lift) sets
-    // it from AlphaCpuAgent::id().  Reconciling cpuSlot with mCpuId/WHAMI is the
-    // TODO(whami-cpuid) follow-up -- do NOT keep two divergent slot sources long
-    // term.  Default-initialized so the snapshot POD blob stays deterministic.
+    // agent (set from AlphaCpuAgent::id() in the agent ctor, T4).  It is the
+    // single "which CPU" source: BOTH the trace/diagnostic cpu= tag AND the
+    // PALcode WHAMI reads -- CSERVE$WHAMI and the MFPR_WHAMI CALL_PAL in
+    // palBoxLib/grains/PalEntries.cpp -- source it (T5).  Single agent => 0.
+    //
+    // (T5 removed the former mis-typed mCpuId/cpuId()/setCpuId() -- a CpuType
+    // MODEL enum, the wrong abstraction for "which CPU", dormant -- so there are
+    // no longer two divergent slot sources.  The removal shrank the POD blob, so
+    // kCpuStateVersion was bumped 8 -> 9; see systemLib/Snapshot.h.)
+    // Default-initialized so the snapshot POD blob stays deterministic.
     uint32_t cpuSlot = 0;
     // ------------------------------------------------------------------
     // Architectural program counter.

@@ -541,11 +541,12 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 
         case 0x41: {   // CSERVE$WHAMI -- get current CPU id
             // sys__cserve cfw_whami: `hw_ldq/p r0, PT__WHAMI(p_temp)`.
-            // V4 is uniprocessor; the primary (and only) CPU is WHAMI 0.
-            // Revisit when an MP profile lands (return the per-CPU id).
+            // T5: return the executing agent's real SMP slot (cpuSlot) -- the one
+            // "which CPU" source of truth.  Single agent => 0, byte-identical to
+            // the prior hardcoded 0; per-CPU once SMP lands.
             r.regWriteIdx   = 0;     // R0
             r.regWriteIsFp  = false;
-            r.regWriteValue = 0;
+            r.regWriteValue = c.cpu->cpuSlot;
             return r;
         }
 
@@ -856,19 +857,19 @@ auto execWtint([[maybe_unused]] InstructionGrain const& g,
 // in R0.  Used by SMP-aware OS code to route per-CPU work and by
 // SRM bootstrap to pick a "primary" CPU.
 //
-// V4 is single-CPU; CPU 0 is the only valid identity.  Hard-coded
-// to return 0 until multi-CPU support lands -- at which point this
-// reads from a per-CpuState whami field.
+// T5: returns the executing agent's real SMP slot (CpuState::cpuSlot) -- the
+// single "which CPU" source.  Single agent => 0 (byte-identical to the prior
+// hardcoded 0); per-CPU once SMP lands.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execMfprWhami([[maybe_unused]] InstructionGrain const& g,
-                   [[maybe_unused]] ExecCtx const&          c) noexcept -> BoxResult
+                   ExecCtx const&                           c) noexcept -> BoxResult
 {
     BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = 0;     // R0 (v0)
     r.regWriteIsFp  = false;
-    r.regWriteValue = 0;     // single-CPU; CPU 0
+    r.regWriteValue = c.cpu->cpuSlot;   // real SMP slot (0 for agent0)
     return r;
 }
 

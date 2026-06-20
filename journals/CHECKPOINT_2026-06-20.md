@@ -43,3 +43,18 @@
   - HwpcbContext fix is **applied but unbuilt/uncommitted** — sandbox can't build (MSVC is client-side). Build before relying on it; commit to land it on the proven baseline.
   - The STEP 1b intermediate is still uncommitted (carried from 04:00/15:06) — HwpcbContext now stacks on top of it, so the commit should cover both.
   - D: mount can serve stale cached copies — validate writes via the Read (host) view, not bash byte counts.
+
+## 23:06 — P2-T5 in progress: WHAMI→cpuSlot reroute + clean mCpuId removal (kCpuStateVersion 8→9)
+- **Working on:** Same "Readiness check" session, now executing **P2-T5** (whami-cpuid reconciliation). Chose option **(a) clean struct**: unify on `CpuState.cpuSlot`, fully delete the dormant mis-typed `mCpuId`, and bump the snapshot version.
+- **Done since last checkpoint:**
+  - **Snapshot serializer correction** — confirmed `Snapshot.cpp:122` writes the entire `CpuState` as a raw POD blob (`ds.writeRawData(&cpu, sizeof(cpu))`); the field-by-field `ds << cpu.cycleCount` above it is a redundant header copy. So `cpuSlot` already round-trips (it lives inside the blob). **Corrects the earlier T4 ledger note** that claimed `cpuSlot` was unserialized → Phase-5 gap; that claim was wrong (grep missed it because the blob is a `memcpy`, not a named field). T4 note being fixed.
+  - **mCpuId removed from the struct** — Tim deleted the three lines in `coreLib/CpuState.h` himself (`mCpuId` field + `cpuId()` + `setCpuId()` accessors); field is gone. Because the snapshot blob is `sizeof(cpu)`, removing the field is a layout change → **`kCpuStateVersion` bump 8→9** (same mechanism STEP 1b used adding `cpuSlot`). Old snapshots version-gated/rejected; round-trip test still passes; boot gate unaffected (byte-identical).
+- **Open / next:**
+  1. **Finish the WHAMI reroute** — point both sites at `cpuSlot`: `CSERVE$WHAMI` (`PalEntries.cpp:548`) and `MFPR_WHAMI` (`execMfprWhami`, ~PalEntries.cpp:871) change `r.regWriteValue = 0;` → `= c.cpu->cpuSlot;` (and un-`maybe_unused` the `ExecCtx`). `cpuSlot = 0` for agent0 → byte-identical. (Mid-edit when checkpointed.)
+  2. Clean the now-stale comments around the removed `mCpuId` block in `CpuState.h`/`Snapshot.h`; finish the T4 ledger-note fix.
+  3. Build (client-side MSVC) + commit — this stacks on the still-uncommitted STEP 1b + HwpcbContext intermediates.
+- **Watch-outs:**
+  - HWRPB `whami` (`HwrpbBuilder.cpp:251`) is `primary_cpu_id` from build `spec`, **not** from `CpuState` — leave it; it's OS-handoff config, already 0, not a decode path.
+  - File churn mid-edit: Tim edited `CpuState.h` by hand while the session was editing it → an Edit missed and required a re-Read. Re-read regions before re-editing to avoid clobbering manual deletions.
+  - Accumulated uncommitted stack is now three deep (STEP 1b → HwpcbContext → T5). A single build/commit should cover all; tree is not green until then.
+  - D: mount can serve stale cached copies — validate writes via the Read (host) view, not bash byte counts.
