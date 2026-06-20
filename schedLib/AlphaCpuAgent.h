@@ -43,6 +43,7 @@
 #define SCHEDLIB_ALPHA_CPU_AGENT_H
 
 #include "schedLib/SmpHarness.h"
+#include "coreLib/CpuState.h"   // Phase-2 T4: the agent now OWNS a CpuState
 
 #include <cstdint>
 
@@ -62,9 +63,25 @@ class AlphaCpuAgent final : public IAgent {
 public:
     explicit AlphaCpuAgent(systemLib::Machine& machine,
                            std::uint32_t       cpuId = 0) noexcept
-        : m_machine(&machine), m_cpuId(cpuId) {}
+        : m_machine(&machine), m_cpuId(cpuId)
+    {
+        // Phase-2 T4: this agent OWNS its CpuState; stamp its SMP slot from the
+        // cpuId the Dispatcher assigned (closes the STEP-1b "slot 0" placeholder
+        // -- agent0 => 0, so byte-identical today).
+        m_cpuState.cpuSlot = cpuId;
+    }
 
     const char* name() const noexcept override { return "alphacpu"; }
+
+    // The CpuState this agent OWNS.  Machine::cpu() aliases agent0's via a
+    // reference member (Phase-2 T4); under SMP each agent owns its own.
+    coreLib::CpuState&       cpu()       noexcept { return m_cpuState; }
+    coreLib::CpuState const& cpu() const noexcept { return m_cpuState; }
+
+    // Reset ONLY the per-run scheduling state (NOT the owned CpuState, which the
+    // Machine resets via resetToLoadedEntry through the m_cpu alias).  Called
+    // when the persistent agent is reused for a fresh Machine::run.
+    void resetForRun() noexcept { m_cycleIndex = 0; m_stopped = false; }
 
     // Runnable until the CPU halts.  Reads the bound Machine's CpuState
     // (referenced, not owned).  Defined in the .cpp where Machine is complete.
@@ -80,6 +97,7 @@ public:
 private:
     systemLib::Machine* m_machine;       // bound shared machine (non-owning)
     std::uint32_t       m_cpuId;         // WHAMI/CPUID source (Phase 2)
+    coreLib::CpuState   m_cpuState;      // Phase-2 T4: the CpuState this agent OWNS
     std::uint64_t       m_cycleIndex{0}; // mirrors legacy run()'s `i` cadence
     bool                m_stopped{false};// set when stepCycle() returns false
                                          // (CPU halt or stop-sentinel) -> the

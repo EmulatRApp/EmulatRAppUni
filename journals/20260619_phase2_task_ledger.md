@@ -123,6 +123,28 @@ P2-T4  STEP 4 -- CpuState ownership into AlphaCpuAgent.
   system clock.  Keep trace + spdlog sinks Dispatcher-level shared services.
   Snapshot must still round-trip agent0.  GATE: byte-identical + determinism_
   equivalence + snapshot round-trip green.
+  APPLIED 2026-06-20 (UNBUILT -- client build + 3-way gate pending): AlphaCpuAgent
+    now OWNS a CpuState (m_cpuState; cpu() accessor; m_cpuState.cpuSlot = cpuId in
+    ctor; resetForRun() resets ONLY m_cycleIndex/m_stopped).  Machine owns a
+    persistent by-value m_agent0; m_cpu is now a CpuState& ALIAS bound to
+    m_agent0.cpu() in the sole ctor (init list m_settings, m_agent0(*this,0),
+    m_cpu(m_agent0.cpu())) -- so ~all m_cpu.<field> sites compile UNCHANGED.
+    Dispatch path reuses m_agent0 (resetForRun + addAgent) instead of a transient
+    local.  SAFE: Machine non-copy/non-move-CONSTRUCTIBLE (all 4 deleted) -> the
+    reference never reseats; m_agent0 address-stable -> bindCycleSource's raw
+    &m_cpu.cycleCount + the L1 RTC seam stay valid with NO change (T3a already
+    routed systemNow()/IDLEWARP off cycleCount).  AlphaCpuAgent.cpp runnable()/
+    step() UNCHANGED (m_machine->cpu() == agent0's m_cpuState via the alias).
+    cpuSlot = agent0.id() = 0 -> byte-identical (cpu= tag stays 0).  Single Machine
+    ctor (default args) so the reference inits everywhere; no other AlphaCpuAgent
+    construction; harness determinism uses MockCpuAgent (untouched).
+  PHASE-5 GAP (recorded per the T4 cpuSlot confirm): cpuSlot is NOT in Snapshot.cpp's
+    field-by-field serializer (grep clean).  HARMLESS for single-agent T4 (cpuSlot
+    invariantly 0 -> round-trips as default 0), but multi-CPU snapshot MUST either
+    serialize cpuSlot or have each agent re-assert it post-restore, else CPU1's slot
+    clobbers to 0 on `machine.cpu() = cpuTmp`.  Prerequisite for Phase 5.
+  NEXT: T5 = whami-cpuid reconciliation (route WHAMI / CSERVE$WHAMI + HWRPB whami
+    through the real cpuSlot; retype/retire the mis-typed mCpuId).  Then T6 flip+delete.
 
 P2-T5  whami-cpuid RECONCILIATION (do with/after STEP 4).
   Today there are TWO slot-ish sources: the NEW CpuState.cpuSlot (numeric, used

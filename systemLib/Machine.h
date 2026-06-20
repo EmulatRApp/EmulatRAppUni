@@ -67,6 +67,7 @@
 #include "coreLib/CpuState.h"
 #include "memoryLib/GuestMemory.h"
 #include "mmuLib/Ev6Translator.h"
+#include "schedLib/AlphaCpuAgent.h"   // Phase-2 T4: Machine owns agent0 (CpuState owner)
 #include "pipelineLib/IFetchOverride.h"
 #include "pipelineLib/MmioRegistry.h"
 #include "systemLib/SrmLoader.h"
@@ -409,7 +410,17 @@ private:
     // threaded in by value.  Declared FIRST so the m_consoleCfg in-class
     // initializer (makeCom1Cfg(m_settings)) sees a fully-constructed object.
     emulatr::config::EmulatorSettings m_settings;
-    coreLib::CpuState        m_cpu;
+
+    // Phase-2 T4 (2026-06-20): CpuState ownership lives in the AGENT.  m_agent0
+    // owns the (single) CpuState; m_cpu is a reference ALIAS into it so the
+    // ~hundreds of existing m_cpu.<field> sites compile unchanged.  Safe because
+    // Machine is non-copy/non-move-CONSTRUCTIBLE (all four deleted above), so the
+    // reference never needs reseating; and m_agent0's address is stable for the
+    // Machine's life, so bindCycleSource's raw &m_cpu.cycleCount stays valid.
+    // Declared BEFORE m_cpu so it constructs first (init order = declaration
+    // order); the ctor init list binds m_cpu(m_agent0.cpu()) right after.
+    emulatr::smp::AlphaCpuAgent m_agent0;
+    coreLib::CpuState&          m_cpu;
 
     // Phase-2 STEP 3 (2026-06-20): the SYSTEM timebase, DECOUPLED from m_cpu's
     // architectural PCC.  Advanced by the per-step RAW retire-cycle delta in

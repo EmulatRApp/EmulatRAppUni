@@ -314,7 +314,10 @@ SRMConsoleDevice::Config Machine::makeCom1Cfg(
 
 Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
     : m_settings(std::move(settings))
-    , m_cpu()
+    // Phase-2 T4: agent0 owns the CpuState; m_cpu aliases it.  m_agent0 must be
+    // initialized BEFORE m_cpu (declaration + init-list order both honor this).
+    , m_agent0(*this, /*cpuId/slot*/ 0)
+    , m_cpu(m_agent0.cpu())
     , m_translator()
     // 2026-05-29: COM1 backend wiring.  m_consoleCfg is fully populated
     // by the in-class initializer (Machine.h) which calls
@@ -1028,9 +1031,12 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
     // journals/20260619_alphacpuagent_phase1_design.md.)
     static bool const s_useDispatcher = (std::getenv("EMULATR_DISPATCH") != nullptr);
     if (s_useDispatcher) {
-        emulatr::smp::Dispatcher    disp(/*quantum*/ 1);
-        emulatr::smp::AlphaCpuAgent agent(*this, /*cpuId*/ 0);
-        disp.addAgent(&agent);
+        emulatr::smp::Dispatcher disp(/*quantum*/ 1);
+        // Phase-2 T4: reuse the Machine-owned agent0 (it OWNS the CpuState that
+        // m_cpu aliases) instead of a transient local agent; reset only its
+        // per-run scheduling state (cycle index + stop flag).
+        m_agent0.resetForRun();
+        disp.addAgent(&m_agent0);
         disp.setDriver(std::make_unique<emulatr::smp::SequentialDriver>());
         disp.run(maxCycles);
     } else {
