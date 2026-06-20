@@ -101,6 +101,20 @@ P2-T3  STEP 3 -- decouple systemNow() + add the global retire ordinal.
     NOTE: bash mount served a STALE-TRUNCATED phantom of Machine.cpp during verify;
     host Read confirmed the file intact (the recurring D: mount hazard).
     NEXT: T3b = global retire ordinal (separate commit, re-mint AFTER T3a gate green).
+  T3b APPLIED 2026-06-20 (UNBUILT -- client build + gate + one-time re-mint pending):
+    traceLib/DecListingSink.{h,cpp}.  New member m_retireOrdinal, incremented once per
+    onCommit (every retire, traced or not), stamped into LookbackEntry.ordinal via
+    freezeRecord (sole-path, like cpuId).  Emitted as the LEADING `ord=` field (DEC
+    listing `o<n>` column) on EVERY line: RET/INS/DEC/REG/FRG/HEARTBEAT/PAL_ENTRY/
+    PAL_EXIT/RUN_END; format-doc headers updated.  Source = the single coalesced sink's
+    per-retire counter, which IS the dispatcher global retire order under the single-
+    sink design (NOT cycleCount, NOT rpcc).  analyze_retire_trace.py regex tolerates
+    optional ord=; test_declistingsink pins updated (INS/REG ord=0, o0 column).
+    Dispatch gate stays byte-identical (gate runs without --trace -> ord absent from the
+    host log).  RE-MINT the stored golden + AXPBox refs ONCE in this commit (trace text
+    changed) -- only now, AFTER T3a's gate proved the clock byte-identical, so the
+    re-mint cannot launder a clock bug.  Phase-2 NEXT: T4 = CpuState ownership into
+    AlphaCpuAgent (the real CPU1 prerequisite), then T5 whami reconcile, T6 flip+delete.
 
 P2-T4  STEP 4 -- CpuState ownership into AlphaCpuAgent.
   Agent owns CpuState; Machine::cpu() returns agent0's.  SET cpuSlot from the

@@ -36,12 +36,14 @@ namespace {
 // stores frozen strings so the entries remain valid after the source
 // CommitRecord goes out of scope -- this is what makes PAL-window
 // auto-on possible (we hand-replay 10 entries on entry).
-LookbackEntry freezeRecord(CommitRecord const& record, uint32_t cpuSlot)
+LookbackEntry freezeRecord(CommitRecord const& record, uint32_t cpuSlot,
+                           uint64_t ordinal)
 {
     LookbackEntry e;
     e.cpuId    = cpuSlot;   // SOLE population path: the signature forces the one
                             // caller (onCommit) to supply the retiring CPU's slot,
                             // so a frozen entry can never carry a default/stray id.
+    e.ordinal  = ordinal;   // P2-T3b: global retire ordinal, same sole-path rule.
     e.cycle    = record.cycle;
     e.pc       = record.pc;
     e.encoded  = record.encoded;
@@ -288,7 +290,7 @@ DecListingSink::DecListingSink(std::filesystem::path const& decLogPath,
             m_retireLog << "# trace_mask=0x" << std::hex << std::setw(8)
                         << std::setfill('0') << traceMask
                         << std::dec << std::setfill(' ') << "\n";
-            m_retireLog << "# format: RET cpu=<n> rpcc=<n> pc=<hex16> <mnem> "
+            m_retireLog << "# format: RET ord=<n> cpu=<n> rpcc=<n> pc=<hex16> <mnem> "
                            "pal=<0|1> exc=<hex16>"
                            " [=>R|F<dd>=<hex16>]"
                            " [<ld|st><sz> va=<hex16> pa=<hex16> v=<hex16>]"
@@ -371,7 +373,8 @@ void DecListingSink::setEmitEnabled(bool enabled) noexcept
 // postCommitCpu; no copy.
 // ============================================================================
 
-void DecListingSink::emitRetireCompact(CommitRecord const&        record,
+void DecListingSink::emitRetireCompact(uint64_t                   ordinal,
+                                       CommitRecord const&        record,
                                        coreLib::CpuState const&   postCommitCpu)
 {
     if (!m_retireOpen) {
@@ -400,7 +403,8 @@ void DecListingSink::emitRetireCompact(CommitRecord const&        record,
     // overlength tokens just push the remainder right rather than
     // crashing the format.
     char const* const mnem = record.mnemonic ? record.mnemonic : "?";
-    m_retireLog << vfmt("RET cpu=%u rpcc=%llu pc=%016llx %-8s pal=%d exc=%016llx",
+    m_retireLog << vfmt("RET ord=%llu cpu=%u rpcc=%llu pc=%016llx %-8s pal=%d exc=%016llx",
+                        static_cast<unsigned long long>(ordinal),
                         static_cast<unsigned>(postCommitCpu.cpuSlot),
                         static_cast<unsigned long long>(record.cycle),
                         static_cast<unsigned long long>(record.pc),
@@ -504,7 +508,8 @@ void DecListingSink::emitCommit(LookbackEntry const&     entry,
                                 coreLib::CpuState const* postCommitCpu)
 {
     if (m_decOpen) {
-        m_decLog << vfmt("c%02u %08llu %016llx %08x %-8s %-22s %s\n",
+        m_decLog << vfmt("o%llu c%02u %08llu %016llx %08x %-8s %-22s %s\n",
+                         static_cast<unsigned long long>(entry.ordinal),
                          static_cast<unsigned>(entry.cpuId),
                          static_cast<unsigned long long>(entry.cycle),
                          static_cast<unsigned long long>(entry.pc),
@@ -516,7 +521,8 @@ void DecListingSink::emitCommit(LookbackEntry const&     entry,
     }
     if (m_machineOpen) {
         m_machineLog << vfmt(
-            "INS cpu=%u rpcc=%llu pc=%016llx instr=%08x mnem=%s ops=\"%s\" result=\"%s\"\n",
+            "INS ord=%llu cpu=%u rpcc=%llu pc=%016llx instr=%08x mnem=%s ops=\"%s\" result=\"%s\"\n",
+            static_cast<unsigned long long>(entry.ordinal),
             static_cast<unsigned>(entry.cpuId),
             static_cast<unsigned long long>(entry.cycle),
             static_cast<unsigned long long>(entry.pc),
@@ -532,17 +538,19 @@ void DecListingSink::emitCommit(LookbackEntry const&     entry,
     // automated divergence diffing.
     if (postCommitCpu && m_machineOpen) {
         if (m_traceMask & (TRACE_REGFILE | TRACE_FPRFILE)) {
-            emitRegisters(entry.cycle, *postCommitCpu);
+            emitRegisters(entry.ordinal, entry.cycle, *postCommitCpu);
         }
     }
 }
 
 
-void DecListingSink::emitRegisters(uint64_t                cycle,
+void DecListingSink::emitRegisters(uint64_t                 ordinal,
+                                   uint64_t                 cycle,
                                    coreLib::CpuState const& postCommitCpu)
 {
     if (m_traceMask & TRACE_REGFILE) {
-        std::string line = vfmt("REG cpu=%u rpcc=%llu",
+        std::string line = vfmt("REG ord=%llu cpu=%u rpcc=%llu",
+                                static_cast<unsigned long long>(ordinal),
                                 static_cast<unsigned>(postCommitCpu.cpuSlot),
                                 static_cast<unsigned long long>(cycle));
         for (int i = 0; i < 32; ++i) {
@@ -553,7 +561,8 @@ void DecListingSink::emitRegisters(uint64_t                cycle,
         m_machineLog << line << '\n';
     }
     if (m_traceMask & TRACE_FPRFILE) {
-        std::string line = vfmt("FRG cpu=%u rpcc=%llu",
+        std::string line = vfmt("FRG ord=%llu cpu=%u rpcc=%llu",
+                                static_cast<unsigned long long>(ordinal),
                                 static_cast<unsigned>(postCommitCpu.cpuSlot),
                                 static_cast<unsigned long long>(cycle));
         for (int i = 0; i < 32; ++i) {
@@ -570,7 +579,11 @@ void DecListingSink::emitRegisters(uint64_t                cycle,
 void DecListingSink::onCommit(CommitRecord const&        record,
                               coreLib::CpuState const&   postCommitCpu)
 {
-    LookbackEntry const frozen = freezeRecord(record, postCommitCpu.cpuSlot);
+    // P2-T3b: stamp the per-retire global ordinal (post-increment so the first
+    // retire is ordinal 0).  Incremented for EVERY retire, traced or not, so a
+    // traced line at ord=N means "the Nth global retire"; gaps are untraced.
+    uint64_t const ordinal = m_retireOrdinal++;
+    LookbackEntry const frozen = freezeRecord(record, postCommitCpu.cpuSlot, ordinal);
 
     // Always update the lookback ring -- cheap, no I/O.  Keeping the
     // ring fresh during the Phase C+ pre-relocation gated window lets
@@ -605,7 +618,7 @@ void DecListingSink::onCommit(CommitRecord const&        record,
     // pokeable peek counter is positive.  See header comment for line
     // format and elision rule.
     if ((m_traceMask & TRACE_RETIRE_COMPACT) || traceWindowActive()) {
-        emitRetireCompact(record, postCommitCpu);
+        emitRetireCompact(frozen.ordinal, record, postCommitCpu);
     }
 
     // Heartbeat: independent of trace mask, fires every
@@ -649,8 +662,9 @@ void DecListingSink::onCommit(CommitRecord const&        record,
                                              : LOOKBACK_DUMP;
 
         if (m_decOpen) {
-            m_decLog << vfmt(">>> HEARTBEAT cpu=%u rpcc=%llu pc=0x%016llx commits=%llu "
+            m_decLog << vfmt(">>> HEARTBEAT ord=%llu cpu=%u rpcc=%llu pc=0x%016llx commits=%llu "
                              "elapsed_ms=%lld cps=%llu %s\n",
+                             static_cast<unsigned long long>(ordinal),
                              static_cast<unsigned>(postCommitCpu.cpuSlot),
                              static_cast<unsigned long long>(record.cycle),
                              static_cast<unsigned long long>(record.pc),
@@ -662,8 +676,9 @@ void DecListingSink::onCommit(CommitRecord const&        record,
             m_decLog.flush();
         }
         if (m_machineOpen) {
-            m_machineLog << vfmt("HEARTBEAT cpu=%u rpcc=%llu pc=%016llx commits=%llu "
+            m_machineLog << vfmt("HEARTBEAT ord=%llu cpu=%u rpcc=%llu pc=%016llx commits=%llu "
                                  "elapsed_ms=%lld cps=%llu %s\n",
+                                 static_cast<unsigned long long>(ordinal),
                                  static_cast<unsigned>(postCommitCpu.cpuSlot),
                                  static_cast<unsigned long long>(record.cycle),
                                  static_cast<unsigned long long>(record.pc),
@@ -697,12 +712,15 @@ void DecListingSink::onPalEntry(uint64_t cycle,
     // emits the marker into both channels for context.
     m_inPalWindow = true;
 
-    // SMP marker tag: stamp the slot of the most recent retired entry
-    // (single agent today => 0).  When CPU1 lands, thread the real slot
-    // from the caller instead of inferring it from the ring.
+    // SMP marker tag: stamp the slot + global ordinal of the most recent retired
+    // entry (single agent today => slot 0).  When CPU1 lands, thread the real
+    // slot from the caller instead of inferring it from the ring.
     unsigned const cpu = static_cast<unsigned>(
         m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].cpuId
                        : 0u);
+    uint64_t const ord =
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].ordinal
+                       : 0ull;
 
     // Dump the last LOOKBACK_DUMP lookback entries into the trace
     // channels.  Walks backward from head to find oldest valid entry,
@@ -712,7 +730,8 @@ void DecListingSink::onPalEntry(uint64_t cycle,
                                          : LOOKBACK_DUMP;
 
     if (m_decOpen) {
-        m_decLog << vfmt(">>> PAL ENTRY cpu=%u rpcc=%llu entryPC=0x%016llx excAddr=0x%016llx\n",
+        m_decLog << vfmt(">>> PAL ENTRY ord=%llu cpu=%u rpcc=%llu entryPC=0x%016llx excAddr=0x%016llx\n",
+                         ord,
                          cpu,
                          static_cast<unsigned long long>(cycle),
                          static_cast<unsigned long long>(entryPc),
@@ -721,7 +740,8 @@ void DecListingSink::onPalEntry(uint64_t cycle,
         m_decLog.flush();
     }
     if (m_machineOpen) {
-        m_machineLog << vfmt("PAL_ENTRY cpu=%u rpcc=%llu entryPC=%016llx excAddr=%016llx\n",
+        m_machineLog << vfmt("PAL_ENTRY ord=%llu cpu=%u rpcc=%llu entryPC=%016llx excAddr=%016llx\n",
+                             ord,
                              cpu,
                              static_cast<unsigned long long>(cycle),
                              static_cast<unsigned long long>(entryPc),
@@ -744,13 +764,18 @@ void DecListingSink::onPalExit(uint64_t cycle,
     m_inPalWindow       = false;
     m_postExitCountdown = POST_PAL_TAIL;
 
-    // SMP marker tag (see onPalEntry): slot of the most recent retired entry.
+    // SMP marker tag (see onPalEntry): slot + global ordinal of the most recent
+    // retired entry.
     unsigned const cpu = static_cast<unsigned>(
         m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].cpuId
                        : 0u);
+    uint64_t const ord =
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].ordinal
+                       : 0ull;
 
     if (m_decOpen) {
-        m_decLog << vfmt("<<< PAL EXIT  cpu=%u rpcc=%llu targetPC=0x%016llx (tail=%u)\n",
+        m_decLog << vfmt("<<< PAL EXIT  ord=%llu cpu=%u rpcc=%llu targetPC=0x%016llx (tail=%u)\n",
+                         ord,
                          cpu,
                          static_cast<unsigned long long>(cycle),
                          static_cast<unsigned long long>(targetPc),
@@ -758,7 +783,8 @@ void DecListingSink::onPalExit(uint64_t cycle,
         m_decLog.flush();
     }
     if (m_machineOpen) {
-        m_machineLog << vfmt("PAL_EXIT cpu=%u rpcc=%llu targetPC=%016llx tail=%u\n",
+        m_machineLog << vfmt("PAL_EXIT ord=%llu cpu=%u rpcc=%llu targetPC=%016llx tail=%u\n",
+                             ord,
                              cpu,
                              static_cast<unsigned long long>(cycle),
                              static_cast<unsigned long long>(targetPc),
@@ -779,8 +805,9 @@ void DecListingSink::onRunEnd(coreLib::CpuState const& finalCpu)
                                          : LOOKBACK_DUMP;
 
     if (m_decOpen) {
-        m_decLog << vfmt("=== RUN END  cpu=%u pc=0x%016llx halted=%d lastFault=%u  "
+        m_decLog << vfmt("=== RUN END  ord=%llu cpu=%u pc=0x%016llx halted=%d lastFault=%u  "
                          "(replaying last %u retired instructions)\n",
+                         static_cast<unsigned long long>(m_retireOrdinal),
                          static_cast<unsigned>(finalCpu.cpuSlot),
                          static_cast<unsigned long long>(finalCpu.pc),
                          finalCpu.halted ? 1 : 0,
@@ -789,7 +816,8 @@ void DecListingSink::onRunEnd(coreLib::CpuState const& finalCpu)
         m_decLog.flush();
     }
     if (m_machineOpen) {
-        m_machineLog << vfmt("RUN_END cpu=%u pc=%016llx halted=%d lastFault=%u replay=%u\n",
+        m_machineLog << vfmt("RUN_END ord=%llu cpu=%u pc=%016llx halted=%d lastFault=%u replay=%u\n",
+                             static_cast<unsigned long long>(m_retireOrdinal),
                              static_cast<unsigned>(finalCpu.cpuSlot),
                              static_cast<unsigned long long>(finalCpu.pc),
                              finalCpu.halted ? 1 : 0,
