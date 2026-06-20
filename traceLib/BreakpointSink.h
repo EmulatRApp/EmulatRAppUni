@@ -69,30 +69,30 @@
 // --------------------------------------------
 //   #-prefixed header records at file open describing format and gates.
 //
-//   BP_OPEN  cyc=<n> rev=<n> pc=<hex16>
+//   BP_OPEN  rpcc=<n> rev=<n> pc=<hex16>
 //     Gate-open transition.  Immediately followed by IPR_SNAP and PT_SNAP.
 //
-//   BP_CLOSE cyc=<n> rev=<n> pc=<hex16>
+//   BP_CLOSE rpcc=<n> rev=<n> pc=<hex16>
 //     Gate-close transition.  Immediately followed by IPR_SNAP and PT_SNAP.
 //
-//   IPR_SNAP cyc=<n> kind=<open|close>
+//   IPR_SNAP rpcc=<n> kind=<open|close>
 //     palBase=H ptbr=H asn=H va_ctl=H i_ctl=H m_ctl=H i_spe=H m_spe=H
 //     mode=N palMode=N cycleCount=H ccOffset=H
 //     intrFlag=H mm_stat=H excAddr=H vptb=H scbb=H pcbb=H
 //     ksp=H esp=H ssp=H usp=H fen=H asten_sr=H
 //     (one record per gate transition; gives the IPR file in one record)
 //
-//   PT_SNAP  cyc=<n> kind=<open|close>
+//   PT_SNAP  rpcc=<n> kind=<open|close>
 //     PT00=H PT01=H ... PT31=H
 //     (one record per gate transition; PAL_TEMP[0..31] in hex)
 //
-//   CBX_SNAP cyc=<n> kind=<open|close>
+//   CBX_SNAP rpcc=<n> kind=<open|close>
 //     <CBoxState fields as key=value, one record per gate transition>
 //     (shape determined from coreLib/CBoxState.h at .cpp time; placeholder
 //     for now -- the open/close snapshot pair carries the Cbox shift-chain
 //     state so the diff reveals what the SRM read out of the chain.)
 //
-//   BRK cyc=<n> pc=<hex16> encoded=<hex8> <mnem> pal=<0|1> exc=<hex16>
+//   BRK rpcc=<n> pc=<hex16> encoded=<hex8> <mnem> pal=<0|1> exc=<hex16>
 //     R00=H R01=H ... R30=H
 //     [ F00=H F01=H ... F30=H ]
 //     [ ea=H val=H ]              -- when HW_LD or HW_ST retired

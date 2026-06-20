@@ -157,9 +157,13 @@ TEST_CASE("DispatchKind -- name helper round-trip")
 
 TEST_CASE("DispatchKind -- canonical count")
 {
-    // Walk values 0..31; expect exactly 18 named, the rest <invalid>.
+    // Walk values 0..31; expect exactly 19 named, the rest <invalid>.
     // Catches drift between the codegen's CANONICAL_DISPATCH_KINDS
     // list and any consumer that switches on the enum by value.
+    // 2026-06-20: bumped 18 -> 19; the generated DispatchKind enum +
+    // dispatchKindName now carry 19 named kinds (Direct..Reserved), all
+    // handled in the switch.  This tripwire correctly flagged the codegen
+    // growth; the count is updated to match the regenerated enum.
     int validCount = 0;
     for (uint8_t i = 0; i < 32; ++i) {
         char const* n = dispatchKindName(static_cast<DispatchKind>(i));
@@ -167,5 +171,5 @@ TEST_CASE("DispatchKind -- canonical count")
             ++validCount;
         }
     }
-    CHECK(validCount == 18);
+    CHECK(validCount == 19);
 }

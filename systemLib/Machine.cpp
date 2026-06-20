@@ -294,7 +294,11 @@ SRMConsoleDevice::Config Machine::makeCom1Cfg(
     // follows the override automatically.  Out-of-range values are ignored.
     if (char const* portEnv = std::getenv("EMULATR_CONSOLE_PORT")) {
         int const v = std::atoi(portEnv);
-        if (v > 0 && v < 65536) {
+        // v == 0 is honored as EPHEMERAL (OS-assigned): SRMConsoleDevice binds
+        // any free port and reports it via boundPort().  The test runner sets
+        // EMULATR_CONSOLE_PORT=0 so coexisting Machines (e.g. snapshot round-trip
+        // builds source + restored at once) never collide on the fixed 10023.
+        if (v >= 0 && v < 65536) {
             cfg.port = static_cast<quint16>(v);
         }
     }
@@ -906,6 +910,9 @@ void Machine::resetToLoadedEntry() noexcept
     // loadDecompressedRom (= the decompressed image's PAL_BASE).
     // reset() re-default-constructed m_cpu and wiped palBase.
     m_cpu.palBase = m_loadedPalBase;
+    // P2-T3a: reset() re-default-constructed m_cpu (cycleCount = 0); resync the
+    // decoupled system clock so systemNow() == m_cpu.cycleCount post-reset.
+    m_systemClock = m_cpu.cycleCount;
 }
 
 
@@ -1079,8 +1086,33 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
 // the IDENTICAL body -- the Phase-1 byte-identical-boot acceptance gate.  `i`
 // is the loop ordinal, used only for the coarse stop-sentinel poll cadence.
 // ============================================================================
-bool Machine::stepCycle(uint64_t i) noexcept
+bool Machine::cpuKernel([[maybe_unused]] coreLib::CpuState& cpu) noexcept
 {
+    // P2-T2 split (2026-06-20): the ONLY per-CPU action -- advance this CPU one
+    // tick via PipelineDriver::step(), which retires zero or more instructions
+    // and updates the CPU's cycleCount.  Returns false when the CPU halted on
+    // this tick (the caller BREAKs the loop).  No global side effects -- all
+    // system-level bookkeeping lives in systemTick().
+    //
+    // STEP-2 seam: step() still drives m_cpu internally; `cpu` is the forward-
+    // compat handle so STEP 4 (CpuState ownership lift) can drive a real per-
+    // agent CpuState here.  Today cpu === m_cpu.
+    return step();   // false => CPU halted this tick
+}
+
+
+bool Machine::systemTick(uint64_t i) noexcept
+{
+    // P2-T2 split (2026-06-20): once-per-quantum, dispatcher-level bookkeeping.
+    // Runs ONCE per quantum regardless of CPU count.  Returns false to BREAK the
+    // run loop (stop sentinel); all cycle-based predicates read systemNow().
+    //
+    // STEP-4 / SMP SEAMS (the Phase-1 gate proves single-agent equivalence only,
+    // NOT split-correctness -- these placements are reasoned, not gate-checked):
+    //   * interval-timer DELIVER reads pendingIrq2(0) (hardcoded CPU0); it becomes
+    //     a per-CPU divert in cpuKernel once ownership gives it a real cpuId.
+    //   * predig snapshot-on-PC matches m_cpu.pc -- a latent per-CPU read; the
+    //     "which CPU's PC?" policy is an SMP-era decision.
     static constexpr uint64_t kStopPollMask = 0xFFFFFULL;  // poll ~every 1M steps
         // Graceful-stop poll (task #9): cheap existence check on a coarse
         // cadence; a clean break lets ~Machine's forceFlush persist NVRAM.
@@ -1093,12 +1125,6 @@ bool Machine::stepCycle(uint64_t i) noexcept
                 std::filesystem::remove(m_stopSentinel, rmec);  // consume it
                 return false;   // BREAK the run loop (was `break;` pre-extraction)
             }
-        }
-        // step() invokes PipelineDriver::step() which retires zero or
-        // more instructions and updates m_cpu.cycleCount.  Returns
-        // false when the CPU halted on this tick.
-        if (!step()) {
-            return false;   // CPU halted -> BREAK the run loop (was `break;`)
         }
 
         // ---- Option-A console-triggered snapshot --------------------------------
@@ -1301,8 +1327,13 @@ bool Machine::stepCycle(uint64_t i) noexcept
                 // (behavior-identical).  STEP 3 advances systemNow() by the warp
                 // delta; under policy P-A the running CPU's PCC tracks the warp
                 // (design D-1a) -- keep them moving together.
-                uint64_t const c0 = m_cpu.cycleCount;
-                m_cpu.cycleCount  = (c0 | Tsunami21272::Spec::kCchipTimerMask) + 1;
+                // P2-T3a: the warp targets the SYSTEM clock (skip system time to
+                // the next timer edge); the running CPU's PCC tracks it under P-A.
+                // Base on systemNow() (== this CPU's PCC today) so the multi-CPU-
+                // correct system-clock-primary shape needs no STEP-4 revisit.
+                uint64_t const c0 = systemNow();
+                m_systemClock     = (c0 | Tsunami21272::Spec::kCchipTimerMask) + 1;
+                m_cpu.cycleCount  = m_systemClock;
                 // process-global static; revisit under the threaded driver.
                 static uint64_t s_warpLog = 0;
                 if ((s_warpLog++ & 0x3FFull) == 0) {     // throttle 1/1024
@@ -1644,6 +1675,34 @@ bool Machine::stepCycle(uint64_t i) noexcept
 
 
 // ============================================================================
+// stepCycle -- one quantum tick = per-CPU kernel + once-per-quantum system tick
+// ============================================================================
+// P2-T2 transitional shape (2026-06-20): drive the (single) CPU, then run the
+// once-per-quantum system bookkeeping.  cpuKernel() false (halt) BREAKs BEFORE
+// systemTick, matching the pre-split order where a CPU halt returned immediately
+// after step() (the only behavioral reorder is the stop-sentinel poll, now after
+// step instead of before -- a no-op whenever the sentinel is absent, so the
+// byte-identical boot gate is unaffected).  Dispatcher and legacy paths call this
+// IDENTICAL body, so phase1_dispatch_gate.sh still governs.
+// ============================================================================
+bool Machine::stepCycle(uint64_t i) noexcept
+{
+    // P2-T3a: advance the SYSTEM clock by the RAW retire-cycle delta this CPU
+    // produced (INVARIANT D-1a: by newPCC - oldPCC, NOT +1 per iteration and NOT
+    // +1 per quantum), whether or not the CPU halted on this tick.  For the
+    // single running agent m_systemClock stays == m_cpu.cycleCount, so
+    // systemNow() reads identically -> the dispatch gate is byte-identical.
+    uint64_t const pccBefore = m_cpu.cycleCount;
+    bool const     alive     = cpuKernel(m_cpu);
+    m_systemClock += (m_cpu.cycleCount - pccBefore);
+    if (!alive) {
+        return false;   // CPU halted -> BREAK the run loop
+    }
+    return systemTick(i);
+}
+
+
+// ============================================================================
 // restoreSrmStaging -- snapshot load-path hook
 // ============================================================================
 //
@@ -1672,5 +1731,10 @@ void Machine::restoreSrmStaging(SrmDescriptor const& descriptor,
     m_loadedStartPc = startPc;
     m_loadedPalMode = palMode;
     m_lastLoadError.clear();
+    // P2-T3a: Snapshot::load has already restored m_cpu (incl. cycleCount) via
+    // `machine.cpu() = cpuTmp` before calling this; resync the decoupled system
+    // clock so a resumed run reads systemNow() == the restored PCC.  (The boot
+    // gate never reaches this -- it is the dormant-arm autoload/restore path.)
+    m_systemClock = m_cpu.cycleCount;
 }
 } // namespace systemLib

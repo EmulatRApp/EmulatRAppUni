@@ -17,11 +17,11 @@
 // instruction:
 //
 //   1. DEC listing channel  (human-readable, diff-against-reference):
-//      "cycle pc encoded mnem  operands  result"
-//      e.g. "00000007 0000000000000008 47e30403 ADDQ  R01, R02, R03  R03 = 0x0000000000000052"
+//      "cNN cycle pc encoded mnem  operands  result"   (cNN = SMP cpu slot)
+//      e.g. "c00 00000007 0000000000000008 47e30403 ADDQ  R01, R02, R03  R03 = 0x0000000000000052"
 //
 //   2. Machine-parsable channel (script-friendly, key=value):
-//      "INS cycle=N pc=H instr=H mnem=X ops=\"...\" result=\"...\""
+//      "INS cpu=N rpcc=N pc=H instr=H mnem=X ops=\"...\" result=\"...\""
 //
 // When TRACE_REGFILE is set, every INS is followed by a REG line
 // containing all 32 integer registers; TRACE_FPRFILE adds an FRG line
@@ -48,7 +48,7 @@
 //   collide.
 //
 //   Line format:
-//     RET cyc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
+//     RET cpu=<n> rpcc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
 //          [ sde=<1-3>][ H<dd>=<hex16>]*
 //
 //   <mnem> is the codegen-emitted instruction mnemonic literal,
