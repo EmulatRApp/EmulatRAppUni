@@ -174,6 +174,25 @@ P2-T6  STEP 5 -- flip default + delete legacy loop (POST-Phase-2 acceptance only
   proven-equivalent default across Phase-2 acceptance.  Flip EMULATR_DISPATCH
   default, delete the legacy Machine::run loop; the determinism harness becomes
   the sole gate.  Until then legacy STAYS the gate's reference.
+  APPLIED 2026-06-20 (UNBUILT -- client build + determinism harness pending):
+    Machine::run now has ONLY the dispatcher path (one AlphaCpuAgent = agent0 under
+    SequentialDriver, calling the shared stepCycle).  Deleted the s_useDispatcher /
+    EMULATR_DISPATCH env gate AND the legacy direct for-loop.  GATE RETIRED:
+    phase1_dispatch_gate.sh has no legacy oracle to diff against (it would now
+    compare the dispatcher path to itself -- vacuous PASS), so retire/repurpose it;
+    determinism_equivalence (schedLib) is the sole acceptance gate going forward.
+    Cleared because Phase-2 acceptance was met (T1..T5 green + gate byte-identical).
+  ===========================================================================
+  PHASE 2 CLOSED 2026-06-20.  T1..T6 landed: trace cpuId/rpcc + global ordinal,
+  stepCycle split, system-clock decouple, CpuState ownership in AlphaCpuAgent,
+  whami->cpuSlot unification, legacy loop deleted.  The dispatcher/agent path is
+  THE path; CpuState is agent-owned; clock + sinks are dispatcher-level shared.
+  NEXT = PHASE 3: LL/SC cross-CPU interlock (THE cliff) -- per-CPU lock_flag/
+  lock_physical_address, any store clears other CPUs' flag on that granule,
+  LockArbiter real backing, a non-negotiable contention micro-test, never yield
+  MID-INSTRUCTION but interleave at the LL/SC boundary.  See memory.md deferred
+  list + journals/20260618_smp_secondary_cpu_bringup_design.md.
+  ===========================================================================
 
 DOWNSTREAM (already in memory.md deferred list; not Phase 2):
   Phase 3 (LL/SC cross-CPU interlock + LockArbiter real backing + contention

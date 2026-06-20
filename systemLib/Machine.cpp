@@ -1016,32 +1016,25 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
                     m_stopSentinel.string());
     }
     // Match PipelineDriver::run() semantics: maxCycles caps the number of
-    // step() iterations, not the cycleCount delta.  Each iteration runs the
+    // stepCycle(i) iterations, not the cycleCount delta.  Each iteration runs the
     // shared per-cycle body stepCycle(i), which returns false to BREAK (stop
-    // sentinel or CPU halt).  The legacy loop here and the dispatcher-driven
-    // AlphaCpuAgent call the IDENTICAL stepCycle -- the Phase-1 byte-identical
-    // boot acceptance gate.
-    // PHASE-1 DISPATCHER PATH (gated; legacy is the default).  EMULATR_DISPATCH
-    // routes the per-cycle stepCycle() through the SMP harness: one
-    // AlphaCpuAgent under SequentialDriver, which calls the IDENTICAL
-    // stepCycle(i).  A clean boot here is the step-3 byte-identical gate for the
-    // dispatcher path; until it passes, the unset default keeps the legacy
-    // direct loop.  After it passes, this becomes the default and the legacy
-    // loop is deleted in a separate commit.  (See
-    // journals/20260619_alphacpuagent_phase1_design.md.)
-    static bool const s_useDispatcher = (std::getenv("EMULATR_DISPATCH") != nullptr);
-    if (s_useDispatcher) {
+    // sentinel or CPU halt).
+    //
+    // Phase-2 T6 (2026-06-20): the dispatcher path is now the ONLY path.  The
+    // legacy direct loop and the EMULATR_DISPATCH env gate were deleted once the
+    // dispatcher boot was proven byte-identical to legacy across the full Phase-2
+    // lift (T1..T5; phase1_dispatch_gate.sh).  With no legacy oracle left, that
+    // boot gate is RETIRED -- the determinism harness (schedLib
+    // determinism_equivalence) is now the sole acceptance gate.  One
+    // AlphaCpuAgent (agent0, which OWNS the CpuState m_cpu aliases) under
+    // SequentialDriver, calling the shared stepCycle(i).  (See journals/
+    // 20260619_alphacpuagent_phase2_ownership_lift_design.md, decision D-2.)
+    {
         emulatr::smp::Dispatcher disp(/*quantum*/ 1);
-        // Phase-2 T4: reuse the Machine-owned agent0 (it OWNS the CpuState that
-        // m_cpu aliases) instead of a transient local agent; reset only its
-        // per-run scheduling state (cycle index + stop flag).
-        m_agent0.resetForRun();
+        m_agent0.resetForRun();   // per-run scheduling state (cycle index + stop)
         disp.addAgent(&m_agent0);
         disp.setDriver(std::make_unique<emulatr::smp::SequentialDriver>());
         disp.run(maxCycles);
-    } else {
-        for (uint64_t i = 0; i < maxCycles; ++i)
-            if (!stepCycle(i)) break;
     }
 
     // Save-on-halt.  Independent of the periodic counter so it always
