@@ -101,8 +101,8 @@ TEST_CASE("DecListingSink -- emits one listing line and one machine line")
     CHECK(contains(decText,  "ADDQ"));
     CHECK(contains(decText,  "R03 = 0x0000000000000052"));
     CHECK(contains(decText,  "00000007"));
-    CHECK(contains(decText,  "c00 00000007"));   // SMP cpu-slot listing column
-    CHECK(contains(machText, "INS cpu=0 rpcc=7"));
+    CHECK(contains(decText,  "o0 c00 00000007"));   // global ordinal + cpu-slot columns
+    CHECK(contains(machText, "INS ord=0 cpu=0 rpcc=7"));
     CHECK(contains(machText, "mnem=ADDQ"));
     CHECK(contains(machText, "instr=40220403"));
 
@@ -140,7 +140,7 @@ TEST_CASE("DecListingSink -- TRACE_REGFILE emits REG line in machine channel")
     }
 
     auto const machText = slurp(mach);
-    CHECK(contains(machText, "REG cpu=0 rpcc=11"));
+    CHECK(contains(machText, "REG ord=0 cpu=0 rpcc=11"));
     CHECK(contains(machText, "R05=00000000deadbeef"));
 
     std::filesystem::remove(mach);

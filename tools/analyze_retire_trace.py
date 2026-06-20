@@ -57,7 +57,7 @@ from pathlib import Path
 # `cyc=`->`rpcc=` rename (2026-06-20) are both tolerated; `cyc=` is still
 # accepted so pre-rename trace files keep parsing.
 RET_LINE = re.compile(
-    r"RET\s+(?:cpu=\d+\s+)?(?:rpcc|cyc)=(\d+)\s+pc=([0-9a-fA-F]+)\s+(\S+)"
+    r"RET\s+(?:ord=\d+\s+)?(?:cpu=\d+\s+)?(?:rpcc|cyc)=(\d+)\s+pc=([0-9a-fA-F]+)\s+(\S+)"
 )
 
 

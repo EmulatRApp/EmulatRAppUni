@@ -17,11 +17,12 @@
 // instruction:
 //
 //   1. DEC listing channel  (human-readable, diff-against-reference):
-//      "cNN cycle pc encoded mnem  operands  result"   (cNN = SMP cpu slot)
-//      e.g. "c00 00000007 0000000000000008 47e30403 ADDQ  R01, R02, R03  R03 = 0x0000000000000052"
+//      "oNN cNN cycle pc encoded mnem  operands  result"   (oNN = global retire
+//      ordinal, cNN = SMP cpu slot)
+//      e.g. "o7 c00 00000007 0000000000000008 47e30403 ADDQ  R01, R02, R03  R03 = 0x0000000000000052"
 //
 //   2. Machine-parsable channel (script-friendly, key=value):
-//      "INS cpu=N rpcc=N pc=H instr=H mnem=X ops=\"...\" result=\"...\""
+//      "INS ord=N cpu=N rpcc=N pc=H instr=H mnem=X ops=\"...\" result=\"...\""
 //
 // When TRACE_REGFILE is set, every INS is followed by a REG line
 // containing all 32 integer registers; TRACE_FPRFILE adds an FRG line
@@ -48,7 +49,7 @@
 //   collide.
 //
 //   Line format:
-//     RET cpu=<n> rpcc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
+//     RET ord=<n> cpu=<n> rpcc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
 //          [ sde=<1-3>][ H<dd>=<hex16>]*
 //
 //   <mnem> is the codegen-emitted instruction mnemonic literal,
@@ -143,6 +144,9 @@ struct LookbackEntry
                                   // CPU, captured at freeze.  Default 0 keeps
                                   // default-constructed ring slots benign --
                                   // they are .valid-gated and never emitted.
+    uint64_t    ordinal    = 0;   // P2-T3b: global retire ordinal (dispatcher
+                                  // monotonic count across all agents) captured
+                                  // at freeze; distinct from cycle (per-CPU PCC).
     std::string mnemonic;       // copy of the codegen literal
     std::string operands;       // pre-rendered Disassembler output
     std::string result;         // pre-rendered formatResult output
@@ -232,6 +236,14 @@ private:
     std::array<LookbackEntry, LOOKBACK_SIZE> m_lookback;
     uint64_t                                 m_lookbackHead = 0;
 
+    // P2-T3b: global retire ordinal.  Incremented once per onCommit (every
+    // retire, traced or not), stamped into each frozen LookbackEntry and emitted
+    // as the leading `ord=` field.  In the single-coalesced-sink design this
+    // monotonic count IS the dispatcher's cross-agent global retire order (CPU1
+    // emits into the same sink -> same counter, in interleave order).  It is NOT
+    // any CPU's cycleCount.
+    uint64_t                                 m_retireOrdinal = 0;
+
     // PAL window state.
     bool      m_inPalWindow      = false;
     uint32_t  m_postExitCountdown = 0;
@@ -266,7 +278,8 @@ private:
 
     // Write the REG line (32 integer regs) and / or the FRG line (32
     // FP regs) into the machine channel.
-    void emitRegisters(uint64_t                cycle,
+    void emitRegisters(uint64_t                 ordinal,
+                       uint64_t                 cycle,
                        coreLib::CpuState const& postCommitCpu);
 
     // True when the sink should emit a per-commit listing right now.
@@ -277,7 +290,8 @@ private:
     // regfile via postCommitCpu, omitting any register currently zero
     // and skipping R31 always.  Charges the window counter when the
     // window is the trigger so it self-disables at zero.
-    void emitRetireCompact(CommitRecord const&        record,
+    void emitRetireCompact(uint64_t                   ordinal,
+                           CommitRecord const&        record,
                            coreLib::CpuState const&   postCommitCpu);
 };
 
