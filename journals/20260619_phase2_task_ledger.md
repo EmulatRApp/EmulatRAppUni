@@ -138,11 +138,12 @@ P2-T4  STEP 4 -- CpuState ownership into AlphaCpuAgent.
     cpuSlot = agent0.id() = 0 -> byte-identical (cpu= tag stays 0).  Single Machine
     ctor (default args) so the reference inits everywhere; no other AlphaCpuAgent
     construction; harness determinism uses MockCpuAgent (untouched).
-  PHASE-5 GAP (recorded per the T4 cpuSlot confirm): cpuSlot is NOT in Snapshot.cpp's
-    field-by-field serializer (grep clean).  HARMLESS for single-agent T4 (cpuSlot
-    invariantly 0 -> round-trips as default 0), but multi-CPU snapshot MUST either
-    serialize cpuSlot or have each agent re-assert it post-restore, else CPU1's slot
-    clobbers to 0 on `machine.cpu() = cpuTmp`.  Prerequisite for Phase 5.
+  CORRECTION (T5, 2026-06-20): the T4 "cpuSlot not serialized" claim was WRONG.
+    Snapshot.cpp:122 writes the WHOLE CpuState as a raw POD blob (writeRawData(&cpu,
+    sizeof(cpu))); the field-by-field `ds << cpu.cycleCount` above it is just a
+    redundant header copy.  So cpuSlot IS serialized and round-trips.  There is NO
+    cpuSlot-specific gap; the real Phase-6 item is serializing ALL agents' CpuStates
+    (one POD blob per agent), already the deferred N-CPU snapshot work.
   NEXT: T5 = whami-cpuid reconciliation (route WHAMI / CSERVE$WHAMI + HWRPB whami
     through the real cpuSlot; retype/retire the mis-typed mCpuId).  Then T6 flip+delete.
 
@@ -153,6 +154,20 @@ P2-T5  whami-cpuid RECONCILIATION (do with/after STEP 4).
   WHAMI (execMfprWhami / CSERVE$WHAMI @PalEntries.cpp ~542/~851) and HWRPB whami
   (HwrpbBuilder) through the real slot; retype/retire the mis-typed mCpuId.  Do
   NOT leave two divergent slot sources long-term.
+  APPLIED 2026-06-20 (UNBUILT -- client build + gate pending): chose CLEAN removal
+    (option a, Tim).  Both PAL WHAMI sites now read c.cpu->cpuSlot: CSERVE$WHAMI
+    (PalEntries.cpp:549) and execMfprWhami (:872, un-maybe_unused'd c).  Single
+    agent => cpuSlot 0 -> byte-identical to the prior hardcoded 0.  REMOVED the
+    dormant mis-typed mCpuId/cpuId()/setCpuId() from CpuState.h (no production
+    caller; AlphaCpuAgent::cpuId() is a separate, unrelated method).  POD-blob
+    layout shrank -> kCpuStateVersion 8 -> 9 (Snapshot.h, + history entry); pre-v9
+    snapshots rejected at load (round-trip test still passes -- same layout in-run).
+    HWRPB whami left as-is: primary_cpu_id is build-time spec config (HwrpbBuilder
+    .cpp:251), not a CpuState decode path, already 0 for one CPU.  cpuSlot is now
+    the SINGLE "which CPU" source (trace cpu= tag + both WHAMI reads).
+  NEXT: T6 = flip EMULATR_DISPATCH default-on + delete the legacy Machine::run loop
+    (D-2 -- its OWN one-variable commit after Phase-2 acceptance; determinism harness
+    becomes the sole gate).  Then Phase 2 is CLOSED; Phase 3 (LL/SC interlock) begins.
 
 P2-T6  STEP 5 -- flip default + delete legacy loop (POST-Phase-2 acceptance only).
   Per D-2: a SEPARATE one-variable commit AFTER the dispatcher path has been the
