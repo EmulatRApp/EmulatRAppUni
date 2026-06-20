@@ -790,25 +790,41 @@ endforeach()
 # ----------------------------------------------------------------------------
 # The run directory ($<TARGET_FILE_DIR:Emulatr>) is the runtime root: relative
 # paths, [Storage] diskDir, the manifest, and any helper tool resolve from here.
-# Every support file (python or data) that must exist at runtime gets a row in
-# one of these lists, or it will not be present in the run dir.  Tools land in
-# run-dir/tools/ and locate config/ as a sibling (../config from tools/).
-set(EMULATR_TOOL_FILES
-    "tools/mkdisk.py"
-    # Run helpers (Git Bash).  Deployed to run-dir/tools/; each anchors to the
-    # run-dir ROOT (../) where Emulatr.exe lives, so cmake regen no longer
-    # wipes them (they regenerate from source here on every build).
-    "tools/trace_halt.sh"
-    "tools/launch_vms_boot.sh"
-    "tools/build_test_run.sh"
-    "tools/diag_halt_irq4.sh"
+# Tool/data files are copied next to the executable on EVERY build.  Previously
+# this was a hand-maintained list, which meant a new helper script silently went
+# undeployed (and had to be copied by hand) until someone remembered to add a
+# row.  It is now GLOB-driven so new tools deploy automatically.
+#
+# run_fw.sh is SPECIAL: it must sit at the run-dir ROOT (beside Emulatr.exe)
+# because it anchors to its own directory via BASH_SOURCE and launches
+# ./Emulatr.exe.  Every other tool lands in run-dir/tools/ and locates config/
+# as a sibling (../config from tools/).
+add_custom_command(TARGET Emulatr POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_fw.sh"
+            "$<TARGET_FILE_DIR:Emulatr>/run_fw.sh"
+    COMMENT "[Emulatr] copy run helper: run_fw.sh (run-dir root)"
+    VERBATIM
 )
 
+# Everything else under tools/ (top-level *.sh and *.py) -> run-dir/tools/.
+# GLOB with CONFIGURE_DEPENDS so a NEWLY ADDED tool script is deployed on the
+# next build WITHOUT hand-editing a list.  Deliberate, scoped exception to the
+# house "no file(GLOB)" rule: that rule guards COMPILED SOURCES (CMake won't
+# reconfigure when a new .cpp appears); these are runtime DATA files, and
+# CONFIGURE_DEPENDS makes the generator re-glob at build time, so new scripts
+# are caught.  Top-level glob only -- the tools/host_decompressor/ and
+# tools/ghidra_scripts/ subtrees are NOT runtime tools and stay excluded.
+file(GLOB EMULATR_TOOL_FILES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/*.sh"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/*.py"
+)
+list(REMOVE_ITEM EMULATR_TOOL_FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_fw.sh")
 foreach(_toolfile ${EMULATR_TOOL_FILES})
     get_filename_component(_toolname "${_toolfile}" NAME)
     add_custom_command(TARGET Emulatr POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_CURRENT_SOURCE_DIR}/${_toolfile}"
+                "${_toolfile}"
                 "$<TARGET_FILE_DIR:Emulatr>/tools/${_toolname}"
         COMMENT "[Emulatr] copy tool: ${_toolname}"
         VERBATIM

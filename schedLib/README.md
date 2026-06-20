@@ -1,13 +1,26 @@
-# schedLib -- deterministic/parallel agent scheduler (UNDER REVIEW, BUILD-INERT)
+# schedLib -- deterministic/parallel agent scheduler (IN BUILD; harness VALIDATED)
 
-Status: **STAGED, NOT IN THE BUILD.** 2026-06-18.
+Status: **IN THE BUILD; harness validated green.** Updated 2026-06-19
+(originally staged 2026-06-18).
 
-This directory holds an incoming scaffold implementation of the toggle-able
-deterministic-vs-parallel processor/agent execution model (the SMP scheduler).
-It is dropped here for review and is **intentionally not compiled**: V4's CMake
-lists sources explicitly (`EMULATR_SOURCES`, `EMULATR_TEST_SOURCES`) with no
-`file(GLOB)`, so nothing in this directory builds until it is explicitly added.
-Your F5 / normal build is unaffected.
+This directory holds the toggle-able deterministic-vs-parallel processor/agent
+execution model (the SMP scheduler). It is now compiled in:
+`SmpHarness.h`, `SmpDrivers.h`, and `AlphaCpuAgent.{h,cpp}` are in
+`EMULATR_SOURCES`, and `tests/schedLib/smp_harness_tests.cpp` is in
+`EMULATR_TEST_SOURCES`. V4's CMake lists sources explicitly (no `file(GLOB)`).
+
+**Validation (2026-06-19):** `determinism_equivalence` passes -- Sequential ==
+Threaded, **bit-identical (1666 lock grants identical across 5 runs)** -- plus
+`parked_agent_no_deadlock` and `lock_arbiter_semantics`. The harness is the
+verification fixed point: a future determinism failure is the new agent's bug,
+not the harness's.
+
+**Live wiring:** the real CPU now steps behind the harness as `AlphaCpuAgent`
+(single agent, cpuId 0, under `SequentialDriver`), gated in `Machine::run` by
+the `EMULATR_DISPATCH` env var (unset => legacy loop, the default). The
+remaining Phase-1 acceptance gate is an `EMULATR_DISPATCH=1` boot proven
+byte-identical to the legacy boot. A real second CPU is deferred (Phase 2+:
+CpuState ownership-lift, then the Phase-3 LL/SC interlock).
 
 ## What it is
 
@@ -38,9 +51,20 @@ Design rationale + the phased SMP plan: `journals/20260618_smp_secondary_cpu_bri
 5. Maps onto V4's existing `commitPending` staged-commit model rather than a
    parallel mechanism.
 
-## To integrate (only after review)
+## Integration status (DONE / REMAINING)
 
-- Add the headers/`.cpp` to `EMULATR_SOURCES` (CMakeLists.txt:105).
-- Add the doctest `.cpp` to `EMULATR_TEST_SOURCES` (CMakeLists.txt:495).
-- Wire the Dispatcher into `systemLib::Machine::run` behind the driver toggle,
-  defaulting to SequentialDriver (preserves current deterministic behavior).
+DONE (2026-06-19):
+- Headers + `AlphaCpuAgent.cpp` added to `EMULATR_SOURCES`; doctest added to
+  `EMULATR_TEST_SOURCES`.
+- Dispatcher wired into `systemLib::Machine::run` behind the `EMULATR_DISPATCH`
+  toggle, defaulting to the legacy loop (preserves current deterministic boot).
+
+REMAINING:
+- Close the Phase-1 gate: `EMULATR_DISPATCH=1` boot byte-identical to legacy.
+- Phase 2: lift `CpuState` ownership into `AlphaCpuAgent` (re-home
+  `bindCycleSource`'s raw pointer and the interval-timer fire-edge onto the
+  dispatcher's logical clock) -- the real prerequisite for a second CPU.
+- Phase 3: real `LockArbiter` backing (`lock_flag` / cache-granule / DMA hook)
+  + the cross-CPU LL/SC contention micro-test.
+- See `journals/20260618_smp_secondary_cpu_bringup_design.md` (Phases 0-6) and
+  `journals/20260619_next_steps_alphacpuagent_gap.md` (P0-P3) for the full plan.
