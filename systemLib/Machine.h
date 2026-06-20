@@ -195,6 +195,18 @@ public:
     coreLib::CpuState&       cpu()       noexcept { return m_cpu; }
     coreLib::CpuState const& cpu() const noexcept { return m_cpu; }
 
+    // ---- System timebase (Phase 2, STEP 1a) --------------------------------
+    // The SYSTEM clock, conceptually distinct from any one CPU's architectural
+    // PCC.  Today it is exactly the (single) CPU's cycleCount, so this is a PURE
+    // indirection with ZERO behavior change.  Every SYSTEM consumer -- the RTC
+    // time source, the Cchip interval-timer fire edge, the flash-flush debounce,
+    // the snapshot cadence + filenames, the IDLEWARP -- must read THIS, never a
+    // CPU's cycleCount directly.  STEP 3 decouples it into its own counter that
+    // advances by the per-step retire cycle delta (design D-1a); under policy
+    // P-A the running CPU's PCC tracks it, so the byte-identical gate still holds.
+    // See journals/20260619_alphacpuagent_phase2_ownership_lift_design.md.
+    [[nodiscard]] uint64_t systemNow() const noexcept { return m_cpu.cycleCount; }
+
     memoryLib::GuestMemory&       memory()       noexcept { return m_chipset.guestMemory(); }
     memoryLib::GuestMemory const& memory() const noexcept { return m_chipset.guestMemory(); }
 

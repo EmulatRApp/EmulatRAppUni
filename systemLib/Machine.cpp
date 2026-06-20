@@ -343,6 +343,11 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
     // the CPU thread, so no synchronization is required.  No host clock
     // anywhere -- identical boots read identical TOY bytes.  See
     // deviceLib/Tsunami/ToyRtc.h DETERMINISM INVARIANT.
+    // L1 SEAM (Phase 2): the RTC time source is the SYSTEM clock, not a CPU's
+    // PCC.  Today systemNow() == m_cpu.cycleCount so binding the pointer here is
+    // behavior-identical; STEP 3/4 re-homes this to dedicated system-clock
+    // storage (the RTC samples a uint64_t* lazily, so the re-home is a pointer
+    // swap).  Do NOT bind this to a second CPU's cycleCount when CPU1 lands.
     m_chipset.rtc().bindCycleSource(&m_cpu.cycleCount);
 
     // CpuState default-init is sufficient for a freshly constructed
@@ -949,7 +954,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
     // post-snapshot resume does not race a save fired in the previous
     // run's tail.
     if (m_autoSnapshotEnabled) {
-        m_nextAutoSaveCycle = m_cpu.cycleCount + kAutoSavePeriodCycles;
+        m_nextAutoSaveCycle = systemNow() + kAutoSavePeriodCycles;
     }
 
     // Clear the forensic exception logs so each run() starts with
@@ -1035,7 +1040,7 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
         uint64_t const ts =
             static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch()).count());
-        name << "auto_halt_" << ts << "_" << m_cpu.cycleCount << kSnapshotExtension;
+        name << "auto_halt_" << ts << "_" << systemNow() << kSnapshotExtension;
 
         std::error_code ec;
         std::filesystem::create_directories(m_snapshotDir, ec);
@@ -1102,11 +1107,11 @@ bool Machine::stepCycle(uint64_t i) noexcept
         // predig path-builder + save the --snapshot-on-pc fire path already uses.
         if (m_chipset.com1().takeSnapshotRequest()) {
             std::string const path = (snapshotDir() /
-                ("predig_oemsnap_cyc" + std::to_string(m_cpu.cycleCount) + ".axpsnap")).string();
+                ("predig_oemsnap_cyc" + std::to_string(systemNow()) + ".axpsnap")).string();
             save(*this, path);
             spdlog::info("console-snapshot: marker matched -> {}", path);
         }
-        if (m_autoSnapshotEnabled && m_cpu.cycleCount >= m_nextAutoSaveCycle) {
+        if (m_autoSnapshotEnabled && systemNow() >= m_nextAutoSaveCycle) {
             // Rolling auto-save.  Filename embeds wall-clock seconds
             // and cycle for chronological sorting under most file
             // systems.  Errors are logged inside save() and do not
@@ -1116,13 +1121,13 @@ bool Machine::stepCycle(uint64_t i) noexcept
             uint64_t const ts =
                 static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
                     std::chrono::system_clock::now().time_since_epoch()).count());
-            name << "auto_" << ts << "_" << m_cpu.cycleCount << kSnapshotExtension;
+            name << "auto_" << ts << "_" << systemNow() << kSnapshotExtension;
 
             std::error_code ec;
             std::filesystem::create_directories(m_snapshotDir, ec);
             (void) systemLib::save(*this, m_snapshotDir / name.str(), "periodic");
             systemLib::pruneOldSnapshots(m_snapshotDir, kAutoSaveKeepCount);
-            m_nextAutoSaveCycle = m_cpu.cycleCount + kAutoSavePeriodCycles;
+            m_nextAutoSaveCycle = systemNow() + kAutoSavePeriodCycles;
         }
 
         // ------------------------------------------------------------------
@@ -1158,7 +1163,7 @@ bool Machine::stepCycle(uint64_t i) noexcept
                           << trig.pc
                           << std::dec << std::setfill(' ');
                 }
-                pname << "_cyc" << m_cpu.cycleCount << kSnapshotExtension;
+                pname << "_cyc" << systemNow() << kSnapshotExtension;
 
                 std::error_code ec;
                 std::filesystem::create_directories(m_snapshotDir, ec);
@@ -1289,7 +1294,13 @@ bool Machine::stepCycle(uint64_t i) noexcept
             uint64_t const idlePc = m_cpu.pcAddr();
             if (idlePc >= 0x000000000007bad0ull && idlePc < 0x000000000007bb10ull
                 && canAcceptInterrupt(22)
-                && !chipsetLib::intervalTimerShouldFire(m_cpu.cycleCount)) {
+                && !chipsetLib::intervalTimerShouldFire(systemNow())) {
+                // IDLEWARP SEAM (Phase 2): warps the SYSTEM clock past an idle
+                // spin to the next timer edge.  Today systemNow() == this CPU's
+                // PCC so warping m_cpu.cycleCount IS warping the system clock
+                // (behavior-identical).  STEP 3 advances systemNow() by the warp
+                // delta; under policy P-A the running CPU's PCC tracks the warp
+                // (design D-1a) -- keep them moving together.
                 uint64_t const c0 = m_cpu.cycleCount;
                 m_cpu.cycleCount  = (c0 | Tsunami21272::Spec::kCchipTimerMask) + 1;
                 // process-global static; revisit under the threaded driver.
@@ -1307,7 +1318,7 @@ bool Machine::stepCycle(uint64_t i) noexcept
         // ---- END EMULATR_IDLEWARP idle fast-forward ----------------------------
 
         // FIRE: latch unconditionally on the cycle edge.
-        if (chipsetLib::intervalTimerShouldFire(m_cpu.cycleCount)) {
+        if (chipsetLib::intervalTimerShouldFire(systemNow())) {
             m_chipset.cchip().fireIntervalTimer();
 
             // 2026-06-02: NVRAM flash debounce poll rides the interval-timer
@@ -1315,7 +1326,7 @@ bool Machine::stepCycle(uint64_t i) noexcept
             // burst (one SRM `set' = sector erase + N byte programs) into a
             // single atomic flush once the flash has been quiescent for W
             // cycles (D1).  Cheap; polled at the ~2^18-cycle timer cadence.
-            m_chipset.flash().tryFlush(m_cpu.cycleCount);
+            m_chipset.flash().tryFlush(systemNow());
         }
 
         // DELIVER: divert only when the CPU can accept the latched request.
@@ -1571,9 +1582,14 @@ bool Machine::stepCycle(uint64_t i) noexcept
         // timer wins; the synthetic stays armed for the next cycle (its
         // !fired guard re-checks cpu.cycleCount >= m_injectInterruptCycle
         // which will still be true).
+        // L2 (Phase 2): armInterruptInjection arms a one-shot at a target SYSTEM
+        // cycle, so the predicate reads systemNow(), not a CPU's PCC.  Today they
+        // are equal (pure indirection).  The compare is level-triggered (>=) and
+        // one-shot, so it is IDLEWARP-safe -- a warp past the target is still
+        // caught on the next retire (same property the interval-timer FIRE has).
         if (!divertedThisCycle
             && m_injectInterruptCycle != 0 && !m_injectInterruptFired
-            && m_cpu.cycleCount >= m_injectInterruptCycle)
+            && systemNow() >= m_injectInterruptCycle)
         {
             if (m_cpu.palBase != 0) {
                 // Snapshot the staging arguments for logging BEFORE

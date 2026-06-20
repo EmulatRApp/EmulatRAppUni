@@ -1,0 +1,79 @@
+Approach.  
+
+1) lookup block by pa
+2) fall back block not resolved
+3) manually created pa JIT blocks - we would write to ./jitLib/handwritten_jit.txt
+
+
+Block 0x8000
+
+                             **************************************************************
+                             *                          FUNCTION                          *
+                             **************************************************************
+                             undefined __stdcall FUN_00008000(undefined1 * param_1, l
+             undefined         <UNASSIGNED>   <RETURN>
+             undefined1 *      a0:8           param_1
+             longlong          a1:8           param_2
+             undefined1        a2:1           param_3
+                             FUN_00008000                                    XREF[11]:    FUN_00011300:00011550(c), 
+                                                                                          FUN_001544f4:00154a24(*), 
+                                                                                          FUN_001544f4:00154a60(*), 
+                                                                                          FUN_001544f4:00154a64(*), 
+                                                                                          0015f58a(*), 00163800(*), 
+                                                                                          001b5c76(*), 001b5d76(*), 
+                                                                                          001b5f76(*), 
+                                                                                          FUN_001bce3c:001bce48(*), 
+                                                                                          002f8094(*)  
+        00008000 10 04 ff 47     CLR        param_1
+        00008004 4e 2d 40 c3     BR         ra,LAB_00013540
+
+Block 0x00013540
+                             LAB_00013540                                    XREF[1]:     FUN_00008000:00008004(j)  
+        00013540 1b 04 3f 44     BIS        t0,zero,pv
+        00013544 1c 04 9f 46     BIS        a4,zero,at
+        00013548 1d 04 bf 46     BIS        a5,zero,GP
+        0001354c 21 96 61 4a     ZAPNOT     a3,0xc,t0
+        00013550 81 96 22 48     SRL        t0,0x14,t0
+        00013554 00 00 7f 24     LDAH       t2,0x0(zero)
+        00013558 ec 0d 63 20     LDA        t2,0xdec(t2)
+                             LAB_0001355c+2                                  XREF[0,1]:   0027ddca  
+        0001355c a1 05 23 40     CMPEQ      t0,t2,t0
+        00013560 01 00 20 e4     BEQ        t0,LAB_00013568
+        00013564 0a 00 e0 c3     BR         LAB_00013590
+
+block 0x00013568
+                             LAB_00013568                                    XREF[1]:     00013560(j)  
+        00013568 c3 00 3f 20     LDA        t0,0xc3
+        0001356c 1f 04 ff 47     CLR        zero
+        00013570 00 04 00 44     MOV        v0,v0
+        00013574 1f 04 ff 47     CLR        zero
+        00013578 1f 04 ff 47     CLR        zero
+        0001357c 1f 04 ff 47     CLR        zero
+        00013580 40 29 e1 77     HW_MTPR    zero
+        00013584 02 00 e0 c3     BR         LAB_00013590
+        00013588 1f 04 ff 47     CLR        zero
+        0001358c 1f 04 ff 47     CLR        zero
+
+block 0x00013590                            
+
+LAB_00013590+1                                  XREF[2,1]:   00013564(j), 00013584(j), 
+                             LAB_00013590                                                 001532b5(j)  
+        00013590 00 04 00 44     MOV        v0,v0
+        00013594 1f 04 ff 47     CLR        zero
+        00013598 1f 04 ff 47     CLR        zero
+        0001359c 1f 04 ff 47     CLR        zero
+        000135a0 10 03 ff 77     HW_MTPR    zero
+                             LAB_000135a4+3                                  XREF[0,2]:   00233beb(j), 0023488b(j)  
+        000135a4 80 a3 ff 77     HW_MTPR    zero
+        000135a8 81 f6 41 4b     SRL        ra,0xf,t0
+                             LAB_000135ac+1                                  XREF[0,1]:   002f539d(j)  
+        000135ac 21 f7 21 48     SLL        t0,0xf,t0
+        000135b0 10 10 e1 77     HW_MTPR    zero
+        000135b4 00 60 3f 24     LDAH       t0,0x6000(zero)
+        000135b8 00 00 21 20     LDA        t0,0x0(t0)
+        000135bc 1f 00 7f 20     LDA        t2,0x1f
+        000135c0 10 16 e1 77     HW_MTPR    zero
+                             LAB_000135c4+2                                  XREF[0,1]:   0028b89a(j)  
+        000135c4 40 2a e3 77     HW_MTPR    zero
+        000135c8 34 00 3f 24     LDAH       t0,0x34(zero)
+etc... 
