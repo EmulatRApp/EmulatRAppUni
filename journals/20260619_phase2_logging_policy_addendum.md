@@ -237,9 +237,15 @@ once 1a's gate is green, against a clean baseline.  SEQUENCING: 1a green -> THEN
 1b, its own one-change-per-gate commit.
 
 CONTRACT (stable):
-  - The cpuId tag is sourced from CpuState::cpuId() (already present), emitted on
-    EVERY trace line of the authoritative stream (DecListingSink INS / RET / DEC
-    listing channels).
+  - CORRECTION (2026-06-19, found in review): the tag is NOT sourced from
+    CpuState::cpuId().  cpuId() returns CpuType -- the processor MODEL enum
+    (EV6=8 ...), NOT an SMP slot -- and is dormant (setCpuId never called; WHAMI
+    hardcoded 0).  STEP 1b adds a dedicated CpuState.cpuSlot (uint32_t, default 0;
+    Option A) and the tag is sourced from THAT.  Single agent = slot 0 today;
+    STEP 4 sets cpuSlot from AlphaCpuAgent::id().  Reconciling cpuSlot with the
+    mis-typed mCpuId/WHAMI is the TODO(whami-cpuid) follow-up.
+  - The cpuId tag (value = CpuState.cpuSlot) is emitted on EVERY trace line of
+    the authoritative stream (DecListingSink INS / RET / DEC listing channels).
   - The trace sink stays a SINGLE shared stream (no per-CPU files).
   - The golden reference AND the AXPBox reference are refreshed ONCE, in the SAME
     commit as the format change (the tag changes trace text).

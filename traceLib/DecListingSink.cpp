@@ -36,9 +36,12 @@ namespace {
 // stores frozen strings so the entries remain valid after the source
 // CommitRecord goes out of scope -- this is what makes PAL-window
 // auto-on possible (we hand-replay 10 entries on entry).
-LookbackEntry freezeRecord(CommitRecord const& record)
+LookbackEntry freezeRecord(CommitRecord const& record, uint32_t cpuSlot)
 {
     LookbackEntry e;
+    e.cpuId    = cpuSlot;   // SOLE population path: the signature forces the one
+                            // caller (onCommit) to supply the retiring CPU's slot,
+                            // so a frozen entry can never carry a default/stray id.
     e.cycle    = record.cycle;
     e.pc       = record.pc;
     e.encoded  = record.encoded;
@@ -562,7 +565,7 @@ void DecListingSink::emitRegisters(uint64_t                cycle,
 void DecListingSink::onCommit(CommitRecord const&        record,
                               coreLib::CpuState const&   postCommitCpu)
 {
-    LookbackEntry const frozen = freezeRecord(record);
+    LookbackEntry const frozen = freezeRecord(record, postCommitCpu.cpuSlot);
 
     // Always update the lookback ring -- cheap, no I/O.  Keeping the
     // ring fresh during the Phase C+ pre-relocation gated window lets
