@@ -12,7 +12,9 @@
 # the bulk of cycles late in the run -- the candidate "wedge" pattern.
 #
 # Line format expected:
-#   RET cyc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
+#   RET [cpu=<n> ]rpcc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
+#   (cpu= is the optional SMP slot tag; rpcc= was formerly cyc=, renamed
+#    2026-06-20 -- it is the per-CPU PCC.  Both forms are accepted.)
 #
 # Usage:
 #   python analyze_retire_trace.py <trace_file>
@@ -49,11 +51,13 @@ from collections import Counter
 from pathlib import Path
 
 # Match the RET line format emitted by DecListingSink::emitRetireCompact.
-# Captures: cycle, pc, mnemonic.  Anything after the mnemonic (pal, exc,
-# register fields) is ignored -- this tool only needs the control-flow
-# trace, not register state.
+# Captures: cycle (rpcc), pc, mnemonic.  Anything after the mnemonic (pal,
+# exc, register fields) is ignored -- this tool only needs the control-flow
+# trace, not register state.  The optional `cpu=<n>` SMP slot tag and the
+# `cyc=`->`rpcc=` rename (2026-06-20) are both tolerated; `cyc=` is still
+# accepted so pre-rename trace files keep parsing.
 RET_LINE = re.compile(
-    r"RET\s+cyc=(\d+)\s+pc=([0-9a-fA-F]+)\s+(\S+)"
+    r"RET\s+(?:cpu=\d+\s+)?(?:rpcc|cyc)=(\d+)\s+pc=([0-9a-fA-F]+)\s+(\S+)"
 )
 
 

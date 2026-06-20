@@ -288,7 +288,7 @@ DecListingSink::DecListingSink(std::filesystem::path const& decLogPath,
             m_retireLog << "# trace_mask=0x" << std::hex << std::setw(8)
                         << std::setfill('0') << traceMask
                         << std::dec << std::setfill(' ') << "\n";
-            m_retireLog << "# format: RET cyc=<n> pc=<hex16> <mnem> "
+            m_retireLog << "# format: RET cpu=<n> rpcc=<n> pc=<hex16> <mnem> "
                            "pal=<0|1> exc=<hex16>"
                            " [=>R|F<dd>=<hex16>]"
                            " [<ld|st><sz> va=<hex16> pa=<hex16> v=<hex16>]"
@@ -345,7 +345,7 @@ void DecListingSink::flush()
 // terminates abnormally during the silent window.
 //
 // One-line state mutation today; lives in the .cpp so future expansion
-// (e.g., emitting a "Trace gate opened at cyc=N" marker into each
+// (e.g., emitting a "Trace gate opened at rpcc=N" marker into each
 // stream) does not require touching the header.
 // ============================================================================
 void DecListingSink::setEmitEnabled(bool enabled) noexcept
@@ -400,7 +400,8 @@ void DecListingSink::emitRetireCompact(CommitRecord const&        record,
     // overlength tokens just push the remainder right rather than
     // crashing the format.
     char const* const mnem = record.mnemonic ? record.mnemonic : "?";
-    m_retireLog << vfmt("RET cyc=%llu pc=%016llx %-8s pal=%d exc=%016llx",
+    m_retireLog << vfmt("RET cpu=%u rpcc=%llu pc=%016llx %-8s pal=%d exc=%016llx",
+                        static_cast<unsigned>(postCommitCpu.cpuSlot),
                         static_cast<unsigned long long>(record.cycle),
                         static_cast<unsigned long long>(record.pc),
                         mnem,
@@ -503,7 +504,8 @@ void DecListingSink::emitCommit(LookbackEntry const&     entry,
                                 coreLib::CpuState const* postCommitCpu)
 {
     if (m_decOpen) {
-        m_decLog << vfmt("%08llu %016llx %08x %-8s %-22s %s\n",
+        m_decLog << vfmt("c%02u %08llu %016llx %08x %-8s %-22s %s\n",
+                         static_cast<unsigned>(entry.cpuId),
                          static_cast<unsigned long long>(entry.cycle),
                          static_cast<unsigned long long>(entry.pc),
                          entry.encoded,
@@ -514,7 +516,8 @@ void DecListingSink::emitCommit(LookbackEntry const&     entry,
     }
     if (m_machineOpen) {
         m_machineLog << vfmt(
-            "INS cycle=%llu pc=%016llx instr=%08x mnem=%s ops=\"%s\" result=\"%s\"\n",
+            "INS cpu=%u rpcc=%llu pc=%016llx instr=%08x mnem=%s ops=\"%s\" result=\"%s\"\n",
+            static_cast<unsigned>(entry.cpuId),
             static_cast<unsigned long long>(entry.cycle),
             static_cast<unsigned long long>(entry.pc),
             entry.encoded,
@@ -539,7 +542,8 @@ void DecListingSink::emitRegisters(uint64_t                cycle,
                                    coreLib::CpuState const& postCommitCpu)
 {
     if (m_traceMask & TRACE_REGFILE) {
-        std::string line = vfmt("REG cycle=%llu",
+        std::string line = vfmt("REG cpu=%u rpcc=%llu",
+                                static_cast<unsigned>(postCommitCpu.cpuSlot),
                                 static_cast<unsigned long long>(cycle));
         for (int i = 0; i < 32; ++i) {
             line += vfmt(" R%02d=%016llx",
@@ -549,7 +553,8 @@ void DecListingSink::emitRegisters(uint64_t                cycle,
         m_machineLog << line << '\n';
     }
     if (m_traceMask & TRACE_FPRFILE) {
-        std::string line = vfmt("FRG cycle=%llu",
+        std::string line = vfmt("FRG cpu=%u rpcc=%llu",
+                                static_cast<unsigned>(postCommitCpu.cpuSlot),
                                 static_cast<unsigned long long>(cycle));
         for (int i = 0; i < 32; ++i) {
             line += vfmt(" F%02d=%016llx",
@@ -644,8 +649,9 @@ void DecListingSink::onCommit(CommitRecord const&        record,
                                              : LOOKBACK_DUMP;
 
         if (m_decOpen) {
-            m_decLog << vfmt(">>> HEARTBEAT cycle=%llu pc=0x%016llx commits=%llu "
+            m_decLog << vfmt(">>> HEARTBEAT cpu=%u rpcc=%llu pc=0x%016llx commits=%llu "
                              "elapsed_ms=%lld cps=%llu %s\n",
+                             static_cast<unsigned>(postCommitCpu.cpuSlot),
                              static_cast<unsigned long long>(record.cycle),
                              static_cast<unsigned long long>(record.pc),
                              static_cast<unsigned long long>(m_lookbackHead),
@@ -656,8 +662,9 @@ void DecListingSink::onCommit(CommitRecord const&        record,
             m_decLog.flush();
         }
         if (m_machineOpen) {
-            m_machineLog << vfmt("HEARTBEAT cycle=%llu pc=%016llx commits=%llu "
+            m_machineLog << vfmt("HEARTBEAT cpu=%u rpcc=%llu pc=%016llx commits=%llu "
                                  "elapsed_ms=%lld cps=%llu %s\n",
+                                 static_cast<unsigned>(postCommitCpu.cpuSlot),
                                  static_cast<unsigned long long>(record.cycle),
                                  static_cast<unsigned long long>(record.pc),
                                  static_cast<unsigned long long>(m_lookbackHead),
@@ -690,6 +697,13 @@ void DecListingSink::onPalEntry(uint64_t cycle,
     // emits the marker into both channels for context.
     m_inPalWindow = true;
 
+    // SMP marker tag: stamp the slot of the most recent retired entry
+    // (single agent today => 0).  When CPU1 lands, thread the real slot
+    // from the caller instead of inferring it from the ring.
+    unsigned const cpu = static_cast<unsigned>(
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].cpuId
+                       : 0u);
+
     // Dump the last LOOKBACK_DUMP lookback entries into the trace
     // channels.  Walks backward from head to find oldest valid entry,
     // then forward to emit them in chronological order.
@@ -698,7 +712,8 @@ void DecListingSink::onPalEntry(uint64_t cycle,
                                          : LOOKBACK_DUMP;
 
     if (m_decOpen) {
-        m_decLog << vfmt(">>> PAL ENTRY cycle=%llu entryPC=0x%016llx excAddr=0x%016llx\n",
+        m_decLog << vfmt(">>> PAL ENTRY cpu=%u rpcc=%llu entryPC=0x%016llx excAddr=0x%016llx\n",
+                         cpu,
                          static_cast<unsigned long long>(cycle),
                          static_cast<unsigned long long>(entryPc),
                          static_cast<unsigned long long>(excAddr));
@@ -706,7 +721,8 @@ void DecListingSink::onPalEntry(uint64_t cycle,
         m_decLog.flush();
     }
     if (m_machineOpen) {
-        m_machineLog << vfmt("PAL_ENTRY cycle=%llu entryPC=%016llx excAddr=%016llx\n",
+        m_machineLog << vfmt("PAL_ENTRY cpu=%u rpcc=%llu entryPC=%016llx excAddr=%016llx\n",
+                             cpu,
                              static_cast<unsigned long long>(cycle),
                              static_cast<unsigned long long>(entryPc),
                              static_cast<unsigned long long>(excAddr));
@@ -728,15 +744,22 @@ void DecListingSink::onPalExit(uint64_t cycle,
     m_inPalWindow       = false;
     m_postExitCountdown = POST_PAL_TAIL;
 
+    // SMP marker tag (see onPalEntry): slot of the most recent retired entry.
+    unsigned const cpu = static_cast<unsigned>(
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].cpuId
+                       : 0u);
+
     if (m_decOpen) {
-        m_decLog << vfmt("<<< PAL EXIT  cycle=%llu targetPC=0x%016llx (tail=%u)\n",
+        m_decLog << vfmt("<<< PAL EXIT  cpu=%u rpcc=%llu targetPC=0x%016llx (tail=%u)\n",
+                         cpu,
                          static_cast<unsigned long long>(cycle),
                          static_cast<unsigned long long>(targetPc),
                          POST_PAL_TAIL);
         m_decLog.flush();
     }
     if (m_machineOpen) {
-        m_machineLog << vfmt("PAL_EXIT cycle=%llu targetPC=%016llx tail=%u\n",
+        m_machineLog << vfmt("PAL_EXIT cpu=%u rpcc=%llu targetPC=%016llx tail=%u\n",
+                             cpu,
                              static_cast<unsigned long long>(cycle),
                              static_cast<unsigned long long>(targetPc),
                              POST_PAL_TAIL);
@@ -756,8 +779,9 @@ void DecListingSink::onRunEnd(coreLib::CpuState const& finalCpu)
                                          : LOOKBACK_DUMP;
 
     if (m_decOpen) {
-        m_decLog << vfmt("=== RUN END  pc=0x%016llx halted=%d lastFault=%u  "
+        m_decLog << vfmt("=== RUN END  cpu=%u pc=0x%016llx halted=%d lastFault=%u  "
                          "(replaying last %u retired instructions)\n",
+                         static_cast<unsigned>(finalCpu.cpuSlot),
                          static_cast<unsigned long long>(finalCpu.pc),
                          finalCpu.halted ? 1 : 0,
                          static_cast<unsigned>(finalCpu.lastFaultCode),
@@ -765,7 +789,8 @@ void DecListingSink::onRunEnd(coreLib::CpuState const& finalCpu)
         m_decLog.flush();
     }
     if (m_machineOpen) {
-        m_machineLog << vfmt("RUN_END pc=%016llx halted=%d lastFault=%u replay=%u\n",
+        m_machineLog << vfmt("RUN_END cpu=%u pc=%016llx halted=%d lastFault=%u replay=%u\n",
+                             static_cast<unsigned>(finalCpu.cpuSlot),
                              static_cast<unsigned long long>(finalCpu.pc),
                              finalCpu.halted ? 1 : 0,
                              static_cast<unsigned>(finalCpu.lastFaultCode),

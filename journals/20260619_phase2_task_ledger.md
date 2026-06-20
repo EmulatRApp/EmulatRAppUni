@@ -32,6 +32,14 @@ P2-T1  FINISH STEP 1b -- emit the cpuId tag + one-time re-baseline.
     sides, cancels); dry-run a synthetic cpu1 line to prove format stable.
   NOTE: NOT the global retire ordinal -- that is P2-T3.  Keep the existing cycle
     column as per-CPU PCC; do not promote it.
+  RENAME (Tim, 2026-06-20): rename the trace `cyc=` label -> `rpcc=` (per-CPU PCC;
+    synonymous in our usage); rename INS/REG/FRG/HEARTBEAT `cycle=` + the DEC
+    cycle column to match; re-mint golden once.  P2-T3's global ordinal stays a
+    SEPARATE field, never `rpcc=`.
+  TOOLING: the `cpu=` add + `cyc=`->`rpcc=` rename BREAK tools/analyze_retire_
+    trace.py (positional regex).  Update to
+    `RET\s+(?:cpu=\d+\s+)?rpcc=(\d+)\s+pc=...`; audit other positional RET/INS
+    consumers for the same break.
 
 P2-T2  STEP 2 -- split stepCycle into cpuKernel(cpu) + systemTick(now).
   cpuKernel = interrupt poll + PipelineDriver::step for one cpu, no global side
@@ -40,6 +48,20 @@ P2-T2  STEP 2 -- split stepCycle into cpuKernel(cpu) + systemTick(now).
   the carried statics (s_idleTickWarp, s_warpLog, s_cnt) to systemTick.  This is
   the structural cliff of the phase (a mis-assigned line double-fires under a 2nd
   agent).  GATE: byte-identical.
+  APPLIED 2026-06-20 (UNBUILT -- client build + gate pending): Machine.{h,cpp}.
+    cpuKernel(CpuState&) = step() only (the one per-CPU action); systemTick(uint64_t
+    i) = sentinel + snapshots + evalDeviceIrqs + IDLEWARP + interval-timer
+    FIRE/DELIVER + b_irq diverts + synthetic inject; stepCycle(i) = { if
+    (!cpuKernel(m_cpu)) return false; return systemTick(i); }.  Split BY CURRENT
+    OWNERSHIP (Tim's deciding principle: relocate by how each line reads TODAY, not
+    anticipated SMP ownership, since the gate proves single-agent equivalence only,
+    not split-correctness).  SEAMS LEFT IN systemTick + flagged in code: DELIVER
+    (reads pendingIrq2(0) = hardcoded CPU0) and snapshot-on-PC (reads m_cpu.pc) ->
+    revisit at STEP 4.  The three process-global statics moved with their system
+    blocks.  Only behavioral reorder: stop-sentinel poll now AFTER step (no-op when
+    the sentinel is absent, so the boot gate is unaffected).  DEVIATION FROM DESIGN:
+    kept bool/uint64_t signatures, did NOT introduce StepStatus/Tick (minimize
+    surface; revisit at STEP 3 if systemNow() decoupling needs the richer types).
 
 P2-T3  STEP 3 -- decouple systemNow() + add the global retire ordinal.
   Make systemNow() its own counter advancing by the PER-STEP RETIRE CYCLE DELTA
@@ -48,6 +70,37 @@ P2-T3  STEP 3 -- decouple systemNow() + add the global retire ordinal.
   global retire ordinal to the trace line (the deferred half of the logging
   policy; do NOT make it any CPU's cycleCount).  Confirm all L2 consumers + L2b
   inject arm track the system clock.  GATE: byte-identical.
+  SPLIT (Tim 2026-06-20): T3a = clock decouple (gate-critical, no re-mint) FIRST,
+    prove byte-identical, THEN T3b = global retire ordinal (re-mint).  Rationale:
+    a re-mint riding on an unproven clock LAUNDERS a delta-accounting miss into the
+    new golden, after which the bug passes every future gate.  T3b's re-mint must
+    happen against an already-proven-byte-identical clock.
+  cycleCount-WRITE ENUMERATION (exhaustive grep, 2026-06-20) -- the set m_systemClock
+    must mirror (RAW cycleCount, pre-ccOffset/pre-kCcMultiplier; HW_CC writes ccOffset
+    NOT raw cycleCount, so guest PCC writes can't desync the timebase):
+      * in cpuKernel (swept in aggregate by the stepCycle before/after delta):
+        PipelineDriver.h 178/207/746 (++), 318/355/421 (+= time advance).
+      * Machine.cpp:1328 IDLEWARP jump -- explicit mirror at site (system-clock-
+        primary form, PCC tracks it, so STEP 4 needn't revisit).
+      * snapshot LOAD + reset (resetToLoadedEntry, ctor) -- m_systemClock =
+        m_cpu.cycleCount after the CpuState lands (Machine-level, off cpuKernel).
+    RESOLVED FINDING: HwpcbContext.h (swpctx) formerly wrote raw cycleCount = src.cc
+    (off boot-gate path -> dormant-arm hole).  FIXED 2026-06-20 to route the per-
+    process PCC through ccOffset (load: ccOffset = src.cc - cycleCount; store:
+    dst.cc = cycleCount + ccOffset), mirroring HW_CC MTPR/MFPR.  swpctx therefore
+    no longer writes raw cycleCount and is NO LONGER a mirror site -- the timebase
+    is insulated from context switches.
+  T3a APPLIED 2026-06-20 (UNBUILT -- client build + gate pending): Machine.{h,cpp}.
+    New member m_systemClock{0}; systemNow() returns it (was m_cpu.cycleCount).
+    stepCycle advances it by the RAW per-step PCC delta (pccBefore vs post-cpuKernel
+    cycleCount), halt or not.  IDLEWARP rewritten system-clock-primary (m_systemClock
+    = (systemNow()|mask)+1; m_cpu.cycleCount tracks).  Resync m_systemClock =
+    m_cpu.cycleCount in resetToLoadedEntry + restoreSrmStaging (the dormant-arm
+    reset/autoload path the boot gate never hits -- handled by enumeration, not gate).
+    Single agent => m_systemClock == m_cpu.cycleCount at every read -> byte-identical.
+    NOTE: bash mount served a STALE-TRUNCATED phantom of Machine.cpp during verify;
+    host Read confirmed the file intact (the recurring D: mount hazard).
+    NEXT: T3b = global retire ordinal (separate commit, re-mint AFTER T3a gate green).
 
 P2-T4  STEP 4 -- CpuState ownership into AlphaCpuAgent.
   Agent owns CpuState; Machine::cpu() returns agent0's.  SET cpuSlot from the

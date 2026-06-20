@@ -316,7 +316,7 @@ void BreakpointSink::ensureBreakOpen()
                << gateClosePc
                << std::dec << std::setfill(' ') << "\n";
     m_breakLog << "# revolutions_requested=" << revsRemain << "\n";
-    m_breakLog << "# format: BRK cyc=<n> pc=<hex16> encoded=<hex8> <mnem> "
+    m_breakLog << "# format: BRK rpcc=<n> pc=<hex16> encoded=<hex8> <mnem> "
                   "pal=<0|1> exc=<hex16> R00..R30=<hex16>"
                   " [ F00..F30=<hex16> ] [ ea=<hex16> val=<hex16> ]"
                   " [ iprid=<hex8> iprval=<hex16> ]\n";
@@ -352,7 +352,7 @@ void BreakpointSink::emitGateSnapshot(uint64_t                 cycle,
     char const* const marker =
         (std::strcmp(kind, "open") == 0) ? "BP_OPEN" : "BP_CLOSE";
 
-    m_breakLog << vfmt("%s cyc=%llu rev=%u pc=%016llx\n",
+    m_breakLog << vfmt("%s rpcc=%llu rev=%u pc=%016llx\n",
                        marker,
                        static_cast<unsigned long long>(cycle),
                        revolution,
@@ -362,7 +362,7 @@ void BreakpointSink::emitGateSnapshot(uint64_t                 cycle,
     // Ordering is the field order in CpuState.h so visual diffing
     // between consecutive snapshots aligns columns when piped through
     // a side-by-side viewer.
-    m_breakLog << vfmt("IPR_SNAP cyc=%llu kind=%s",
+    m_breakLog << vfmt("IPR_SNAP rpcc=%llu kind=%s",
                        static_cast<unsigned long long>(cycle), kind);
     m_breakLog << vfmt(" ptbr=%016llx",         static_cast<unsigned long long>(s.ptbr));
     m_breakLog << vfmt(" asn=%016llx",          static_cast<unsigned long long>(s.asn));
@@ -399,7 +399,7 @@ void BreakpointSink::emitGateSnapshot(uint64_t                 cycle,
     // PT_SNAP: PAL_TEMP[0..31] in one record.  Values are 64-bit so the
     // line lands around 32*17 = ~544 chars; well within ofstream line
     // capacity and within any reasonable diff tool's column width.
-    m_breakLog << vfmt("PT_SNAP cyc=%llu kind=%s",
+    m_breakLog << vfmt("PT_SNAP rpcc=%llu kind=%s",
                        static_cast<unsigned long long>(cycle), kind);
     for (int i = 0; i < 32; ++i) {
         m_breakLog << vfmt(" PT%02d=%016llx",
@@ -414,7 +414,7 @@ void BreakpointSink::emitGateSnapshot(uint64_t                 cycle,
     // the sys__cbox investigation: the open-vs-close diff of these
     // fields reveals exactly what the shift loop pulled out of the
     // ERROR_REG chain on this revolution.
-    m_breakLog << vfmt("CBX_SNAP cyc=%llu kind=%s",
+    m_breakLog << vfmt("CBX_SNAP rpcc=%llu kind=%s",
                        static_cast<unsigned long long>(cycle), kind);
     m_breakLog << vfmt(" writeMany=%016llx", static_cast<unsigned long long>(s.cBox.writeMany));
     m_breakLog << vfmt(" errorReg=%016llx",  static_cast<unsigned long long>(s.cBox.errorReg));
@@ -450,7 +450,7 @@ void BreakpointSink::emitBrkRecord(CommitRecord const&        record,
     // opcode 0x1E and the sub-function lives in bits 15:12 of the encoded
     // word -- without this field the trace cannot disambiguate which
     // variant retired.
-    m_breakLog << vfmt("BRK cyc=%llu pc=%016llx encoded=%08x %-8s "
+    m_breakLog << vfmt("BRK rpcc=%llu pc=%016llx encoded=%08x %-8s "
                        "pal=%d exc=%016llx",
                        static_cast<unsigned long long>(record.cycle),
                        static_cast<unsigned long long>(record.pc),

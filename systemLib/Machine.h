@@ -187,6 +187,18 @@ public:
     // (journals/20260619_alphacpuagent_phase1_design.md).
     bool stepCycle(uint64_t i) noexcept;
 
+    // P2-T2 split (2026-06-20): stepCycle = cpuKernel + systemTick.  The split
+    // is BY CURRENT OWNERSHIP (how each line reads today), not anticipated SMP
+    // ownership -- the Phase-1 gate proves single-agent equivalence only, NOT
+    // split-correctness, so the un-gate-checkable reasoning surface is kept
+    // minimal.  cpuKernel = the one per-CPU action (PipelineDriver::step);
+    // systemTick = all once-per-quantum system bookkeeping (sentinel, snapshots,
+    // device-IRQ eval, IDLEWARP, interval-timer FIRE/DELIVER, b_irq diverts,
+    // synthetic inject).  DELIVER (reads pendingIrq2(0)) and snapshot-on-PC
+    // (reads m_cpu.pc) stay in systemTick; both are flagged STEP-4/SMP seams.
+    bool cpuKernel(coreLib::CpuState& cpu) noexcept;   // per-CPU: PipelineDriver::step
+    bool systemTick(uint64_t i) noexcept;              // system: once per quantum
+
     // Run until halted or maxCycles reached.  Classifies the stop and
     // returns it; cpu() and memory() are observable post-run for the
     // post-mortem dump.
@@ -205,7 +217,7 @@ public:
     // advances by the per-step retire cycle delta (design D-1a); under policy
     // P-A the running CPU's PCC tracks it, so the byte-identical gate still holds.
     // See journals/20260619_alphacpuagent_phase2_ownership_lift_design.md.
-    [[nodiscard]] uint64_t systemNow() const noexcept { return m_cpu.cycleCount; }
+    [[nodiscard]] uint64_t systemNow() const noexcept { return m_systemClock; }
 
     memoryLib::GuestMemory&       memory()       noexcept { return m_chipset.guestMemory(); }
     memoryLib::GuestMemory const& memory() const noexcept { return m_chipset.guestMemory(); }
@@ -398,6 +410,15 @@ private:
     // initializer (makeCom1Cfg(m_settings)) sees a fully-constructed object.
     emulatr::config::EmulatorSettings m_settings;
     coreLib::CpuState        m_cpu;
+
+    // Phase-2 STEP 3 (2026-06-20): the SYSTEM timebase, DECOUPLED from m_cpu's
+    // architectural PCC.  Advanced by the per-step RAW retire-cycle delta in
+    // stepCycle (+ the IDLEWARP warp delta) so it tracks m_cpu.cycleCount exactly
+    // for the single running agent (byte-identical), but is its OWN storage: a
+    // parked CPU cannot stall it, and a guest PCC write (which goes through
+    // ccOffset, not raw cycleCount) cannot perturb it.  Resynced to
+    // m_cpu.cycleCount on reset / snapshot load.  systemNow() reads this.
+    uint64_t                 m_systemClock{ 0 };
     // m_memory removed -- m_chipset owns the single GuestMemory backing.
     mmuLib::Ev6Translator    m_translator;   // owned for future TLB state
 

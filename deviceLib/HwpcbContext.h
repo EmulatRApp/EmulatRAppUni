@@ -70,7 +70,16 @@ inline void loadCpuFromHwpcb(coreLib::CpuState& cpu, Hwpcb const& src) noexcept
     cpu.asn        = static_cast<coreLib::ASNType>(src.asn);
     cpu.asten_sr   = src.asten_sr;
     cpu.fen        = src.fen;
-    cpu.cycleCount = src.cc;
+    // Per-process PCC restore: route through ccOffset, NEVER raw cycleCount.
+    // cycleCount is the system timebase (the value the Cchip interval timer
+    // masks against); a context switch must NOT move it.  Mirroring HW_MTPR
+    // HW_CC (PalEntries.cpp: ccOffset = written - cycleCount), this makes the
+    // architectural CC -- (cycleCount + ccOffset), what RPCC / HW_MFPR HW_CC
+    // read -- resume at the saved src.cc while the raw timebase stays
+    // monotonic.  (Was `cpu.cycleCount = src.cc`, which conflated the per-
+    // process PCC with the system clock; see Phase-2 P2-T3 cycleCount-write
+    // enumeration.)
+    cpu.ccOffset   = src.cc - cpu.cycleCount;
     // src.scratch[] is PAL-private context the OS does not see; PALcode
     // is responsible for copying it into PT slots if its convention
     // expects that mirroring.
@@ -95,7 +104,12 @@ inline void storeCpuToHwpcb(Hwpcb& dst, coreLib::CpuState const& cpu) noexcept
     dst.asn      = static_cast<uint64_t>(cpu.asn);
     dst.asten_sr = cpu.asten_sr;
     dst.fen      = cpu.fen;
-    dst.cc       = cpu.cycleCount;
+    // Save the architectural CC -- (cycleCount + ccOffset), the value HW_MFPR
+    // HW_CC / RPCC observe -- NOT raw cycleCount.  Symmetric with the ccOffset-
+    // based restore in loadCpuFromHwpcb: storeCpuToHwpcb then loadCpuFromHwpcb
+    // round-trips the process PCC exactly while leaving the system timebase
+    // (raw cycleCount) untouched.  (Was `dst.cc = cpu.cycleCount`.)
+    dst.cc       = cpu.cycleCount + cpu.ccOffset;
     // dst.scratch[] is PAL-private; left at whatever the previous
     // contents were.  PALcode populates it explicitly if the personality
     // needs scratch state to survive across the SWPCTX.
