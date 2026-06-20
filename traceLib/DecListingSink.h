@@ -139,6 +139,10 @@ struct LookbackEntry
     uint64_t    cycle      = 0;
     uint64_t    pc         = 0;
     uint32_t    encoded    = 0;
+    uint32_t    cpuId      = 0;   // SMP slot (CpuState.cpuSlot) of the retiring
+                                  // CPU, captured at freeze.  Default 0 keeps
+                                  // default-constructed ring slots benign --
+                                  // they are .valid-gated and never emitted.
     std::string mnemonic;       // copy of the codegen literal
     std::string operands;       // pre-rendered Disassembler output
     std::string result;         // pre-rendered formatResult output

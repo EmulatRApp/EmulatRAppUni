@@ -153,6 +153,18 @@ struct CpuState
     deviceLib::hwrpb::CpuType mCpuId = {};
     [[nodiscard]] AXP_ALWAYS_INLINE deviceLib::hwrpb::CpuType cpuId() const noexcept { return mCpuId; }
     [[nodiscard]] AXP_ALWAYS_INLINE void setCpuId(deviceLib::hwrpb::CpuType c)  noexcept { mCpuId = c; }
+
+    // ---- SMP slot index (Phase 2 STEP 1b -- trace/log cpuId tag source) ----
+    // cpuSlot is the per-CPU SLOT (0..cpu_count-1) the harness assigns this
+    // agent.  It is DISTINCT from mCpuId above: mCpuId is typed as the processor
+    // MODEL enum (CpuType: EV6=8 ...) -- the wrong abstraction for "which CPU" --
+    // and is dormant (setCpuId is never called; WHAMI is hardcoded 0).  The
+    // trace/diagnostic cpuId tag is sourced from THIS field, NOT cpuId().
+    // Default 0 = the single agent today; STEP 4 (CpuState ownership lift) sets
+    // it from AlphaCpuAgent::id().  Reconciling cpuSlot with mCpuId/WHAMI is the
+    // TODO(whami-cpuid) follow-up -- do NOT keep two divergent slot sources long
+    // term.  Default-initialized so the snapshot POD blob stays deterministic.
+    uint32_t cpuSlot = 0;
     // ------------------------------------------------------------------
     // Architectural program counter.
     // ------------------------------------------------------------------

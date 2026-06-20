@@ -121,6 +121,11 @@ inline constexpr uint32_t kFormatVersion         = 1;
 //       PALmode is now carried in PC<0> (single source of truth).
 //       Removing the bool field shrinks/realigns the raw POD blob, so
 //       all pre-v6 snapshots are layout-incompatible and rejected.
+//   v7 -> v8 (2026-06-19): CpuState.cpuSlot (uint32_t SMP slot index) added as
+//       the Phase-2 per-CPU trace/log tag source (distinct from the dormant,
+//       mis-typed mCpuId/CpuType).  CpuState is a raw POD blob, so the new
+//       field grows/realigns it; all pre-v8 snapshots are layout-incompatible
+//       and rejected at load.
 // Snapshots captured before this point cannot be loaded; cold-boot
 // to re-establish a halt snapshot post-change.
 // Chipset stream versions:
@@ -147,7 +152,7 @@ inline constexpr uint32_t kFormatVersion         = 1;
 //       IDENTITY is re-applied from the platform manifest before restore;
 //       only mutable content travels.  Pre-v5 snapshots rejected (the IIC
 //       block layout changed; not backward-readable).
-inline constexpr uint32_t kCpuStateVersion       = 7;  // v7: + CpuState.fpcr
+inline constexpr uint32_t kCpuStateVersion       = 8;  // v8: + CpuState.cpuSlot
 inline constexpr uint32_t kChipsetVersion        = 5;  // v5: manifest-driven IIC content
 inline constexpr char     kSnapshotExtension[]   = ".axpsnap";
 inline constexpr char     kSnapshotDirDefault[]  = "snapshots";
