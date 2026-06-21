@@ -168,3 +168,114 @@ TEST_CASE("GuestMemory -- writes are independent across non-overlapping ranges")
     CHECK(b == 0x2222222222222222ull);
     CHECK(c == 0x3333333333333333ull);
 }
+
+
+// ============================================================================
+// LockMonitor -- per-CPU LDx_L / STx_C reservation contract (SSOT).
+// ============================================================================
+// EXECUTABLE SPEC for the reservation table that backs the real CPU's LL/SC,
+// ported from the schedLib::LockArbiter Phase-3 micro-tests now that the
+// validated logic lives here in memoryLib (the memory boundary every writer
+// crosses).  LockMonitor splits the arbiter's atomic storeCond into a pure
+// query (check) plus an explicit mutation, so the tests model a store-
+// conditional as: a SUCCESSFUL STx_C is a store, so it check()s then
+// clearLine()s the line (consuming its own reservation AND cross-invalidating
+// every other CPU on that line); a FAILED STx_C just clear()s the issuer.
+// Granularity is the 64-byte EV6 cache line.
+
+namespace {
+
+// Model one store-conditional against the monitor.  Returns success.
+bool storeCond(LockMonitor& lm, int cpu, uint64_t line)
+{
+    bool const ok = lm.check(cpu, line);
+    if (ok) lm.clearLine(line);   // success stores -> break ALL reservations on line
+    else    lm.clear(cpu);        // failure drops only the issuer's
+    return ok;
+}
+
+} // namespace
+
+
+TEST_CASE("LockMonitor -- LL then SC by the same CPU succeeds once")
+{
+    LockMonitor lm;
+    constexpr uint64_t G = 0x100;
+
+    lm.set(0, G);
+    CHECK(storeCond(lm, 0, G) == true);    // reservation valid -> SC wins
+    CHECK(storeCond(lm, 0, G) == false);   // consumed by the prior success
+}
+
+TEST_CASE("LockMonitor -- reservation is cache-line granular (64B)")
+{
+    LockMonitor lm;
+
+    // LDx_L of one byte reserves the whole 64-byte line; an SC to a DIFFERENT
+    // byte of the same line still matches.
+    lm.set(0, 0x2000);
+    CHECK(lm.check(0, 0x2008) == true);    // same line (0x2000..0x203F)
+    CHECK(lm.check(0, 0x2040) == false);   // next line -- no match
+}
+
+TEST_CASE("LockMonitor -- a load does not clear another CPU's reservation")
+{
+    LockMonitor lm;
+    constexpr uint64_t G = 0x4000;
+    int const A = 0, B = 1;
+
+    lm.set(A, G);   // CPU A reserves G
+    lm.set(B, G);   // CPU B reserves G -- must NOT clear A's reservation
+
+    // A stores-conditional first: succeeds; its store then breaks B's line.
+    CHECK(storeCond(lm, A, G) == true);
+    CHECK(storeCond(lm, B, G) == false);
+}
+
+TEST_CASE("LockMonitor -- exactly one STx_C wins a contended line")
+{
+    LockMonitor lm;
+    constexpr uint64_t G = 0x4000;
+    int const A = 0, B = 1;
+
+    lm.set(A, G);
+    lm.set(B, G);
+
+    bool const aWon = storeCond(lm, A, G);
+    bool const bWon = storeCond(lm, B, G);
+
+    CHECK(aWon != bWon);   // exactly one winner: no double-acquire, no livelock
+    CHECK(aWon == true);   // first-to-SC wins
+}
+
+TEST_CASE("LockMonitor -- a plain store breaks every OTHER CPU's reservation")
+{
+    LockMonitor lm;
+    constexpr uint64_t G = 0x4000;
+    int const A = 0, B = 1, C = 2;
+
+    lm.set(A, G);
+    lm.set(B, G);
+    lm.set(C, G);
+
+    // CPU B issues a PLAIN store to G: cross-invalidate everyone but B.
+    lm.clearLine(G, /*exceptCpu*/ B);
+
+    CHECK(lm.check(A, G) == false);   // A's reservation broken
+    CHECK(lm.check(C, G) == false);   // C's reservation broken
+    CHECK(lm.check(B, G) == true);    // B keeps its own (exceptCpu)
+}
+
+TEST_CASE("LockMonitor -- device/DMA store (exceptCpu=-1) breaks ALL reservations")
+{
+    LockMonitor lm;
+    constexpr uint64_t G = 0x4000;
+
+    lm.set(0, G);
+    lm.set(1, G);
+
+    lm.clearLine(G);   // default exceptCpu = -1: no CPU is spared
+
+    CHECK(lm.check(0, G) == false);
+    CHECK(lm.check(1, G) == false);
+}
