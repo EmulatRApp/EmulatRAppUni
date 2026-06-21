@@ -42,7 +42,7 @@ memorySize  = 1073741824   ; 1 GiB
 
 [ROM]
 firmwareImage = firmware/ds10_v7_3.exe
-; Optional SHA-256 integrity check (empty = skip).
+; Optional SHA-256 integrity check (empty = skip). 
 firmwareSha256 =
 
 [Trace]
