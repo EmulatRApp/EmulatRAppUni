@@ -175,9 +175,10 @@ struct MemDrainer
     //   pipeline driver consumes the post-drain BoxResult at WB.
     // -------------------------------------------------------------
     AXP_HOT AXP_FLATTEN
-    static void drain(coreLib::PipelineSlot& slot,
-                      coreLib::CpuState&     cpu,
-                      memoryLib::ISystemBus& bus) noexcept
+    static void drain(coreLib::PipelineSlot&    slot,
+                      coreLib::CpuState&        cpu,
+                      memoryLib::ISystemBus&    bus,
+                      memoryLib::LockMonitor&   locks) noexcept
     {
         coreLib::BoxResult& r = slot.result;
 
@@ -192,7 +193,7 @@ struct MemDrainer
         // 1. Memory effect.
         // ---------------------------------------------------------
         if (r.memSize != coreLib::kNoMemEffect) {
-            applyMemEffect(slot, cpu, bus);
+            applyMemEffect(slot, cpu, bus, locks);
 
             // applyMemEffect may have set faultCode; if so, abort
             // before regfile commit and reservation.
@@ -271,9 +272,10 @@ private:
     //   successful read.
     // -------------------------------------------------------------
     AXP_HOT AXP_FLATTEN
-    static void applyMemEffect(coreLib::PipelineSlot& slot,
-                               coreLib::CpuState&     cpu,
-                               memoryLib::ISystemBus& bus) noexcept
+    static void applyMemEffect(coreLib::PipelineSlot&  slot,
+                               coreLib::CpuState&      cpu,
+                               memoryLib::ISystemBus&  bus,
+                               memoryLib::LockMonitor& locks) noexcept
     {
         coreLib::BoxResult& r = slot.result;
 
@@ -427,9 +429,9 @@ private:
             & static_cast<uint64_t>(grainFactory::GrainSem::S_Locked)) != 0;
 
         if (r.memIsStore) {
-            applyStoreEffect(r, cpu, bus, pa, isLocked);
+            applyStoreEffect(r, cpu, bus, locks, pa, isLocked);
         } else {
-            applyLoadEffect(r, cpu, bus, pa, isLocked);
+            applyLoadEffect(r, cpu, bus, locks, pa, isLocked);
         }
     }
 
@@ -444,11 +446,12 @@ private:
     //   successful read.
     // -------------------------------------------------------------
     AXP_HOT AXP_FLATTEN
-    static void applyLoadEffect(coreLib::BoxResult&     r,
-                                coreLib::CpuState&     cpu,
-                                memoryLib::ISystemBus& bus,
-                                coreLib::PAType         pa,
-                                bool                    isLocked) noexcept
+    static void applyLoadEffect(coreLib::BoxResult&      r,
+                                coreLib::CpuState&       cpu,
+                                memoryLib::ISystemBus&   bus,
+                                memoryLib::LockMonitor&  locks,
+                                coreLib::PAType          pa,
+                                bool                     isLocked) noexcept
     {
         memoryLib::BusResult br = bus.read(pa, r.memSize);
 
@@ -619,12 +622,12 @@ private:
                                           r.semFlags);
 
         if (isLocked) {
-            // LDL_L / LDQ_L: set the reservation at cache-line
-            // granularity.  A subsequent STL_C / STQ_C to the same
-            // line succeeds; any other path that clears
-            // hasReservation invalidates it.
-            cpu.reservedCacheLine = pa & kCacheLineMask;
-            cpu.hasReservation    = true;
+            // LDL_L / LDQ_L: arm THIS CPU's reservation in the
+            // LockMonitor SSOT at cache-line granularity.  A subsequent
+            // STL_C / STQ_C by the same CPU to the same line succeeds;
+            // a store by any CPU (or DMA) to that line clears it via
+            // LockMonitor::clearLine.
+            locks.set(static_cast<int>(cpu.cpuSlot), pa);
         }
     }
 
@@ -640,20 +643,20 @@ private:
     //   path.
     // -------------------------------------------------------------
     AXP_HOT AXP_FLATTEN
-    static void applyStoreEffect(coreLib::BoxResult&     r,
-                                 coreLib::CpuState&     cpu,
-                                 memoryLib::ISystemBus& bus,
-                                 coreLib::PAType         pa,
-                                 bool                    isLocked) noexcept
+    static void applyStoreEffect(coreLib::BoxResult&      r,
+                                 coreLib::CpuState&       cpu,
+                                 memoryLib::ISystemBus&   bus,
+                                 memoryLib::LockMonitor&  locks,
+                                 coreLib::PAType          pa,
+                                 bool                     isLocked) noexcept
     {
+        int const lockSlot = static_cast<int>(cpu.cpuSlot);
         if (isLocked) {
-            // STL_C / STQ_C.  Reservation valid iff the cache line
-            // matches and hasReservation is still set.
-            uint64_t const line  = pa & kCacheLineMask;
-            bool     const valid = cpu.hasReservation
-                                && cpu.reservedCacheLine == line;
+            // STL_C / STQ_C.  Reservation valid iff THIS CPU still holds
+            // a LockMonitor reservation on this cache line.
+            bool const valid = locks.check(lockSlot, pa);
 
-            cpu.hasReservation = false;     // cleared regardless of outcome
+            locks.clear(lockSlot);          // cleared regardless of outcome
 
             if (!valid) {
                 // Lock lost: skip the publish, success indicator = 0.
@@ -864,6 +867,27 @@ private:
             cpu.cBox.dataReg = 0x01;
             return;
         }
+
+        // Store published successfully.  Per Alpha LL/SC semantics, a
+        // store to a reserved cache line clears the reservation of every
+        // OTHER CPU on that line (the storing CPU is excepted so its own
+        // plain store does not self-invalidate -- a successful STx_C has
+        // already cleared its own reservation above via locks.clear).
+        // With one active CPU exceptCpu==lockSlot makes this a no-op, so
+        // the single-CPU boot stays byte-identical; with a second agent
+        // it is the cross-CPU invalidation that makes contended STx_C
+        // correct.
+        //
+        // TODO(Phase 4, 2nd agent): when MemDrainer runs under
+        //   ThreadedDriver with >1 agent, this shared-state mutation must
+        //   be STAGED in step() and applied in syncPhase (see SmpHarness
+        //   staged-Effect discipline) so determinism_equivalence stays
+        //   bit-identical; inline mutation is safe only while exactly one
+        //   agent steps the single LockMonitor.
+        // TODO(DMA): device/DMA writes that bypass MemDrainer must also
+        //   call locks.clearLine(pa, -1); no DMA path exists on the
+        //   single-CPU boot yet.
+        locks.clearLine(pa, lockSlot);
 
         if (isLocked) {
             // Successful conditional store: success indicator = 1.

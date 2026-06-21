@@ -87,7 +87,7 @@ struct FakeSystemBus final : memoryLib::ISystemBus {
 // Wrap a GuestMemory and run drain -- keeps each call site a one-liner.
 inline void drainBus(PipelineSlot& s, CpuState& cpu, GuestMemory& mem) noexcept {
     FakeSystemBus bus(mem);
-    MemDrainer::drain(s, cpu, bus);
+    MemDrainer::drain(s, cpu, bus, mem.lockMonitor());
 }
 
 // Build a slot whose result carries the given memEffect.  PAL-mode
@@ -322,8 +322,8 @@ TEST_CASE("MemDrainer -- LDQ_L sets reservation at cache-line granularity")
     drainBus(s, cpu, mem);
 
     CHECK(cpu.intReg[11] == 0x1234ull);
-    CHECK(cpu.hasReservation);
-    CHECK(cpu.reservedCacheLine == (0x700ULL & ~0x3FULL));   // 0x700
+    // Reservation now lives in the LockMonitor SSOT, line-masked to 64B.
+    CHECK(mem.lockMonitor().check(static_cast<int>(cpu.cpuSlot), 0x700ULL));
 }
 
 TEST_CASE("MemDrainer -- STQ_C succeeds when reservation matches; writes 1 to Ra")
@@ -332,8 +332,7 @@ TEST_CASE("MemDrainer -- STQ_C succeeds when reservation matches; writes 1 to Ra
     GuestMemory mem(4096);
 
     // Pre-reserve as if LDQ_L at 0x700 had already drained.
-    cpu.hasReservation    = true;
-    cpu.reservedCacheLine = 0x700ULL & ~0x3FULL;
+    mem.lockMonitor().set(static_cast<int>(cpu.cpuSlot), 0x700ULL);
 
     PipelineSlot s = slotWithEffect(/*size*/8, /*addr*/0x700,
                                     /*data*/0xFEEDFACEull,
@@ -344,7 +343,8 @@ TEST_CASE("MemDrainer -- STQ_C succeeds when reservation matches; writes 1 to Ra
 
     CHECK(s.result.faultCode == kNoFault);
     CHECK(cpu.intReg[12] == 1u);
-    CHECK_FALSE(cpu.hasReservation);   // cleared regardless
+    CHECK_FALSE(mem.lockMonitor().check(static_cast<int>(cpu.cpuSlot),
+                                        0x700ULL));   // cleared regardless
 
     uint64_t back = 0;
     CHECK(mem.read8(0x700, back) == MemStatus::Ok);
@@ -357,7 +357,8 @@ TEST_CASE("MemDrainer -- STQ_C fails when reservation cleared; writes 0; no publ
     GuestMemory mem(4096);
     CHECK(mem.write8(0x800, 0xDEADBEEFull) == MemStatus::Ok);
 
-    cpu.hasReservation = false;
+    // No reservation held (fresh LockMonitor); make it explicit.
+    mem.lockMonitor().clear(static_cast<int>(cpu.cpuSlot));
 
     PipelineSlot s = slotWithEffect(/*size*/8, /*addr*/0x800,
                                     /*data*/0xCAFEBABEull,
@@ -368,7 +369,8 @@ TEST_CASE("MemDrainer -- STQ_C fails when reservation cleared; writes 0; no publ
 
     CHECK(s.result.faultCode == kNoFault);
     CHECK(cpu.intReg[13] == 0u);
-    CHECK_FALSE(cpu.hasReservation);
+    CHECK_FALSE(mem.lockMonitor().check(static_cast<int>(cpu.cpuSlot),
+                                        0x800ULL));
 
     uint64_t back = 0;
     CHECK(mem.read8(0x800, back) == MemStatus::Ok);
@@ -381,8 +383,7 @@ TEST_CASE("MemDrainer -- STQ_C fails when reservation tags a different cache lin
     GuestMemory mem(4096);
 
     // Reserve a different line than the one STQ_C targets.
-    cpu.hasReservation    = true;
-    cpu.reservedCacheLine = 0x900ULL;
+    mem.lockMonitor().set(static_cast<int>(cpu.cpuSlot), 0x900ULL);
 
     PipelineSlot s = slotWithEffect(/*size*/8, /*addr*/0x800,
                                     /*data*/0x1111ull,
@@ -392,7 +393,9 @@ TEST_CASE("MemDrainer -- STQ_C fails when reservation tags a different cache lin
     drainBus(s, cpu, mem);
 
     CHECK(cpu.intReg[14] == 0u);
-    CHECK_FALSE(cpu.hasReservation);
+    // STx_C clears this CPU's reservation regardless of hit/miss.
+    CHECK_FALSE(mem.lockMonitor().check(static_cast<int>(cpu.cpuSlot),
+                                        0x900ULL));
 }
 
 

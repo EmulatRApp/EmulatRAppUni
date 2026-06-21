@@ -547,7 +547,7 @@ struct PipelineDriver
         // -----------------------------------------------------
         // MEM: drain memEffect + regfile commit.
         // -----------------------------------------------------
-        MemDrainer::drain(slot, cpu, bus);
+        MemDrainer::drain(slot, cpu, bus, mem.lockMonitor());
 
         // -----------------------------------------------------
         // WB: PC advance + halt / fault intercept.

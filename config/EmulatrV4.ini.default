@@ -1,0 +1,90 @@
+; ============================================================================
+; EmulatrV4.ini.default -- PACKAGED default configuration for EmulatR V4
+; ============================================================================
+; Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
+; Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
+; Licensed under eNVy Systems Non-Commercial License v1.1
+;
+; Project Architect: Timothy Peer
+; AI Collaboration:  Claude (Anthropic)
+;
+; Commercial use prohibited without separate license.
+; Contact:        peert@envysys.com  |  https://envysys.com
+; Documentation:  https://timothypeer.github.io/ASA-EMulatR-Project/
+; ============================================================================
+;
+; This is the DEPLOY default the installer ships (renamed to EmulatrV4.ini in
+; the package).  It differs deliberately from the in-tree development ini:
+;   - model is the locked DS10 single-socket 21264 (not ES40),
+;   - tracing is OFF (dev ini runs 0x07),
+;   - no PuTTY auto-launch and no Windows-specific launcher path, so the
+;     default behaves identically on Windows, Mint, and ARM Linux.
+;
+; Schema mirrors configLib::EmulatorSettings exactly; missing keys keep struct
+; defaults.  Search order when no explicit path is given on the command line:
+;   1. ./EmulatrV4.ini
+;   2. ./config/EmulatrV4.ini
+;   3. <exe-dir>/EmulatrV4.ini
+;   4. <exe-dir>/config/EmulatrV4.ini
+;
+; ============================================================================
+
+[System]
+; `model` is the master switch: it selects <lower(model)>_platform.json
+; (DS10 -> ds10_platform.json) and the default firmware image, and sets the
+; FDM/HWRPB system identity.  DS10 is a single-socket 21264: cpuCount=1.
+; Do NOT advertise >1 CPU while only one executes -- SRM/GCT can spin waiting
+; for secondaries (boot hang).
+model       = DS10
+cpuCount    = 1
+activeCpus  = 1
+memorySize  = 1073741824   ; 1 GiB
+
+[ROM]
+firmwareImage = firmware/ds10_v7_3.exe
+; Optional SHA-256 integrity check (empty = skip).
+firmwareSha256 =
+
+[Trace]
+; Trace mask flags (OR together):
+;   TRACE_INSTR    = 0x01
+;   TRACE_PIPELINE = 0x02
+;   TRACE_REGFILE  = 0x04
+;   TRACE_FPRFILE  = 0x08
+;   TRACE_EVENT    = 0x10
+; Deploy default: tracing OFF (zero overhead, no trace files written).
+traceMask    = 0x00
+traceFile    = trace/cpu_trace.log
+traceLstFile = trace/cpu_trace.lst
+
+[Snapshot]
+enabled      = false
+targetCycle  = 0
+outputPath   = snapshots/
+
+[Logging]
+; spdlog runtime level.  Values: trace, debug, info, warn, err, critical, off.
+defaultLevel = warn
+
+[SRMConsole]
+; OPA0 console TCP server.  A terminal (PuTTY, telnet, nc) connects here.
+; Default 10023 (unprivileged).  EMULATR_CONSOLE_PORT env var overrides this
+; at launch if set.
+port             = 10023
+rxBufferSize     = 4096
+defaultTimeoutMs = 30000
+echoEnabled      = true
+
+; Auto-launch a terminal at start is OFF in the deploy default, and the
+; launcher path is left empty so this default is platform-neutral.  Set
+; puttyPath + autoLaunchPutty locally if you want the convenience.
+autoLaunchPutty  = false
+puttyPath        =
+puttyExtraArgs   =
+
+[Storage]
+; Host directory where disk / media image files live.  The platform manifest
+; (ds10_platform.json) names each drive's media as a bare FILENAME; that name
+; resolves against this directory.  Empty = resolve filenames against the
+; launch CWD.
+diskDir =

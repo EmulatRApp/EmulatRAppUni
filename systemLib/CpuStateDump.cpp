@@ -132,9 +132,10 @@ void dumpCpuState(coreLib::CpuState const& cpu, std::ostream& os)
        << "  mm_stat=0x"  << std::hex << cpu.mm_stat
        << "  intrFlag=0x" << cpu.intrFlag
        << '\n';
-    os << "    reservedCacheLine=0x" << cpu.reservedCacheLine
-       << "  hasReservation=" << std::dec << (cpu.hasReservation ? "true" : "false")
-       << '\n';
+    // LL/SC reservation state retired from CpuState 2026-06-21; it now lives in
+    // memoryLib::LockMonitor (GuestMemory::lockMonitor), which this CpuState-only
+    // dump cannot reach.  Dump the reservation from the LockMonitor separately if
+    // needed.
 
     os.flags(flags);
 }

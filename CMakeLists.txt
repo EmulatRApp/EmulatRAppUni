@@ -34,7 +34,7 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET)
         CACHE STRING "vcpkg target triplet")
 endif()
 
-project(Emulatr LANGUAGES C CXX)   # C enabled for the vendored SoftFloat (.c) static lib (task #26)
+project(Emulatr VERSION 4.0.0 LANGUAGES C CXX)   # C enabled for the vendored SoftFloat (.c) static lib (task #26).  VERSION feeds CPACK_PACKAGE_VERSION.
 
 # ----------------------------------------------------------------------------
 # Compiler standard
@@ -521,6 +521,8 @@ set(EMULATR_TEST_SOURCES
     # 2026-06-08: S4 CY82C693 IDE func1 chipset wiring / routing
     tests/chipsetLib/test_ide_wiring.cpp
     tests/chipsetLib/test_flashrom.cpp
+    # 2026-06-21: TIG per-CPU CPU-START latch (secondary-CPU bring-up)
+    tests/chipsetLib/test_tsunami_tig.cpp
     tests/systemLib/test_firmwareloader.cpp
     tests/systemLib/test_srmloader.cpp
     tests/systemLib/test_machine.cpp
@@ -927,3 +929,72 @@ install(TARGETS Emulatr
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+# ============================================================================
+# Packaging -- staged runtime layout + Qt deploy + CPack  (2026-06-20)
+# ============================================================================
+# Three layers, in order:
+#   (1) install() rules stage a runnable layout (exe + default config + license)
+#   (2) a Qt deploy step drops the Qt runtime (Qt6Core/Network/Concurrent + deps)
+#       into that layout so the package runs on a box without Qt installed
+#   (3) CPack wraps the staged tree into a portable archive and a native installer
+#
+# Cross-platform by construction: Qt 6.10's qt_generate_deploy_app_script is the
+# single deploy entry point on Windows, Mint, and ARM Linux.  The dev-time
+# windeployqt POST_BUILD above is a separate convenience (populates the BUILD dir
+# so the freshly-built exe runs in place); it is Windows-only and does not feed
+# the package -- the deploy SCRIPT below is what the package consumes.
+
+# ---- (1) staged runtime layout --------------------------------------------
+# Ship the curated DS10 deploy default (NOT the in-tree ES40 dev ini), renamed
+# to the name the app searches for next to the executable.
+install(FILES   "${CMAKE_SOURCE_DIR}/config/EmulatrV4.ini.default"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        RENAME EmulatrV4.ini)
+
+# License at the package root (text + html form).
+install(FILES   "${CMAKE_SOURCE_DIR}/LICENSE.md"        DESTINATION .)
+install(FILES   "${CMAKE_SOURCE_DIR}/docs/license.html" DESTINATION .)
+
+# ---- (2) Qt deploy (cross-platform; Qt 6.3+ CMake-native API) --------------
+# qt_generate_deploy_app_script emits a per-config script that, at install/cpack
+# time, copies the Qt runtime the target actually links (Core/Network/Concurrent
+# here -- no GUI plugins, since this is a QCoreApplication) next to the exe.
+if(COMMAND qt_generate_deploy_app_script)
+    qt_generate_deploy_app_script(
+        TARGET Emulatr
+        OUTPUT_SCRIPT deploy_script
+        NO_TRANSLATIONS)
+    install(SCRIPT ${deploy_script})
+else()
+    message(WARNING
+        "qt_generate_deploy_app_script not available (Qt < 6.3?) -- packaged "
+        "Qt runtime will not be staged; the dev-time windeployqt step covers "
+        "Windows build dirs only.")
+endif()
+
+# ---- (3) CPack -------------------------------------------------------------
+set(CPACK_PACKAGE_NAME               "EmulatR")
+set(CPACK_PACKAGE_VENDOR             "eNVy Systems, Inc.")
+set(CPACK_PACKAGE_VERSION            "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY  "EmulatR")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "EmulatR V4 -- Alpha AXP / EV6 architecture emulator")
+set(CPACK_RESOURCE_FILE_LICENSE      "${CMAKE_SOURCE_DIR}/LICENSE.md")
+# (exe name ; Start-Menu label) -- exe name is the lowercase target.
+set(CPACK_PACKAGE_EXECUTABLES        "Emulatr" "EmulatR V4")
+
+if(WIN32)
+    set(CPACK_GENERATOR "ZIP;NSIS")
+    set(CPACK_NSIS_DISPLAY_NAME "EmulatR V4")
+    set(CPACK_NSIS_PACKAGE_NAME "EmulatR V4")
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_CREATE_DESKTOP_LINKS "Emulatr")
+elseif(UNIX)
+    set(CPACK_GENERATOR "TGZ;DEB")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "eNVy Systems, Inc. <peert@envysys.com>")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "misc")
+    # Qt runtime is bundled by the deploy script, so do NOT auto-depend on
+    # system Qt via shlibdeps (keeps the .deb self-contained on Mint/ARM).
+endif()
+
+include(CPack)

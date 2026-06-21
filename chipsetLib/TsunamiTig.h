@@ -43,6 +43,7 @@ public:
     void reset() noexcept {
         m_halt[0] = m_halt[1] = 0;
         m_ipcr[0] = m_ipcr[1] = m_ipcr[2] = m_ipcr[3] = 0;
+        m_cpuStartReq = 0;
         m_arbCtrl = 0;
     }
 
@@ -55,8 +56,26 @@ public:
         return m_halt[0] == 0 && m_halt[1] == 0
             && m_ipcr[0] == 0 && m_ipcr[1] == 0
             && m_ipcr[2] == 0 && m_ipcr[3] == 0
+            && m_cpuStartReq == 0
             && m_arbCtrl == 0;
     }
+
+    // ---- Secondary-CPU start signalling (TIG 0xC00028+id; pc264.c) ----------
+    // A guest write to the per-CPU CPU-START register (kIpcr0..3) latches a
+    // start request for that CPU id; the secondary-CPU bring-up polls these.
+    // On a UP boot `cpu_enabled` lists only the primary, so start_secondaries()
+    // never writes these -> m_cpuStartReq stays 0 and the boot is byte-identical.
+    // The latched id maps to the entry slot at PAL$CPU0_START_BASE + id*8
+    // (coreLib/Ev6Pc264PalDefs.h cpuStartSlotOffset(id)), which the started
+    // secondary loads and jumps to (EV6_VMS_PC264_PAL.MAR).
+    bool cpuStartRequested(int cpuId) const noexcept {
+        return cpuId >= 0 && cpuId < 4
+            && (m_cpuStartReq & (1u << cpuId)) != 0;
+    }
+    void clearCpuStartRequest(int cpuId) noexcept {
+        if (cpuId >= 0 && cpuId < 4) m_cpuStartReq &= ~(1u << cpuId);
+    }
+    uint32_t pendingCpuStartMask() const noexcept { return m_cpuStartReq; }
 
     uint64_t read(uint64_t pa) const noexcept {
         switch (pa) {
@@ -87,12 +106,17 @@ public:
         // write-1-to-clear pattern -- add on demand if firmware touches them.
         case kClrIrq4:   return 0;
 
-        // Inter-processor communication regs (pc264.c outtig(0xC00028+id)).
-        // STORAGE-ONLY: a write does NOT inject a target-CPU interrupt.
-        // Harmless on UP DS10; on ES40/ES45 (up to 4x 21264) an ipcr write
-        // meant to IPI a secondary just sits here -> SMP secondary startup
-        // stalls on an IPI that never fires (ties to per-CPU HWRPB BIP/state
-        // bring-up).  TODO(SMP): wire ipcr writes to IPI injection.
+        // Per-CPU CPU-START registers (formerly mislabeled "ipcr").  VERIFIED
+        // 2026-06-21 from apisrm pc264.c start_secondary(id): the console stages
+        // the secondary's entry address in PAL$CPU0_START_BASE[id] (impure mem,
+        // offset 0x100 + id*8; see coreLib/Ev6Pc264PalDefs.h), issues mb(), then
+        // KICKS the secondary with outtig(NULL, 0xC00028 + id, 0).  That offset
+        // maps (xtig: PA = 0x801_0000_0000 + (off<<6)) to 0x801_3000_0A00 + id*0x40
+        // = kIpcr0..3.  The VALUE written is 0 -- the WRITE EVENT is the kick, NOT
+        // an IPI and NOT the Cchip MISC.IPREQ path (that is the OS-level
+        // interprocessor interrupt, irq<3>/IPL22, used post-boot).  The kick is
+        // latched in m_cpuStartReq for the secondary-CPU bring-up to poll/consume
+        // (see cpuStartRequested()).  Reads return the stored value (faithful).
         case kIpcr0:     return m_ipcr[0];
         case kIpcr1:     return m_ipcr[1];
         case kIpcr2:     return m_ipcr[2];
@@ -114,10 +138,13 @@ public:
         case kHaltCpu0:  m_halt[0] = v; return;
         case kHaltCpu1:  m_halt[1] = v; return;
         case kClrIrq4:   return;                      // IRQ4 ack -- absorb (no TIG latch; see read())
-        case kIpcr0:     m_ipcr[0] = v; return;
-        case kIpcr1:     m_ipcr[1] = v; return;
-        case kIpcr2:     m_ipcr[2] = v; return;
-        case kIpcr3:     m_ipcr[3] = v; return;
+        // CPU-START kick: store the (0) value faithfully AND latch a start
+        // request for CPU id so the secondary-CPU bring-up can poll/consume it.
+        // The WRITE EVENT is the signal (value is 0); see read() + pc264.c.
+        case kIpcr0:     m_ipcr[0] = v; m_cpuStartReq |= 0x1u; return;
+        case kIpcr1:     m_ipcr[1] = v; m_cpuStartReq |= 0x2u; return;
+        case kIpcr2:     m_ipcr[2] = v; m_cpuStartReq |= 0x4u; return;
+        case kIpcr3:     m_ipcr[3] = v; m_cpuStartReq |= 0x8u; return;
         case kArbCtrl:   m_arbCtrl = v; return;
         case kArbRev:
         case kTigPldRev:
@@ -171,6 +198,9 @@ private:
 
     uint64_t m_halt[2] = { 0, 0 };
     uint64_t m_ipcr[4] = { 0, 0, 0, 0 };
+    // Per-CPU CPU-START request latch (bit i = CPU i kicked via kIpcr_i write).
+    // Transient SMP-signalling state; consumed/cleared by the secondary bring-up.
+    uint32_t m_cpuStartReq = 0;
     uint64_t m_arbCtrl = 0;
 };
 
