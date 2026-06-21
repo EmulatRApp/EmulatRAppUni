@@ -194,6 +194,38 @@ P2-T6  STEP 5 -- flip default + delete legacy loop (POST-Phase-2 acceptance only
   list + journals/20260618_smp_secondary_cpu_bringup_design.md.
   ===========================================================================
 
+PHASE 3 PROGRESS (started 2026-06-20):
+  STEP 1 APPLIED (UNBUILT -- client build pending) -- LL/SC interlock CORRECT at
+  the harness/arbiter level:
+    - tests/schedLib/smp_harness_tests.cpp: 3 Phase3 LockArbiter contract micro-
+      tests (the memo-mandated executable spec).  RED-FIRST CONFIRMED on the
+      prior build: cases 1+2 failed against the old one-holder arbiter
+      (storeCond(A)==false so B wrongly wins; aWon==false), case 3 (plain-store
+      invalidation) passed.  462 cases / 2 failed / 3 assertions, exactly as
+      predicted.
+    - schedLib/SmpHarness.h LockArbiter REFINED one-holder-per-granule ->
+      PER-CPU reservations (m_reservation: AgentId->granule).  loadLocked sets
+      ONLY that agent (a load never clears another CPU's reservation); a
+      successful storeCond AND a plain store clear EVERY reservation on the
+      granule (cross-CPU invalidation -- the memo's crux); first-to-SC in
+      cooperative drain order wins.  Expect the 3 micro-tests GREEN and
+      determinism_equivalence still green (one shared arbiter, single-threaded
+      in syncPhase).
+    - FOLLOW-ON FIX: the PRE-EXISTING lock_arbiter_semantics test (0x300
+      interleave block) still encoded the OLD one-holder model ("only the
+      current holder (1) wins").  Under the corrected per-CPU model the FIRST to
+      SC (agent 0, drain order) wins, so that block flipped to
+      storeCond(0)==true / storeCond(1)==false.  Build run 2026-06-20 19:46 was
+      462|461 passed|1 failed -- the lone red was exactly this stale assertion,
+      with all 3 Phase3 cases GREEN; after the flip expect 462/462.
+  REMAINING (Phase 3 step 2 -- wire the REAL CPU): MemDrainer LDx_L ->
+    loadLocked(id, granule); STx_C -> storeCond; any plain STx + the Pchip/DMA
+    write path -> store(id, granule).  Mirror per-CPU reservedCacheLine/
+    hasReservation off the arbiter; add a 2-agent contention loop over the real
+    CPU (mutual exclusion + total grants == N + no livelock).  Granule = confirm
+    the 21264 cache-block/lock range vs the current 64-byte reservedCacheLine.
+  ===========================================================================
+
 DOWNSTREAM (already in memory.md deferred list; not Phase 2):
   Phase 3 (LL/SC cross-CPU interlock + LockArbiter real backing + contention
   micro-test -- THE cliff); Phase 4 (per-CPU IPI divert + P4 constants); Phase 5

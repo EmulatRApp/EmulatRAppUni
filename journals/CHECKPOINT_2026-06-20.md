@@ -58,3 +58,18 @@
   - File churn mid-edit: Tim edited `CpuState.h` by hand while the session was editing it → an Edit missed and required a re-Read. Re-read regions before re-editing to avoid clobbering manual deletions.
   - Accumulated uncommitted stack is now three deep (STEP 1b → HwpcbContext → T5). A single build/commit should cover all; tree is not green until then.
   - D: mount can serve stale cached copies — validate writes via the Read (host) view, not bash byte counts.
+
+## 01:06 — Phase 3 red-first: failing LockArbiter LL/SC contract micro-test landed
+- **Working on:** Same "Readiness check" session crossed into **Phase 3** (LL/SC interlock — "the cliff"). Wrote the executable spec for per-CPU reservation semantics as a direct `LockArbiter` contract test, deliberately landed **red first** before touching the arbiter itself.
+- **Done since last checkpoint:**
+  - **Three `Phase3 LockArbiter` doctest cases appended** to the LockArbiter test file (host Grep confirms them at lines **206 / 222 / 238**; `AgentId = int`, `LockArbiter` directly constructible, doctest style). Confirmed via host Grep — the bash 186-line count was the stale-mount phantom again, Edit succeeded on host.
+  - Expected build result is **exactly two new failures** against the current one-holder arbiter: `a load does not clear another CPU's reservation` and `exactly one STx_C wins a contended granule` (a 2nd CPU's `loadLocked` overwrites the single holder, so the 1st CPU's `STx_C` wrongly fails). The third case — `a plain store breaks every OTHER CPU's reservation` — **passes** as a co-invariant guarding against over-correction. That red confirms the spec catches the bug; nothing else should change.
+  - Design traced for the green step (held separate on purpose): refine `LockArbiter` from one-holder-per-granule to **per-CPU reservations** — `m_reservation: AgentId → granule`; `loadLocked` sets only that agent's reservation; both `storeCond` (on success) and `store` clear *every* agent whose reservation names that granule. Traced safe for `determinism_equivalence` (both drivers share the one arbiter resolved in `syncPhase`, stays bit-identical).
+- **Open / next:**
+  1. **Build to see the red** (client-side MSVC) — confirm exactly the two expected new failures, third case green.
+  2. On "go", **land the `LockArbiter` per-CPU reservation refinement** to turn it green — the actual Phase-3 interlock core.
+- **Watch-outs:**
+  - Refinement was held as a separate step so the build shows clean red first, and so any perturbation of an *existing* grant-count assertion is caught in isolation rather than tangled with the new tests.
+  - `MockCpuAgent` already does the two-quantum LL/SC and `syncPhase` drains effects in agent order — the one-holder bug is directly expressible as this `LockArbiter` contract test.
+  - Still no committed/built baseline — the uncommitted stack (STEP 1b → HwpcbContext → P2-T5) remains open beneath this Phase-3 test; tree not green until built+committed.
+  - D: mount can serve stale cached copies — validate writes via the Read (host) view, not bash byte counts.

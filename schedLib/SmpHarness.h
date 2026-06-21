@@ -78,39 +78,56 @@ private:
 // it stays correct and deterministic without host atomics. This is the
 // "synchronous lock-table" the cooperative model buys you.
 //
-// Semantics (granule = address key here; refine to cache-block granule when
-// wiring the real CPU):
-//   loadLocked(a, addr) : agent a arms a lock on addr.
-//   storeCond (a, addr) : succeeds iff a's lock on addr is still valid; a
-//                         successful SC clears the lock and returns true.
-//   store     (a, addr) : a plain store breaks any OTHER agent's lock on addr
-//                         (cross-CPU invalidation).
+// Semantics -- PER-CPU reservations (Phase 3; granule = address key here, refine
+// to the cache-block granule when wiring the real CPU).  Multiple CPUs may hold a
+// reservation on the SAME granule at once; a LOAD never clears another CPU's
+// reservation -- only a STORE does:
+//   loadLocked(a, addr) : agent a sets ITS reservation on addr; others untouched.
+//   storeCond (a, addr) : succeeds iff a's reservation on addr is still valid; a
+//                         successful SC is a store, so it clears a's reservation
+//                         AND every OTHER agent's reservation on addr, then
+//                         returns true.  (Cooperative drain order => the first
+//                         agent to SC a contended granule wins.)
+//   store     (a, addr) : a plain store (normal STx or DMA write) breaks every
+//                         OTHER agent's reservation on addr (cross-CPU
+//                         invalidation), and drops a's own as a store would.
+// Resolved single-threaded in syncPhase => no host atomics, deterministic.
 // ----------------------------------------------------------------------------
 class LockArbiter {
 public:
-    void reset() noexcept { m_holder.clear(); }
+    void reset() noexcept { m_reservation.clear(); }
 
     void loadLocked(AgentId a, std::uint64_t addr) {
-        m_holder[addr] = a;                     // arm / re-arm
+        m_reservation[a] = addr;                 // set/re-arm a's reservation only
     }
 
     bool storeCond(AgentId a, std::uint64_t addr) {
-        auto it = m_holder.find(addr);
-        bool const ok = (it != m_holder.end() && it->second == a);
-        if (ok) m_holder.erase(it);             // success consumes the lock
+        auto const it = m_reservation.find(a);
+        bool const ok = (it != m_reservation.end() && it->second == addr);
+        if (ok) clearGranule(addr);              // success stores -> break ALL on addr
         return ok;
     }
 
     void store(AgentId /*a*/, std::uint64_t addr) {
-        m_holder.erase(addr);                   // break any lock on this granule
+        clearGranule(addr);                      // plain store -> break ALL on addr
     }
 
     bool isLocked(std::uint64_t addr) const {
-        return m_holder.find(addr) != m_holder.end();
+        for (auto const& kv : m_reservation)
+            if (kv.second == addr) return true;
+        return false;
     }
 
 private:
-    std::unordered_map<std::uint64_t, AgentId> m_holder;
+    // Drop every agent's reservation that names this granule.
+    void clearGranule(std::uint64_t addr) {
+        for (auto it = m_reservation.begin(); it != m_reservation.end(); ) {
+            if (it->second == addr) it = m_reservation.erase(it);
+            else                    ++it;
+        }
+    }
+
+    std::unordered_map<AgentId, std::uint64_t> m_reservation;  // agent -> reserved granule
 };
 
 // ----------------------------------------------------------------------------
