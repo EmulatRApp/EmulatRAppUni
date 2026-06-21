@@ -251,6 +251,55 @@ namespace memoryLib {
         std::memset(m_dirtyBitmap, 0, m_dirtyWordCount * sizeof(uint64_t));
     }
 
-    
+    // ===========================================================================
+    // LockMonitor -- per-CPU LDx_L / STx_C reservation table (SSOT).
+    // ===========================================================================
+    // Semantics ported from the validated schedLib::LockArbiter (Phase 3) and
+    // promoted here because this is the memory boundary every writer crosses --
+    // CPU stores AND device/DMA writes -- so cross-CPU invalidation can be hooked
+    // in one place.  Real LL/SC: multiple CPUs may hold a reservation on the SAME
+    // cache line at once; a LOAD never clears another CPU's reservation, only a
+    // STORE does.  Granularity is the 64-byte EV6 cache line: LDx_L of any byte in
+    // a line reserves the whole line; STx_C to any byte of that line matches.
+    //
+    //   set(cpuId, pa)        : arm ONLY cpuId's reservation on pa's line.
+    //   check(cpuId, pa)      : true iff cpuId's reservation is valid and names
+    //                           pa's line.  Pure query; does not mutate.
+    //   clear(cpuId)          : drop cpuId's reservation (e.g. a failed STx_C, or
+    //                           the self-clear after a successful one).
+    //   clearLine(pa, except) : drop EVERY CPU's reservation on pa's line except
+    //                           `except` (a CPU's own plain store passes its id so
+    //                           it does not self-invalidate; device/DMA writes pass
+    //                           the default -1 to clear all).  This is the cross-CPU
+    //                           invalidation hook.
+    //
+    // Out-of-range cpuId is ignored (set/clear) or reported false (check) so a
+    // mis-wired caller can never index out of bounds.
+    // ---------------------------------------------------------------------------
+    void LockMonitor::set(int cpuId, uint64_t pa) noexcept {
+        if (cpuId < 0 || cpuId >= kMaxCPUs) return;
+        m_cpu[cpuId].pa    = pa & kCacheLineMask;
+        m_cpu[cpuId].valid = true;
+    }
+
+    bool LockMonitor::check(int cpuId, uint64_t pa) const noexcept {
+        if (cpuId < 0 || cpuId >= kMaxCPUs) return false;
+        return m_cpu[cpuId].valid
+            && m_cpu[cpuId].pa == (pa & kCacheLineMask);
+    }
+
+    void LockMonitor::clear(int cpuId) noexcept {
+        if (cpuId < 0 || cpuId >= kMaxCPUs) return;
+        m_cpu[cpuId].valid = false;
+    }
+
+    void LockMonitor::clearLine(uint64_t pa, int exceptCpu) noexcept {
+        uint64_t const line = pa & kCacheLineMask;
+        for (int i = 0; i < kMaxCPUs; ++i) {
+            if (i == exceptCpu) continue;
+            if (m_cpu[i].valid && m_cpu[i].pa == line)
+                m_cpu[i].valid = false;
+        }
+    }
 
 } // namespace memoryLib
