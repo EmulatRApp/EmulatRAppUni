@@ -92,12 +92,14 @@ TEST_CASE("lock_arbiter_semantics") {
     arb.store(1, 0x200);                 // breaks 0's lock on this granule
     CHECK(arb.storeCond(0, 0x200) == false);
 
-    // Mutual exclusion under interleave: 0 LLs, 1 LLs (overwrites), then both
-    // SC -> only the current holder (1) wins.
+    // Mutual exclusion under interleave: both 0 and 1 reserve the SAME granule
+    // (per-CPU reservations -- a load never clears another CPU's). Both SC ->
+    // the FIRST to store-conditional (agent 0, drain order) wins; its store
+    // clears agent 1's reservation, so agent 1's SC fails. Exactly one winner.
     arb.loadLocked(0, 0x300);
-    arb.loadLocked(1, 0x300);            // 1 is now the holder
-    CHECK(arb.storeCond(0, 0x300) == false);
-    CHECK(arb.storeCond(1, 0x300) == true);
+    arb.loadLocked(1, 0x300);            // both now hold a reservation on 0x300
+    CHECK(arb.storeCond(0, 0x300) == true);
+    CHECK(arb.storeCond(1, 0x300) == false);
 }
 
 // ----------------------------------------------------------------------------
@@ -183,4 +185,70 @@ TEST_CASE("determinism_across_quantum_sequential") {
     auto b = runWith(4);
     CHECK(a.counters == b.counters);
     CHECK(a.rng == b.rng);
+}
+
+
+// ============================================================================
+// Phase 3 -- LockArbiter LDx_L / STx_C per-CPU reservation semantics.
+// ============================================================================
+// EXECUTABLE SPEC for the cross-CPU interlock (design memo Phase 3).  Real
+// LL/SC: multiple CPUs may hold a reservation on the SAME granule at once; a
+// LOAD never clears another CPU's reservation -- only a STORE (a plain store, or
+// a successful STx_C) does.  The contended winner is the FIRST CPU to STx_C
+// (here the lower AgentId, since syncPhase drains effects in agent order); its
+// store then clears every OTHER CPU's reservation, so their STx_C fails.
+//
+// Cases 1 and 2 FAIL against the current one-holder-per-granule LockArbiter
+// (loadLocked OVERWRITES the single holder, so a 2nd CPU's load wrongly
+// invalidates the 1st CPU's reservation and the 1st CPU's STx_C fails).  They
+// are the spec driving the per-CPU-reservation refinement.  Case 3 is a
+// co-invariant that already holds and guards against over-correction (dropping
+// the cross-CPU clear on a plain store).
+
+TEST_CASE("Phase3 LockArbiter -- a load does not clear another CPU's reservation")
+{
+    LockArbiter arb;
+    constexpr std::uint64_t G = 0x4000;
+    AgentId const A = 0, B = 1;
+
+    arb.loadLocked(A, G);   // CPU A reserves G
+    arb.loadLocked(B, G);   // CPU B reserves G -- must NOT clear A's reservation
+
+    // A stores-conditional first (drained first): must SUCCEED; its store then
+    // clears B's reservation.
+    CHECK(arb.storeCond(A, G) == true);
+    // B's store-conditional now fails -- A's store broke B's reservation.
+    CHECK(arb.storeCond(B, G) == false);
+}
+
+TEST_CASE("Phase3 LockArbiter -- exactly one STx_C wins a contended granule")
+{
+    LockArbiter arb;
+    constexpr std::uint64_t G = 0x4000;
+    AgentId const A = 0, B = 1;
+
+    arb.loadLocked(A, G);
+    arb.loadLocked(B, G);
+
+    bool const aWon = arb.storeCond(A, G);
+    bool const bWon = arb.storeCond(B, G);
+
+    CHECK(aWon != bWon);    // exactly one winner: no double-acquire, no livelock
+    CHECK(aWon == true);    // first-to-SC (drain order) wins
+}
+
+TEST_CASE("Phase3 LockArbiter -- a plain store breaks every OTHER CPU's reservation")
+{
+    LockArbiter arb;
+    constexpr std::uint64_t G = 0x4000;
+    AgentId const A = 0, B = 1, C = 2;
+
+    arb.loadLocked(A, G);
+    arb.loadLocked(B, G);
+    arb.loadLocked(C, G);
+
+    arb.store(B, G);        // B does a PLAIN store to G
+
+    CHECK(arb.storeCond(A, G) == false);   // A's reservation broken
+    CHECK(arb.storeCond(C, G) == false);   // C's reservation broken
 }
