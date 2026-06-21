@@ -388,9 +388,8 @@ void BreakpointSink::emitGateSnapshot(uint64_t                 cycle,
     m_breakLog << vfmt(" usp=%016llx",          static_cast<unsigned long long>(s.usp));
     m_breakLog << vfmt(" fen=%016llx",          static_cast<unsigned long long>(s.fen));
     m_breakLog << vfmt(" asten_sr=%016llx",     static_cast<unsigned long long>(s.asten_sr));
-    m_breakLog << vfmt(" reservedCacheLine=%016llx",
-                       static_cast<unsigned long long>(s.reservedCacheLine));
-    m_breakLog << vfmt(" hasReservation=%d",    s.hasReservation ? 1 : 0);
+    // reservedCacheLine / hasReservation retired from CpuState 2026-06-21;
+    // LL/SC reservation state now lives in memoryLib::LockMonitor (the SSOT).
     m_breakLog << vfmt(" halted=%d",            s.halted ? 1 : 0);
     m_breakLog << vfmt(" unalignTrapEnabled=%d", s.unalignTrapEnabled ? 1 : 0);
     m_breakLog << vfmt(" lastFaultCode=%04x",   static_cast<unsigned>(s.lastFaultCode));

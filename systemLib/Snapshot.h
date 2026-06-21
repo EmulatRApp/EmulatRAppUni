@@ -129,6 +129,11 @@ inline constexpr uint32_t kFormatVersion         = 1;
 //   v8 -> v9 (2026-06-20): removed the dormant, mis-typed mCpuId/CpuType field
 //       (T5 -- WHAMI now reads cpuSlot, the single slot source).  Shrinks/
 //       realigns the raw POD blob; all pre-v9 snapshots are rejected at load.
+//   v9 -> v10 (2026-06-21): removed CpuState.reservedCacheLine (uint64) and
+//       hasReservation (bool); LDx_L / STx_C reservation state now lives in
+//       memoryLib::LockMonitor (the SSOT, reached via GuestMemory::lockMonitor),
+//       not in CpuState.  Shrinks/realigns the raw POD blob; all pre-v10
+//       snapshots are rejected at load.
 // Snapshots captured before this point cannot be loaded; cold-boot
 // to re-establish a halt snapshot post-change.
 // Chipset stream versions:
@@ -155,7 +160,7 @@ inline constexpr uint32_t kFormatVersion         = 1;
 //       IDENTITY is re-applied from the platform manifest before restore;
 //       only mutable content travels.  Pre-v5 snapshots rejected (the IIC
 //       block layout changed; not backward-readable).
-inline constexpr uint32_t kCpuStateVersion       = 9;  // v9: - mCpuId (T5); v8: + cpuSlot
+inline constexpr uint32_t kCpuStateVersion       = 10; // v10: - reservedCacheLine/hasReservation (LL/SC SSOT = LockMonitor); v9: - mCpuId (T5); v8: + cpuSlot
 inline constexpr uint32_t kChipsetVersion        = 5;  // v5: manifest-driven IIC content
 inline constexpr char     kSnapshotExtension[]   = ".axpsnap";
 inline constexpr char     kSnapshotDirDefault[]  = "snapshots";

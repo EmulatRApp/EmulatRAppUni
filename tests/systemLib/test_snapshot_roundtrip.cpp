@@ -117,8 +117,8 @@ void populateMachine(Machine& m, uint64_t salt)
     cpu.usp = salt + 0xD000ULL;
     cpu.fen = salt + 0xE000ULL;
     cpu.asten_sr = salt + 0xF000ULL;
-    cpu.reservedCacheLine = salt + 0x10000ULL;
-    cpu.hasReservation    = true;
+    // reservedCacheLine / hasReservation retired from CpuState 2026-06-21
+    // (LL/SC reservation now in memoryLib::LockMonitor, not snapshotted here).
     for (int i = 0; i < 32; ++i) {
         cpu.palTemp[i] = salt + 0x20000ULL + static_cast<uint64_t>(i);
     }
@@ -197,8 +197,6 @@ void checkCpuStateEqual(coreLib::CpuState const& a,
     CHECK(a.usp         == b.usp);
     CHECK(a.fen         == b.fen);
     CHECK(a.asten_sr    == b.asten_sr);
-    CHECK(a.reservedCacheLine == b.reservedCacheLine);
-    CHECK(a.hasReservation    == b.hasReservation);
 }
 
 } // namespace

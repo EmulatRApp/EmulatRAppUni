@@ -560,37 +560,18 @@ struct CpuState
     // ------------------------------------------------------------------
     // Load-locked / store-conditional reservation.
     // ------------------------------------------------------------------
-    // Per-CPU reservation tracking for LDL_L / LDQ_L paired with
-    // STL_C / STQ_C.  64-byte cache-line granularity per V1
-    // ReservationManager.  Single-CPU posture: one reservation per
-    // CPU, no shared bookkeeping.  Multi-CPU machinery (cache-line
-    // invalidation across CPUs on stores) is deferred until v1
-    // sees a multi-CPU consumer.
-    //
-    // LDL_L / LDQ_L drain at MEM:
-    //   reservedCacheLine = pa & ~0x3FULL;
-    //   hasReservation    = true;
-    //
-    // STL_C / STQ_C drain at MEM:
-    //   bool valid = hasReservation && reservedCacheLine == (pa & ~0x3FULL);
-    //   hasReservation = false;
-    //   regWriteValue  = valid ? 1 : 0;
-    //   if (valid) actually publish the store, else skip.
-    //
-    // TODO(deprecated) 2026-05-14: reservation state has moved into
-    //   memoryLib::GuestMemory::lockMonitor() (a memoryLib::LockMonitor
-    //   instance).  The LockMonitor provides per-CPU cache-line
-    //   reservation tracking with the cross-CPU invalidation hook
-    //   already wired -- every store calls clearLine(pa) on its own
-    //   so STQ_C semantics are correct in SMP-eventual.  The fields
-    //   below remain for MemDrainer / BreakpointSink / CpuStateDump
-    //   call sites that have not yet been migrated; migration is
-    //   mechanical (find these names, route the read/write through
-    //   GuestMemory::lockMonitor()).  Once all call sites are
-    //   migrated, remove these two fields and the snapshot path
-    //   that serialises them.  See journals/MemoryV2_Integration_Notes.md.
-    uint64_t reservedCacheLine = 0;
-    bool     hasReservation    = false;
+    // RETIRED 2026-06-21: per-CPU LDx_L / STx_C reservation state is now
+    // owned solely by memoryLib::LockMonitor
+    // (memoryLib::GuestMemory::lockMonitor()) -- the single source of
+    // truth.  MemDrainer arms it on LDx_L (locks.set), tests + clears it
+    // on STx_C (locks.check / locks.clear), and broadcasts cross-CPU
+    // invalidation on every published store (locks.clearLine(pa,
+    // exceptCpu = cpuSlot)).  The former CpuState fields
+    // reservedCacheLine / hasReservation were removed here; because
+    // CpuState round-trips through the snapshot as a raw sizeof(cpu)
+    // blob, removing them is a layout change and bumped
+    // kCpuStateVersion 9 -> 10 (see systemLib/Snapshot.h).  Old
+    // snapshots are version-gated and rejected at load.
 
     // ------------------------------------------------------------------
     // CPU lifecycle flags.

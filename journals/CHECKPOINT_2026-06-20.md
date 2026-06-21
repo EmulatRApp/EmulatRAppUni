@@ -90,3 +90,18 @@
   - Phase-3 red test from 01:06 (LockArbiter cases at lines 206/222/238) is still unbuilt; greening it is downstream of this SSOT-wiring decision.
   - Uncommitted stack still open beneath all of this (STEP 1b → HwpcbContext → P2-T5) — tree not green until built+committed (MSVC client-side).
   - D: mount can serve stale cached copies — validate writes via the Read (host) view, not bash byte counts.
+
+## 05:06 — Pivot to packaging: 6 host platform variants (.ux/.arm) written; manual-ZIP distribution chosen over CPack
+- **Working on:** Same "Readiness check" session pivoted off SMP/Phase-3 onto distribution/packaging. Created Linux/ARM platform-manifest variants for the three machine profiles and settled the release-packaging approach (manual ZIP, not CPack).
+- **Done since last checkpoint:**
+  - **Six platform variants written** to `out/build/release/tools/`: `ds10_platform.{ux,arm}`, `ds20_platform.{ux,arm}`, `es40_platform.{ux,arm}` — all validated as well-formed JSON (correct platform + 3 PCI devices each).
+  - **Only host-specific content was DS10's media paths** — POSIX-ified: ISO `D:\isos\alpha082.iso` → bare `alpha082.iso` (resolves against `[Storage] diskDir`); host-optical passthrough `host:0`/`\\.\E:` → `/dev/sr0`. **DS20/ES40 ship empty media (`""`)**, so their variants are topology-identical to `.win` with only a host marker added in the top comment. `.ux` and `.arm` are intentionally identical today (x86-Linux and ARM-Linux share `/dev/sr0` + POSIX paths); `.arm` kept distinct as a reserved slot for future ARM divergence (noted in each file's comment).
+  - **User chose manual installable ZIP over CPack** (CPack "did not work well for the installation"). Runnable set for the manual ZIP: `Emulatr.exe`, the Qt DLLs `windeployqt` POST_BUILD stages next to the exe, `EmulatrV4.ini` (curated DS10 default), the relevant `*_platform.*` manifest, and `LICENSE.md`.
+- **Open / next:**
+  1. Phase-2/3 coding remains where 03:06 left it — **P2-T1** (DecListingSink cpuId emit + re-baseline) gated on committing the still-uncommitted STEP 1b → HwpcbContext → P2-T5 stack; Phase-3 SSOT-wiring decision still pending. Packaging was a side-track, not progress on the boot path.
+  2. Optional follow-ups offered, not taken: leave the inert `include(CPack)` block or strip it; add a repeatable manual-ZIP staging script.
+- **Watch-outs:**
+  - The six variants live in `out/build/release/tools/` — a **build-output dir**. Canonical source is the top-level `./*_platform.win`; a clean rebuild will NOT recreate `.ux`/`.arm` (CMake only copies `.win`/`.linux`). Good as test-scratch; for persistence they need to live at the source dir + a copy rule.
+  - **Runtime does not select `.ux`/`.arm`** — Machine's OS-suffix logic (CMakeLists ~line 838) picks `.win` on Windows, `.linux` everywhere else. On Mint/ARM the app looks for `ds10_platform.linux`, not these; to boot from them today, rename to `.linux` per host or point `EMULATR_PLATFORM_CONFIG` at the specific file.
+  - The Phase-2/3 uncommitted stack from earlier today is unaffected and still open — this packaging work did not touch it.
+  - D: mount can serve stale cached copies — validate writes via the Read (host) view, not bash byte counts.

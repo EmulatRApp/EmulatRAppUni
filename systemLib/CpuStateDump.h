@@ -37,7 +37,7 @@
 //   IPRs:
 //     ptbr=0x... asn=0x... va_ctl=0x... i_ctl=0x... m_ctl=0x...
 //     i_spe=0x... m_spe=0x... mode=Kernel mm_stat=0x... intrFlag=0x...
-//     reservedCacheLine=0x... hasReservation=false
+//   (LL/SC reservation retired from CpuState 2026-06-21; now in LockMonitor.)
 //
 // Output shape (dumpStopReason):
 //
