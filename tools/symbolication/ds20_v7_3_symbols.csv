@@ -1,0 +1,4 @@
+name,linked_addr
+vmem,0x00195e40
+fpr,0x00195e50
+gpr,0x00195e68
