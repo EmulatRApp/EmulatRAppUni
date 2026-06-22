@@ -841,6 +841,59 @@ private:
         }
         // ---- END fp->ip store-watch ----
 #endif
+        // ---- TEMP START-WATCH (VALUE) 2026-06-21 -- REMOVE BEFORE COMMIT ----
+        // Base-pinning for secondary-CPU bring-up: catch start_secondary(id)
+        // staging the entry address (PAL$PAL_BASE+1 = palBase|1 at the store
+        // moment) into PAL$CPU0_START_BASE[id], wherever the linkage base
+        // resolves.  Keyed by VALUE so it self-locates regardless of base;
+        // covers the relocation epochs palBase can be in when start_secondaries
+        // runs (0x900000 stub / 0x600000 target / SDL 0x8000).  The hit paired
+        // with the immediately-following TIG 0xC00029 write is the slot.  Gated
+        // by EMULATR_START_WATCH (cached getenv); (void)0 when unset.  See
+        // journals/20260621_storewatch_cpu0_start_base_base_pinning.md.
+        {
+            static bool const s_startWatch =
+                (std::getenv("EMULATR_START_WATCH") != nullptr);
+            if (s_startWatch) {
+                // (a) candidate slot store: staged entry value palBase|1.  NOTE:
+                // 0x8001 (compile-time PAL$PAL_BASE+1) is ubiquitous, so a (val)
+                // hit alone is NOT the slot -- only the one whose cyc immediately
+                // precedes a (kick) line below is start_secondary's slot store.
+                if (r.memSize == 8 &&
+                    (r.memData == 0x0000000000900001ull ||
+                     r.memData == 0x0000000000600001ull ||
+                     r.memData == 0x0000000000008001ull)) {
+                    std::fprintf(stderr,
+                        "START-WATCH(val) cyc=%llu pc=0x%016llx pa=0x%016llx "
+                        "v=0x%016llx pal=%d palBase=0x%016llx\n",
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(cpu.pc),
+                        static_cast<unsigned long long>(pa),
+                        static_cast<unsigned long long>(r.memData),
+                        cpu.inPalMode() ? 1 : 0,
+                        static_cast<unsigned long long>(cpu.palBase));
+                    std::fflush(stderr);
+                }
+                // (b) THE unique start_secondary signal: the TIG CPU-START kick
+                // (outtig 0xC00028+id -> store to kIpcr0..3 PA 0x801_3000_0A00 +
+                // id*0x40).  Its presence proves start_secondary ran; the (val)
+                // store just before it is the slot, and that pa is the answer.
+                if (pa >= 0x0000080130000A00ull && pa <= 0x0000080130000AC0ull) {
+                    std::fprintf(stderr,
+                        "START-WATCH(kick) cyc=%llu pc=0x%016llx pa=0x%016llx "
+                        "id=%u v=0x%016llx pal=%d palBase=0x%016llx\n",
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(cpu.pc),
+                        static_cast<unsigned long long>(pa),
+                        static_cast<unsigned>((pa - 0x0000080130000A00ull) / 0x40ull),
+                        static_cast<unsigned long long>(r.memData),
+                        cpu.inPalMode() ? 1 : 0,
+                        static_cast<unsigned long long>(cpu.palBase));
+                    std::fflush(stderr);
+                }
+            }
+        }
+        // ---- END START-WATCH ----
         memoryLib::BusResult const br = bus.write(pa, r.memData, r.memSize);
         if (br.status != memoryLib::BusStatus::Ok) {
             r.faultCode = coreLib::kFaultBusError;
