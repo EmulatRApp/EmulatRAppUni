@@ -170,7 +170,11 @@ inline constexpr char     kSnapshotDirDefault[]  = "snapshots";
 // throughput to ~40M cyc/s wall; at 10M the 69 MB periodic save fired
 // ~4x/second and dominated run I/O (observed in the 20260603-211444
 // run tail).  1B ~= one save per ~25 s wall at warped speed.
-inline constexpr uint64_t kAutoSavePeriodCycles  = 1000ULL * 1000ULL * 1000ULL;
+// 2026-06-22: 1B -> 50B.  Deep multi-hour boot runs (100B+ cyc) made 1B
+// noisy (100+ saves, churn + prune); 50B keeps the periodic safety net
+// (5 kept = 250B coverage) without the clutter.  Lower it again if a
+// finer restore granularity is needed for a specific investigation.
+inline constexpr uint64_t kAutoSavePeriodCycles  = 50ULL * 1000ULL * 1000ULL * 1000ULL;
 inline constexpr int      kAutoSaveKeepCount     = 5;
 
 
