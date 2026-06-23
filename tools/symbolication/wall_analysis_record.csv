@@ -1,0 +1,22 @@
+bucket_pc,pct,count,first_cyc,last_cyc,ds10_func,entry,offset,apisrm_file,def_line,def_kind,role_notes,confidence
+0x0000000b400,41.13,675794886,186819599,1643118583,(unmapped),,,,,region,PAL/low (below console map 0x24000),region-only
+0x0000007b800,34.81,572006022,186819483,1643118592,krn$_poll,0x7b728,0xd8,kernel.c,978,extern-decl; body in ASM krn module,SRM cooperative poll-queue scheduler (idles when no fg thread runnable) -- WALL: init blocked on event/device; decompile @entry in Ghidra,exact-if-DS10 / candidate-if-DS20
+0x000001c6400,12.66,207937173,186817196,1643118585,sysfault_nohalt,0x1c630c,0xf4,,,ASM / no C def,per-tick/fault handler region (spans clock-ISR PC 0x1c6d4c); decompile @entry in Ghidra,exact-if-DS10 / candidate-if-DS20
+0x00000600800,5.50,90365058,4194489,186786175,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x00000601000,3.00,49271930,4252347,186786109,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x00000601400,2.49,40923181,4253599,186571968,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x00000900000,0.16,2621510,1,4194396,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x00000600c00,0.10,1591354,4196359,184353863,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x00000900400,0.10,1572894,30,4194404,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x00000601800,0.02,357441,4194695,184320063,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x0000007f400,0.01,221352,186801138,1642885004,reset_hardware,0x7f350,0xb0,pc264_init.c,513,C-def,hardware reset path,exact-if-DS10 / candidate-if-DS20
+0x0000007cc00,0.01,130802,186789601,1642885066,uptime,0x7cbf0,0x10,uptime.c,108,C-def,uptime/timer read,exact-if-DS10 / candidate-if-DS20
+0x000000b5400,0.01,125340,186819330,1642885013,config_vga_disable,0xb51d8,0x228,,,-,,exact-if-DS10 / candidate-if-DS20
+0x00000601c00,0.00,66150,4194569,186571987,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x000000b5c00,0.00,60023,194799656,1642885020,kbd_output,0xb5be0,0x20,kbd_driver.c,255,C-def(heuristic),,exact-if-DS10 / candidate-if-DS20
+0x000001c6800,0.00,28519,186789651,1642885060,mtpr64,0x1c678c,0x74,,,-,,exact-if-DS10 / candidate-if-DS20
+0x0000007fc00,0.00,16118,186790177,186815460,outdmeml,0x7fbe8,0x18,mc_driver.c,86,C-def(heuristic),,exact-if-DS10 / candidate-if-DS20
+0x00000600000,0.00,15666,4194492,186752305,(unmapped),,,,,region,pre-reloc stub/decompressor,region-only
+0x00000080c00,0.00,3490,186789838,186813792,io_get_window_base_rt,0x80a20,0x1e0,tsunami_io.c,786,C-def(heuristic),,exact-if-DS10 / candidate-if-DS20
+0x000001c6000,0.00,2338,186787001,186789503,(unmapped),,,,,region,unmapped,region-only
+0x0000007f800,0.00,1344,186801129,1259568413,inportw,0x7f7e8,0x18,dw_driver.c,354,C-def(heuristic),,exact-if-DS10 / candidate-if-DS20

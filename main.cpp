@@ -203,6 +203,14 @@ int main(int argc, char* argv[])
                      static_cast<unsigned long long>(opts.memSize));
     }
 
+    // SSOT (2026-06-23): record the RESOLVED firmware path (CLI > ini) back into
+    // settings so the Machine ctor can derive the platform manifest from it
+    // (<firmware-stem>_platform.json).  run_fw.sh passes --firmware on the CLI and
+    // does NOT set [ROM] firmwareImage, so without this the ctor would see a
+    // stale/empty ini value and load the wrong (or default) manifest.
+    // generic_string() keeps forward slashes for the stem derivation.
+    settings.rom.firmwareImage = opts.firmwarePath.generic_string();
+
     // ------------------------------------------------------------------
     // Construct the Machine and load firmware.
     // ------------------------------------------------------------------

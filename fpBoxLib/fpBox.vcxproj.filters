@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\fpBox_autogen\mocs_compilation_Debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\fp_host_guard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\fp_backend_softfloat.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\fp_backend_active.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\fpBox_autogen\mocs_compilation_Release.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\fpBox_autogen\mocs_compilation_MinSizeRel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\fpBox_autogen\mocs_compilation_RelWithDebInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fpBoxLib\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{61F9D55F-4D19-3B11-AA6A-950E6D52282B}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -834,40 +834,26 @@ foreach(_toolfile ${EMULATR_TOOL_FILES})
 endforeach()
 
 # ----------------------------------------------------------------------------
-# Platform device manifest consumed at runtime
+# Platform device manifests consumed at runtime
 # ----------------------------------------------------------------------------
-# The manifest sits NEXT TO the executable (the default path Machine builds is
-# OS-suffixed: ds10_platform.win on Windows, ds10_platform.linux elsewhere;
-# override with EMULATR_PLATFORM_CONFIG).  A missing or invalid file is
-# non-fatal -- Machine falls back to the compiled-in default DS10 manifest --
-# but shipping it lets operators re-populate the emulated board (IIC + PCI
-# devices, storage media) with a JSON edit instead of a rebuild.  Content is
-# plain JSON regardless of the .win/.linux extension.
-if(WIN32)
-    set(_platform_manifest "ds10_platform.win")
-else()
-    set(_platform_manifest "ds10_platform.linux")
-endif()
-add_custom_command(TARGET Emulatr POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/${_platform_manifest}"
-            "$<TARGET_FILE_DIR:Emulatr>/${_platform_manifest}"
-    COMMENT "[Emulatr] copy platform manifest: ${_platform_manifest}"
-    VERBATIM
+# Each manifest is named after its FIRMWARE-IMAGE STEM (<name>_v7_3_platform.json)
+# and is HOST-AGNOSTIC: it describes the GUEST device tree (IIC + PCI devices,
+# storage media), which is identical on every host -- so there is NO .win/.linux
+# split.  At runtime Machine derives the leaf as stem(firmwareImage)+"_platform.json"
+# (e.g. ds20_v7_3.exe -> ds20_v7_3_platform.json) and resolves it NEXT TO the
+# executable; copy each one there.  A missing/invalid file is non-fatal (Machine
+# falls back to the compiled-in default DS10 bus), but shipping them lets operators
+# re-populate the emulated board with a JSON edit instead of a rebuild.
+# EMULATR_PLATFORM_CONFIG overrides the path entirely.
+set(EMULATR_PLATFORM_MANIFESTS
+    "ds10_v7_3_platform.json"
+    "ds20_v7_3_platform.json"
+    "ds25_v7_3_platform.json"
+    "es40_v7_3_platform.json"
+    "es45_v7_3_platform.json"
 )
-
-# 2026-06-16: additional platform manifests for the firmware test matrix.
-# The runtime selects <lower(model)>_platform.win (Windows) next to the exe,
-# so set model=ES40 / DS20 in EmulatrV4.ini to drive these.  Only the Tsunami
-# platforms (ES40, DS20) are deployed -- DS25/ES45 are Titan and not yet
-# bootable (their _platform.json files exist in-source as staged manifests).
-# Windows-only deploy: these manifests ship as .win (plain JSON content).
-if(WIN32)
-    set(EMULATR_EXTRA_PLATFORM_MANIFESTS
-        "es40_platform.win"
-        "ds20_platform.win"
-    )
-    foreach(_pm ${EMULATR_EXTRA_PLATFORM_MANIFESTS})
+foreach(_pm ${EMULATR_PLATFORM_MANIFESTS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_pm}")
         add_custom_command(TARGET Emulatr POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${CMAKE_CURRENT_SOURCE_DIR}/${_pm}"
@@ -875,8 +861,8 @@ if(WIN32)
             COMMENT "[Emulatr] copy platform manifest: ${_pm}"
             VERBATIM
         )
-    endforeach()
-endif()
+    endif()
+endforeach()
 
 # ----------------------------------------------------------------------------
 # windeployqt -- copy Qt runtime DLLs alongside the executable

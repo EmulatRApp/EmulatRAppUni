@@ -626,14 +626,66 @@ private:
         m_pchip.registerIoPortRange(0x536, 0x537, &m_superio); // floppy IRQ6 poll (0x536)
 
         // 3. PCI dense-memory claimants (G3-lite seam, 2026-06-03).
-        // PCF8584 IIC controller at the DS10's fixed platform address
-        // (proven from the shipped image's iic_write_csr: base 0xFFFF0000).
+        // PCF8584 IIC controller -- FIXED platform mapping ("low BIOS region
+        // of ROM space", pc264_init.c:43), so the base is PER-MODEL, NOT a PCI
+        // BAR (the PCF8584 is a hardwired CSR region, not config-relocatable).
         // S0-area at +0, S1 control/status at +1.  Empty-bus NAK semantics
         // bound the iic_init probe loop that stalled powerup; see
-        // journals/IIC_PCF8584_Specification.txt.  The driver's dummy
-        // chip-select reads of ISA port 0x80 stay with the Cypress
-        // fallback by design.
-        m_pchip.registerPciMemRange(0xFFFF0000ULL, 0xFFFF0002ULL, &m_iic);
+        // journals/IIC_PCF8584_Specification.txt.  m_iic is model-agnostic;
+        // only the decode base differs by platform.  Bases proven from each
+        // shipped image's IIC byte traffic (S0 at +0, S1 at +1):
+        //   DS10  = 0xFFFF0000  iic_write_csr                        [2026-06-03]
+        //   DS20  = 0xFFF80000  writeb @0x1ade60 (EMULATR_IIC_WATCH)  [2026-06-22]
+        //   DS20E = 0xFFF80000  shares DS20 chassis/IIC mapping (defensive;
+        //                       m_model is the raw INI string, unnormalized)
+        // TODO prove ES40/ES45/DS25 IIC bases via EMULATR_IIC_WATCH when those
+        // models are booted; until then they default to the DS10 base (which
+        // leaves today's ES40/ES45 behavior unchanged).  registerPciMemRange
+        // takes a WINDOW-RELATIVE offset, half-open [start,end); +2 claims the
+        // two byte ports (S0,S1) exactly.
+        static constexpr struct { char const* model; uint64_t base; }
+            kIicBaseByModel[] = {
+                { "DS10",  0xFFFF0000ULL },   // proven: iic_write_csr     [2026-06-03]
+                { "DS20",  0xFFF80000ULL },   // proven: writeb@0x1ade60    [2026-06-22]
+                { "DS20E", 0xFFF80000ULL },   // shares DS20 chassis/IIC map (defensive)
+            };
+        // No silent default: an unmatched model is NOT laundered into DS10's
+        // base (that converts "unknown" into "confidently wrong" and re-hangs
+        // downstream).  DS10 is safe because it is an explicit ROW, not a
+        // fallback.  Find-or-fail:
+        uint64_t const* iicBase = nullptr;
+        for (auto const& e : kIicBaseByModel)
+            if (m_model == e.model) { iicBase = &e.base; break; }
+        if (iicBase != nullptr) {
+            m_pchip.registerPciMemRange(*iicBase, *iicBase + 2, &m_iic);
+        } else {
+            // Models we drive to the SRM console with the IIC on the boot path:
+            // a missing table row for THESE is a build error in kIicBaseByModel,
+            // not a runtime unknown -- hard-stop (same posture as the fpBox x87
+            // guard) rather than paper over it.  Expand as models reach console
+            // bring-up.  NOTE this set is intentionally narrower than
+            // variantFromModel's recognized models: ES40/ES45/DS25 are accepted
+            // configs but their IIC base is not yet proven, so they are NOT
+            // hard-stopped here.
+            auto const iicBaseRequired = [](std::string const& m) noexcept {
+                return m == "DS10" || m == "DS20" || m == "DS20E";
+            };
+            std::fprintf(stderr,
+                "TsunamiChipset: no proven IIC base for model '%s' -- IIC left "
+                "UNMAPPED.  First poke -> UNHANDLED OUTER WRITE will surface the "
+                "real base (the signal that located DS20); add a proven "
+                "kIicBaseByModel row when known.\n",
+                m_model.c_str());
+            if (iicBaseRequired(m_model)) {
+                std::fprintf(stderr,
+                    "TsunamiChipset: FATAL -- model '%s' is IIC-required but has "
+                    "no kIicBaseByModel row; refusing to launder into a default "
+                    "base.\n", m_model.c_str());
+                std::abort();
+            }
+            // else: unproven/unknown model -> leave IIC unmapped (no guessed
+            // registration that could shadow a real device at the wrong base).
+        }
     }
 
     static ChipsetVariant normalizeVariant(ChipsetVariant v) noexcept

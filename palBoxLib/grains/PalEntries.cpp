@@ -108,6 +108,16 @@
 
 namespace palBox {
 
+// TEMP DIAGNOSTIC (SDE shadow-swap ledger) forward decls -- REMOVE WITH the
+// DIVERT-REI block.  Storage + sdeLog body live in the palDiag namespace near
+// execHwRei (~1921); execHwMtpr (HW_I_CTL, above that point) needs them
+// forward-declared.  See project_ds20_wall_sde_shadow_choreography.
+namespace palDiag {
+extern bool g_sdeTraceArmed;
+extern int  g_sdeTraceWindows;
+void sdeLog(char const* tag, coreLib::CpuState const& cpu) noexcept;
+} // namespace palDiag
+
 using coreLib::BoxResult;
 using coreLib::CpuState;
 using coreLib::ExecCtx;
@@ -1664,9 +1674,19 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         bool const nowOn = coreLib::iCtlSdeHigh(c.opB);
         c.cpu->i_ctl = c.opB;
         c.cpu->i_spe = static_cast<uint8_t>((c.opB >> 3) & 0x7u);
+#if EMULATR_BRINGUP_PROBES
+        // TEMP (SDE swap ledger): record the in-PAL SDE toggle edges (the
+        // "zap sde"/"restore sde" pair the VMS clock ISR does each tick).
+        if (palDiag::g_sdeTraceArmed && c.cpu->inPalMode() && wasOn != nowOn)
+            palDiag::sdeLog(nowOn ? "ictl-set-pre" : "ictl-clr-pre", *c.cpu);
+#endif
         if (c.cpu->inPalMode() && wasOn != nowOn) {
             coreLib::swapPalShadowRegs(*c.cpu);
         }
+#if EMULATR_BRINGUP_PROBES
+        if (palDiag::g_sdeTraceArmed && c.cpu->inPalMode() && wasOn != nowOn)
+            palDiag::sdeLog("ictl-postswap", *c.cpu);
+#endif
         break;
     }
     case coreLib::HW_M_CTL:
@@ -1925,6 +1945,40 @@ uint64_t g_divertPendingReg[2][10] = {};   // natives R2-R7, R20-R23 at divert
 bool     g_divertPendingLive[2]    = {};   // slot occupied
 // Register-number map for the 10 tracked slots (R2-R7, R20-R23).
 constexpr int kDivertRegMap[10] = { 2, 3, 4, 5, 6, 7, 20, 21, 22, 23 };
+
+// ---- TEMP (SDE shadow-swap ledger) -- REMOVE WITH the DIVERT-REI block ----
+// Arms on a clock divert whose interrupted PC is in the 0x1ad600-0x1adbff
+// wall loop, then logs the 8 shadow regs (R4-R7, R20-R23) + palMode + SDE<1>
+// at every swap-eliciting edge (DIVERT, post-enter, ictl zap/restore, post-rei)
+// for g_sdeTraceWindows ticks.  Auditing the 4-swap parity per tick pins which
+// edge double-swaps or no-ops.  See project_ds20_wall_sde_shadow_choreography.
+bool g_sdeTraceArmed   = false;
+int  g_sdeTraceWindows = 3;        // number of 0x1adb60-window ticks to capture
+void sdeLog(char const* tag, coreLib::CpuState const& cpu) noexcept
+{
+#if EMULATR_BRINGUP_PROBES
+    if (!g_sdeTraceArmed) return;
+    std::fprintf(stderr,
+        "[SDE %-13s] cyc=%llu pal=%d sde1=%d  r4=%llx r5=%llx r6=%llx r7=%llx "
+        "r20=%llx r21=%llx r22=%llx r23=%llx\n",
+        tag,
+        static_cast<unsigned long long>(cpu.cycleCount),
+        cpu.inPalMode() ? 1 : 0,
+        coreLib::iCtlSdeHigh(cpu.i_ctl) ? 1 : 0,
+        static_cast<unsigned long long>(cpu.intReg[4]),
+        static_cast<unsigned long long>(cpu.intReg[5]),
+        static_cast<unsigned long long>(cpu.intReg[6]),
+        static_cast<unsigned long long>(cpu.intReg[7]),
+        static_cast<unsigned long long>(cpu.intReg[20]),
+        static_cast<unsigned long long>(cpu.intReg[21]),
+        static_cast<unsigned long long>(cpu.intReg[22]),
+        static_cast<unsigned long long>(cpu.intReg[23]));
+    std::fflush(stderr);
+#else
+    (void)tag; (void)cpu;
+#endif
+}
+// ---- END TEMP SDE shadow-swap ledger ----
 } // namespace palDiag
 // ---- END TEMP DIVERT-REI ledger storage ----
 
@@ -2054,6 +2108,24 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
     }
 #endif
     coreLib::setPalMode(*c.cpu, resumeInPal);
+
+#if EMULATR_BRINGUP_PROBES
+    // TEMP (SDE swap ledger): log the post-REI native view, then close the
+    // window when this REI resumes the interrupted wall-loop PC.
+    if (palDiag::g_sdeTraceArmed) {
+        palDiag::sdeLog("post-rei", *c.cpu);
+        uint64_t const rp = rawTarget & ~uint64_t{3};
+        if (!resumeInPal && rp >= 0x1ad600ull && rp <= 0x1adbffull) {
+            if (palDiag::g_sdeTraceWindows > 0) --palDiag::g_sdeTraceWindows;
+            palDiag::g_sdeTraceArmed = false;
+            std::fprintf(stderr, "[SDE window-close] resumePc=0x%llx "
+                         "windows-left=%d\n",
+                         static_cast<unsigned long long>(rp),
+                         palDiag::g_sdeTraceWindows);
+            std::fflush(stderr);
+        }
+    }
+#endif
 
     // TEMP DIAGNOSTIC (DIVERT-REI register ledger compare) -- REMOVE AFTER
     // the nvram_get fclose(&spl_kernel) corruption is root-caused.

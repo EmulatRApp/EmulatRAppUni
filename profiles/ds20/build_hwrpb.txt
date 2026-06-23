@@ -1,0 +1,51 @@
+                             **************************************************************
+                             *                          FUNCTION                          *
+                             **************************************************************
+                             undefined __stdcall FUN_001db42b(void)
+             undefined         <UNASSIGNED>   <RETURN>
+                             FUN_001db42b                                    XREF[1]:     0015b793(c)  
+        001db42b dd 86 81 8f     LDT        at,-0x7923(t0)
+        001db42f 11 9d 8f 21     LDA        s3,-0x62ef(FP)
+        001db433 1c ac 0a f3     BLBS       t10,DAT_004864a7
+        001db437 32 14 27 97     STG        t11,0x1432(t6)
+        001db43b c6 23 e2 98     STS        t6,0x23c6(t1)
+        001db43f cd              ??         CDh
+        001db440 6c cc 48 cb     FBLT       ra,LAB_0040e5f4
+                             LAB_001db444+2                                  XREF[0,1]:   001e09fe(*)  
+        001db444 c5 f3 71 cc     FBLE       t2,LAB_ffffffffffe5835c
+        001db448 79 05 42 6e     HW_LD      a2,0x179(t1)
+        001db44c be 6f 17 f2     BLBS       a0,DAT_fffffffffffb7348
+        001db450 a8 23 23 3a     STB        a1,0x23a8(t2)
+        001db454 9c ec bd 9c     STT        t4,-0x1364(GP)
+        001db458 a6 e3 5e e5     BEQ        s1,LAB_001942f4
+        001db45c fa 8f 7f b9     STL_C      s2,-0x7006(zero)=>DAT_ffffffffffff8ffa
+        001db460 87 46 16 f5     BNE        t7,LAB_fffffffffff6ce80
+        001db464 a1              ??         A1h
+        001db465 fc ae 11 9e     STT        a0,-0x5104(a1)
+        001db469 db              ??         DBh
+        001db46a 29 5e 09 d2     BSR        a0,SUB_00432d12
+        001db46e dd b3 50 3e     STQ_U      a2,-0x4c23(a0)
+        001db472 e4              ??         E4h
+        001db473 7c e1 0a a4     LDQ        v0,-0x1e84(s1)
+
+                             LAB_001942f4                                    XREF[1]:     001db458(j)  
+        001942f4 00 00 00 00     HALT
+                             s_of_allocated_PTEs,_continuing_an_0019430c     XREF[0,1]:   0028f13c(j)  
+        001942f8 45 78 63        ds         "Exceeded the number of allocated PTEs, contin
+                 65 65 64 
+                 65 64 20 
+        00194334 00 00 00 00     HALT
+        00194338 45 72 72        ds         "Error mapping firmware to l3pt0 - BOOT_L30PAG
+                 6f 72 20 
+                 6d 61 70 
+        00194374 00 00 00 00     HALT
+        00194378 69 6e 69        ds         "initializing page table at %x\n"
+                 74 69 61 
+                 6c 69 7a 
+        00194398 69 6e 69        ds         "initializing HWRPB at %x\n"
+                 74 69 61 
+                 6c 69 7a 
+        001943b4 00 00 00 00     HALT
+        001943b8 63 68 61        ds         "changing image_start to %x\n"
+                 6e 67 69 
+                 6e 67 20 

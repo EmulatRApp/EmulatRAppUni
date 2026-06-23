@@ -58,6 +58,7 @@ struct SystemSettings {
 struct RomSettings {
     std::string firmwareImage;          // Path to firmware (e.g. es45_v7_3.exe)
     std::string firmwareSha256;         // Optional integrity check (empty = skip)
+    std::string flashImage;             // Optional NVRAM backing; empty => derive <firmware-stem>.rom (co-located)
 };
 
 // ----------------------------------------------------------------------------
