@@ -121,6 +121,7 @@ void loadRom(QSettings& s, RomSettings& out,
     s.beginGroup("ROM");
     out.firmwareImage  = readValue<std::string>(s, "firmwareImage",  out.firmwareImage,  warnings);
     out.firmwareSha256 = readValue<std::string>(s, "firmwareSha256", out.firmwareSha256, warnings);
+    out.flashImage     = readValue<std::string>(s, "flashImage",     out.flashImage,     warnings);
     s.endGroup();
 }
 

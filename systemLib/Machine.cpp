@@ -60,6 +60,10 @@ extern uint64_t g_divertPendingPc[2];
 extern uint64_t g_divertPendingCyc[2];
 extern uint64_t g_divertPendingReg[2][10];
 extern bool     g_divertPendingLive[2];
+// TEMP (SDE shadow-swap ledger) -- arm side; storage/body in PalEntries.cpp.
+extern bool     g_sdeTraceArmed;
+extern int      g_sdeTraceWindows;
+void sdeLog(char const* tag, coreLib::CpuState const& cpu) noexcept;
 } } // namespace palBox::palDiag
 // ---- END TEMP DIVERT-REI ledger extern declarations ----
 
@@ -196,6 +200,19 @@ inline void stageInterruptDivert(coreLib::CpuState& cpu, uint64_t isumMask) noex
     // so the saved PC is just cpu.pc -- no separate flag to OR in.
     uint64_t const savedPc = cpu.pc;
     cpu.excAddr = savedPc;
+#if EMULATR_BRINGUP_PROBES
+    // TEMP (SDE swap ledger): arm on a clock divert that interrupts the
+    // 0x1ad600-0x1adbff wall loop, then log the native shadow regs as the
+    // ISR sees them on entry (pre-palModeEnter swap).
+    {
+        namespace pd = ::palBox::palDiag;
+        uint64_t const sp = savedPc & ~uint64_t{3};
+        if (pd::g_sdeTraceWindows > 0 && sp >= 0x1ad600ull && sp <= 0x1adbffull) {
+            pd::g_sdeTraceArmed = true;
+            pd::sdeLog("DIVERT-native", cpu);
+        }
+    }
+#endif
     // CHANGE 2026-05-28: target is INTERRUPT vector (palBase + 0x680),
     // NOT DTBM_DOUBLE_3 (palBase + 0x100).  See block comment above.
     // 2026-05-29: replaced magic 0x680 with coreLib::ev6::kEntry_INTERRUPT
@@ -206,6 +223,9 @@ inline void stageInterruptDivert(coreLib::CpuState& cpu, uint64_t isumMask) noex
     // their private scratch view of those 8 registers on entry; without
     // the swap, native-context values leak in and handlers misbehave.
     coreLib::palModeEnter(cpu);
+#if EMULATR_BRINGUP_PROBES
+    ::palBox::palDiag::sdeLog("post-enter", cpu);   // TEMP SDE swap ledger
+#endif
     // 2026-05-30: caller selects the EV6 ISUM external-interrupt cause bit.
     // EV6__ISUM__EI__S = 33, so EI[n] = bit (33 + n): EI[0]=IRQ_ERR (1<<33),
     // EI[2]=IRQ_CLK / interval timer (1<<35).  The interval-timer divert site
@@ -428,23 +448,23 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
         if (mp) {
             manifestPath = std::string(mp);
         } else {
-            // OS-suffixed manifest so one tree carries both host variants:
-            // ds10_platform.win on Windows, ds10_platform.linux elsewhere (the
-            // user renamed the file per host).  Content is plain JSON regardless
-            // of extension; PlatformConfig::load parses by content, not suffix.
-#ifdef _WIN32
-            char const* const kManifestLeaf = "ds10_platform.win";
-#else
-            char const* const kManifestLeaf = "ds10_platform.linux";
-#endif
-            if (QCoreApplication::instance() != nullptr) {
-                // Resolve NEXT TO the executable (build/install dir), not the
-                // launch CWD, so the POST_BUILD-copied manifest is found wherever
-                // Emulatr is started from.  Mirrors IniLoader's applicationDirPath().
-                manifestPath = (QCoreApplication::applicationDirPath()
-                                + "/" + kManifestLeaf).toStdString();
-            } else {
-                manifestPath = kManifestLeaf;          // no Qt app (unit tests)
+            // Manifest is named after the FIRMWARE-IMAGE STEM and is host-
+            // agnostic (the device tree is the guest's, not the host's):
+            //   firmware/ds20_v7_3.exe  ->  ds20_v7_3_platform.json
+            // Keyed 1:1 to the firmware that actually loaded (main.cpp wrote the
+            // resolved --firmware path into settings.rom.firmwareImage before
+            // construction), so model and firmware cannot drift and a firmware
+            // variant can carry its own device set.  Resolved NEXT TO the
+            // executable (where run_fw.sh / POST_BUILD drops the copy), not the
+            // launch CWD.  Empty firmwareImage -> empty manifestPath ->
+            // PlatformConfig::load falls back to the compiled-in default.
+            std::filesystem::path const fw(m_settings.rom.firmwareImage);
+            if (!fw.empty()) {
+                std::string const leaf = fw.stem().string() + "_platform.json";
+                manifestPath = (QCoreApplication::instance() != nullptr)
+                    ? (QCoreApplication::applicationDirPath().toStdString()
+                       + "/" + leaf)
+                    : leaf;
             }
         }
         ManifestLoadResult const mr = PlatformConfig::load(manifestPath);
@@ -769,6 +789,32 @@ void Machine::onBeforeFetch(uint64_t pa) noexcept
 }
 
 
+// ----------------------------------------------------------------------------
+// bindFlash -- point the TIG flash NVRAM backing at a file co-located with the
+// loaded firmware (<stem>.rom), so each model/firmware keeps its own NVRAM
+// instead of all sharing the ds10_flash.rom default.  The ctor binds the default
+// without knowing the firmware path; this re-binds once it is known.  Precedence:
+//   EMULATR_FLASH_ROM env  >  [ROM]flashImage ini  >  <firmware>.rom  >  ds10_flash.rom
+// ----------------------------------------------------------------------------
+void Machine::bindFlash(std::filesystem::path const& firmwarePath) noexcept
+{
+    char const* const env = std::getenv("EMULATR_FLASH_ROM");
+    std::string flashPath;
+    if (env && env[0]) {
+        flashPath = env;
+    } else if (!m_settings.rom.flashImage.empty()) {
+        flashPath = m_settings.rom.flashImage;
+    } else if (!firmwarePath.empty()) {
+        std::filesystem::path d = firmwarePath;
+        d.replace_extension(".rom");          // ds20_v7_3.exe -> ds20_v7_3.rom (same dir)
+        flashPath = d.string();
+    } else {
+        flashPath = "ds10_flash.rom";         // legacy fallback
+    }
+    std::fprintf(stderr, "FlashRom: NVRAM backing -> '%s'\n", flashPath.c_str());
+    m_chipset.flash().loadRaw(flashPath);
+}
+
 bool Machine::loadSrmFirmware(std::filesystem::path const& path,
                               uint64_t                     loadPa)
 {
@@ -786,6 +832,12 @@ bool Machine::loadSrmFirmware(std::filesystem::path const& path,
     m_srmPayload        = std::move(r.payload);
     m_srmLoadPa         = loadPa;     // base address tryFetch uses for range check
     m_palImageRelocated = false;      // Step D arms on first entryPa fetch
+
+    // Re-point the flash NVRAM backing co-located with THIS firmware (<stem>.rom)
+    // before the seeding check below.  The ctor bound the ds10_flash.rom default
+    // without knowing the firmware path, which made every model read DS10's
+    // persisted env/FRU. 2026-06-22.
+    bindFlash(path);
 
     // ----------------------------------------------------------------
     // Flash seeding (2026-06-03): if loadRaw found no persisted backing

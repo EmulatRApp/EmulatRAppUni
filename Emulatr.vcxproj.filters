@@ -1,0 +1,440 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_autogen\mocs_compilation_Debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\config\EmulatorSettings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\config\IniLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\LogSubsystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\OpcDec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\eBoxLib\grains\IntArith.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mBoxLib\grains\LoadStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\cBoxLib\grains\CacheOps.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\iBoxLib\grains\ControlFlow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\palBoxLib\grains\PalEntries.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fBoxLib\grains\Float.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fBoxLib\grains\FloatVariants.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\global_firmwaredevicemanager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\memoryLib\GuestMemory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\DispatchTables.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\GrainStubs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\AppOptions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\FirmwareLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\SrmLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\CpuStateDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\Machine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\Snapshot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\PlatformConfig.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\schedLib\AlphaCpuAgent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mmuLib\UnalignedEventLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mmuLib\CboxEventLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\FaultEventLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\SPAMBucket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\SPAMShardManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\Disassembler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\DecListingSink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\BreakpointSink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\PaDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\CsrDiag.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TsunamiChipset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\FlashRom.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\ConsoleManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\global_ConsoleManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\global_SRMEnvStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\SRMConsole.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\SRMConsoleDevice.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\SRMEnvStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\StdoutConsoleBackend.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_autogen\mocs_compilation_Release.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_autogen\mocs_compilation_MinSizeRel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_autogen\mocs_compilation_RelWithDebInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\alpha_int_byteops.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\alpha_int_helpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\axp_attributes_core.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\bitutils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\BoxResult.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\CBoxState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\CpuState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\DispatchEntry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\ExecCtx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\HW_IPR.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\InstructionGrain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\IprFields.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\LogSubsystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\PalShadow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\PipelineSlot.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\memoryLib\GuestMemory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pipelineLib\IFetchOverride.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pipelineLib\MemDrainer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pipelineLib\PipelineDriver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\DispatchAccess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\StopReason.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\AppOptions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\FirmwareLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\SrmLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\CpuStateDump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\Machine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\Snapshot.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\PlatformConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\schedLib\SmpHarness.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\schedLib\SmpDrivers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\schedLib\AlphaCpuAgent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mmuLib\UnalignedEventLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mmuLib\CboxEventLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\FaultEventLog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\AlphaPte.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\Ev6PteFormat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\TlbEntry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\TlbEpoch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\SPAMBucket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\SPAMShardManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\CommitRecord.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\TraceSink.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\Disassembler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\DecListingSink.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\BreakpointSink.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\PaDump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\DispatchKinds.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\GrainsForward.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\SemanticFlagsEnum.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\ProcessorVariant.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\IprBank.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\VA_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\chipset_adapter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\IDeviceHandlers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\Cypress_CY82C693ISABridge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\AliM1543C.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\Tsunami21272_RegisterMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\Tsunami21272_CsrSpec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\CsrDiag.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TsunamiCchip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\Pic8259Pair.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TsunamiChipset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\FlashRom.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TsunamiDchip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TsunamiPchip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TsunamiVariant.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\Titan21274_CsrSpec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TitanPchip.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TitanChipset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\Tsunami\IsaBridge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\Tsunami\Uart16550.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\scsi\ScsiTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\scsi\ScsiSenseData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\scsi\ScsiCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\scsi\VirtualScsiDevice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\scsi\VirtualIsoDevice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\Tsunami\Cy82C693Ide.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\ConsoleManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\device_core_inl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\deviceLib_global.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\global_ConsoleManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\global_SRMEnvStore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\IBootDevice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\IConsoleDevice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\OPA_Console_Config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\SRMConsole.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\SRMConsoleDevice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\SRMEnvStore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\StdoutConsoleBackend.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\LoggingMacros.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\ControllerConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\GrainMasterV4.tsv" />
+    <None Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\SemanticFlags.tsv" />
+    <None Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\README.md" />
+    <None Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\codegen\genGrains.py" />
+    <None Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\codegen\README.md" />
+    <None Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{F4CC1BB8-3A70-36A8-B0B2-616E08D94F5C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{61F9D55F-4D19-3B11-AA6A-950E6D52282B}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

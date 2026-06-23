@@ -128,11 +128,22 @@ public:
         fdcTrace('W', port, value, width);
         if (port == kIntPoll) return;            // F4: 0x0A poll-select, no-op
         switch (port - kBase) {
-        case 2:                                  // DOR
-            // bit2 = /RESET; a 1->0->1 on it resets the controller FSM.
-            if ((m_dor & 0x04) && !(v & 0x04)) reset();
+        case 2: {                                // DOR
+            // bit2 = /RESET.  Entering reset (1->0) resets the controller FSM;
+            // LEAVING reset (0->1) makes the 82077 raise IRQ6 (reset-completion
+            // interrupt), which the polled/interrupt driver waits on before its
+            // 4x SENSE INTERRUPT drive-state drain.  Without that edge the
+            // post-reset krn$_wait runs its full timeout -- the dva0 option-
+            // firmware-scan stall (EMULATR_FDC_TRACE 2026-06-22: only 0x08 then
+            // 0x0C, then silence).  enterReset/exitReset are mutually exclusive;
+            // reset() zeroes m_dor, so m_dor=v must follow it.
+            bool const enterReset = (m_dor & 0x04) && !(v & 0x04);  // 1->0
+            bool const exitReset  = !(m_dor & 0x04) && (v & 0x04);  // 0->1
+            if (enterReset) reset();             // clears FSM state + m_intPending
             m_dor = v;
+            if (exitReset)  m_intPending = true; // 82077 reset-completion IRQ6
             break;
+        }
         case 4: m_dsr = v;        break;         // DSR
         case 5: fifoWrite(v);     break;         // FIFO (command/param)
         case 7: m_ccr = v;        break;         // CCR
@@ -185,6 +196,18 @@ private:
             m_cmd[0]  = v;
             m_cmdPos  = 1;
             m_cmdLen  = 1 + nParam;
+            // 82077: accepting a command opcode takes the controller BUSY,
+            // which DEASSERTS any INT left from the prior command -- e.g. the
+            // reset-completion IRQ6 that enable_controller waits on but never
+            // SENSE-INTERRUPTs (EMULATR_FDC_TRACE 2026-06-22: reset edge, then
+            // no 0x08 drain).  Completion re-asserts INT, giving a fresh 0->1
+            // edge the edge-triggered ISA IRQ6 can latch.  Without this deassert
+            // the next IRQ-raising command (RECALIBRATE) sets m_intPending 1->1
+            // (no edge), the ide_recalibrate_cmd krn$_wait never wakes, and it
+            // burns its 5000-unit timeout x2 retries x every floppy_devtab row
+            // -- the dva0 spin.  Cleared here (a guest step before the param
+            // write that triggers completion) so the PIC samples the edge.
+            m_intPending = false;
         } else if (m_cmdPos < static_cast<int>(m_cmd.size())) {
             m_cmd[static_cast<size_t>(m_cmdPos++)] = v;
         }
@@ -201,6 +224,14 @@ private:
             m_phase  = Phase::Command;
             m_cmdPos = 0;
             m_msr    = kMSR_RQM;                   // ready for next command
+            // 82077 Path B (result-phase commands: READ DATA/READ ID/WRITE):
+            // the completion interrupt is cleared by READING the result phase
+            // (last byte out of 0x3F5), NOT by SENSE INTERRUPT.  Drop IRQ6 here
+            // so a Path-B command leaves no lingering edge.  (Path A --
+            // RECALIBRATE/SEEK -- has no result phase and is cleared by SENSE
+            // INTERRUPT in execute(); the command-busy deassert on the next
+            // opcode still covers any leftover.)
+            m_intPending = false;
         }
         return r;
     }

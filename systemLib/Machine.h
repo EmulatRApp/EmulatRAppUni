@@ -406,6 +406,14 @@ public:
 
 
 private:
+    // bindFlash (2026-06-22) -- point the TIG flash NVRAM backing at a file
+    // co-located with the loaded firmware (<stem>.rom) so each model keeps its
+    // own NVRAM instead of all sharing the ds10_flash.rom default.  Called from
+    // the firmware-load path (the resolved firmware path is unknown in the ctor).
+    // Precedence: EMULATR_FLASH_ROM env > [ROM]flashImage ini > <firmware>.rom
+    // > ds10_flash.rom fallback.
+    void bindFlash(std::filesystem::path const& firmwarePath) noexcept;
+
     // 2026-06-08 (SSOT Slice A): authoritative config, loaded once in main and
     // threaded in by value.  Declared FIRST so the m_consoleCfg in-class
     // initializer (makeCom1Cfg(m_settings)) sees a fully-constructed object.

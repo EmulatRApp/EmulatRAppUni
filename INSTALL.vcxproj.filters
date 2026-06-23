@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\CMakeFiles\2c25539735a3c01cb182bff2ec2df8fe\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{F6217E17-D25C-3599-8E21-D4A383D1DF75}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -894,6 +894,38 @@ private:
             }
         }
         // ---- END START-WATCH ----
+        // ---- TEMP IIC-WATCH 2026-06-22 -- REMOVE WITH the DS20 IIC base fix ----
+        // Pin the DS20 PCF8584 IIC base + the storing iic_write_csr PC.  The DS20
+        // v7.3 image pokes the IIC S0/S1 byte pair at PA 0x800.FFF8.0000 (S0/data,
+        // A0=0) / 0x800.FFF8.0001 (S1 control-status, A0=1) -- vs the DS10
+        // 0x800.FFFF.0000 the m_iic stub is registered at (TsunamiChipset.h:636).
+        // The DS20 writes therefore miss the stub -> UNHANDLED OUTER WRITE -> the
+        // iic_init polled handshake (wait PIN->0, read LRB) never completes ->
+        // spin at native 0x1ad6xx.  Logging cpu.pc here names iic_write_csr so the
+        // base constant is CONFIRMED from the image (disasm around the logged PC
+        // for the LDAH/LDA forming 0xFFF80000) before registerPciMemRange's base
+        // is made model-conditional.  Gated by EMULATR_IIC_WATCH (cached getenv);
+        // one bool test per store when unset.  See
+        // project_ds20_wall_sde_shadow_choreography.
+        {
+            static bool const s_iicWatch =
+                (std::getenv("EMULATR_IIC_WATCH") != nullptr);
+            if (s_iicWatch &&
+                pa >= 0x00000800FFF80000ull && pa <= 0x00000800FFF80001ull) {
+                std::fprintf(stderr,
+                    "IIC-WATCH cyc=%llu pc=0x%016llx pa=0x%016llx sz=%u "
+                    "v=0x%016llx pal=%d ra=0x%016llx\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(cpu.pc),
+                    static_cast<unsigned long long>(pa),
+                    static_cast<unsigned>(r.memSize),
+                    static_cast<unsigned long long>(r.memData),
+                    cpu.inPalMode() ? 1 : 0,
+                    static_cast<unsigned long long>(cpu.intReg[26]));
+                std::fflush(stderr);
+            }
+        }
+        // ---- END IIC-WATCH ----
         memoryLib::BusResult const br = bus.write(pa, r.memData, r.memSize);
         if (br.status != memoryLib::BusStatus::Ok) {
             r.faultCode = coreLib::kFaultBusError;

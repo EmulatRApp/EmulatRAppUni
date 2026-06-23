@@ -39,3 +39,15 @@
   - Don't re-run short value/kick watches or warm-resume-from-107B expecting a `(kick)` — `start_secondaries` is far beyond 107B, behind the wall.
   - Alpha rebuild gives DS20 *names* but not addresses matching the shipped (stripped) image — not usable for runtime PCs.
   - Memory updated: `reference_srm_symbolication`, `reference_secondary_cpu_start_tig` (base-pinning-blocked note).
+
+## 05:07 — Snapshot cadence 1B→50B, commit text drafted, no-warp DS20 diag script staged for tomorrow
+- **Working on:** Wrapping the session for an overnight no-warp cold-boot profiler run aimed at the post-banner boot wall; thinning snapshot noise, prepping clean commits, and producing a self-contained diagnostic launch script.
+- **Done since last checkpoint:**
+  - **Snapshot cadence change landed.** `systemLib/Snapshot.h` `kAutoSavePeriodCycles` 1B (`1000³`) → **50B** (`50 * 1000³`); `kAutoSaveKeepCount` stays 5 → rolling net still 250B. Header constexpr (forces `Machine.cpp` recompile), no format change (`kCpuStateVersion` stays 10), doesn't touch manual `predig_` snapshots. ~50× fewer periodic saves on deep runs.
+  - **Commit text drafted, split two ways:** (1) the Snapshot.h cadence change; (2) the `tools/symbolication/` toolkit (SYM-table recovery — `parse_symtab2.py` with entry=desc+8 PDSC parser, DS10 2832-func + ES45 2938-func `*_symbols_entries.csv`, `apply_symbols.py` Ghidra import @ base 0x8000, string-anchoring fallback). Commit text flags OMIT of superseded v1 artifacts (`parse_symtab.py`, `ds10_v7_3_symbols.csv`, `ds20_v7_3_symbols.csv` — descriptor-addr, wrong).
+  - **Diagnostic launch script written:** `tools/diag_ds20_nowarp.sh` (presented to user). Preflights build/firmware; explicitly `unset`s all three warp vars (`EMULATR_IDLEWARP`/`EMULATR_RSCCWARP`/`EMULATR_TICKWARP`) + base-pin watch + TIG canary; pins `EMULATR_RETIRE_TRACE_DIR`; leaves `EMULATR_PLATFORM` unset (=ISP, working path); launches no-warp cold DS20 boot, profiler always-on, 50B snapshot net. Verified: `RetireProfiler` is always-on (no enable flag, dumps `dump("run_end")` only on *clean* exit), warp off by default.
+- **Open / next:** User to (1) rebuild with 50B cadence, (2) commit (Snapshot.h + symbolication toolkit, holding back the temp START-WATCH), (3) tomorrow run `bash diag_ds20_nowarp.sh` overnight → hand back profiler histogram → correlate top retire-PC buckets via Ghidra VT/BSim from DS10/ES45 maps to name the wall.
+- **Watch-outs:**
+  - **Clean stop = sentinel, not Ctrl-C.** `touch …/EMULATR_STOP` for a clean stop so the profiler dumps `profile_<ts>_run_end.txt`; Ctrl-C/kill produces **no** histogram.
+  - **Do NOT `git add pipelineLib/MemDrainer.h`** — still carries the temp START-WATCH (4 hits, REMOVE-BEFORE-COMMIT); strip or leave uncommitted.
+  - No-warp trades depth for ground truth — may not *reach* the wall overnight (fewer real cycles than warped 108B), but the early read is the point: a stall at low real-cycle count is itself the answer.

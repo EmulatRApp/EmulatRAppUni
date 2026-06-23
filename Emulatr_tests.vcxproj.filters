@@ -1,0 +1,268 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_tests_autogen\mocs_compilation_Debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\grainFactoryLib\test_semanticflags.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\eBoxLib\test_intarith.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\mBoxLib\test_loadstore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\iBoxLib\test_controlflow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\cBoxLib\test_cacheops.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\palBoxLib\test_palentries.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\fBoxLib\test_float.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\memoryLib\test_guestmemory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\pipelineLib\test_memdrainer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\pipelineLib\test_pipelinedriver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_mmio_csc_roundtrip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_csr_spec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_fixtures_sanity.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ticket01_dispatch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ticket01_5_variant_binding.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ticket02_aar_encoding.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ticket03_interrupts.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ticket04_timer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ticket05_pci_enum.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ticket06_isa_uart.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_ide_wiring.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_flashrom.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_tsunami_tig.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\systemLib\test_firmwareloader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\systemLib\test_srmloader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\systemLib\test_machine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\systemLib\test_snapshot_roundtrip.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\systemLib\test_platform_config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_srm_console_device.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_toyrtc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_iicpcf8584.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_scsi_iso.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_block_media.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_cy82c693ide.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_floppy82077.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_io_seam.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\traceLib\test_disassembler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\traceLib\test_declistingsink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\traceLib\test_retireprofiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\pteLib\test_spam.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\OpcDec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\LogSubsystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\eBoxLib\grains\IntArith.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mBoxLib\grains\LoadStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\iBoxLib\grains\ControlFlow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\cBoxLib\grains\CacheOps.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\palBoxLib\grains\PalEntries.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fBoxLib\grains\Float.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\fBoxLib\grains\FloatVariants.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\TsunamiChipset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\FlashRom.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\chipsetLib\CsrDiag.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\AppOptions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\FirmwareLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\SrmLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\CpuStateDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\Machine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\schedLib\AlphaCpuAgent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\StdoutConsoleBackend.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\deviceLib\SRMConsoleDevice.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\Snapshot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\systemLib\PlatformConfig.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mmuLib\UnalignedEventLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\mmuLib\CboxEventLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\coreLib\FaultEventLog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\SPAMBucket.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\pteLib\SPAMShardManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\memoryLib\GuestMemory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\Disassembler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\DecListingSink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\BreakpointSink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\traceLib\PaDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\DispatchTables.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\grainFactoryLib\generated\GrainStubs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\deviceLib\test_uart16550_interrupts.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\chipsetLib\test_pic8259.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\schedLib\smp_harness_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\fBoxLib\fp_softfloat_vs_host_bench.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\fpBoxLib\test_fp_host_guard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\tests\fpBoxLib\test_fp_backend.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_tests_autogen\mocs_compilation_Release.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_tests_autogen\mocs_compilation_MinSizeRel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\Emulatr_tests_autogen\mocs_compilation_RelWithDebInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\EmulatR\EmulatRAppUniV4\Emulatr\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{61F9D55F-4D19-3B11-AA6A-950E6D52282B}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
