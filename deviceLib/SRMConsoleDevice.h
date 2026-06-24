@@ -49,8 +49,8 @@
 // ============================================================================
 
 #include <QObject>
-#include <QtNetwork\QTcpServer>
-#include <QtNetwork\QTcpSocket>
+#include <QtNetwork/QTcpServer>
+#include <QtNetwork/QTcpSocket>
 #include <QQueue>
 #include <QMutex>
 #include <QWaitCondition>

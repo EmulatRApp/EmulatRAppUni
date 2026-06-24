@@ -33,9 +33,40 @@
 #include <atomic>
 #include <barrier>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace emulatr::smp {
+
+// ----------------------------------------------------------------------------
+// joining_thread -- std::jthread where the toolchain provides it (MSVC, recent
+// libc++), else a minimal auto-joining std::thread wrapper.  ThreadedDriver
+// uses only emplace + join-on-scope-exit (no stop_token), so the fallback is
+// sufficient.  The Windows build stays on std::jthread, byte-identical; only
+// toolchains whose libc++ lacks std::jthread (e.g. Apple clang 14) fall back.
+// ----------------------------------------------------------------------------
+#if defined(__cpp_lib_jthread) && __cpp_lib_jthread >= 201911L
+using joining_thread = std::jthread;
+#else
+class joining_thread {
+public:
+    joining_thread() noexcept = default;
+    template <class F, class... Args>
+    explicit joining_thread(F&& f, Args&&... args)
+        : t_(std::forward<F>(f), std::forward<Args>(args)...) {}
+    joining_thread(joining_thread&&) noexcept            = default;
+    joining_thread& operator=(joining_thread&& o) noexcept {
+        if (t_.joinable()) t_.join();
+        t_ = std::move(o.t_);
+        return *this;
+    }
+    joining_thread(const joining_thread&)            = delete;
+    joining_thread& operator=(const joining_thread&) = delete;
+    ~joining_thread() { if (t_.joinable()) t_.join(); }
+private:
+    std::thread t_;
+};
+#endif
 
 // ----------------------------------------------------------------------------
 // SequentialDriver -- deterministic, single host thread. The reference model.
@@ -101,7 +132,7 @@ public:
 
         std::barrier sync(static_cast<std::ptrdiff_t>(agents.size()), onBarrier);
 
-        std::vector<std::jthread> threads;
+        std::vector<joining_thread> threads;
         threads.reserve(agents.size());
         for (IAgent* a : agents) {
             threads.emplace_back([a, &d, &sync, &done]() {
