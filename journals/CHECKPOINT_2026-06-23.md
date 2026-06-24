@@ -34,3 +34,15 @@
 - **Watch-outs:**
   - Commit batch now: `main.cpp` + `Machine.cpp` + `run_fw.sh` + the renamed `<model>_v7_3_platform.json` manifests — keep them together so the derivation never points at a missing/old-named manifest.
   - Must clear `EMULATR_PLATFORM_CONFIG` for the verify run or the override hides whether the stem derivation actually works.
+
+## 23:07 — Planning EmulatR V4 migration to Intel iMac (build-dependency scoping)
+- **Working on:** Helping Tim move the V4 project to an Intel iMac "for the next few days." Scoped what the iMac needs beyond the source tree by inspecting the actual V4 build setup (CMake / vcpkg / Qt config), not a generic list.
+- **Done since last checkpoint:**
+  - Identified V4 as a C++20 / Qt6 / CMake project, currently MSVC2022 on Windows, pulling header-only spdlog + fmt from vcpkg.
+  - Produced the macOS prerequisite list: Xcode CLT (Clang w/ C++20; CMake already handles Clang, e.g. `-ffp-contract=off` for the strict-FP SoftFloat path), Homebrew, CMake ≥3.16, Qt6 (Core/Network/Concurrent), spdlog+fmt (via vcpkg or `brew install`), Git, Python 3. Optional: Ghidra (+JDK), `host_decompressor` (builds with same Clang, no extra deps).
+  - Flagged three hardcoded CMake paths to override at configure time: `CMAKE_TOOLCHAIN_FILE`, `VCPKG_ROOT`, `QT_INSTALL_ROOT` (Windows pins `D:/Qt/6.10.2/msvc2022_64`). Windows-specific blocks (windeployqt) already guarded by `if(WIN32)` → no-op on macOS.
+  - Confirmed repo is NOT using Git LFS (`.gitattributes` marks `*.rom/*.bin/*.m64` binary but no `filter=lfs`) → plain git transfer is fine.
+- **Open / next:** Tim to choose between (a) a `setup-imac.sh` that brew-installs prereqs and prints the exact `cmake` configure command with path overrides, or (b) a minimal transfer manifest (copy git-tracked source only). Awaiting his pick (offered both).
+- **Watch-outs:**
+  - Size trap: V4 `Emulatr/` working dir is ~131 GB (plus a 6.8 GB `Emulatr.zip` and a large `.git`); much of it is logs (`boot.log` ~103 MB, `rpcc_probe.txt` ~13 MB) and build artifacts. Copy git-tracked source only — do NOT drag 100+ GB to the iMac.
+  - On Intel brew the Qt prefix is `/usr/local/opt/qt`, not `/opt/homebrew/...` (that's Apple Silicon) — easy mismatch to make on an Intel iMac.
