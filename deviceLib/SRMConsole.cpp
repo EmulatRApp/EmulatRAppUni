@@ -245,7 +245,7 @@ QString SRMConsole::readLine() noexcept
 			return m_currentLine;
 
 		case BACKSPACE:
-		case DELETE:
+		case DELETE_:   // 0x7F; NOT the Windows <winnt.h> DELETE macro (0x00010000)
 			handleBackspace();
 			break;
 

@@ -9,11 +9,11 @@
       "manufacturer": "DEC", "model": "DS20", "part_class": "54-", "serial": "" },
     { "name": "iic_cpu0", "address": "0xA4", "class": "fru_eeprom",
       "manufacturer": "DEC", "model": "EV6", "part_class": "54-", "serial": "" },
-    { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 }
+    { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 },
 	{ "name": "iic_ocp0", "address": "0x40", "class": "status", "byte": "0x00",
       "comment": "OCP LED panel (IIC_LED_TYPE @ 0x40, iic_driver.c). Presence is the get_sysvar (pc264.c) platform discriminator: fopen(iic_ocp0) success -> SYSVAR member 6 -> banner 'AlphaServer DS20' (vs default member 1 = 'AlphaPC 264DP'). Do NOT add iic_8574_ocp (0x4E) -> member 8 = DS20E/Goldrack." },
     { "name": "iic_ocp1", "address": "0x42", "class": "status", "byte": "0x00",
-      "comment": "OCP data device (IIC_LED_TYPE @ 0x42). The OCP is a control+data PAIR: ocp0 (0x40)=control, ocp1 (0x42)=data (sable_ocp_driver.c). sable_ocp_init opens BOTH; presenting only ocp0 caused 'Device Open Error: IIC_OCP1' + sable_ocp_init exit status 1 (non-fatal)." },
+      "comment": "OCP data device (IIC_LED_TYPE @ 0x42). The OCP is a control+data PAIR: ocp0 (0x40)=control, ocp1 (0x42)=data (sable_ocp_driver.c). sable_ocp_init opens BOTH; presenting only ocp0 caused 'Device Open Error: IIC_OCP1' + sable_ocp_init exit status 1 (non-fatal)." }
 
   ],
   "pci_devices": [

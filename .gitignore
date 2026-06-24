@@ -34,6 +34,16 @@ CTestTestfile.cmake
 compile_commands.json
 .cmake/
 
+# Exception: the vendored SoftFloat host-config header (platform.h) lives
+# under a build/ path but is REQUIRED source, not build output -- a fresh
+# clone (any OS) cannot compile softfloat without it.  Re-include precisely
+# that one file; keep everything else under that build/ tree ignored.
+!berkeley-softfloat-3-master/build/
+berkeley-softfloat-3-master/build/*
+!berkeley-softfloat-3-master/build/EmulatR-MSVC-x64/
+berkeley-softfloat-3-master/build/EmulatR-MSVC-x64/*
+!berkeley-softfloat-3-master/build/EmulatR-MSVC-x64/platform.h
+
 # Compiler outputs ------------------------------------------------------------
 *.o
 *.obj

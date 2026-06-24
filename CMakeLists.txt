@@ -24,12 +24,16 @@ cmake_minimum_required(VERSION 3.16)
 # including correct debug/release library selection.
 # Override at configure time: cmake -DVCPKG_ROOT=<path> ...
 # ============================================================================
-if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+# The vcpkg toolchain + triplet defaults are Windows-specific (the dev
+# host keeps vcpkg at C:/vcpkg).  Only seed them on Windows so non-Windows
+# hosts (macOS/Linux, deps via Homebrew/system) configure without a bogus
+# toolchain file.  Override anywhere with -DCMAKE_TOOLCHAIN_FILE=...
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE AND WIN32)
     set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
         CACHE STRING "vcpkg toolchain file" FORCE)
 endif()
 
-if(NOT DEFINED VCPKG_TARGET_TRIPLET)
+if(NOT DEFINED VCPKG_TARGET_TRIPLET AND WIN32)
     set(VCPKG_TARGET_TRIPLET "x64-windows"
         CACHE STRING "vcpkg target triplet")
 endif()
@@ -55,11 +59,16 @@ set(CMAKE_AUTORCC ON)
 # config files at D:/Qt/.../msvc2022_64/lib/cmake/Qt6/Qt6Config.cmake.
 # Override at configure time: cmake -DQT_INSTALL_ROOT=<path> ...
 # Same pattern V1 uses (D:/EmulatR/EmulatRAppUni/CMakeLists.txt line 56).
-if(NOT DEFINED QT_INSTALL_ROOT)
+# Windows seeds the official Qt-installer prefix; other hosts resolve Qt6
+# from CMAKE_PREFIX_PATH (e.g. -DCMAKE_PREFIX_PATH=$(brew --prefix qt) or an
+# aqtinstall prefix) or a -DQT_INSTALL_ROOT=... override.
+if(NOT DEFINED QT_INSTALL_ROOT AND WIN32)
     set(QT_INSTALL_ROOT "D:/Qt/6.10.2/msvc2022_64"
         CACHE STRING "Qt installer prefix path")
 endif()
-list(APPEND CMAKE_PREFIX_PATH "${QT_INSTALL_ROOT}")
+if(DEFINED QT_INSTALL_ROOT)
+    list(APPEND CMAKE_PREFIX_PATH "${QT_INSTALL_ROOT}")
+endif()
 
 find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core Network Concurrent)
 find_package(Qt6 REQUIRED COMPONENTS Core Network Concurrent)
@@ -89,10 +98,25 @@ find_package(Qt6 REQUIRED COMPONENTS Core Network Concurrent)
 #   spdlog:x64-windows` populating C:/vcpkg/installed/x64-windows/share/
 #   and (b) reverting this block to find_package(spdlog REQUIRED) plus
 #   spdlog::spdlog in target_link_libraries.
-include_directories(
-    "C:/vcpkg/packages/spdlog_x64-windows/include"
-    "C:/vcpkg/packages/fmt_x64-windows/include"
-)
+if(WIN32)
+    include_directories(
+        "C:/vcpkg/packages/spdlog_x64-windows/include"
+        "C:/vcpkg/packages/fmt_x64-windows/include"
+    )
+else()
+    # Non-Windows: locate the header-only spdlog/fmt via the platform
+    # package manager (Homebrew: `brew install spdlog fmt`).  Only the
+    # include path is needed -- SPDLOG_HEADER_ONLY + FMT_HEADER_ONLY (set
+    # per-target below) keep every symbol inline, so no link target.
+    find_path(SPDLOG_INCLUDE_DIR spdlog/spdlog.h)
+    find_path(FMT_INCLUDE_DIR fmt/format.h)
+    if(SPDLOG_INCLUDE_DIR)
+        include_directories("${SPDLOG_INCLUDE_DIR}")
+    endif()
+    if(FMT_INCLUDE_DIR)
+        include_directories("${FMT_INCLUDE_DIR}")
+    endif()
+endif()
 
 # ----------------------------------------------------------------------------
 # Project source files
@@ -946,7 +970,14 @@ install(FILES   "${CMAKE_SOURCE_DIR}/docs/license.html" DESTINATION .)
 # qt_generate_deploy_app_script emits a per-config script that, at install/cpack
 # time, copies the Qt runtime the target actually links (Core/Network/Concurrent
 # here -- no GUI plugins, since this is a QCoreApplication) next to the exe.
-if(COMMAND qt_generate_deploy_app_script)
+if(APPLE)
+    # On Apple platforms qt_generate_deploy_app_script requires the target to
+    # be an .app bundle (Qt6CoreMacros).  EmulatR is a plain QCoreApplication
+    # executable and the macOS host is a dev/build environment, not a package
+    # producer -- skip deploy-script generation here (Windows/Linux unchanged).
+    message(STATUS
+        "Skipping Qt deploy-script generation on macOS (non-bundle executable).")
+elseif(COMMAND qt_generate_deploy_app_script)
     qt_generate_deploy_app_script(
         TARGET Emulatr
         OUTPUT_SCRIPT deploy_script

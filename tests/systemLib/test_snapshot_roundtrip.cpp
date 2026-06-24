@@ -50,6 +50,7 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <sstream>   // std::ostringstream (libc++ does not pull it in transitively)
 #include <thread>
 #include <vector>
 
@@ -531,14 +532,24 @@ TEST_CASE("Snapshot: pruneOldSnapshots keeps newest N auto_ files only")
     // opts in for its own scope and restores the ambient state after,
     // keeping the result independent of the invoking shell's environment
     // (it failed 7!=3 when run from a shell that had unset the var).
-    // _putenv_s is the MSVC CRT setter; getenv-visible immediately.
+    // Set the opt-in env var; getenv-visible immediately.  _putenv_s is the
+    // MSVC CRT setter (empty value removes the var); setenv/unsetenv are the
+    // POSIX equivalents -- guarded so the Windows build is unchanged.
     char const* const ambientPrune = std::getenv("EMULATR_SNAPSHOT_PRUNE");
+#ifdef _WIN32
     _putenv_s("EMULATR_SNAPSHOT_PRUNE", "1");
+#else
+    setenv("EMULATR_SNAPSHOT_PRUNE", "1", /*overwrite*/ 1);
+#endif
 
     systemLib::pruneOldSnapshots(dir, 3);
 
     if (ambientPrune == nullptr) {
-        _putenv_s("EMULATR_SNAPSHOT_PRUNE", "");   // remove from environment
+#ifdef _WIN32
+        _putenv_s("EMULATR_SNAPSHOT_PRUNE", "");   // empty string removes it
+#else
+        unsetenv("EMULATR_SNAPSHOT_PRUNE");
+#endif
     }
 
     int autoCount   = 0;
