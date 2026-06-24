@@ -407,6 +407,21 @@ bool PlatformConfig::validate(const DeviceManifest& m,
         if (!haveIic(0xA2)) warn("DS10 has no IIC 0xA2 (iic_smb0) -- FRU descriptor will be empty");
     }
 
+    // ---- DS20 identity discriminator (pc264.c get_sysvar IIC OCP probe) ----
+    // The guest SRM badges "AlphaServer DS20" iff iic_ocp0@0x40 ACKs; otherwise
+    // it falls back to "AlphaPC 264DP".  iic_ocp1@0x42 must also be present or
+    // sable_ocp_init reports a (non-fatal) IIC_OCP1 open error.  iic_8574_ocp@0x4E
+    // would force the DS20E/Goldrack branch (member 8).  Warnings only.
+    if (m.platform == "DS20") {
+        auto haveIic = [&](uint8_t a) {
+            for (const IicDeviceEntry& e : m.iic) if (e.address == a) return true;
+            return false;
+        };
+        if (!haveIic(0x40)) warn("DS20 has no IIC 0x40 (iic_ocp0) -- get_sysvar will badge 'AlphaPC 264DP', not 'AlphaServer DS20'");
+        if (!haveIic(0x42)) warn("DS20 has no IIC 0x42 (iic_ocp1) -- sable_ocp_init reports Device Open Error: IIC_OCP1");
+        if ( haveIic(0x4E)) warn("DS20 has IIC 0x4E (iic_8574_ocp) -- get_sysvar will badge DS20E/Goldrack (member 8), not DS20");
+    }
+
     return !hardError;
 }
 

@@ -498,6 +498,47 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
                          manifestPath, mr.error);
         }
 
+        // ----------------------------------------------------------------
+        // P1 LATCH (2026-06-24): Channel A (ini [System] model) and Channel B
+        // (manifest "platform") must agree.  A mismatch means a hybrid boot --
+        // e.g. DS20 firmware on a DS10 device bus -- and the guest SRM badges by
+        // the IIC device tree it probes, not by the ini.  Warn-loud during
+        // bring-up (do not yet refuse to launch).  See
+        // journals/Platform_Interface_Contract_and_Latch_Plan_20260624.md.
+        // ----------------------------------------------------------------
+        {
+            auto up = [](std::string s) {
+                for (char& c : s) if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
+                return s;
+            };
+            std::string const iniModel = up(m_settings.system.model);
+            std::string const mfModel  = up(mr.manifest.platform);
+            if (!mfModel.empty() && !mr.usedDefault && mfModel != iniModel) {
+                spdlog::error("PLATFORM MISMATCH: ini [System] model='{}' vs manifest "
+                              "platform='{}' (manifest '{}').  The firmware badges by "
+                              "the device bus, not the ini -- align the manifest "
+                              "\"platform\" field or the ini model.",
+                              iniModel, mfModel, manifestPath);
+            }
+
+            // P2 CANARY: one deterministic line per boot.  Presence of IIC 0x40
+            // (+0x42) is the get_sysvar() discriminator -- with it the SRM badges
+            // "AlphaServer DS20", without it "AlphaPC 264DP".
+            std::string acks;
+            bool haveOcp0 = false, haveOcp1 = false;
+            for (IicDeviceEntry const& e : mr.manifest.iic) {
+                char buf[8];
+                std::snprintf(buf, sizeof buf, "0x%02X ", unsigned(e.address));
+                acks += buf;
+                if (e.address == 0x40) haveOcp0 = true;
+                if (e.address == 0x42) haveOcp1 = true;
+            }
+            spdlog::info("platform latched: model={} manifest={} usedDefault={} "
+                         "ocp40={} ocp42={} iic_acks=[ {}]",
+                         iniModel, mr.manifest.platform, mr.usedDefault ? 1 : 0,
+                         haveOcp0 ? "Y" : "N", haveOcp1 ? "Y" : "N", acks);
+        }
+
         // ------------------------------------------------------------
         // Storage attach (2026-06-11, dqa0 boot): for each AtaDisk target
         // behind a named storage controller, resolve the manifest media
