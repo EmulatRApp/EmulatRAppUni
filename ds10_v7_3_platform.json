@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "platform": "DS20",
+  "platform": "DS10",
   "comment": "EmulatR DS20 / PC264 platform device manifest (Tsunami 21272, dual EV6; boot uniprocessor with cpuCount=1). Created 2026-06-16. DS20 = PC264 lineage, the SAME platform family as the DS10/PC264 EmulatR already models -- it genuinely uses the Cypress CY82C693 south bridge, so this is the LOWEST-divergence second test after DS10 (firmware ds20_v7_3.exe or ds20_disk1/pc264srm.sys). Differences from DS10: dual-CPU capable (keep cpuCount=1 to avoid SRM secondary spin), DS20E uses DE500 at slot 9 / SCSI at slot 7 per REFERENCE_INDEX (slots here _PROVISIONAL/DS10-derived). The halt-button check is chipset-level (TIG smir). Strict JSON: no // or /* */ comments -- use comment fields.",
   "iic_devices": [
     { "name": "iic_system0", "address": "0x70", "class": "status", "byte": "0x00" },

@@ -59,6 +59,19 @@ LOG="fw_${NAME}_${TS}.out"
 mkdir -p firmware
 cp -f "$SRC_FW" "$DST_FW"
 
+# Manifest safety-net (2026-06-24): CMake POST_BUILD copies <name>_v7_3_platform.json
+# next to the exe, but that custom command only re-runs when Emulatr.exe relinks --
+# so a manifest edit can be left stale beside the exe.  Refresh it from source every
+# run (Machine resolves the manifest next to the exe), so the guest always probes the
+# CURRENT device tree.  Non-fatal if the source manifest is absent (Machine falls back).
+SRC_MANIFEST="$BUILD_DIR/../../../${NAME}_v7_3_platform.json"
+if [ -f "$SRC_MANIFEST" ]; then
+    cp -f "$SRC_MANIFEST" "./${NAME}_v7_3_platform.json"
+    echo "manifest : refreshed ./${NAME}_v7_3_platform.json from source"
+else
+    echo "manifest : WARNING source $SRC_MANIFEST missing -- using whatever sits next to the exe"
+fi
+
 # ---- set model in ini for this run; restore on exit ------------------------
 cp -f "$INI" "$INI.runbak"
 trap 'mv -f "$INI.runbak" "$INI"' EXIT
