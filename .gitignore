@@ -68,6 +68,13 @@ ds10_flash.rom
 *decompressed*.bin
 ref_decompressed.bin
 
+# Ghidra exports / large generated analysis dumps -----------------------------
+# These regenerate from the .gdb/CAB and routinely exceed GitHub's 100MB limit.
+ghidra/ghirda_decompressed.txt
+ghidra/*.txt
+*_decompressed.txt
+*decompressed*.txt
+
 HMDocs/__history/
 
 # Editor backups --------------------------------------------------------------
