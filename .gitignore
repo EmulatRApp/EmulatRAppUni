@@ -116,3 +116,39 @@ HMDocs/
 otherdocs/
 HMDocs/
 otherdocs/
+
+# CMake / MSVC build output
+out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.dir/
+*_autogen/
+[Dd]ebug/
+[Rr]elease/
+RelWithDebInfo/
+MinSizeRel/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.exp
+
+# runtime / scratch
+*.img
+*.axpsnap
+boot*.out
+fw_*.out
+*.log
+*.runbak
+ds*_flash.rom
+EMULATR_STOP
+.fuse_hidden*
+*.BAK
+
+# RE / analysis workspaces
+ghidra/
+traces/
+sysvar_dump.txt
+rpcc_probe.txt
+firmware/
