@@ -18,7 +18,18 @@
 # ============================================================================
 set -euo pipefail
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD="$SRC/out/build/mac-debug"
+
+# Build type is the optional 1st arg (default RelWithDebInfo, the original
+# behavior).  Release = -O3 -DNDEBUG (fastest, no debug info); RelWithDebInfo =
+# -O2 -g -DNDEBUG (asserts already off, symbols kept for the HWRPB probe work).
+BUILD_TYPE="${1:-RelWithDebInfo}"
+case "$BUILD_TYPE" in
+  Release)        SUBDIR="mac-release" ;;
+  RelWithDebInfo) SUBDIR="mac-debug" ;;   # legacy dir name; kept for back-compat
+  Debug)          SUBDIR="mac-debug-g" ;;
+  *) echo "usage: $0 [Release|RelWithDebInfo|Debug]"; exit 2 ;;
+esac
+BUILD="$SRC/out/build/$SUBDIR"
 
 # Locate the aqt-installed Qt prefix (…/<ver>/macos).
 QT_PREFIX="$(ls -d "$HOME"/Qt/6.*/macos 2>/dev/null | sort -V | tail -1)"
@@ -29,7 +40,7 @@ fi
 echo "Using Qt: $QT_PREFIX"
 
 cmake -S "$SRC" -B "$BUILD" -G Ninja \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
   -DCMAKE_PREFIX_PATH="$QT_PREFIX"
 
 cmake --build "$BUILD" --target Emulatr Emulatr_tests -j"$(sysctl -n hw.ncpu)"

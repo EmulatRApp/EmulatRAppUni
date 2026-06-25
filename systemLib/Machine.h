@@ -200,6 +200,15 @@ public:
     bool cpuKernel(coreLib::CpuState& cpu) noexcept;   // per-CPU: PipelineDriver::step
     bool systemTick(uint64_t i) noexcept;              // system: once per quantum
 
+    // EMULATR_HWRPB_SCAN one-shot probe (2026-06-25).  Triggered by the
+    // m_hwrpbScanSentinel file; scans guest physical RAM for the HWRPB and
+    // dumps its location + header to stderr.  Two scans: (A) the configured
+    // pattern (default the sys_serial_num marker), validating each hit's
+    // candidate base (hit-64) by the HWRPB self-pointer + "HWRPB" id; and
+    // (B) a serial-independent scan for that same self-pointer/id signature,
+    // which also reports EVERY HWRPB present (the two-HWRPB question).
+    void scanGuestForHwrpb();
+
     // Run until halted or maxCycles reached.  Classifies the stop and
     // returns it; cpu() and memory() are observable post-run for the
     // post-mortem dump.
@@ -513,6 +522,10 @@ private:
     // the per-cycle body (stepCycle) reads it without re-resolving the path
     // each cycle.  (2026-06-19, AlphaCpuAgent Phase-1 extraction.)
     std::filesystem::path    m_stopSentinel;
+    // EMULATR_HWRPB_SCAN sentinel (2026-06-25): touch it at >>> to dump the
+    // HWRPB location.  Resolved once in run(), polled in systemTick() beside
+    // the stop sentinel.  REMOVE with the probe once the region map is locked.
+    std::filesystem::path    m_hwrpbScanSentinel;
 
     // ------------------------------------------------------------------
     // Snapshot auto-save state.
