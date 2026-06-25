@@ -768,6 +768,78 @@ private:
         }
         // ---- END GCT store-watch ----
 
+        // ---- TEMP SYSVAR/DSRDB store-watch 2026-06-24: DS20 badges as 264DP ----
+        // The SRM banner is build_dsrdb() reading hwrpb->SYSVAR member id in bits
+        // <15:10>: 1="AlphaPC 264DP", 6="AlphaServer DS20", 8="DS20E".  get_sysvar()
+        // sets it from the IIC OCP probe.  The EMULATR_IIC_TRACE run shows the OCP at
+        // 0x40/0x42 ACKing and sable_ocp_init running (fopen succeeded) yet the banner
+        // is 264DP -- so SYSVAR was latched to member 1 at a point the OCP was not yet
+        // openable.  Catch it two ways, self-locating by VALUE (the SRM HWRPB PA is
+        // not known a priori):
+        //   (a) the SYSVAR member write -- a small (low-16-only) qword whose <15:10>
+        //       is a known member id.  Its cyc/pc, ordered against iic_init (first
+        //       IIC-TXN addr=0x40, ~cyc 1.84e8), tells us if it latched too early.
+        //   (b) the DSRDB name copy -- any store whose bytes carry "264D"/"DS20"/
+        //       "Alph"; locates the DSRDB PA and the build_dsrdb pc.
+        // Gated by EMULATR_SYSVAR_WATCH (cached getenv); (void)0 when unset.  REMOVE
+        // once the latch ordering is mapped.
+        {
+            static bool const s_sysvarWatch =
+                (std::getenv("EMULATR_SYSVAR_WATCH") != nullptr);
+            if (s_sysvarWatch) {
+                // (a) SYSVAR member field: a low-16 value (size 2/4/8) whose
+                // <15:10> is member 1/6/8.  WIDENED 2026-06-24: the banner was
+                // reached (build_dsrdb ran) but a size-8-only filter missed the
+                // write -- SYSVAR is almost certainly a longword store, not a qword.
+                if ((r.memSize == 2 || r.memSize == 4 || r.memSize == 8) &&
+                    (r.memData & ~0xFFFFull) == 0) {
+                    uint64_t const member = (r.memData >> 10) & 0x3Full;
+                    if (member == 1 || member == 6 || member == 8) {
+                        std::fprintf(stderr,
+                            "SYSVAR-WATCH(member=%llu) cyc=%llu pc=0x%016llx "
+                            "pa=0x%016llx va=0x%016llx v=0x%016llx pal=%d ra=0x%016llx\n",
+                            static_cast<unsigned long long>(member),
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(cpu.pc),
+                            static_cast<unsigned long long>(pa),
+                            static_cast<unsigned long long>(r.memAddr),
+                            static_cast<unsigned long long>(r.memData),
+                            cpu.inPalMode() ? 1 : 0,
+                            static_cast<unsigned long long>(cpu.intReg[26]));
+                        std::fflush(stderr);
+                    }
+                }
+                // (b) DSRDB name bytes: scan the stored value for an ASCII tag.
+                if (r.memSize >= 4) {
+                    uint64_t const v = r.memData;
+                    char const* tag = nullptr;
+                    for (int s = 0; s + 4 <= static_cast<int>(r.memSize); ++s) {
+                        uint32_t const w =
+                            static_cast<uint32_t>((v >> (8 * s)) & 0xFFFFFFFFull);
+                        if      (w == 0x44343632u) { tag = "264D"; break; } // '2''6''4''D' LE
+                        else if (w == 0x30325344u) { tag = "DS20"; break; } // 'D''S''2''0' LE
+                        else if (w == 0x68706C41u) { tag = "Alph"; break; } // 'A''l''p''h' LE
+                    }
+                    if (tag) {
+                        std::fprintf(stderr,
+                            "DSRDB-WATCH(name=%s) cyc=%llu pc=0x%016llx pa=0x%016llx "
+                            "va=0x%016llx sz=%u v=0x%016llx pal=%d ra=0x%016llx\n",
+                            tag,
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(cpu.pc),
+                            static_cast<unsigned long long>(pa),
+                            static_cast<unsigned long long>(r.memAddr),
+                            static_cast<unsigned>(r.memSize),
+                            static_cast<unsigned long long>(r.memData),
+                            cpu.inPalMode() ? 1 : 0,
+                            static_cast<unsigned long long>(cpu.intReg[26]));
+                        std::fflush(stderr);
+                    }
+                }
+            }
+        }
+        // ---- END SYSVAR/DSRDB store-watch ----
+
         // ---- STORE-WATCH + conditional break: PA 0x10 bad-descriptor-ptr hunt
         //      2026-06-03 (cold-boot PC=0 halt root) -- REMOVE once found ----
         // Root of the clean-cold-boot halt (full-trace 20260603-111611_srm.trc):
