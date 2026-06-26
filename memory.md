@@ -64,6 +64,23 @@ decimal/hex error in the resume journal. ALL UNCOMMITTED.** Full writeup:
   root + tests copies are stale.)
 - **PuTTY on Mac:** off by default; even on it's Windows-pinned (`putty.exe`, hardcoded
   `d:/...` sessionlog at `SRMConsoleDevice.cpp:656`) + needs XQuartz. Use `nc localhost 10023`.
+- **PERSISTENCE MACHINERY (resolved + dumpbin-proven).** 3 layers: (1) flash ROM = emulated
+  AMD-FSM flash (`chipsetLib/FlashRom.cpp`), written by BOTH `update srm` AND `set` via
+  0x5555/0x2AAA, backing `ds20_v7_3.rom`, persisted ONLY on clean exit (`~Machine::forceFlush`);
+  (2) NVRAM env INSIDE that flash (serial at flash off 0x5f815); (3) HWRPB = RAM-only, built
+  each boot, NEVER persisted. Dumpbin of both firmware files: `.exe` has ZERO HWRPB/serial
+  (it's the COMPRESSED image), `.rom` has the serial (NVRAM) but ZERO HWRPB. => LFU/`update
+  srm` writes FIRMWARE to flash, NOT the HWRPB; HWRPB+SYSVAR are a DRAM event at from_init.
+  `--firmware ds20_v7_3.rom` MIS-ROUTES (main.cpp routes `.rom`->loadDecompressedRom, but the
+  file is the flash backing) -- approach dropped. Instruments: `EMULATR_FLASH_TRACE` (flash
+  writes) vs `EMULATR_PA_WATCH` (DRAM/HWRPB).
+- **GRACEFUL-EXIT FLUSH (LANDED + verified).** SIGINT/SIGTERM previously killed the process
+  before `~Machine::forceFlush` -> `update srm`/`set` LOST. Added: `Machine::requestStop()` +
+  `m_stopRequested` atomic (async-signal-safe store ONLY) polled every tick in `systemTick()`;
+  `main.cpp` `extern "C"` handler (SIGINT+SIGTERM) -> requestStop, 2nd signal = SIG_DFL
+  force-quit; try/catch around `mach.run()` so an exception can't bypass the flush. Portable
+  via `std::signal` (no #ifdef). Suite 472/472. Verified: `kill -INT` -> "stop requested
+  (signal) -- clean exit" -> destructor flush. (No CMake change -- main.cpp already in build.)
 - **NEXT (concrete):** build `EMULATR_PA_WATCH=0x2058` store-watch in `pipelineLib/MemDrainer.h`
   (beside EMULATR_SYSVAR_WATCH), ARM BEFORE a COLD boot (SYSVAR is written during cold init,
   before `>>>`), capture the writing PC -> Ghidra `get_sysvar`/`build_dsrdb` to learn WHY

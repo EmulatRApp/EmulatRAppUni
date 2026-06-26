@@ -243,6 +243,52 @@ emits. This is exactly the kind of contract divergence the region-mapping is mea
 
 ---
 
+## 10. PERSISTENCE MACHINERY + GRACEFUL-EXIT FLUSH (2026-06-25)
+
+### What `update srm` / `set` actually persist (grounded in `chipsetLib/FlashRom.cpp`)
+Three distinct layers -- conflating them muddied the HWRPB question:
+1. **Flash ROM** = emulated AMD command-FSM flash (mirrors AXPBox `CFlash`): guest writes
+   via unlock->erase->program at magic addrs 0x5555/0x2AAA. BOTH `update srm` AND `set <env>`
+   reach flash through this FSM. Backing file `ds20_v7_3.rom`, restored at boot, persisted
+   ONLY on clean exit via `~Machine::forceFlush()`. Instrument: `EMULATR_FLASH_TRACE` logs
+   every AMD-FSM write.
+2. **NVRAM env vars** live INSIDE that flash region (our `HEAX1PEER` was at flash off 0x5f815).
+3. **HWRPB** = RAM only, built fresh each boot in DRAM at 0x2000; NEVER persisted.
+
+PROVEN by dumpbin (python scan of both firmware files): `ds20_v7_3.exe` has ZERO "HWRPB"/
+serial bytes (it's the COMPRESSED self-decompressing image -- the identifier + decision code
+are inside the compressed payload). `ds20_v7_3.rom` has ZERO "HWRPB" and ONE serial hit
+(0x5f815 = the NVRAM env). => The HWRPB is NOT ROM-resident; LFU/`update srm` writes the
+FIRMWARE to flash, NOT the HWRPB. The HWRPB (and SYSVAR) are built later, at `from_init`, by
+the running SRM -- a DRAM event (EMULATR_PA_WATCH path), NOT a flash event (FLASH_TRACE path).
+
+CONSEQUENCE for the `.rom`-as-firmware idea: `main.cpp` routes firmware by EXTENSION -- `.exe`
+-> SRM decompressing loader; `.rom` -> `loadDecompressedRom` (expects a PRE-decompressed
+image). `ds20_v7_3.rom` is the flash backing (compressed SRM + env), so `--firmware
+ds20_v7_3.rom` MIS-ROUTES. Dropped that approach.
+
+### Graceful-exit flush (LANDED + verified)
+PROBLEM: `~Machine::forceFlush()` only runs on a clean `run()` return (the EMULATR_STOP
+sentinel). Ctrl-C/SIGTERM killed the process first -> destructor skipped -> `update srm`/`set`
+LOST. FIX (additive, no env gate, portable Windows+macOS via `std::signal`):
+- `systemLib/Machine.{h,cpp}`: `std::atomic<bool> m_stopRequested` + `requestStop()`
+  (async-signal-safe: atomic store ONLY) + `stopRequested()`. `systemTick()` polls it EVERY
+  tick (atomic load ~free) beside the EMULATR_STOP sentinel -> clean `return false`.
+- `main.cpp`: file-scope `std::atomic<Machine*> g_machineForSignal`; `extern "C"`
+  `emulatrSignalHandler` sets requestStop() then resets to SIG_DFL (2nd signal = force-quit);
+  installed for SIGINT+SIGTERM right after `mach` is constructed. ALSO wrapped `mach.run()`
+  in try/catch so an exception can't bypass the destructor flush (mach is a main() local;
+  catch+fall-through guarantees ~Machine runs).
+- DESIGN NOTE: the handler does NOT create the sentinel FILE (file I/O is not
+  async-signal-safe); it sets the atomic -- the async-signal-safe equivalent of the same
+  lever. Suite 472/472 green. VERIFIED end-to-end: boot, `kill -INT` -> log
+  `Machine::run: stop requested (signal) -- clean exit at cycle 109119114`, process exits
+  via the destructor (flush) path.
+- BONUS: this also makes headless background runs flushable (was dying on
+  MaxCyclesExceeded/kill without a flush).
+
+---
+
 ## 6. UNCOMMITTED at handoff (stage file-by-file, NATIVE git only)
 
 - `systemLib/Machine.h`, `systemLib/Machine.cpp` -- the instrument.
