@@ -81,7 +81,23 @@ decimal/hex error in the resume journal. ALL UNCOMMITTED.** Full writeup:
   force-quit; try/catch around `mach.run()` so an exception can't bypass the flush. Portable
   via `std::signal` (no #ifdef). Suite 472/472. Verified: `kill -INT` -> "stop requested
   (signal) -- clean exit" -> destructor flush. (No CMake change -- main.cpp already in build.)
-- **NEXT (concrete):** build `EMULATR_PA_WATCH=0x2058` store-watch in `pipelineLib/MemDrainer.h`
+- **STATIC ANALYSIS (option C, journal §11).** Built the byte-faithful DECOMPRESSED DS20
+  image via `tools/host_decompressor` (clang: `cc -O2 -o oracle src/oracle.c src/inflate.c`;
+  `./oracle firmware/ds20_v7_3.exe out/decompressed_ds20_v7_3.bin`; target=0x8000, sig OK).
+  **ADDR MAP: runtime VA = file_off + 0x8000** -> any runtime PC disassembles at PC-0x8000
+  (the image is the disassembly substrate; the .bin is regenerable, NOT committed). Banner
+  table @ 0x153cd8 (stride 0x2c, base 0x153cac=member0) fully decoded: member1->264DP
+  (0x19a6c8), member2->DS20; SYSVAR 0x405->member1 confirmed. Strings: "Defaulting system
+  type to AlphaPC 264DP" @0x19ad90, "Error determining system type, SYSVAR=%x" @0x19adc0,
+  iic_ocp0 @0x17a3c0/0x1a0218 (no debug symbols). **STRONG INFERENCE: get_sysvar hits its
+  DEFAULT path (can't ID the DS20 -> falls back to 264DP).** Static code-location HIT THE
+  GP-RELATIVE WALL (4 methods, all 0; addresses are computed gp-relative, never stored as
+  literals) = the journal's EXHAUSTED route; don't relitigate.
+- **NEXT (cheap + decisive):** (1) CONSOLE CAPTURE `plink -raw -P 10023 localhost | tee
+  console.log` and grep boot for "Defaulting system type"/"Error determining system type,
+  SYSVAR=0x.." -- the firmware names its own path (near-definitive, no disasm). (2) capture
+  get_sysvar PC via PA-watch, disassemble the decompressed image at PC-0x8000.
+- **(earlier next, still valid):** build `EMULATR_PA_WATCH=0x2058` store-watch in `pipelineLib/MemDrainer.h`
   (beside EMULATR_SYSVAR_WATCH), ARM BEFORE a COLD boot (SYSVAR is written during cold init,
   before `>>>`), capture the writing PC -> Ghidra `get_sysvar`/`build_dsrdb` to learn WHY
   member 1 (NOT a blind patch) -> then map CTB/CRB/MEMDSC/DSRDB/FRU from the 0x2000 header's

@@ -289,6 +289,61 @@ LOST. FIX (additive, no env gate, portable Windows+macOS via `std::signal`):
 
 ---
 
+## 11. STATIC ANALYSIS OF THE DECOMPRESSED FIRMWARE (option C, 2026-06-25)
+
+GOAL: read the badge decision (`get_sysvar`/`build_dsrdb`) WITHOUT Ghidra, since the
+`.exe` is the COMPRESSED self-decompressing image (no plaintext code/strings).
+
+### Decompressed image built + verified (the durable deliverable)
+- `tools/host_decompressor` (oracle.c + inflate.c) builds clean with clang on the Mac
+  (`cc -O2 -o oracle src/oracle.c src/inflate.c`). Run:
+  `./oracle ../../firmware/ds20_v7_3.exe out/decompressed_ds20_v7_3.bin`.
+- Output: WimC@0x2400, compressedSize=0x1f1097, **target=0x8000**, size 0x2f9a00 (3,119,616).
+  Signature check PASSED (hw_ret R2 x3 / R6 x0) => byte-faithful.
+- **ADDRESS MAP: runtime VA = file_offset + 0x8000** (decompress target). So a runtime PC X
+  disassembles at image file offset X-0x8000. This is the KEY enabler: any PC the PA-watch
+  later yields is instantly readable in this image.
+- The `.bin` is a GENERATED artifact (regenerate via the oracle); NOT committed.
+
+### Banner table FULLY decoded (@ 0x153cd8, stride 0x2c) -- confirms journal anchor
+`table[member]`, base 0x153cac (member 0 = invalid, strptr 0x00f00000). Each 0x2c entry =
+11 longwords: [0]=string ptr, [1]=code1, [2]=code2(0x19|0x4b), [3..8]=0xffffffff, [9]=[10]=0x41a.
+- member 1 -> "AlphaPC 264DP %3d MHz" (0x19a6c8), code1=0x72e code2=0x19
+- member 2 -> "AlphaServer DS20 %3d MHz" (0x19a6e0), code1=0x780
+- member 3 -> "AlphaServer DS20 %3d MHz" (0x19a700), code1=0x730
+- member 4..8 -> "COMPAQ AlphaServer DS20E" (0x1a90c8)
+SYSVAR 0x405 -> (>>10)&0x3F = member 1 -> 264DP. Self-consistent with the live HWRPB.
+
+### Decision strings + iic_ocp0 located (empirically, == journal)
+"Defaulting system type to AlphaPC 264DP" @ **0x19ad90**; "Error determining system type,
+SYSVAR = %x" @ **0x19adc0**; `iic_ocp0` @ 0x17a3c0 / 0x1a0218. NO debug symbols
+(`get_sysvar`/`build_dsrdb` names absent).
+
+### STRONG INFERENCE
+The existence of the distinct message "Defaulting system type to AlphaPC 264DP" + our result
+(SYSVAR=member 1=264DP) => `get_sysvar` is hitting its **DEFAULT path**: it cannot positively
+identify the DS20 and falls back to 264DP. "Error determining system type, SYSVAR = %x" is the
+error-path sibling (and would print the computed SYSVAR).
+
+### Static code-location HIT THE DOCUMENTED GP-RELATIVE WALL (route exhausted)
+Four independent methods all returned ZERO get_sysvar candidates: (1) absolute LDAH/LDA
+construction of the targets; (2) gp-relative pairs 0x30 apart (Defaulting<->Error gap);
+(3) triple-constraint (Defaulting+Error+table, consistent gp); (4) consensus-gp voting across
+all known data targets incl. iic_ocp0. Confirmed: the string/table addresses are COMPUTED
+gp-relative (NOT stored as literals -- 0x19ad90 appears NOWHERE as a 4/8-byte value), so static
+XREF can't pin the decision instruction without the runtime gp or a runtime PC. This is exactly
+the wall the 2026-06-24 journal recorded as EXHAUSTED -- do not relitigate it.
+
+### NEXT (cheap + decisive)
+1. **Console capture**: `plink -raw -P 10023 localhost | tee console.log`; look early in boot
+   for "Defaulting system type to AlphaPC 264DP" or "Error determining system type, SYSVAR =
+   0x..". The firmware tells us the path (and, for Error, the SYSVAR value) -- near-definitive,
+   no disassembly.
+2. **Runtime PC**: capture get_sysvar's write/IIC-probe PC via PA-watch, then disassemble this
+   image at PC-0x8000. The image (built above) is the substrate that makes that trivial.
+
+---
+
 ## 6. UNCOMMITTED at handoff (stage file-by-file, NATIVE git only)
 
 - `systemLib/Machine.h`, `systemLib/Machine.cpp` -- the instrument.
