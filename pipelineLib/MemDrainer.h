@@ -840,6 +840,45 @@ private:
         }
         // ---- END SYSVAR/DSRDB store-watch ----
 
+        // ---- TEMP PA-WATCH 2026-06-25: catch the writer of HWRPB SYSVAR ----
+        // EMULATR_HWRPB_SCAN located the live HWRPB @ PA 0x2000; the "AlphaPC
+        // 264DP" badge is SYSVAR (HWRPB+0x58 = PA 0x2058, value 0x405 => member 1).
+        // Unlike the blind EMULATR_SYSVAR_WATCH above (which guessed the VALUE and
+        // never fired), this keys on the ADDRESS: it fires on ANY store touching
+        // the watched quadword, handing us the PC of get_sysvar/build_dsrdb -- the
+        // firmware decision we could not reach by static XREF.  ARM BEFORE A COLD
+        // BOOT (the write happens during cold init, long before >>>).  PA is
+        // parameterized via EMULATR_PA_WATCH=<hex|dec> (default 0x2058) so we can
+        // re-point if the HWRPB base ever moves.  REMOVE once the decision is mapped.
+        {
+            static uint64_t const s_paWatch = []() -> uint64_t {
+                char const* e = std::getenv("EMULATR_PA_WATCH");
+                if (!e || !*e) return 0;
+                return std::strtoull(e, nullptr, 0);   // 0x.. hex or decimal
+            }();
+            if (s_paWatch != 0) {
+                uint64_t const qw   = s_paWatch & ~7ULL;                    // watched quadword
+                uint64_t const sLo  = pa;
+                uint64_t const sHi  = pa + (r.memSize ? r.memSize : 1);     // store byte range
+                if (sLo < qw + 8 && sHi > qw) {                            // overlaps the qword
+                    std::fprintf(stderr,
+                        "PA-WATCH(0x%llx) STORE cyc=%llu pc=0x%016llx pa=0x%016llx "
+                        "va=0x%016llx sz=%u v=0x%016llx pal=%d ra=0x%016llx\n",
+                        static_cast<unsigned long long>(s_paWatch),
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(cpu.pc),
+                        static_cast<unsigned long long>(pa),
+                        static_cast<unsigned long long>(r.memAddr),
+                        static_cast<unsigned>(r.memSize),
+                        static_cast<unsigned long long>(r.memData),
+                        cpu.inPalMode() ? 1 : 0,
+                        static_cast<unsigned long long>(cpu.intReg[26]));
+                    std::fflush(stderr);
+                }
+            }
+        }
+        // ---- END PA-WATCH ----
+
         // ---- STORE-WATCH + conditional break: PA 0x10 bad-descriptor-ptr hunt
         //      2026-06-03 (cold-boot PC=0 halt root) -- REMOVE once found ----
         // Root of the clean-cold-boot halt (full-trace 20260603-111611_srm.trc):

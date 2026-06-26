@@ -1369,6 +1369,15 @@ bool Machine::systemTick(uint64_t i) noexcept
     static constexpr uint64_t kStopPollMask = 0xFFFFFULL;  // poll ~every 1M steps
         // Graceful-stop poll (task #9): cheap existence check on a coarse
         // cadence; a clean break lets ~Machine's forceFlush persist NVRAM.
+        // Signal-requested stop (2026-06-25): a SIGINT/SIGTERM handler in main()
+        // called requestStop().  Checked EVERY tick (not on the coarse cadence)
+        // and an atomic load is ~free, so Ctrl-C breaks out promptly -> clean
+        // return -> ~Machine::forceFlush persists the flash (no `update srm' loss).
+        if (m_stopRequested.load(std::memory_order_relaxed)) {
+            SPDLOG_INFO("Machine::run: stop requested (signal) -- clean exit at cycle {}",
+                        static_cast<unsigned long long>(m_cpu.cycleCount));
+            return false;   // BREAK the run loop
+        }
         if ((i & kStopPollMask) == 0) {
             std::error_code sec;
             if (std::filesystem::exists(m_stopSentinel, sec)) {
