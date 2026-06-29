@@ -49,6 +49,7 @@
 #ifndef SYSTEMLIB_MACHINE_H
 #define SYSTEMLIB_MACHINE_H
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -200,10 +201,28 @@ public:
     bool cpuKernel(coreLib::CpuState& cpu) noexcept;   // per-CPU: PipelineDriver::step
     bool systemTick(uint64_t i) noexcept;              // system: once per quantum
 
+    // EMULATR_HWRPB_SCAN one-shot probe (2026-06-25).  Triggered by the
+    // m_hwrpbScanSentinel file; scans guest physical RAM for the HWRPB and
+    // dumps its location + header to stderr.  Two scans: (A) the configured
+    // pattern (default the sys_serial_num marker), validating each hit's
+    // candidate base (hit-64) by the HWRPB self-pointer + "HWRPB" id; and
+    // (B) a serial-independent scan for that same self-pointer/id signature,
+    // which also reports EVERY HWRPB present (the two-HWRPB question).
+    void scanGuestForHwrpb();
+
     // Run until halted or maxCycles reached.  Classifies the stop and
     // returns it; cpu() and memory() are observable post-run for the
     // post-mortem dump.
     StopReason run(uint64_t maxCycles = ~uint64_t{0}) noexcept;
+
+    // Graceful-stop request (2026-06-25).  Async-signal-safe: sets a lock-free
+    // atomic ONLY, so a SIGINT/SIGTERM handler in main() can call it to make the
+    // run loop break and return cleanly -- which lets ~Machine::forceFlush()
+    // persist the flash NVRAM (an `update srm'/`set' heal).  systemTick() polls
+    // this beside the EMULATR_STOP sentinel.  No I/O here (file ops are NOT
+    // async-signal-safe); the actual flush happens on the normal main() return.
+    void requestStop()        noexcept { m_stopRequested.store(true, std::memory_order_relaxed); }
+    bool stopRequested() const noexcept { return m_stopRequested.load(std::memory_order_relaxed); }
 
     coreLib::CpuState&       cpu()       noexcept { return m_cpu; }
     coreLib::CpuState const& cpu() const noexcept { return m_cpu; }
@@ -513,6 +532,13 @@ private:
     // the per-cycle body (stepCycle) reads it without re-resolving the path
     // each cycle.  (2026-06-19, AlphaCpuAgent Phase-1 extraction.)
     std::filesystem::path    m_stopSentinel;
+    // EMULATR_HWRPB_SCAN sentinel (2026-06-25): touch it at >>> to dump the
+    // HWRPB location.  Resolved once in run(), polled in systemTick() beside
+    // the stop sentinel.  REMOVE with the probe once the region map is locked.
+    std::filesystem::path    m_hwrpbScanSentinel;
+    // Set by main()'s SIGINT/SIGTERM handler via requestStop(); polled in
+    // systemTick() to break the run loop cleanly so the flash NVRAM is flushed.
+    std::atomic<bool>        m_stopRequested{ false };
 
     // ------------------------------------------------------------------
     // Snapshot auto-save state.

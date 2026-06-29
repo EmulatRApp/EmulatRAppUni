@@ -32,7 +32,9 @@
 //
 // ============================================================================
 
+#include <atomic>        // 2026-06-25: signal-handler -> Machine stop flag
 #include <chrono>        // 2026-06-08: boot throughput baseline (task #10)
+#include <csignal>       // 2026-06-25: SIGINT/SIGTERM -> graceful flush
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>    // 2026-06-08: std::filesystem::path firmware fallback (SSOT Slice B)
@@ -71,6 +73,33 @@
 #include "fpBoxLib/fp_host_guard.h"    // 2026-06-10: host-FP safety self-test (task #26 Phase A)
 #endif
 
+
+// ----------------------------------------------------------------------------
+// Graceful-stop on SIGINT (Ctrl-C) / SIGTERM (kill) -- 2026-06-25.
+// Without this, the default disposition terminates the process immediately, so
+// ~Machine::forceFlush() never runs and an `update srm'/`set' heal is LOST
+// (the "hard taskkill skips the destructor" hazard the flash code warns about).
+// The handler is async-signal-safe: it ONLY sets a lock-free atomic via
+// Machine::requestStop() (NO I/O -- file ops are not async-signal-safe).  The
+// run loop polls that flag, returns cleanly, and main() falls through to the
+// normal ~Machine flush.  A SECOND signal restores the default handler and
+// re-raises, so a wedged shutdown can still be force-killed.
+// ----------------------------------------------------------------------------
+namespace {
+    std::atomic<systemLib::Machine*> g_machineForSignal{ nullptr };
+
+    extern "C" void emulatrSignalHandler(int sig) noexcept
+    {
+        systemLib::Machine* m = g_machineForSignal.load(std::memory_order_relaxed);
+        if (m != nullptr) {
+            m->requestStop();                 // async-signal-safe: atomic store only
+            std::signal(sig, SIG_DFL);        // 2nd same signal -> default (force quit)
+        } else {
+            std::signal(sig, SIG_DFL);
+            std::raise(sig);                  // not armed yet -> default behavior
+        }
+    }
+}
 
 int main(int argc, char* argv[])
 {
@@ -215,6 +244,14 @@ int main(int argc, char* argv[])
     // Construct the Machine and load firmware.
     // ------------------------------------------------------------------
     systemLib::Machine mach{opts.memSize, std::move(settings)};
+
+    // Arm graceful-stop signals now that `mach` exists (it outlives the run and
+    // its destructor flushes the flash).  SIGINT (Ctrl-C) + SIGTERM (kill) ->
+    // requestStop() -> clean run-loop exit -> ~Machine forceFlush.  std::signal
+    // is portable across Windows (CRT) and macOS/Linux; no #ifdef needed.
+    g_machineForSignal.store(&mach, std::memory_order_relaxed);
+    std::signal(SIGINT,  emulatrSignalHandler);
+    std::signal(SIGTERM, emulatrSignalHandler);
 
     bool loadOk = false;
     bool isDecompressedRom = false;
@@ -642,7 +679,22 @@ int main(int argc, char* argv[])
     // and emit a PROFILE line so cold-boot-to->>> throughput is measurable.
     // ------------------------------------------------------------------
     [[maybe_unused]] auto const profT0 = std::chrono::steady_clock::now();
-    systemLib::StopReason const sr = mach.run(opts.maxCycles);
+    // try/catch so an exception escaping the run cannot bypass the destructor
+    // flush: `mach` is a main()-local, so falling through here (instead of
+    // letting the exception propagate to std::terminate) guarantees
+    // ~Machine::forceFlush() persists the flash NVRAM. 2026-06-25.
+    systemLib::StopReason sr = systemLib::StopReason::HaltedClean;
+    try {
+        sr = mach.run(opts.maxCycles);
+    } catch (std::exception const& e) {
+        std::fprintf(stderr,
+            "FATAL: exception escaped mach.run() (%s) -- returning cleanly so "
+            "~Machine flushes the flash NVRAM\n", e.what());
+    } catch (...) {
+        std::fprintf(stderr,
+            "FATAL: unknown exception escaped mach.run() -- returning cleanly so "
+            "~Machine flushes the flash NVRAM\n");
+    }
     [[maybe_unused]] auto const profT1 = std::chrono::steady_clock::now();
 #if EMULATR_BRINGUP_PROBES
     double             const profSecs    = std::chrono::duration<double>(profT1 - profT0).count();

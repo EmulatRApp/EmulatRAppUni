@@ -45,6 +45,13 @@ if [ "${1:-}" = "cold" ] || [ "${1:-}" = "COLD" ]; then COLD=1; shift; fi
 BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$BUILD_DIR"
 
+# Binary name is platform-dependent: MSVC emits Emulatr.exe; the macOS/Linux
+# clang build emits a bare Emulatr.  Pick whichever is present (.exe first so
+# the Windows production path is unchanged).
+if   [ -x "./Emulatr.exe" ]; then BIN="Emulatr.exe"
+elif [ -x "./Emulatr"     ]; then BIN="Emulatr"
+else echo "FATAL: neither ./Emulatr.exe nor ./Emulatr found in $BUILD_DIR"; exit 1; fi
+
 SRC_FW="$BUILD_DIR/../../../firmware/${NAME}_v7_3.exe"   # source firmware tree
 DST_FW="firmware/${NAME}_v7_3.exe"                       # cwd-relative target
 INI="config/EmulatrV4.ini"
@@ -53,7 +60,6 @@ TS="$(date +%Y%m%d-%H%M%S)"
 LOG="fw_${NAME}_${TS}.out"
 
 # ---- preflight -------------------------------------------------------------
-[[ -x "./Emulatr.exe" ]] || { echo "FATAL: ./Emulatr.exe not found in $BUILD_DIR"; exit 1; }
 [[ -f "$SRC_FW" ]]       || { echo "FATAL: firmware not found: $SRC_FW"; exit 1; }
 [[ -f "$INI" ]]          || { echo "FATAL: ini not found: $INI"; exit 1; }
 mkdir -p firmware
@@ -75,8 +81,12 @@ fi
 # ---- set model in ini for this run; restore on exit ------------------------
 cp -f "$INI" "$INI.runbak"
 trap 'mv -f "$INI.runbak" "$INI"' EXIT
-# Replace the first "model = ..." line under [System].
-sed -i "s/^\(\s*model\s*=\s*\).*/\1${MODEL}/" "$INI"
+# Replace the first "model = ..." line under [System].  Portable across GNU and
+# BSD/macOS sed: `sed -i` needs a suffix arg on BSD and `\s` is GNU-only, so use
+# a temp file + a POSIX [[:space:]] class instead of in-place `-i` / `\s`.
+SED_TMP="$(mktemp)"
+sed "s/^\([[:space:]]*model[[:space:]]*=[[:space:]]*\).*/\1${MODEL}/" "$INI" > "$SED_TMP" \
+    && mv -f "$SED_TMP" "$INI"
 
 # ---- stop-sentinel + (cold) snapshot hygiene -------------------------------
 rm -f EMULATR_STOP                       # never start with a stale stop sentinel
@@ -99,10 +109,11 @@ echo "=== EmulatR run [$MODE] ====================================="
 echo "  firmware : $DST_FW"
 echo "  model    : $MODEL   (ini-driven; no --model flag exists)"
 echo "  memory   : $MEM bytes (4 GiB)"
-echo "  console  : TCP 10023  (connect PuTTY/plink, raw mode)"
+echo "  console  : TCP 10023  (Windows: PuTTY/plink raw; macOS/Linux: nc localhost 10023)"
+echo "  binary   : ./$BIN"
 echo "  log      : $BUILD_DIR/$LOG"
 echo "  extra    : $*"
 echo "============================================================="
 
 # Run. 2>&1 | tee captures StopReason / fault / exit cycle into the log.
-./Emulatr.exe --firmware "$DST_FW" --mem "$MEM" $COLD_FLAG "$@" 2>&1 | tee "$LOG"
+"./$BIN" --firmware "$DST_FW" --mem "$MEM" $COLD_FLAG "$@" 2>&1 | tee "$LOG"

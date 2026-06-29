@@ -111,6 +111,11 @@ Desktop.ini
 *.tmp
 core
 core.*
+
+# host_decompressor: compiled oracle + generated decompressed images (regenerable)
+tools/host_decompressor/oracle
+tools/host_decompressor/oracle.exe
+tools/host_decompressor/out/
 other docs/
 HMDocs/
 otherdocs/

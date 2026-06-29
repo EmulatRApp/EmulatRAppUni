@@ -10,6 +10,102 @@ them from here.
 
 ---
 
+## 2026-06-25 -- EMULATR_HWRPB_SCAN instrument BUILT (Mac) + macOS build/launcher hardening
+
+**Headline: resumed the HWRPB-region work on the Mac. Built the `EMULATR_HWRPB_SCAN`
+guest-memory probe (resume-journal §7a) into `systemLib/Machine.{h,cpp}`; suite 472/472
+green. LIVE DUMP CAPTURED -> HWRPB @ PA 0x2000, badge pinned to SYSVAR=0x405=member 1 @
+PA 0x2058; two-HWRPB question RESOLVED. Got the macOS build + launcher working. Caught a
+decimal/hex error in the resume journal. ALL UNCOMMITTED.** Full writeup:
+`journals/20260625_hwrpb_scan_instrument_and_mac_build.md` (§7 = live dump results).
+
+- **LIVE DUMP RESULT (the big finding).** DS20 cold boot, `set sys_serial_num HEAX1PEER` +
+  `touch EMULATR_HWRPB_SCAN`: Scan B found **exactly ONE** HWRPB, at **PA 0x2000**, carrying
+  our serial -> it is the **SRM-built** one (NOT EmulatR's `HwrpbBuilder`, which is "fixed at
+  PA 0" per FirmwareDeviceManager.h:175 and is NOT present/used). Header is spec-conformant:
+  self-ptr@+0=0x2000, id="HWRPB", rev 14, size 0xb80, page 8K, serial@+0x40, **SYSTYPE@+0x50
+  = 0x22 = DEC_TSUNAMI (CORRECT, family-wide DS10/DS20/ES40), SYSVAR@+0x58 = 0x405 ->
+  member (SYSVAR>>10)&0x3F = 1 = "AlphaPC 264DP" = THE BADGE**. (DS20 = member 6 => SYSVAR
+  0x1805.) CONSEQUENCE: patching EmulatR's HwrpbBuilder would NOT fix the badge; the decision
+  is firmware-internal (get_sysvar). The 8 non-HWRPB serial hits (console echo/history bufs,
+  env-var store @0x30e20, heap copy @0x3ff4bf58) all correctly rejected -> disambiguation works.
+- **HWRPB REGION MAP (top-level directory) decoded from the 0x2000 header** -- journal §9.
+  All section pointers are RELATIVE to base 0x2000 (proven: fru_offset 0x3ff30000 -> abs
+  0x3ff32000 = the GCT/FRU anchor). PAs: TBB 0x2140; per-CPU slots 0x2180 (count 2, **size
+  0x280**) slot1 0x2400; CTB 0x2680 (1 x 0x160); CRB 0x27e0; MEMDSC/MDDT 0x2840; DSRDB 0x2ac0;
+  CDB 0x38880; FRU/GCT 0x3ff32000. Inline sections pack contiguously inside the 0xb80 block
+  (0x2000..0x2b80). **DIVERGENCE to verify:** live SLOT size 0x280 vs our `Hwrpb.h` PerCpuSlot
+  static_assert 0x400 (AARM-canonical) -- reconcile vs apisrm hwrpb_def. Internal sub-struct
+  fields NOT yet dumped (next pass).
+
+- **`EMULATR_HWRPB_SCAN` instrument (the session deliverable).** Sentinel-gated one-shot
+  (resolved in `run()`, polled in `systemTick()` beside the stop sentinel -- the journal's
+  "Machine.cpp:1058" trigger line is STALE post P2-T2 split). Two scans of the sparse
+  allocated pages (`GuestMemory::forEachPage`): (A) PATTERN `EMULATR_SCAN_PATTERN` (default
+  `HEAX1PEER`) -- per hit `H`, dump `[H-64,H+192)`, validate base `B=H-64` via self-pointer
+  (`read8(B)==B`) + id (`read8(B+8)==0x0000004250525748`="HWRPB"); (B) SIGNATURE -- serial-
+  independent walk for that self-pointer/id pair, finds the HWRPB even if `sys_serial_num`
+  doesn't propagate AND reports EVERY HWRPB (resolves the two-HWRPB question). Env-gated,
+  zero cost off. USE: `set sys_serial_num HEAX1PEER` at `>>>`, then `touch EMULATR_HWRPB_SCAN`;
+  dump -> stderr/`fw_ds20_<ts>.out`.
+- **SPEC GROUND TRUTH + JOURNAL CORRECTION.** Per `deviceLib/Hwrpb.h` static_asserts:
+  serial@+64, self-ptr@+0, id@+8, **SYSTYPE@+80 (0x50), SYSVAR@+88 (0x58)**. The 2026-06-24
+  resume journal's "SYSVAR/SYSTYPE at +0x80/+0x88" is a decimal/hex slip -- the NEXT step
+  (`EMULATR_PA_WATCH`) must target `base+0x58` for SYSVAR, not 0x88.
+- **macOS build working + Release option added.** `scripts/build_mac.sh [Release|
+  RelWithDebInfo|Debug]` (default RelWithDebInfo, back-compat); Release->`out/build/mac-release`.
+  RelWithDebInfo already has -DNDEBUG, so Release ~= -O3-vs-O2 only (modest). Binary is bare
+  `Emulatr` (Mach-O x86_64), not `.exe`.
+- **`tools/run_fw.sh` macOS-portable (real bug fixed).** (1) binary name `.exe`-or-bare;
+  (2) **`sed -i` was GNU-only and silently no-op'd the `model=` line on BSD/macOS sed** ->
+  replaced with temp-file + POSIX `[[:space:]]`. This had caused a 32-min "hang": DS20
+  firmware ran on an `model=ES40` chipset (Cypress vs ALi) because the model never flipped.
+  Now `./run_fw.sh ds20` echoes `model : DS20`. (`tools/run_fw.sh` is the CMake-deployed one;
+  root + tests copies are stale.)
+- **PuTTY on Mac:** off by default; even on it's Windows-pinned (`putty.exe`, hardcoded
+  `d:/...` sessionlog at `SRMConsoleDevice.cpp:656`) + needs XQuartz. Use `nc localhost 10023`.
+- **PERSISTENCE MACHINERY (resolved + dumpbin-proven).** 3 layers: (1) flash ROM = emulated
+  AMD-FSM flash (`chipsetLib/FlashRom.cpp`), written by BOTH `update srm` AND `set` via
+  0x5555/0x2AAA, backing `ds20_v7_3.rom`, persisted ONLY on clean exit (`~Machine::forceFlush`);
+  (2) NVRAM env INSIDE that flash (serial at flash off 0x5f815); (3) HWRPB = RAM-only, built
+  each boot, NEVER persisted. Dumpbin of both firmware files: `.exe` has ZERO HWRPB/serial
+  (it's the COMPRESSED image), `.rom` has the serial (NVRAM) but ZERO HWRPB. => LFU/`update
+  srm` writes FIRMWARE to flash, NOT the HWRPB; HWRPB+SYSVAR are a DRAM event at from_init.
+  `--firmware ds20_v7_3.rom` MIS-ROUTES (main.cpp routes `.rom`->loadDecompressedRom, but the
+  file is the flash backing) -- approach dropped. Instruments: `EMULATR_FLASH_TRACE` (flash
+  writes) vs `EMULATR_PA_WATCH` (DRAM/HWRPB).
+- **GRACEFUL-EXIT FLUSH (LANDED + verified).** SIGINT/SIGTERM previously killed the process
+  before `~Machine::forceFlush` -> `update srm`/`set` LOST. Added: `Machine::requestStop()` +
+  `m_stopRequested` atomic (async-signal-safe store ONLY) polled every tick in `systemTick()`;
+  `main.cpp` `extern "C"` handler (SIGINT+SIGTERM) -> requestStop, 2nd signal = SIG_DFL
+  force-quit; try/catch around `mach.run()` so an exception can't bypass the flush. Portable
+  via `std::signal` (no #ifdef). Suite 472/472. Verified: `kill -INT` -> "stop requested
+  (signal) -- clean exit" -> destructor flush. (No CMake change -- main.cpp already in build.)
+- **STATIC ANALYSIS (option C, journal §11).** Built the byte-faithful DECOMPRESSED DS20
+  image via `tools/host_decompressor` (clang: `cc -O2 -o oracle src/oracle.c src/inflate.c`;
+  `./oracle firmware/ds20_v7_3.exe out/decompressed_ds20_v7_3.bin`; target=0x8000, sig OK).
+  **ADDR MAP: runtime VA = file_off + 0x8000** -> any runtime PC disassembles at PC-0x8000
+  (the image is the disassembly substrate; the .bin is regenerable, NOT committed). Banner
+  table @ 0x153cd8 (stride 0x2c, base 0x153cac=member0) fully decoded: member1->264DP
+  (0x19a6c8), member2->DS20; SYSVAR 0x405->member1 confirmed. Strings: "Defaulting system
+  type to AlphaPC 264DP" @0x19ad90, "Error determining system type, SYSVAR=%x" @0x19adc0,
+  iic_ocp0 @0x17a3c0/0x1a0218 (no debug symbols). **STRONG INFERENCE: get_sysvar hits its
+  DEFAULT path (can't ID the DS20 -> falls back to 264DP).** Static code-location HIT THE
+  GP-RELATIVE WALL (4 methods, all 0; addresses are computed gp-relative, never stored as
+  literals) = the journal's EXHAUSTED route; don't relitigate.
+- **NEXT (cheap + decisive):** (1) CONSOLE CAPTURE `plink -raw -P 10023 localhost | tee
+  console.log` and grep boot for "Defaulting system type"/"Error determining system type,
+  SYSVAR=0x.." -- the firmware names its own path (near-definitive, no disasm). (2) capture
+  get_sysvar PC via PA-watch, disassemble the decompressed image at PC-0x8000.
+- **(earlier next, still valid):** build `EMULATR_PA_WATCH=0x2058` store-watch in `pipelineLib/MemDrainer.h`
+  (beside EMULATR_SYSVAR_WATCH), ARM BEFORE a COLD boot (SYSVAR is written during cold init,
+  before `>>>`), capture the writing PC -> Ghidra `get_sysvar`/`build_dsrdb` to learn WHY
+  member 1 (NOT a blind patch) -> then map CTB/CRB/MEMDSC/DSRDB/FRU from the 0x2000 header's
+  +160/+184/+192/+200/+216/+312 offsets -> boot-time validator. CAVEAT: confirm PA 0x2000 is
+  stable across cold boots (or have PA_WATCH self-locate the header, then watch base+0x58).
+
+---
+
 ## 2026-06-20 -- PHASE 2 CLOSED (P2-T1 .. T6) + fixes; suite 459/459, boot byte-identical
 
 **Headline: CLOSED PHASE 2 -- the full AlphaCpuAgent ownership lift (T1..T6).
@@ -1184,3 +1280,31 @@ now, Mac tomorrow). Do NOT commit a truncated manifest -- verify with native `gi
   "enter device / hit <return>") -- drive PuTTY to progress; NOT a hang.
 - PCI: firmware probes an un-enumerated on-board NIC (DE500/21143) -> all-ones BAR ->
   base 0xFFFF0000 -> `TsunamiPchip` UNHANDLED OUTER WRITE. Non-fatal; see deferred-work.
+
+---
+
+## 2026-06-28 -- HWRPB hand-off: TWO-GATE plan (consuming/preparing for OS boot)
+
+Full plan: `journals/20260628_hwrpb_handoff_gates_plan.md`. The bifurcation is **TEMPORAL**:
+the OS never consumes the `>>>` image, it consumes the HWRPB as it stands at the `boot`
+hand-off. So we need TWO gates, and we only have the first:
+- **Gate A -- `P00>>>` (HAVE IT):** `EMULATR_HWRPB_SCAN` -> console-idle snapshot
+  (HWRPB @ PA 0x2000, single SRM-built copy; top-level directory mapped in the 0625 journal §9).
+- **Gate B -- `boot` hand-off (NEXT):** reuse `EMULATR_PA_WATCH` pointed at the per-CPU slot
+  bootstrap-in-progress/state field (PerCpuSlot `state` @ slot+0x080); when the SRM sets BIP
+  + transfers to the secondary bootstrap, fire the SAME region dump = the "consuming" snapshot.
+
+SEQUENCE: **(1)** deepen Gate A to field-by-field via a new `EMULATR_DUMP_PA=<pa>[:<len>]`
+extension to `scanGuestForHwrpb()` in `systemLib/Machine.cpp` (the `hexdump` lambda is already
+in that function). **MEMDSC/MDDT @ PA 0x2840 FIRST** -- most boot-critical (OS reads it to map
+physical memory). Decode `MemoryDescriptor` per `deviceLib/Hwrpb.h`: checksum+0, reserved+8,
+cluster_count+16, cluster[3]@+24 (each 56B: start_pfn/pfn_count/test_count/bitmap_va/bitmap_pa/
+bitmap_checksum/usage). ASSERT Sigma(pfn_count) x 0x2000 (8 KB pages) == configured 4 GiB --
+wrong clusters = OS can't map memory = silent boot fail. Then per-CPU slot 0 (resolve live
+stride **0x280** vs spec **0x400**), CTB/CRB, DSRDB. **(2)** stand up Gate B. **(3)** diff
+A<->B = the prep-for-OS-boot delta = golden image. **(4)** boot-time HWRPB validator (extends
+the P1/P2 latch). IMMEDIATE when code resumes: confirm the configured-RAM accessor on
+Machine/GuestMemory, then add `EMULATR_DUMP_PA` + the MEMDSC decoder. The 264DP/SYSVAR badge
+is ONE PARALLEL ledger item, NOT the OS-boot critical path. NO instrument code landed today
+(plan/journal/memory only). Also this session: fixed the ini `model = ES40` -> `DS20` mismatch
+that was silently booting DS20 firmware on an ES40 chipset (platform now latches DS20/DS20).
