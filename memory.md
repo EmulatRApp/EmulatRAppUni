@@ -1280,3 +1280,31 @@ now, Mac tomorrow). Do NOT commit a truncated manifest -- verify with native `gi
   "enter device / hit <return>") -- drive PuTTY to progress; NOT a hang.
 - PCI: firmware probes an un-enumerated on-board NIC (DE500/21143) -> all-ones BAR ->
   base 0xFFFF0000 -> `TsunamiPchip` UNHANDLED OUTER WRITE. Non-fatal; see deferred-work.
+
+---
+
+## 2026-06-28 -- HWRPB hand-off: TWO-GATE plan (consuming/preparing for OS boot)
+
+Full plan: `journals/20260628_hwrpb_handoff_gates_plan.md`. The bifurcation is **TEMPORAL**:
+the OS never consumes the `>>>` image, it consumes the HWRPB as it stands at the `boot`
+hand-off. So we need TWO gates, and we only have the first:
+- **Gate A -- `P00>>>` (HAVE IT):** `EMULATR_HWRPB_SCAN` -> console-idle snapshot
+  (HWRPB @ PA 0x2000, single SRM-built copy; top-level directory mapped in the 0625 journal §9).
+- **Gate B -- `boot` hand-off (NEXT):** reuse `EMULATR_PA_WATCH` pointed at the per-CPU slot
+  bootstrap-in-progress/state field (PerCpuSlot `state` @ slot+0x080); when the SRM sets BIP
+  + transfers to the secondary bootstrap, fire the SAME region dump = the "consuming" snapshot.
+
+SEQUENCE: **(1)** deepen Gate A to field-by-field via a new `EMULATR_DUMP_PA=<pa>[:<len>]`
+extension to `scanGuestForHwrpb()` in `systemLib/Machine.cpp` (the `hexdump` lambda is already
+in that function). **MEMDSC/MDDT @ PA 0x2840 FIRST** -- most boot-critical (OS reads it to map
+physical memory). Decode `MemoryDescriptor` per `deviceLib/Hwrpb.h`: checksum+0, reserved+8,
+cluster_count+16, cluster[3]@+24 (each 56B: start_pfn/pfn_count/test_count/bitmap_va/bitmap_pa/
+bitmap_checksum/usage). ASSERT Sigma(pfn_count) x 0x2000 (8 KB pages) == configured 4 GiB --
+wrong clusters = OS can't map memory = silent boot fail. Then per-CPU slot 0 (resolve live
+stride **0x280** vs spec **0x400**), CTB/CRB, DSRDB. **(2)** stand up Gate B. **(3)** diff
+A<->B = the prep-for-OS-boot delta = golden image. **(4)** boot-time HWRPB validator (extends
+the P1/P2 latch). IMMEDIATE when code resumes: confirm the configured-RAM accessor on
+Machine/GuestMemory, then add `EMULATR_DUMP_PA` + the MEMDSC decoder. The 264DP/SYSVAR badge
+is ONE PARALLEL ledger item, NOT the OS-boot critical path. NO instrument code landed today
+(plan/journal/memory only). Also this session: fixed the ini `model = ES40` -> `DS20` mismatch
+that was silently booting DS20 firmware on an ES40 chipset (platform now latches DS20/DS20).
