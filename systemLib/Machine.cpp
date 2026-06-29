@@ -1108,6 +1108,25 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
                     "(touch it to stop cleanly and flush flash NVRAM)",
                     m_stopSentinel.string());
     }
+
+    // EMULATR_HWRPB_SCAN sentinel (2026-06-25): resolved once per run, same
+    // idiom as the stop sentinel.  $EMULATR_HWRPB_SCAN_FILE if set, else
+    // "EMULATR_HWRPB_SCAN" in the cwd.  Pre-cleared so a stale file from a
+    // prior run cannot fire this one.  When it appears at >>>, systemTick()
+    // calls scanGuestForHwrpb() once and consumes it.
+    {
+        char const* envp = std::getenv("EMULATR_HWRPB_SCAN_FILE");
+        m_hwrpbScanSentinel = (envp && *envp) ? std::filesystem::path(envp)
+                                              : std::filesystem::path("EMULATR_HWRPB_SCAN");
+        std::error_code ec;
+        std::filesystem::path const abs = std::filesystem::absolute(m_hwrpbScanSentinel, ec);
+        if (!ec) m_hwrpbScanSentinel = abs;
+        std::error_code rmec;
+        std::filesystem::remove(m_hwrpbScanSentinel, rmec);
+        SPDLOG_INFO("Machine::run: HWRPB-scan sentinel = {} "
+                    "(set sys_serial_num <marker> at >>>, then touch it)",
+                    m_hwrpbScanSentinel.string());
+    }
     // Match PipelineDriver::run() semantics: maxCycles caps the number of
     // stepCycle(i) iterations, not the cycleCount delta.  Each iteration runs the
     // shared per-cycle body stepCycle(i), which returns false to BREAK (stop
@@ -1193,6 +1212,148 @@ bool Machine::cpuKernel([[maybe_unused]] coreLib::CpuState& cpu) noexcept
 }
 
 
+// ============================================================================
+// scanGuestForHwrpb -- EMULATR_HWRPB_SCAN one-shot probe (2026-06-25).
+// ----------------------------------------------------------------------------
+// Locates the HWRPB in guest physical RAM and dumps it to stderr.  Triggered
+// once by the m_hwrpbScanSentinel file (touched at >>>).  Two complementary
+// scans over the sparse allocated pages:
+//   (A) PATTERN: find every occurrence of EMULATR_SCAN_PATTERN (default the
+//       sys_serial_num marker the operator just `set`).  For each hit PA H,
+//       dump the bytes before/after it, then test the candidate HWRPB base
+//       B = H - 64 (the spec-pinned system_serial_number offset, Hwrpb.h
+//       static_assert) by the self-pointer (qword@B == B) + "HWRPB" id @B+8.
+//   (B) SIGNATURE: serial-independent walk for that same self-pointer/id
+//       pair, so we find the HWRPB even if sys_serial_num never propagates
+//       into it -- and report EVERY match (the EmulatR-PA0 vs SRM two-HWRPB
+//       question).  All offsets per deviceLib/Hwrpb.h HwrpbHeader.
+// ============================================================================
+void Machine::scanGuestForHwrpb()
+{
+    using memoryLib::GuestMemory;
+    using memoryLib::MemStatus;
+    GuestMemory const& gm = m_chipset.guestMemory();
+
+    constexpr uint64_t kHwrpbId   = 0x0000004250525748ULL; // "HWRPB\0\0\0" (LE)
+    constexpr uint64_t kSerialOff = 64;   // system_serial_number  (+0x40)
+    constexpr uint64_t kSysTypeOff = 80;  // system_type   / SYSTYPE (+0x50)
+    constexpr uint64_t kSysVarOff  = 88;  // system_variation/SYSVAR (+0x58)
+
+    char const* patEnv = std::getenv("EMULATR_SCAN_PATTERN");
+    std::string const pattern = (patEnv && *patEnv) ? patEnv : "HEAX1PEER";
+
+    std::fprintf(stderr,
+        "\n==== EMULATR_HWRPB_SCAN begin (pattern=\"%s\", cyc=%llu) ====\n",
+        pattern.c_str(), static_cast<unsigned long long>(systemNow()));
+
+    // Validate a candidate HWRPB base by its self-describing header.
+    auto isHwrpb = [&](uint64_t base) -> bool {
+        uint64_t selfp = 0, ident = 0;
+        if (gm.read8(base,     selfp) != MemStatus::Ok) return false;
+        if (gm.read8(base + 8, ident) != MemStatus::Ok) return false;
+        return selfp == base && ident == kHwrpbId;
+    };
+
+    // 16-bytes-per-line hexdump (+ASCII) of [start, start+len) via read1.
+    auto hexdump = [&](uint64_t start, uint64_t len) {
+        for (uint64_t off = 0; off < len; off += 16) {
+            std::fprintf(stderr, "  0x%012llx:",
+                         static_cast<unsigned long long>(start + off));
+            char ascii[17]; ascii[16] = '\0';
+            for (int b = 0; b < 16; ++b) {
+                uint8_t v = 0;
+                bool const ok = gm.read1(start + off + b, v) == MemStatus::Ok;
+                std::fprintf(stderr, ok ? " %02x" : " ??", v);
+                ascii[b] = (ok && v >= 0x20 && v < 0x7f)
+                               ? static_cast<char>(v) : '.';
+            }
+            std::fprintf(stderr, "  |%s|\n", ascii);
+        }
+    };
+
+    // Decode + dump a confirmed HWRPB header.
+    auto reportHwrpb = [&](uint64_t base, char const* how) {
+        uint64_t rev = 0, size = 0, systype = 0, sysvar = 0;
+        gm.read8(base + 16, rev);
+        gm.read8(base + 24, size);
+        gm.read8(base + kSysTypeOff, systype);
+        gm.read8(base + kSysVarOff,  sysvar);
+        std::fprintf(stderr,
+            "*** HWRPB CONFIRMED (%s): base=0x%012llx rev=%llu size=0x%llx "
+            "SYSTYPE=0x%llx SYSVAR=0x%llx member=%llu ***\n",
+            how,
+            static_cast<unsigned long long>(base),
+            static_cast<unsigned long long>(rev),
+            static_cast<unsigned long long>(size),
+            static_cast<unsigned long long>(systype),
+            static_cast<unsigned long long>(sysvar),
+            static_cast<unsigned long long>((sysvar >> 10) & 0x3FULL));
+        std::fprintf(stderr, "--- HWRPB header [base .. base+0x140) ---\n");
+        hexdump(base, 0x140);
+    };
+
+    std::vector<uint64_t> confirmed;   // bases found by Scan A (dedup Scan B)
+
+    // ---- Scan A: pattern occurrences ---------------------------------------
+    size_t const plen = pattern.size();
+    int hits = 0;
+    if (plen > 0 && plen <= GuestMemory::kPageSize) {
+        uint8_t const first = static_cast<uint8_t>(pattern[0]);
+        gm.forEachPage([&](uint32_t pidx, uint8_t const* page) {
+            for (uint64_t i = 0; i + plen <= GuestMemory::kPageSize; ++i) {
+                if (page[i] != first) continue;
+                if (std::memcmp(page + i, pattern.data(), plen) != 0) continue;
+                uint64_t const H =
+                    (static_cast<uint64_t>(pidx) << GuestMemory::kPageShift) | i;
+                ++hits;
+                std::fprintf(stderr, "[A] hit #%d at PA=0x%012llx\n",
+                             hits, static_cast<unsigned long long>(H));
+                uint64_t const win = (H >= 64) ? H - 64 : 0;
+                std::fprintf(stderr, "--- window [PA-64 .. PA+192) ---\n");
+                hexdump(win, 256);
+                if (H >= kSerialOff && isHwrpb(H - kSerialOff)) {
+                    reportHwrpb(H - kSerialOff, "serial@+64");
+                    confirmed.push_back(H - kSerialOff);
+                } else {
+                    std::fprintf(stderr,
+                        "    -> base candidate 0x%012llx (PA-64) did not "
+                        "validate (NVRAM/FRU/GCT copy, not the HWRPB)\n",
+                        static_cast<unsigned long long>(
+                            H >= kSerialOff ? H - kSerialOff : 0));
+                }
+            }
+        });
+    }
+    std::fprintf(stderr, "[A] pattern scan: %d hit(s)\n", hits);
+
+    // ---- Scan B: self-pointer + "HWRPB" signature (serial-independent) -----
+    // HWRPB is quadword-aligned; step 8 bytes and read the two header qwords
+    // straight from the page buffer (host==guest endianness: x86_64 & Alpha
+    // both little-endian).
+    int found = 0;
+    gm.forEachPage([&](uint32_t pidx, uint8_t const* page) {
+        for (uint64_t i = 0; i + 16 <= GuestMemory::kPageSize; i += 8) {
+            uint64_t selfp = 0, ident = 0;
+            std::memcpy(&selfp, page + i,     8);
+            std::memcpy(&ident, page + i + 8, 8);
+            uint64_t const base =
+                (static_cast<uint64_t>(pidx) << GuestMemory::kPageShift) | i;
+            if (selfp != base || ident != kHwrpbId) continue;
+            ++found;
+            bool dup = false;
+            for (uint64_t b : confirmed) if (b == base) dup = true;
+            std::fprintf(stderr, "[B] HWRPB signature #%d at base=0x%012llx%s\n",
+                         found, static_cast<unsigned long long>(base),
+                         dup ? " (already reported by Scan A)" : "");
+            if (!dup) reportHwrpb(base, "signature");
+        }
+    });
+    std::fprintf(stderr, "[B] signature scan: %d HWRPB(s)\n", found);
+    std::fprintf(stderr, "==== EMULATR_HWRPB_SCAN end ====\n\n");
+    std::fflush(stderr);
+}
+
+
 bool Machine::systemTick(uint64_t i) noexcept
 {
     // P2-T2 split (2026-06-20): once-per-quantum, dispatcher-level bookkeeping.
@@ -1208,6 +1369,15 @@ bool Machine::systemTick(uint64_t i) noexcept
     static constexpr uint64_t kStopPollMask = 0xFFFFFULL;  // poll ~every 1M steps
         // Graceful-stop poll (task #9): cheap existence check on a coarse
         // cadence; a clean break lets ~Machine's forceFlush persist NVRAM.
+        // Signal-requested stop (2026-06-25): a SIGINT/SIGTERM handler in main()
+        // called requestStop().  Checked EVERY tick (not on the coarse cadence)
+        // and an atomic load is ~free, so Ctrl-C breaks out promptly -> clean
+        // return -> ~Machine::forceFlush persists the flash (no `update srm' loss).
+        if (m_stopRequested.load(std::memory_order_relaxed)) {
+            SPDLOG_INFO("Machine::run: stop requested (signal) -- clean exit at cycle {}",
+                        static_cast<unsigned long long>(m_cpu.cycleCount));
+            return false;   // BREAK the run loop
+        }
         if ((i & kStopPollMask) == 0) {
             std::error_code sec;
             if (std::filesystem::exists(m_stopSentinel, sec)) {
@@ -1216,6 +1386,15 @@ bool Machine::systemTick(uint64_t i) noexcept
                 std::error_code rmec;
                 std::filesystem::remove(m_stopSentinel, rmec);  // consume it
                 return false;   // BREAK the run loop (was `break;` pre-extraction)
+            }
+            // EMULATR_HWRPB_SCAN one-shot (2026-06-25): same coarse cadence.
+            // When the sentinel appears (operator touched it after `set
+            // sys_serial_num <marker>` at >>>), scan guest RAM for the HWRPB,
+            // then consume it.  Non-fatal: the run continues afterward.
+            if (std::filesystem::exists(m_hwrpbScanSentinel, sec)) {
+                scanGuestForHwrpb();
+                std::error_code hrmec;
+                std::filesystem::remove(m_hwrpbScanSentinel, hrmec);  // consume it
             }
         }
 
