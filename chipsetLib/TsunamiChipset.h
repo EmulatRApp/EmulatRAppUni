@@ -342,6 +342,50 @@ public:
             if (level) m_cchip.assertInterrupt(kIsaBridgeDrirBit);
             else       m_cchip.deassertInterrupt(kIsaBridgeDrirBit);
         }
+
+        // ----------------------------------------------------------------
+        // IIC completion interrupt (DS20 badge root-cause fix, 2026-06-29).
+        // The PCF8584 is a Cchip-DIRECT interrupt (not on the 8259), so its
+        // INT level drives a DRIR bit straight into the Cchip; the firmware
+        // maps that bit to SCB vector 0xa9/0xaa (iic_service) via the PAL
+        // 0x800 + vector*16 rule.  Proven need: the iic_init .trc shows the
+        // interrupt-driven driver krn$_wait-timing-out because no INT is
+        // delivered -> rec_count 0 -> iic_ocp0 unregistered -> member 1.
+        //
+        // The exact DS20 DRIR bit is selected at runtime via
+        // EMULATR_IIC_IRQ_BIT (device class DRIR<55:0>) so it can be hunted
+        // without a rebuild.  DEFAULT OFF (unset) == today's faithful
+        // behavior (no IIC INT; boot byte-identical).  Once the bit that
+        // makes iic_init register iic_ocp0 (SYSVAR -> 0x1805, member 6) is
+        // confirmed, replace this env read with a named constant.
+        // ----------------------------------------------------------------
+        static int const s_iicDrirBit = []() -> int {
+            char const* e = std::getenv("EMULATR_IIC_IRQ_BIT");
+            int const b = (e && *e)
+                ? static_cast<int>(std::strtol(e, nullptr, 0)) : -1;
+            return (b >= 0 && b <= 55) ? b : -1;   // device class DRIR<55:0>
+        }();
+        if (s_iicDrirBit >= 0) {
+            static bool s_lastIicLevel = false;
+            bool const iicLevel = m_iic.interruptPending();
+            if (iicLevel != s_lastIicLevel) {
+                s_lastIicLevel = iicLevel;
+                if (iicLevel) m_cchip.assertInterrupt(s_iicDrirBit);
+                else          m_cchip.deassertInterrupt(s_iicDrirBit);
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+                // DS20 badge diag (2026-06-29): prove whether the IIC INT level
+                // ever asserts (interruptPending == PIN-clear && ENI).  If this
+                // never prints, the verify never set ENI -> the interrupt path
+                // is not the gate.  Throttled.
+                static unsigned s_n = 0;
+                if (s_n++ < 64) {
+                    std::fprintf(stderr, "IIC-IRQ-%s bit=%d\n",
+                                 iicLevel ? "ASSERT" : "deassert", s_iicDrirBit);
+                    std::fflush(stderr);
+                }
+#endif
+            }
+        }
     }
 
     // INTA seam for Machine::run's device-divert block: acknowledges the
