@@ -889,6 +889,20 @@ foreach(_pm ${EMULATR_PLATFORM_MANIFESTS})
 endforeach()
 
 # ----------------------------------------------------------------------------
+# Retire-trace output directory (diagnostics)
+# ----------------------------------------------------------------------------
+# DecListingSink writes the retire / breakpoint / profiler .trc files into the
+# directory named by EMULATR_RETIRE_TRACE_DIR; if that directory does not exist
+# the sink resolves an unreachable root and DISABLES itself.  Pre-create a
+# "traces" subdir next to the executable so the default capture path is always
+# reachable.  Run with: EMULATR_RETIRE_TRACE_DIR=<exe-dir>/traces (absolute).
+add_custom_command(TARGET Emulatr POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Emulatr>/traces"
+    COMMENT "[Emulatr] create retire-trace dir: traces/"
+    VERBATIM
+)
+
+# ----------------------------------------------------------------------------
 # windeployqt -- copy Qt runtime DLLs alongside the executable
 # ----------------------------------------------------------------------------
 # After Emulatr.exe builds, run windeployqt to populate the output

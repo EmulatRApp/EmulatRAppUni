@@ -1,0 +1,79 @@
+<topic template="Default" modified="2026-06-29T13:53:31.696Z" lasteditedby="tim" version="2">
+  <title>Virtualization Methods</title>
+  <keywords>
+    <keyword>0xBFFC</keyword>
+    <keyword>CAFEBEEF</keyword>
+    <keyword>EMULATR_PLATFORM</keyword>
+    <keyword>execution path</keyword>
+    <keyword>ISP_MODEL</keyword>
+    <keyword>platform()</keyword>
+    <keyword>REAL_HW</keyword>
+    <keyword>silicon</keyword>
+    <keyword>virtualization</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Virtualization Methods</para>
+    </header>
+    <para styleclass="Normal">EmulatR can present the firmware with one of two execution-path identities. The choice is made by a single firmware routine -- the SRM console's <text styleclass="Code Example">platform()</text> (apisrm <text styleclass="Code Example">pc264.c</text>) -- which reads the 32-bit longword at physical address <text styleclass="Code Example">0xBFFC</text> and branches: the constant <text styleclass="Code Example">0xCAFEBEEF</text> selects <text styleclass="Code Example">ISP_MODEL</text> (the pre-silicon simulator path), any other value selects <text styleclass="Code Example">REAL_HW</text> (the faithful hardware path). EmulatR controls which branch the firmware takes through the <text styleclass="Code Example">EMULATR_PLATFORM</text> environment variable; there is no second knob, because the firmware's own <text styleclass="Code Example">platform()</text> is the single source of truth.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="3" colcount="2" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Method</text></para>
+        </td>
+        <td>
+          <para styleclass="Normal"><text style="font-weight:bold;">Description</text></para>
+        </td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal"> ISP (virtual) path; </para>
+        </td>
+        <td>
+          <para styleclass="Normal">Default</para>
+        </td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td>
+          <para styleclass="Normal">Silicon</para>
+        </td>
+        <td>
+          <para styleclass="Normal">Hardware Initialization</para>
+          <para styleclass="Code Example">EMULATR_PLATFORM=silicon</para>
+        </td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">How the selection works</para>
+    <para styleclass="Normal"><text styleclass="Code Example">platform()</text> reads <text styleclass="Code Example">*(int *)0xBFFC</text>. EmulatR answers that read with a READ-INTERCEPT, never a deposit: <text styleclass="Code Example">0xBFFC</text> sits at firmware image offset <text styleclass="Code Example">0x3FFC</text> and is overwritten by the SRM self-decompressor during cold boot, so a one-time store would not survive to the moment <text styleclass="Code Example">platform()</text> runs. The lever therefore lives in the load path (<text styleclass="Code Example">pipelineLib/MemDrainer.h</text>): when the ISP method is active and the guest reads physical <text styleclass="Code Example">0xBFFC</text>, EmulatR substitutes <text styleclass="Code Example">0xCAFEBEEF</text> (sign-extended to match the firmware's constant). On the silicon method the read is not intercepted, so <text styleclass="Code Example">0xBFFC</text> returns its real memory contents and <text styleclass="Code Example">platform()</text> resolves to <text styleclass="Code Example">REAL_HW</text>.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">ISP (virtual) path -- default</para>
+    <para styleclass="Normal">Active when <text styleclass="Code Example">EMULATR_PLATFORM</text> is unset or set to any value other than the exact string <text styleclass="Code Example">silicon</text> (the legacy alias <text styleclass="Code Example">isp</text> also selects it). <text styleclass="Code Example">platform()</text> returns <text styleclass="Code Example">ISP_MODEL</text>, and the firmware takes its pre-silicon simulator branches -- skipping the real-hardware timing, probe, and IDE steps that EmulatR does not yet model. This is the path that reaches the SRM console prompt <text styleclass="Code Example">P00&gt;&gt;&gt;</text>. It is the out-of-box behavior and the path used for all current console-and-boot work.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Silicon path -- hardware initialization</para>
+    <para styleclass="Normal">Active when <text styleclass="Code Example">EMULATR_PLATFORM</text> is set to exactly <text styleclass="Code Example">silicon</text>.</para>
+    <para styleclass="Normal"><text styleclass="Code Example">EMULATR_PLATFORM=silicon</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">platform()</text> returns <text styleclass="Code Example">REAL_HW</text>, and the firmware runs the faithful hardware-initialization sequence (the same code path real Alpha silicon would execute). This exercises the real timing/probe/device-init steps, so it takes substantially longer to initialize. IMPORTANT: <text styleclass="Code Example">REAL_HW</text> is currently largely unmodeled in EmulatR, so this path may not reach <text styleclass="Code Example">P00&gt;&gt;&gt;</text> -- it can grind in the hardware-probe steps and run until the cycle limit (MaxCyclesExceeded). Stop a run cleanly by creating the file <text styleclass="Code Example">EMULATR_STOP</text> in the run directory (this flushes flash NVRAM on exit). The value of running it today is comparative: it shows whether the firmware's deterministic init sequence (for example, the order of IIC bus init versus HWRPB construction, and the resulting system-type badge) behaves differently from the ISP path.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Invocation examples</para>
+    <para styleclass="Normal">From the build/run directory (<text styleclass="Code Example">out/build/release</text>). Console is on TCP 10023.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="Code Example"># ISP (virtual) path -- default; reaches the SRM prompt</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">./run_fw.sh ds20 cold</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="Code Example"># Silicon path -- full hardware init (slow; may not reach the prompt)</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_PLATFORM=silicon</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_FLASH_ROM=ds20_flash.rom; rm -f ds20_flash.rom   # factory-fresh cold</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">./run_fw.sh ds20 cold 2&gt;&amp;1 | tee fw_ds20_silicon.out</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">touch EMULATR_STOP            # stop a long silicon run cleanly</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Notes</para>
+    <para styleclass="Normal">The <text styleclass="Code Example">EMULATR_PLATFORM</text> lever (2026-06-19) supersedes the temporary <text styleclass="Code Example">EMULATR_CPU1_ALIVE</text> flag. Do not add a second host-side sim/silicon flag -- the firmware's <text styleclass="Code Example">platform()</text> is the single source of truth, and EmulatR's only role is to answer the <text styleclass="Code Example">0xBFFC</text> read consistently with the chosen method. Selection is evaluated once per run (a function-local static), so changing <text styleclass="Code Example">EMULATR_PLATFORM</text> requires a fresh run.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Source authority</para>
+    <para styleclass="Normal">Lever: <text styleclass="Code Example">pipelineLib/MemDrainer.h</text> (the <text styleclass="Code Example">0xBFFC</text> read-intercept). Firmware decision: apisrm <text styleclass="Code Example">pc264.c</text> <text styleclass="Code Example">platform()</text> (reads <text styleclass="Code Example">0xBFFC</text>; <text styleclass="Code Example">0xCAFEBEEF</text> =&gt; <text styleclass="Code Example">ISP_MODEL</text>, else <text styleclass="Code Example">REAL_HW</text>).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text> CMake Macro Guards; HWRPB Key/Value Offset Map. <link displaytype="text" defaultstyle="true" type="topiclink" href="--What-is-EmulatR">What is EmulatR</link></para>
+  </body>
+</topic>

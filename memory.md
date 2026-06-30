@@ -10,6 +10,65 @@ them from here.
 
 ---
 
+## 2026-06-29 -- DS20 badge ROOT-CAUSED from apisrm source: incomplete iic_ocp0 open interface
+
+**Headline: the "AlphaPC 264DP" badge is a deterministic consequence of `fopen("iic_ocp0")`
+returning NULL -- an incomplete interface, NOT a value to patch.** Found entirely in the
+read-only apisrm SRM source; supersedes the PA-watch / Ghidra-of-the-binary approach. Full
+chain: `journals/20260629_ds20_badge_deterministic_cause_iic_ocp0.md`.
+
+- **Chain (apisrm ref):** `hwrpb.c:414` (`#if APC_PLATFORM`) `hwrpb->SYSVAR = get_sysvar()`;
+  `pc264.c:636 get_sysvar()` = `fopen("iic_ocp0")?6 : fopen("iic_8574_ocp")?8 : 1`;
+  `pc264.c:566 build_dsrdb()` switch(SYSVAR>>10): 6->DS20, 1->"AlphaPC 264DP" (clean, no print),
+  default->"Error determining system type" print. `iic_driver.c` table: `iic_ocp0`=IIC_LED_TYPE
+  @ node **0x40**. So a 264DP badge == clean member-1 == get_sysvar's `fopen("iic_ocp0")` failed.
+- **Interface to make solid (EmulatR):** at HWRPB-build time, the guest iic_driver must open
+  node 0x40 -- PCF8584 controller initialized + manifest OCP device @0x40 + open-probe ACK.
+  The earlier "0x40 ACKs" was from `sable_ocp_init` (LATER); necessary but not sufficient.
+- **Confirm (one cold boot, EMULATR_IIC_TRACE=1):** (a) no "Error determining system type" line
+  (expected -> clean member-1 path); (b) is 0x40 opened/probed in the early HWRPB-build window,
+  ACK or NAK? NAK-early-ACK-later => init-order gap; never-probed => controller/registration gap.
+- **Tasks reframed:** #7 = "make iic_ocp0 open interface solid"; #6 = deterministic IIC-trace
+  disambiguation (PA-watch demoted to optional confirmation).
+
+---
+
+## 2026-06-29 -- HWRPB per-CPU SLOT corrected to AARM Table 26-4 + kKeyValue offset map
+
+**Headline: resolved the slot-size divergence and landed the HWRPB "kKeyValue" convenience
+layer in `deviceLib/Hwrpb.h` (EmulatR-only; apisrm/srmapi untouched SSOT).** Tim supplied
+the AARM Section III Table 26-4 (Per-CPU Slot Fields) extract; reconciled it against
+`Hwrpb.h`. Full field map + reconciliation:
+`journals/HWRPB_PerCpuSlot_FieldMap_AARM_20260629.md`. H&M topic:
+`journals/HWRPB_KeyValue_Map_topic.xml`.
+
+- **SLOT SIZE RESOLVED: 0x280 is correct, the old 0x400 was the bug.** AARM slot fields run
+  to Cycle Counter Frequency at +624 (last byte +631), padded to an octaword = **640 = 0x280**
+  -- exactly the live DS20 SRM stride. `Hwrpb.h` matched AARM byte-for-byte +0..+591 but then
+  (a) hid five real OS-read fields (+592 SW-compat, +600/+608 console data-log PA/len, +616
+  cache descriptor, **+624 cycle-counter freq**) inside an opaque `hwpcb_filler[176]`, and
+  (b) embedded a DSRDB at slot+0x300 that inflated the slot to 0x400.
+- **FIX APPLIED (Hwrpb.h):** replaced the filler with the five named tail fields + an octaword
+  `slot_pad`; `static_assert(sizeof(PerCpuSlot)==0x280)`. **Promoted DSRDB to its own
+  top-level `struct Dsrdb`** (reached via HWRPB header +312, live PA 0x2ac0 -- NOT part of the
+  slot). Builder adapts automatically (it derives everything from `sizeof(PerCpuSlot)` and
+  never touched the removed members). Verified: g++ -std=c++17 compiles clean, all
+  static_asserts pass (slot=0x280, header=320, Dsrdb=0x100, cycle_count_freq@0x270).
+- **kKeyValue layer LANDED:** k-prefixed `constexpr` offset constants for every HWRPB-header
+  (`kHwrpb*`), per-CPU-slot (`kSlot*`), and DSRDB (`kDsrdb*`) field; per-region View unions
+  (`HwrpbHeaderView`/`PerCpuSlotView`/`DsrdbView` = `{ uint8_t raw[]; Typed fields; }`);
+  templated `peek<T>/poke<T>(base,keyOffset)` helpers. Cross static_asserts pin each key to
+  its struct `offsetof()` so the typed-member and offset-key paths can never drift.
+- **Two flagged follow-ups (NOT changed, cross-refs exist):** (1) AARM REASON-FOR-HALT codes
+  differ from EmulatR's `HaltCode` enum numbering (e.g. AARM 3=invalid SCBB vs enum 5);
+  (2) AARM PALCODE REVISION (+168) is one bit-packed qword (max-procs/compat in the high 32)
+  -- EmulatR keeps the `pal_rev`/`pal_var` u32 split (offset correct, high half dropped).
+  Reconcile when the halt path / PAL-rev publishing is next touched.
+- **Still gated:** the actual HwrpbBuilder behavior change (which HWRPB the OS consumes) waits
+  on the two-HWRPB question; the struct definition is now spec-true regardless.
+
+---
+
 ## 2026-06-25 -- EMULATR_HWRPB_SCAN instrument BUILT (Mac) + macOS build/launcher hardening
 
 **Headline: resumed the HWRPB-region work on the Mac. Built the `EMULATR_HWRPB_SCAN`

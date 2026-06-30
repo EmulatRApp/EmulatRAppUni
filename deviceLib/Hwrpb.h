@@ -62,6 +62,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 namespace deviceLib {
 namespace hwrpb {
@@ -266,31 +267,60 @@ struct alignas(8) PerCpuSlot {
     uint64_t palcode_revs[16];       // 0x1D0 -- PAL revs by personality
                                      //          [0]=unused, [1]=VMS, [2]=OSF
                                      //          (16 qwords = 128 = 0x80 bytes)
-    uint8_t  hwpcb_filler[176];      // 0x250 -- padding to DSRDB alignment
-                                     //          (176 = 0xB0 bytes)
-
-    // DSRDB (Dynamic System Recognition Data Block) -- OS-readable
-    // descriptive strings (system marketing model, name, LURT table).
-    uint64_t dsrdb_smm;              // 0x300 -- system-marketing-model code
-    uint64_t dsrdb_lurt_off;         // 0x308
-    uint64_t dsrdb_name_off;         // 0x310
-    uint64_t dsrdb_lurt_count;       // 0x318
-    uint64_t dsrdb_lurt_table[20];   // 0x320 -- 20 qwords = 160 = 0xA0 bytes
-    uint64_t dsrdb_name_count;       // 0x3C0
-    uint64_t dsrdb_name[7];          // 0x3C8 -- 7 qwords = 56 = 0x38 bytes
-                                     //          ends at 0x400
+    // ---- AARM Table 26-4 slot tail (+592..+631) -------------------------
+    // CORRECTED 2026-06-29.  These five fields were previously hidden inside
+    // an opaque hwpcb_filler[176], with an (incorrect) in-slot DSRDB after it
+    // that inflated the slot to 0x400.  The DSRDB is in fact a SEPARATE
+    // top-level HWRPB section reached via the header's dsrdb_offset (+312) --
+    // it is NOT part of the per-CPU slot.  See the Dsrdb struct below.  The
+    // live DS20 SRM builds slots with stride 0x280, which matches this layout
+    // (AARM fields end at +624, last byte +631, padded to an octaword = 640).
+    // Full map + reconciliation: journals/HWRPB_PerCpuSlot_FieldMap_AARM_20260629.md
+    uint64_t sw_compat;              // 0x250 (+592) processor SW-compat (fmt follows SLOT[176])
+    uint64_t console_log_pa;         // 0x258 (+600) console data-log physical address (0 = none)
+    uint64_t console_log_len;        // 0x260 (+608) console data-log length (0 = none)
+    uint64_t cache_descriptor;       // 0x268 (+616) assoc / char-mask / block-size / total-size
+    uint64_t cycle_count_freq;       // 0x270 (+624) per-CPU SCC/PCC freq (0 => use HWRPB[112])
+    uint64_t slot_pad;               // 0x278 -- octaword pad to slot size 0x280 (640 bytes)
 };
 static_assert(offsetof(PerCpuSlot, state)        == 0x080, "state (SlotState) after HWPCB");
 static_assert(offsetof(PerCpuSlot, halt_pc)      == 0x0F0, "halt_pc offset");
-static_assert(offsetof(PerCpuSlot, halt_code)    == 0x118, "halt_code offset");
-static_assert(offsetof(PerCpuSlot, icba)         == 0x128, "icba offset");
-static_assert(offsetof(PerCpuSlot, palcode_revs) == 0x1D0, "palcode_revs offset (icba[21] = 168 bytes from 0x128)");
-static_assert(offsetof(PerCpuSlot, hwpcb_filler) == 0x250, "hwpcb_filler offset");
-static_assert(offsetof(PerCpuSlot, dsrdb_smm)    == 0x300, "dsrdb_smm offset (after 176-byte filler)");
-static_assert(offsetof(PerCpuSlot, dsrdb_lurt_table) == 0x320, "dsrdb_lurt_table offset");
-static_assert(offsetof(PerCpuSlot, dsrdb_name)   == 0x3C8, "dsrdb_name offset");
-static_assert(sizeof(PerCpuSlot) == 0x400,
-              "PerCpuSlot = 1024 bytes (128 qwords) per apu_hwrpb_def.h SLOT structure");
+static_assert(offsetof(PerCpuSlot, halt_code)    == 0x118, "halt_code (REASON FOR HALT) offset");
+static_assert(offsetof(PerCpuSlot, icba)         == 0x128, "icba (RXTX BUFFER AREA) offset");
+static_assert(offsetof(PerCpuSlot, palcode_revs) == 0x1D0, "palcode_revs (PALCODE AVAILABLE) offset");
+static_assert(offsetof(PerCpuSlot, sw_compat)        == 0x250, "sw_compat at +592 (AARM Table 26-4)");
+static_assert(offsetof(PerCpuSlot, console_log_pa)   == 0x258, "console_log_pa at +600");
+static_assert(offsetof(PerCpuSlot, console_log_len)  == 0x260, "console_log_len at +608");
+static_assert(offsetof(PerCpuSlot, cache_descriptor) == 0x268, "cache_descriptor at +616");
+static_assert(offsetof(PerCpuSlot, cycle_count_freq) == 0x270, "cycle_count_freq at +624");
+static_assert(sizeof(PerCpuSlot) == 0x280,
+              "PerCpuSlot = 640 bytes (0x280): AARM Table 26-4 fields end at +624 (last byte "
+              "+631), padded to an octaword.  Matches the live DS20 SRM slot stride; supersedes "
+              "the prior 0x400 (which embedded a now-extracted in-slot DSRDB).");
+
+// ----------------------------------------------------------------------------
+// Dsrdb -- Dynamic System Recognition Data Block.
+// A SEPARATE top-level HWRPB section (NOT part of PerCpuSlot), located via the
+// HWRPB header's dsrdb_offset (+312).  Found live on DS20 at PA 0x2ac0.  Holds
+// OS-readable descriptive data: the system marketing-model code, the system
+// name, and the LURT (logical-unit recognition table).
+// Promoted out of PerCpuSlot 2026-06-29 (it was incorrectly embedded in the
+// slot).  The field layout below preserves EmulatR's prior intent; VALIDATE it
+// field-by-field against the live 0x2ac0 dump and apisrm apu_hwrpb_def.h before
+// relying on it (HWRPB field-map task 1 follow-up).
+// ----------------------------------------------------------------------------
+struct alignas(8) Dsrdb {
+    uint64_t smm;                // 0x00 -- system marketing-model code
+    uint64_t lurt_offset;        // 0x08 -- byte offset to the LURT table
+    uint64_t name_offset;        // 0x10 -- byte offset to the system name
+    uint64_t lurt_count;         // 0x18 -- number of LURT entries
+    uint64_t lurt_table[20];     // 0x20 -- 20 qwords = 160 bytes
+    uint64_t name_count;         // 0xC0 -- length of the system name
+    uint64_t name[7];            // 0xC8 -- 7 qwords = 56 bytes (ends 0x100)
+};
+static_assert(offsetof(Dsrdb, lurt_table) == 0x20,  "Dsrdb lurt_table offset");
+static_assert(offsetof(Dsrdb, name)       == 0xC8,  "Dsrdb name offset");
+static_assert(sizeof(Dsrdb) == 0x100, "Dsrdb = 256 bytes");
 
 // ----------------------------------------------------------------------------
 // MemoryCluster + MemoryDescriptor -- physical memory layout.
@@ -518,6 +548,163 @@ constexpr uint64_t kHwrpbRevisionCurrent = 13;
 // Standard Alpha page size (8 KB; AARM defines this as fixed for all
 // implementations).
 constexpr uint64_t kAlphaPageSize = 8192;
+
+// ============================================================================
+// kKeyValue offset map -- named byte-offset constants ("key = value" pairs),
+// one per field, mirroring kAlphaPageSize-style convenience constants.  Value
+// is the field's byte offset from its region base.  These let raw-memory
+// walkers (the HWRPB scan instrument, the boot-time validator, snapshot tools)
+// locate a field by name instead of a magic number, and pair with the View
+// unions + peek/poke helpers below.  Every constant is pinned to the matching
+// struct offsetof() by the static_asserts at the end of this block, so the two
+// access paths (typed member <-> offset key) can never silently drift apart.
+//
+// Authoritative layout: AARM Section III Console Interface (Table 26-1 header,
+// Table 26-4 per-CPU slot).  EmulatR-only; apisrm/srmapi remain the read-only
+// SSOT and are cross-referenced, never edited.
+// ============================================================================
+
+// ---- HWRPB header field offsets (decimal, AARM Table 26-1) ----
+constexpr uint64_t kHwrpbPhysAddr        = 0;    // +0   self physical address
+constexpr uint64_t kHwrpbId              = 8;    // +8   "HWRPB\0\0\0"
+constexpr uint64_t kHwrpbRevision        = 16;   // +16  HWRPB revision
+constexpr uint64_t kHwrpbSize            = 24;   // +24  total HWRPB size
+constexpr uint64_t kHwrpbPrimaryCpuId    = 32;   // +32  primary WHAMI
+constexpr uint64_t kHwrpbPageSize        = 40;   // +40  page size (8192)
+constexpr uint64_t kHwrpbPaSize          = 48;   // +48  PA size in bits (u32)
+constexpr uint64_t kHwrpbExtVaSize       = 52;   // +52  extended VA size (u32)
+constexpr uint64_t kHwrpbMaxValidAsn     = 56;   // +56  max valid ASN
+constexpr uint64_t kHwrpbSysSerialNum    = 64;   // +64  system serial (octaword)
+constexpr uint64_t kHwrpbSystemType      = 80;   // +80  SYSTYPE
+constexpr uint64_t kHwrpbSystemVariation = 88;   // +88  SYSVAR
+constexpr uint64_t kHwrpbSystemRevision  = 96;   // +96  system revision (4 ASCII)
+constexpr uint64_t kHwrpbIntrClockFreq   = 104;  // +104 interval-clock freq
+constexpr uint64_t kHwrpbCycleCountFreq  = 112;  // +112 cycle-counter freq (fallback)
+constexpr uint64_t kHwrpbVptbVa          = 120;  // +120 virtual page-table base VA
+constexpr uint64_t kHwrpbReservedArch    = 128;  // +128 reserved for architecture
+constexpr uint64_t kHwrpbTbbOffset       = 136;  // +136 -> Translation Buffer hint Block
+constexpr uint64_t kHwrpbCpuSlotCount    = 144;  // +144 number of per-CPU slots
+constexpr uint64_t kHwrpbCpuSlotSize     = 152;  // +152 size of each slot (=> 0x280)
+constexpr uint64_t kHwrpbCpuSlotOffset   = 160;  // +160 -> per-CPU slot array
+constexpr uint64_t kHwrpbCtbCount        = 168;  // +168 number of CTBs
+constexpr uint64_t kHwrpbCtbSize         = 176;  // +176 size of each CTB
+constexpr uint64_t kHwrpbCtbOffset       = 184;  // +184 -> CTB table
+constexpr uint64_t kHwrpbCrbOffset       = 192;  // +192 -> Console Routine Block
+constexpr uint64_t kHwrpbMddtOffset      = 200;  // +200 -> Memory Data Descriptor Table
+constexpr uint64_t kHwrpbCdbOffset       = 208;  // +208 -> Configuration Data Block
+constexpr uint64_t kHwrpbFruOffset       = 216;  // +216 -> FRU table
+constexpr uint64_t kHwrpbTermSaveVa      = 224;  // +224 save-state routine VA
+constexpr uint64_t kHwrpbTermSavePv      = 232;  // +232 save-state routine PV
+constexpr uint64_t kHwrpbTermRestoreVa   = 240;  // +240 restore-state routine VA
+constexpr uint64_t kHwrpbTermRestorePv   = 248;  // +248 restore-state routine PV
+constexpr uint64_t kHwrpbCpuRestartVa    = 256;  // +256 CPU restart routine VA
+constexpr uint64_t kHwrpbCpuRestartPv    = 264;  // +264 CPU restart routine PV
+constexpr uint64_t kHwrpbReservedSw      = 272;  // +272 reserved for software
+constexpr uint64_t kHwrpbReservedHw      = 280;  // +280 reserved for hardware
+constexpr uint64_t kHwrpbChecksum        = 288;  // +288 header checksum
+constexpr uint64_t kHwrpbRxtxBlock       = 296;  // +296 RX/TX serial extension
+constexpr uint64_t kHwrpbDsrdbOffset     = 312;  // +312 -> DSRDB section
+constexpr uint64_t kHwrpbHeaderSize      = 320;  // total fixed-header size
+
+// ---- Per-CPU slot field offsets (hex, AARM Table 26-4) ----
+constexpr uint64_t kSlotHwpcb            = 0x000; // HWPCB (128 bytes)
+constexpr uint64_t kSlotStateFlags       = 0x080; // STATE FLAGS (BIP/RC/PA/PP/.../PE-via-+184)
+constexpr uint64_t kSlotPalMemLen        = 0x088; // PALcode memory length
+constexpr uint64_t kSlotPalScrLen        = 0x090; // PALcode scratch length
+constexpr uint64_t kSlotPalMemPa         = 0x098; // PA of PALcode memory
+constexpr uint64_t kSlotPalScrPa         = 0x0A0; // PA of PALcode scratch
+constexpr uint64_t kSlotPalRevision      = 0x0A8; // PALcode revision (qword in AARM)
+constexpr uint64_t kSlotPalVariation     = 0x0AC; // (EmulatR splits the low half here)
+constexpr uint64_t kSlotProcType         = 0x0B0; // PROCESSOR TYPE (major/minor)
+constexpr uint64_t kSlotProcVariation    = 0x0B8; // PROCESSOR VARIATION (PE=bit2, IEEE=1, VAX=0)
+constexpr uint64_t kSlotProcRevision     = 0x0C0; // PROCESSOR REVISION (4 ASCII)
+constexpr uint64_t kSlotProcSerial       = 0x0C8; // PROCESSOR SERIAL (octaword)
+constexpr uint64_t kSlotLogoutPa         = 0x0D8; // PA of logout area
+constexpr uint64_t kSlotLogoutLen        = 0x0E0; // logout area length
+constexpr uint64_t kSlotHaltPcbb         = 0x0E8; // HALT PCBB
+constexpr uint64_t kSlotHaltPc           = 0x0F0; // HALT PC
+constexpr uint64_t kSlotHaltPs           = 0x0F8; // HALT PS
+constexpr uint64_t kSlotHaltArgList      = 0x100; // HALT ARGUMENT LIST (R25)
+constexpr uint64_t kSlotHaltRetAddr      = 0x108; // HALT RETURN ADDRESS (R26)
+constexpr uint64_t kSlotHaltProcValue    = 0x110; // HALT PROCEDURE VALUE (R27)
+constexpr uint64_t kSlotReasonForHalt    = 0x118; // REASON FOR HALT
+constexpr uint64_t kSlotReservedSw       = 0x120; // reserved for software
+constexpr uint64_t kSlotRxtxBuffer       = 0x128; // RXTX BUFFER AREA (168 bytes)
+constexpr uint64_t kSlotPalcodeAvailable = 0x1D0; // PALCODE AVAILABLE (16 qwords; [0]=fw rev)
+constexpr uint64_t kSlotSwCompat         = 0x250; // +592 processor SW-compatibility
+constexpr uint64_t kSlotConsoleLogPa     = 0x258; // +600 console data-log PA
+constexpr uint64_t kSlotConsoleLogLen    = 0x260; // +608 console data-log length
+constexpr uint64_t kSlotCacheDescriptor  = 0x268; // +616 cache descriptor
+constexpr uint64_t kSlotCycleCounterFreq = 0x270; // +624 per-CPU cycle-counter freq
+constexpr uint64_t kSlotSize             = 0x280; // total slot stride (640 bytes)
+
+// ---- DSRDB section field offsets (hex; validate vs live 0x2ac0 dump) ----
+constexpr uint64_t kDsrdbSmm             = 0x00;  // system marketing-model code
+constexpr uint64_t kDsrdbLurtOffset      = 0x08;
+constexpr uint64_t kDsrdbNameOffset      = 0x10;
+constexpr uint64_t kDsrdbLurtCount       = 0x18;
+constexpr uint64_t kDsrdbLurtTable       = 0x20;
+constexpr uint64_t kDsrdbNameCount       = 0xC0;
+constexpr uint64_t kDsrdbName            = 0xC8;
+constexpr uint64_t kDsrdbSize            = 0x100;
+
+// ----------------------------------------------------------------------------
+// View unions -- overlay a raw guest-memory byte window with the typed struct.
+// Host (x86_64) and guest (Alpha) are both little-endian and the structs are
+// #pragma pack(1), so a direct overlay is byte-faithful (this matches what
+// HwrpbBuilder already does with reinterpret_cast).  Reach a field either by
+// typed member (view.fields.system_type) or by offset key over the bytes
+// (peek<uint64_t>(view.raw, kHwrpbSystemType)).
+// ----------------------------------------------------------------------------
+union HwrpbHeaderView {
+    uint8_t     raw[kHwrpbHeaderSize];   // 320 bytes
+    HwrpbHeader fields;
+};
+static_assert(sizeof(HwrpbHeaderView) == 320, "HwrpbHeaderView overlays the 320-byte header");
+
+union PerCpuSlotView {
+    uint8_t    raw[kSlotSize];           // 640 bytes (0x280)
+    PerCpuSlot fields;
+};
+static_assert(sizeof(PerCpuSlotView) == 0x280, "PerCpuSlotView overlays the 0x280 slot");
+
+union DsrdbView {
+    uint8_t raw[kDsrdbSize];             // 256 bytes (0x100)
+    Dsrdb   fields;
+};
+static_assert(sizeof(DsrdbView) == 0x100, "DsrdbView overlays the 256-byte DSRDB");
+
+// ----------------------------------------------------------------------------
+// peek / poke -- typed read/write at an offset key from a region base pointer.
+// memcpy-based, so they are alignment- and strict-aliasing-safe regardless of
+// where the base points in guest memory.
+//   uint64_t st = peek<uint64_t>(slotBase, kSlotProcVariation);
+//   poke<uint64_t>(hdrBase, kHwrpbSystemVariation, 0x1805);  // DS20 SYSVAR
+// ----------------------------------------------------------------------------
+template <class T>
+inline T peek(const uint8_t* base, uint64_t keyOffset) noexcept {
+    T v{};
+    std::memcpy(&v, base + keyOffset, sizeof(T));
+    return v;
+}
+template <class T>
+inline void poke(uint8_t* base, uint64_t keyOffset, T value) noexcept {
+    std::memcpy(base + keyOffset, &value, sizeof(T));
+}
+
+// ---- Pin every key to its struct field so the two access paths never drift --
+static_assert(kHwrpbId          == offsetof(HwrpbHeader, identifier),     "key/id");
+static_assert(kHwrpbRevision    == offsetof(HwrpbHeader, revision),       "key/revision");
+static_assert(kHwrpbSystemType  == offsetof(HwrpbHeader, system_type),    "key/system_type");
+static_assert(kHwrpbSystemVariation == offsetof(HwrpbHeader, system_variation), "key/sysvar");
+static_assert(kHwrpbCpuSlotSize == offsetof(HwrpbHeader, cpu_slot_size),  "key/cpu_slot_size");
+static_assert(kHwrpbCpuSlotOffset == offsetof(HwrpbHeader, cpu_slot_offset), "key/cpu_slot_offset");
+static_assert(kHwrpbDsrdbOffset == offsetof(HwrpbHeader, dsrdb_offset),   "key/dsrdb_offset");
+static_assert(kSlotStateFlags   == offsetof(PerCpuSlot, state),          "key/state");
+static_assert(kSlotProcVariation == offsetof(PerCpuSlot, cpu_var),       "key/proc_variation");
+static_assert(kSlotReasonForHalt == offsetof(PerCpuSlot, halt_code),     "key/reason_for_halt");
+static_assert(kSlotCycleCounterFreq == offsetof(PerCpuSlot, cycle_count_freq), "key/cycle_count_freq");
+static_assert(kDsrdbLurtTable   == offsetof(Dsrdb, lurt_table),          "key/dsrdb_lurt_table");
 
 }  // namespace hwrpb
 }  // namespace deviceLib

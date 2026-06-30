@@ -1,0 +1,170 @@
+<topic template="Default" modified="2026-06-29T12:00:00.000-07:00" lasteditedby="tim" version="1">
+  <title>HWRPB Key/Value Offset Map</title>
+  <keywords>
+    <keyword>AARM Table 26-1</keyword>
+    <keyword>AARM Table 26-4</keyword>
+    <keyword>cycle counter frequency</keyword>
+    <keyword>DSRDB</keyword>
+    <keyword>HWRPB</keyword>
+    <keyword>Hwrpb.h</keyword>
+    <keyword>kKeyValue</keyword>
+    <keyword>offset keys</keyword>
+    <keyword>peek poke</keyword>
+    <keyword>per-CPU slot</keyword>
+    <keyword>PerCpuSlot</keyword>
+    <keyword>SYSVAR</keyword>
+    <keyword>View union</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">HWRPB Key/Value Offset Map</para>
+    </header>
+    <para styleclass="Normal">This page documents the kKeyValue offset map for the HWRPB (Hardware Restart Parameter Block) and its chained structures, as encoded in deviceLib/Hwrpb.h. It is a navigation aid; the authoritative layout is the AARM Section III "Common Architecture, Console Interface" (Table 26-1 header, Table 26-4 per-CPU slot), cross-referenced against the read-only apisrm/srmapi SSOT and the live DS20 SRM dump. EmulatR is the only tree edited; apisrm/srmapi is never modified.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text> journals/HWRPB_PerCpuSlot_FieldMap_AARM_20260629.md (the full AARM-vs-Hwrpb.h reconciliation), journals/HWRPB_Region_Fidelity_and_Resume_20260624.md (region methodology).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The kKeyValue pattern</para>
+    <para styleclass="Normal">Each HWRPB field has a convenience constexpr "key = value" constant (value is the field's byte offset from its region base), in the same spirit as kAlphaPageSize. A field can then be reached two equivalent ways: by typed struct member, or by offset key over a raw byte window through a View union. The two paths are pinned together by static_asserts so they can never silently drift.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="Code Example">// offset keys (constexpr uint64_t, like kAlphaPageSize = 8192)</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">constexpr uint64_t kSlotStateFlags       = 0x080;</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">constexpr uint64_t kSlotCycleCounterFreq = 0x270;</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">constexpr uint64_t kSlotSize             = 0x280;</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="Code Example">// View union: overlay a raw byte window with the typed struct</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">union PerCpuSlotView { uint8_t raw[kSlotSize]; PerCpuSlot fields; };</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="Code Example">// typed-member path and offset-key path are equivalent:</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">uint64_t a = view.fields.state.raw;</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">uint64_t b = peek&lt;uint64_t&gt;(view.raw, kSlotStateFlags);   // a == b</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">poke&lt;uint64_t&gt;(hdrBase, kHwrpbSystemVariation, 0x1805); // DS20 SYSVAR</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">peek/poke are memcpy-based, so they are alignment- and strict-aliasing-safe wherever the base points in guest memory. Host (x86_64) and guest (Alpha) are both little-endian and the structs are #pragma pack(1), so the overlay is byte-faithful.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">HWRPB header offset keys (AARM Table 26-1)</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="41" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Key</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Offset</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">AARM field</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">HwrpbHeader member</text></para></td>
+      </thead>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbPhysAddr</para></td><td><para styleclass="Normal">0</para></td><td><para styleclass="Normal">self physical address</para></td><td><para styleclass="Normal">hwrpb_pa</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbId</para></td><td><para styleclass="Normal">8</para></td><td><para styleclass="Normal">"HWRPB" identifier</para></td><td><para styleclass="Normal">identifier</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbRevision</para></td><td><para styleclass="Normal">16</para></td><td><para styleclass="Normal">HWRPB revision</para></td><td><para styleclass="Normal">revision</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbSize</para></td><td><para styleclass="Normal">24</para></td><td><para styleclass="Normal">total HWRPB size</para></td><td><para styleclass="Normal">hwrpb_size</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbPrimaryCpuId</para></td><td><para styleclass="Normal">32</para></td><td><para styleclass="Normal">primary WHAMI</para></td><td><para styleclass="Normal">primary_cpu_id</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbPageSize</para></td><td><para styleclass="Normal">40</para></td><td><para styleclass="Normal">page size (8192)</para></td><td><para styleclass="Normal">page_size</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbPaSize</para></td><td><para styleclass="Normal">48</para></td><td><para styleclass="Normal">PA size in bits</para></td><td><para styleclass="Normal">pa_size_bits</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbExtVaSize</para></td><td><para styleclass="Normal">52</para></td><td><para styleclass="Normal">extended VA size</para></td><td><para styleclass="Normal">extended_va_size</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbMaxValidAsn</para></td><td><para styleclass="Normal">56</para></td><td><para styleclass="Normal">max valid ASN</para></td><td><para styleclass="Normal">max_valid_asn</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbSysSerialNum</para></td><td><para styleclass="Normal">64</para></td><td><para styleclass="Normal">system serial (octaword)</para></td><td><para styleclass="Normal">system_serial_number</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbSystemType</para></td><td><para styleclass="Normal">80</para></td><td><para styleclass="Normal">SYSTYPE</para></td><td><para styleclass="Normal">system_type</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbSystemVariation</para></td><td><para styleclass="Normal">88</para></td><td><para styleclass="Normal">SYSVAR (badge member)</para></td><td><para styleclass="Normal">system_variation</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbSystemRevision</para></td><td><para styleclass="Normal">96</para></td><td><para styleclass="Normal">system revision (ASCII)</para></td><td><para styleclass="Normal">system_revision</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbIntrClockFreq</para></td><td><para styleclass="Normal">104</para></td><td><para styleclass="Normal">interval-clock freq</para></td><td><para styleclass="Normal">intrclock_freq</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCycleCountFreq</para></td><td><para styleclass="Normal">112</para></td><td><para styleclass="Normal">cycle-counter freq (fallback)</para></td><td><para styleclass="Normal">cycle_count_freq</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbVptbVa</para></td><td><para styleclass="Normal">120</para></td><td><para styleclass="Normal">virtual page-table base VA</para></td><td><para styleclass="Normal">vptb_va</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbReservedArch</para></td><td><para styleclass="Normal">128</para></td><td><para styleclass="Normal">reserved for architecture</para></td><td><para styleclass="Normal">reserved_arch</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbTbbOffset</para></td><td><para styleclass="Normal">136</para></td><td><para styleclass="Normal">-&gt; TB hint block</para></td><td><para styleclass="Normal">tbb_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCpuSlotCount</para></td><td><para styleclass="Normal">144</para></td><td><para styleclass="Normal">number of per-CPU slots</para></td><td><para styleclass="Normal">cpu_slot_count</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCpuSlotSize</para></td><td><para styleclass="Normal">152</para></td><td><para styleclass="Normal">size of each slot (=&gt; 0x280)</para></td><td><para styleclass="Normal">cpu_slot_size</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCpuSlotOffset</para></td><td><para styleclass="Normal">160</para></td><td><para styleclass="Normal">-&gt; per-CPU slot array</para></td><td><para styleclass="Normal">cpu_slot_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCtbCount</para></td><td><para styleclass="Normal">168</para></td><td><para styleclass="Normal">number of CTBs</para></td><td><para styleclass="Normal">ctb_count</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCtbSize</para></td><td><para styleclass="Normal">176</para></td><td><para styleclass="Normal">size of each CTB</para></td><td><para styleclass="Normal">ctb_size</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCtbOffset</para></td><td><para styleclass="Normal">184</para></td><td><para styleclass="Normal">-&gt; CTB table</para></td><td><para styleclass="Normal">ctb_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCrbOffset</para></td><td><para styleclass="Normal">192</para></td><td><para styleclass="Normal">-&gt; Console Routine Block</para></td><td><para styleclass="Normal">crb_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbMddtOffset</para></td><td><para styleclass="Normal">200</para></td><td><para styleclass="Normal">-&gt; Memory Data Descriptor Table</para></td><td><para styleclass="Normal">mddt_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCdbOffset</para></td><td><para styleclass="Normal">208</para></td><td><para styleclass="Normal">-&gt; Configuration Data Block</para></td><td><para styleclass="Normal">cdb_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbFruOffset</para></td><td><para styleclass="Normal">216</para></td><td><para styleclass="Normal">-&gt; FRU table</para></td><td><para styleclass="Normal">fru_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbTermSaveVa</para></td><td><para styleclass="Normal">224</para></td><td><para styleclass="Normal">save-state routine VA</para></td><td><para styleclass="Normal">terminal_save_va</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbTermSavePv</para></td><td><para styleclass="Normal">232</para></td><td><para styleclass="Normal">save-state routine PV</para></td><td><para styleclass="Normal">terminal_save_pv</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbTermRestoreVa</para></td><td><para styleclass="Normal">240</para></td><td><para styleclass="Normal">restore-state routine VA</para></td><td><para styleclass="Normal">terminal_restore_va</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbTermRestorePv</para></td><td><para styleclass="Normal">248</para></td><td><para styleclass="Normal">restore-state routine PV</para></td><td><para styleclass="Normal">terminal_restore_pv</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCpuRestartVa</para></td><td><para styleclass="Normal">256</para></td><td><para styleclass="Normal">CPU restart routine VA</para></td><td><para styleclass="Normal">cpu_restart_va</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbCpuRestartPv</para></td><td><para styleclass="Normal">264</para></td><td><para styleclass="Normal">CPU restart routine PV</para></td><td><para styleclass="Normal">cpu_restart_pv</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbReservedSw</para></td><td><para styleclass="Normal">272</para></td><td><para styleclass="Normal">reserved for software</para></td><td><para styleclass="Normal">reserved_software</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbReservedHw</para></td><td><para styleclass="Normal">280</para></td><td><para styleclass="Normal">reserved for hardware</para></td><td><para styleclass="Normal">reserved_hardware</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbChecksum</para></td><td><para styleclass="Normal">288</para></td><td><para styleclass="Normal">header checksum</para></td><td><para styleclass="Normal">checksum</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbRxtxBlock</para></td><td><para styleclass="Normal">296</para></td><td><para styleclass="Normal">RX/TX serial extension</para></td><td><para styleclass="Normal">rxtx_block</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbDsrdbOffset</para></td><td><para styleclass="Normal">312</para></td><td><para styleclass="Normal">-&gt; DSRDB section</para></td><td><para styleclass="Normal">dsrdb_offset</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kHwrpbHeaderSize</para></td><td><para styleclass="Normal">320</para></td><td><para styleclass="Normal">fixed-header size</para></td><td><para styleclass="Normal">sizeof(HwrpbHeader)</para></td></tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Per-CPU slot offset keys (AARM Table 26-4)</para>
+    <para styleclass="Normal">The slot stride is 0x280 (640 bytes): the AARM fields end at Cycle Counter Frequency (+624, last byte +631), padded to an octaword. This matches the live DS20 SRM. The five fields at +592..+624 were previously hidden in an opaque filler, and an in-slot DSRDB had inflated the slot to 0x400 (corrected 2026-06-29).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="31" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Key</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Offset</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">AARM field</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">PerCpuSlot member</text></para></td>
+      </thead>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotHwpcb</para></td><td><para styleclass="Normal">0x000</para></td><td><para styleclass="Normal">HWPCB (128 B)</para></td><td><para styleclass="Normal">hwpcb</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotStateFlags</para></td><td><para styleclass="Normal">0x080</para></td><td><para styleclass="Normal">STATE FLAGS (BIP/RC/PA/PP/...)</para></td><td><para styleclass="Normal">state</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotPalMemLen</para></td><td><para styleclass="Normal">0x088</para></td><td><para styleclass="Normal">PALcode memory length</para></td><td><para styleclass="Normal">pal_mem_len</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotPalScrLen</para></td><td><para styleclass="Normal">0x090</para></td><td><para styleclass="Normal">PALcode scratch length</para></td><td><para styleclass="Normal">pal_scr_len</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotPalMemPa</para></td><td><para styleclass="Normal">0x098</para></td><td><para styleclass="Normal">PA of PALcode memory</para></td><td><para styleclass="Normal">pal_mem_pa</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotPalScrPa</para></td><td><para styleclass="Normal">0x0A0</para></td><td><para styleclass="Normal">PA of PALcode scratch</para></td><td><para styleclass="Normal">pal_scr_pa</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotPalRevision</para></td><td><para styleclass="Normal">0x0A8</para></td><td><para styleclass="Normal">PALCODE REVISION (qword)</para></td><td><para styleclass="Normal">pal_rev</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotPalVariation</para></td><td><para styleclass="Normal">0x0AC</para></td><td><para styleclass="Normal">(low-half split; see note)</para></td><td><para styleclass="Normal">pal_var</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotProcType</para></td><td><para styleclass="Normal">0x0B0</para></td><td><para styleclass="Normal">PROCESSOR TYPE</para></td><td><para styleclass="Normal">cpu_type</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotProcVariation</para></td><td><para styleclass="Normal">0x0B8</para></td><td><para styleclass="Normal">PROC VARIATION (PE=bit2/IEEE/VAX)</para></td><td><para styleclass="Normal">cpu_var</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotProcRevision</para></td><td><para styleclass="Normal">0x0C0</para></td><td><para styleclass="Normal">PROCESSOR REVISION (ASCII)</para></td><td><para styleclass="Normal">cpu_rev</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotProcSerial</para></td><td><para styleclass="Normal">0x0C8</para></td><td><para styleclass="Normal">PROC SERIAL (octaword)</para></td><td><para styleclass="Normal">serial_no</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotLogoutPa</para></td><td><para styleclass="Normal">0x0D8</para></td><td><para styleclass="Normal">PA of logout area</para></td><td><para styleclass="Normal">logout_mem_pa</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotLogoutLen</para></td><td><para styleclass="Normal">0x0E0</para></td><td><para styleclass="Normal">logout area length</para></td><td><para styleclass="Normal">logout_length</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotHaltPcbb</para></td><td><para styleclass="Normal">0x0E8</para></td><td><para styleclass="Normal">HALT PCBB</para></td><td><para styleclass="Normal">halt_pcbb</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotHaltPc</para></td><td><para styleclass="Normal">0x0F0</para></td><td><para styleclass="Normal">HALT PC</para></td><td><para styleclass="Normal">halt_pc</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotHaltPs</para></td><td><para styleclass="Normal">0x0F8</para></td><td><para styleclass="Normal">HALT PS</para></td><td><para styleclass="Normal">halt_ps</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotHaltArgList</para></td><td><para styleclass="Normal">0x100</para></td><td><para styleclass="Normal">HALT ARG LIST (R25)</para></td><td><para styleclass="Normal">halt_arglist</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotHaltRetAddr</para></td><td><para styleclass="Normal">0x108</para></td><td><para styleclass="Normal">HALT RETURN ADDR (R26)</para></td><td><para styleclass="Normal">halt_ret_addr</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotHaltProcValue</para></td><td><para styleclass="Normal">0x110</para></td><td><para styleclass="Normal">HALT PROC VALUE (R27)</para></td><td><para styleclass="Normal">halt_proc_value</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotReasonForHalt</para></td><td><para styleclass="Normal">0x118</para></td><td><para styleclass="Normal">REASON FOR HALT</para></td><td><para styleclass="Normal">halt_code</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotReservedSw</para></td><td><para styleclass="Normal">0x120</para></td><td><para styleclass="Normal">reserved for software</para></td><td><para styleclass="Normal">reserved_sw</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotRxtxBuffer</para></td><td><para styleclass="Normal">0x128</para></td><td><para styleclass="Normal">RXTX BUFFER AREA (168 B)</para></td><td><para styleclass="Normal">icba</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotPalcodeAvailable</para></td><td><para styleclass="Normal">0x1D0</para></td><td><para styleclass="Normal">PALCODE AVAILABLE ([0]=fw rev)</para></td><td><para styleclass="Normal">palcode_revs</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotSwCompat</para></td><td><para styleclass="Normal">0x250</para></td><td><para styleclass="Normal">+592 SW-compatibility</para></td><td><para styleclass="Normal">sw_compat</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotConsoleLogPa</para></td><td><para styleclass="Normal">0x258</para></td><td><para styleclass="Normal">+600 console data-log PA</para></td><td><para styleclass="Normal">console_log_pa</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotConsoleLogLen</para></td><td><para styleclass="Normal">0x260</para></td><td><para styleclass="Normal">+608 console data-log length</para></td><td><para styleclass="Normal">console_log_len</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotCacheDescriptor</para></td><td><para styleclass="Normal">0x268</para></td><td><para styleclass="Normal">+616 cache descriptor</para></td><td><para styleclass="Normal">cache_descriptor</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotCycleCounterFreq</para></td><td><para styleclass="Normal">0x270</para></td><td><para styleclass="Normal">+624 cycle-counter freq</para></td><td><para styleclass="Normal">cycle_count_freq</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kSlotSize</para></td><td><para styleclass="Normal">0x280</para></td><td><para styleclass="Normal">slot stride (640 bytes)</para></td><td><para styleclass="Normal">sizeof(PerCpuSlot)</para></td></tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-weight:bold;">Note (PALCODE REVISION):</text> the AARM defines +168 as one bit-packed quadword (bits 63:48 max processors sharing this PALcode, 47:32 compatibility, 23:16 variation, 15:8 major, 7:0 minor). EmulatR keeps a pal_rev/pal_var u32 split at 0x0A8/0x0AC: the offset is correct, but the high 32 bits (max-procs + compat) are not separately modeled. Widen when the PAL-rev publishing path is reworked.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="" style="font-weight:bold;">Note (REASON FOR HALT):</text> the AARM halt codes (0 boot, 1 operator crash, 2 kstack-not-valid, 3 invalid SCBB, 4 invalid PTBR, 5 CALL_PAL HALT in kernel, 6 double-error, 7 machine-check in PALcode) do not match EmulatR's HaltCode enum numbering. Reconcile before relying on the halt reason cross-process.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">DSRDB section offset keys</para>
+    <para styleclass="Normal">The DSRDB (Dynamic System Recognition Data Block) is a separate top-level HWRPB section reached via kHwrpbDsrdbOffset (+312), found live on DS20 at PA 0x2ac0. It is NOT part of the per-CPU slot (it was incorrectly embedded there before 2026-06-29). Validate this layout field-by-field against the live 0x2ac0 dump before relying on it.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="9" colcount="3" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Key</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Offset</text></para></td>
+        <td><para styleclass="Normal"><text styleclass="" style="font-family:Arial; font-size:10pt; font-weight:bold; color:#000000;">Field</text></para></td>
+      </thead>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbSmm</para></td><td><para styleclass="Normal">0x00</para></td><td><para styleclass="Normal">system marketing-model code</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbLurtOffset</para></td><td><para styleclass="Normal">0x08</para></td><td><para styleclass="Normal">offset to LURT table</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbNameOffset</para></td><td><para styleclass="Normal">0x10</para></td><td><para styleclass="Normal">offset to system name</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbLurtCount</para></td><td><para styleclass="Normal">0x18</para></td><td><para styleclass="Normal">number of LURT entries</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbLurtTable</para></td><td><para styleclass="Normal">0x20</para></td><td><para styleclass="Normal">LURT table (20 qwords)</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbNameCount</para></td><td><para styleclass="Normal">0xC0</para></td><td><para styleclass="Normal">length of system name</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbName</para></td><td><para styleclass="Normal">0xC8</para></td><td><para styleclass="Normal">system name (7 qwords)</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal">kDsrdbSize</para></td><td><para styleclass="Normal">0x100</para></td><td><para styleclass="Normal">DSRDB size (256 bytes)</para></td></tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Correctness: keys pinned to struct offsets</para>
+    <para styleclass="Normal">A block of static_asserts at the end of Hwrpb.h ties each key to the matching offsetof() in its struct, so the typed-member path and the offset-key path can never silently diverge as the layout evolves:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="Code Example">static_assert(kSlotCycleCounterFreq == offsetof(PerCpuSlot, cycle_count_freq), "key/cycle_count_freq");</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">static_assert(kHwrpbSystemVariation == offsetof(HwrpbHeader, system_variation), "key/sysvar");</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal">Verified with g++ -std=c++17: the header compiles clean and every static_assert passes (PerCpuSlot = 0x280, HwrpbHeader = 320, Dsrdb = 0x100, cycle_count_freq at 0x270).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text> <link displaytype="text" defaultstyle="true" type="topiclink" href="--What-is-EmulatR">What is EmulatR</link></para>
+  </body>
+</topic>

@@ -227,7 +227,21 @@ DecListingSink::DecListingSink(std::filesystem::path const& decLogPath,
         // created on a drive that isn't there, so attempting it is a
         // guaranteed second wait.
         std::error_code probeEc;
-        std::filesystem::path const retireDir{dirStr};
+        std::filesystem::path retireDir{dirStr};
+        // A RELATIVE dir (e.g. "./traces") has an EMPTY root_path(), which the
+        // reachability probe below would read as "not reachable" and DISABLE
+        // the sink.  Resolve relative dirs against the current working
+        // directory so the probe is meaningful (and so the .trc lands in a
+        // real, absolute location).  Absolute dirs are unchanged, preserving
+        // the unmounted-drive guard.
+        if (retireDir.is_relative()) {
+            std::error_code absEc;
+            std::filesystem::path const abs =
+                std::filesystem::absolute(retireDir, absEc);
+            if (!absEc) {
+                retireDir = abs;
+            }
+        }
         std::filesystem::path const rootProbe = retireDir.root_path();
         std::fprintf(stderr,
                      "DecListingSink: probing root '%s'\n",
@@ -498,6 +512,15 @@ bool DecListingSink::shouldEmitNow() const noexcept
     // diagnostic for early-boot debugging).
     if ((m_traceMask & TRACE_PAL_WINDOW)
         && (m_inPalWindow || m_postExitCountdown > 0)) {
+        return true;
+    }
+    // Code-armed trace window (setTraceWindowCountdown / kTigTraceArmReg /
+    // the GuestMemory store-arm): emit while the counter is positive,
+    // regardless of mask.  emitRetireCompact charges (decrements) it per
+    // line, so it self-disables at zero.  Without this check the window
+    // arm sets the counter but onCommit never reaches emitRetireCompact,
+    // so the .trc gets only its header -- the window mechanism is inert.
+    if (s_traceWindowCountdown.load(std::memory_order_relaxed) > 0) {
         return true;
     }
     return false;

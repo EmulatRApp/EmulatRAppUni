@@ -57,3 +57,20 @@
   - Fallback A — if the Ghidra console reports **0 refs** for the string anchors, auto-analysis didn't reference them; switch the script to a value-scan (search all instructions that load these addresses).
   - Fallback B — if `get_sysvar` shows up only under **ORPHAN REFS** (raw disasm, no clean function), the raw Alpha disassembly around the reference is enough to read the member logic by hand.
   - Badge is **non-blocking** — machine already runs to `>>>`; the "100 MHz" banner is the same class of issue (firmware computes it from an RPCC calibration that lands low in EmulatR). This is a fidelity/cosmetic fix, not a boot blocker.
+
+## 03:07 — SSOT rehome + git-hygiene triage for the PC→Mac handoff
+- **Working on:** Closing out the context-migration session so the Mac can pick up tomorrow via `git pull`; then triaging the "few dozen uncommitted files" MSVC/VS2022 shows in its Changes view (which to commit vs ignore).
+- **Done since last checkpoint:**
+  - Rehomed `memory.md` + `CLAUDE.md` from `D:\EmulatR\` into the repo root `…/EmulatRAppUniV4/Emulatr/` (now the single source of truth), each with a new dated session block / canonical-location + sandbox-caveat note.
+  - Wrote resume contract `journals/HWRPB_Region_Fidelity_and_Resume_20260624.md` — proven vs exhausted findings, HWRPB-region methodology, two runtime instrument designs (`EMULATR_HWRPB_SCAN`, `EMULATR_PA_WATCH`), the two-HWRPB question, and a numbered step-by-step plan (section 8 = literal checklist for tomorrow).
+  - Investigated alarming `ds20_v7_3_platform.json` / `ds25_v7_3_platform.json` "modified with net deletions" → confirmed **not a regression**: identical blob hashes on two distinct files + OCP pair (0x40/0x42) intact at lines 13–15 = the **FUSE mount truncation artifact** (same one that hit `.gitignore`). Sandbox view is truncated; real Windows file is fine.
+  - Gave the user a native (Windows Git Bash) commit recipe — stage SSOT + handoff journals + still-uncommitted source (`pipelineLib/MemDrainer.h`, `systemLib/Machine.cpp`, `systemLib/PlatformConfig.cpp`, `ds10_v7_3_platform.json`, `tools/run_fw.sh`, `tools/vsenv.sh`, `tools/ghidra_scripts/DumpSysvarFns.java`), `git status` check, commit, push, then `rm` the superseded `D:\EmulatR\memory.md` + `CLAUDE.md`.
+  - Triaged the VS2022 uncommitted set: **commit** source/config/docs (`*_platform.json`, `tools/*.sh|*.py`, ghidra `.java`, `journals/*.md`, `memory.md`, `CLAUDE.md`, `.cpp/.h`, CMakeLists/presets); **never commit** build/runtime output (`*.dir/`, `*_autogen/`, `Debug|Release/`, `out/build/`, `CMakeCache.txt`, `*.obj/.exe/.pdb`, `*.img`, `*.axpsnap`, `boot*.out`, `fw_*.out`, `*.log`, `ds*_flash.rom`, `EMULATR_STOP`, `ghidra/`, `traces/`). Drafted a `.gitignore` stanza covering all of it.
+- **Open / next:**
+  - User to run the native commit/push recipe (sandbox **cannot** be trusted for git — do it in Windows Git Bash, verify `git diff --stat` on ds20/ds25 reads EMPTY natively; `git checkout --` them if a phantom truncation shows).
+  - Decide whether to append the proposed `.gitignore` stanza to tonight's commit (Claude offered; awaiting go-ahead). Note: won't auto-ignore already-tracked `Emulatr.sln`/`*.vcxproj` — cleaning those is a separate `git rm --cached` decision.
+  - After deleting `D:\EmulatR\CLAUDE.md`, **repoint the working folder** to `…/EmulatRAppUniV4/Emulatr` so the rehomed `CLAUDE.md`/`memory.md` auto-load (otherwise the auto-load is gone).
+- **Watch-outs:**
+  - **Re-add `firmware/` to `.gitignore`** — if it's showing untracked, the rule got dropped; SRM images are copyrighted + multi-MB (same class as the 177 MB blob that got a push rejected).
+  - Stray duplicate `tools/ghidra_scripts/dumSysVarFns2.java` (New-Script attempt) — delete or leave unstaged, do **not** commit.
+  - D: mount / FUSE sandbox reads back truncated or empty — never trust sandbox for git or file integrity; verify natively.
