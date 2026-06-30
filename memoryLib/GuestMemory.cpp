@@ -12,6 +12,11 @@
 #include <cstdio>
 #include <cstring>
 
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+#  include <cstdlib>                       // std::getenv / std::strtoull
+#  include "traceLib/DecListingSink.h"     // setTraceWindowCountdown (retire-window arm)
+#endif
+
 #if defined(EMULATR_USE_OS_PAGES)
 #  if defined(_WIN32)
 #    ifndef WIN32_LEAN_AND_MEAN
@@ -113,6 +118,78 @@ namespace memoryLib {
 
     // Bulk memory operations now trust that the caller is operating within 
     // valid DRAM bounds.
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+    // ------------------------------------------------------------------------
+    // gmemDiagOnStore -- observe-only diagnostic hook at the universal DRAM
+    // commit sink.  Catches stores that bypass the MemDrainer drain-watch
+    // (e.g. the HWRPB build at PA 0x2000).  Runtime default-OFF; absent in
+    // Release (guarded).  See journals/20260629_guestmemory_diag_instrumentation.md.
+    //   EMULATR_GMEM_WATCH=<pa>        log every store overlapping that quadword
+    //   EMULATR_TRACE_ARM_PA=<pa>      arm the retire .trc window on a store to <pa>
+    //   EMULATR_TRACE_ARM_VAL=<v>      (optional) only when the stored value == v
+    //   EMULATR_TRACE_ARM_INSTRS=<n>   window length in retired instrs (default 8M)
+    //   EMULATR_TRACE_DISARM_PA=<pa>   disarm (close) the window on a store to <pa>
+    //   EMULATR_TRACE_DISARM_VAL=<v>   (optional) only when the stored value == v
+    // The disarm is a hard backstop bound for a window armed elsewhere (e.g. the
+    // IIC-model arm, EMULATR_TRACE_ARM_ON_IIC): a store to <pa> sets the retire
+    // countdown to 0 so the .trc stops at, e.g., the HWRPB base store (0x2000).
+    // ------------------------------------------------------------------------
+    static inline void gmemDiagOnStore(uint64_t pa, uint64_t value,
+                                       unsigned size) noexcept {
+        static uint64_t const s_watchPa = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_GMEM_WATCH");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        static uint64_t const s_armPa = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_TRACE_ARM_PA");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        static bool const s_armValSet =
+            (std::getenv("EMULATR_TRACE_ARM_VAL") != nullptr);
+        static uint64_t const s_armVal = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_TRACE_ARM_VAL");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        static int64_t const s_armInstrs = []() -> int64_t {
+            char const* e = std::getenv("EMULATR_TRACE_ARM_INSTRS");
+            return (e && *e) ? std::strtoll(e, nullptr, 0) : 8000000LL; }();
+        static uint64_t const s_disarmPa = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_TRACE_DISARM_PA");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        static bool const s_disarmValSet =
+            (std::getenv("EMULATR_TRACE_DISARM_VAL") != nullptr);
+        static uint64_t const s_disarmVal = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_TRACE_DISARM_VAL");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+
+        if (s_watchPa != 0ULL) {
+            uint64_t const qw  = s_watchPa & ~7ULL;
+            uint64_t const sHi = pa + (size ? size : 1u);
+            if (pa < qw + 8ULL && sHi > qw) {
+                std::fprintf(stderr,
+                    "GMEM-WATCH(0x%llx) STORE pa=0x%llx sz=%u v=0x%llx\n",
+                    (unsigned long long)s_watchPa, (unsigned long long)pa,
+                    size, (unsigned long long)value);
+                std::fflush(stderr);
+            }
+        }
+        if (s_armPa != 0ULL && pa == s_armPa &&
+            (!s_armValSet || value == s_armVal)) {
+            traceLib::DecListingSink::setTraceWindowCountdown(s_armInstrs);
+            std::fprintf(stderr,
+                "GMEM-TRACE-ARM pa=0x%llx v=0x%llx -> retire window %lld instrs\n",
+                (unsigned long long)pa, (unsigned long long)value,
+                (long long)s_armInstrs);
+            std::fflush(stderr);
+        }
+        if (s_disarmPa != 0ULL && pa == s_disarmPa &&
+            (!s_disarmValSet || value == s_disarmVal)) {
+            traceLib::DecListingSink::setTraceWindowCountdown(0);
+            std::fprintf(stderr,
+                "GMEM-TRACE-DISARM pa=0x%llx v=0x%llx -> retire window closed\n",
+                (unsigned long long)pa, (unsigned long long)value);
+            std::fflush(stderr);
+        }
+    }
+#endif
+
     bool GuestMemory::writeBlock(uint64_t pa, void const* src, uint64_t len) noexcept {
         uint8_t const* sp = static_cast<uint8_t const*>(src);
         uint64_t remaining = len;
@@ -128,6 +205,9 @@ namespace memoryLib {
             if (!page) return false;
             std::memcpy(page + offset, sp, chunk);
             markDirty(pidx);
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+            gmemDiagOnStore(addr, 0ULL, static_cast<unsigned>(chunk));
+#endif
 
             sp += chunk; addr += chunk; remaining -= chunk;
         }
@@ -201,6 +281,9 @@ namespace memoryLib {
 
         page[pa & kPageMask] = value;
         markDirty(pidx);
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+        gmemDiagOnStore(pa, value, 1u);
+#endif
         return MemStatus::Ok;
     }
 
@@ -211,6 +294,9 @@ namespace memoryLib {
 
         std::memcpy(&page[pa & kPageMask], &value, 2);
         markDirty(pidx);
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+        gmemDiagOnStore(pa, value, 2u);
+#endif
         return MemStatus::Ok;
     }
 
@@ -221,6 +307,9 @@ namespace memoryLib {
 
         std::memcpy(&page[pa & kPageMask], &value, 4);
         markDirty(pidx);
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+        gmemDiagOnStore(pa, value, 4u);
+#endif
         return MemStatus::Ok;
     }
 
@@ -231,6 +320,9 @@ namespace memoryLib {
 
         std::memcpy(&page[pa & kPageMask], &value, 8);
         markDirty(pidx);
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+        gmemDiagOnStore(pa, value, 8u);
+#endif
         return MemStatus::Ok;
     }
 

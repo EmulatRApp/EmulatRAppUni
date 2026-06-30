@@ -1,0 +1,72 @@
+<topic template="Default" modified="2026-06-29T18:30:00.000-07:00" lasteditedby="tim" version="1">
+  <title>Diagnostics: GuestMemory Store-Watch and Retire-Trace Arm</title>
+  <keywords>
+    <keyword>build_hwrpb</keyword>
+    <keyword>diagnostics</keyword>
+    <keyword>EMULATR_DIAGNOSTIC_LOGGING</keyword>
+    <keyword>EMULATR_GMEM_WATCH</keyword>
+    <keyword>EMULATR_RETIRE_TRACE_DIR</keyword>
+    <keyword>EMULATR_TRACE_ARM_PA</keyword>
+    <keyword>EMULATR_TRACE_WINDOW</keyword>
+    <keyword>GuestMemory</keyword>
+    <keyword>HWRPB</keyword>
+    <keyword>retire trace</keyword>
+    <keyword>RelWithDebInfo</keyword>
+    <keyword>store watch</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Diagnostics: GuestMemory Store-Watch and Retire-Trace Arm</para>
+    </header>
+    <para styleclass="Normal">Two observe-only instruments placed at the GuestMemory commit sink -- the universal point through which every committed DRAM byte passes. They capture stores (and arm a full executed-instruction trace) that the pipeline-level <text styleclass="Code Example">EMULATR_PA_WATCH</text> cannot see, because some firmware stores (notably the HWRPB construction at PA 0x2000) reach DRAM by a path that bypasses the MemDrainer drain-watch. EmulatR is the tool of record for firmware execution analysis; these instruments produce a faithful, deterministic capture without Ghidra.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Prerequisite: build configuration</para>
+    <para styleclass="Normal">These instruments are compiled in only when <text styleclass="Code Example">EMULATR_DIAGNOSTIC_LOGGING</text> is defined -- that is, in a <text styleclass="Code Example">Debug</text> or <text styleclass="Code Example">RelWithDebInfo</text> build. In a <text styleclass="Code Example">Release</text> build they compile to nothing (zero bytes, zero cycles), so the faithful production path is untouched. Build <text styleclass="Code Example">RelWithDebInfo</text> for diagnostics. To confirm the code is present, set <text styleclass="Code Example">EMULATR_GMEM_WATCH=0x2058</text> on a cold boot; a <text styleclass="Code Example">GMEM-WATCH</text> line on stderr proves it is compiled in.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The two instruments</para>
+    <para styleclass="Normal"><text styleclass="" style="font-weight:bold;">Sink store-watch</text> -- set <text styleclass="Code Example">EMULATR_GMEM_WATCH=&lt;pa&gt;</text>. Logs every store whose byte range overlaps the watched quadword, at the GuestMemory sink. Output: <text styleclass="Code Example">GMEM-WATCH(0x&lt;pa&gt;) STORE pa=0x.. sz=N v=0x..</text>.</para>
+    <para styleclass="Normal"><text styleclass="" style="font-weight:bold;">Store-triggered retire-trace arm</text> -- set <text styleclass="Code Example">EMULATR_TRACE_ARM_PA=&lt;pa&gt;</text> (optionally <text styleclass="Code Example">EMULATR_TRACE_ARM_VAL=&lt;v&gt;</text> and <text styleclass="Code Example">EMULATR_TRACE_ARM_INSTRS=&lt;n&gt;</text>). When a store to that address (and matching value, if given) commits, the windowed retire trace is armed for N retired instructions (default 8,000,000), reusing the existing .trc machinery. Output marker: <text styleclass="Code Example">GMEM-TRACE-ARM pa=0x.. v=0x.. -&gt; retire window N instrs</text>.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Environment levers (set prior to execution)</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="13" colcount="2" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Lever</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Role</text></para></td>
+      </thead>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">-DEMULATR_TRACE_HOOKS=ON</text></para></td><td><para styleclass="Normal">CONFIGURE-TIME (CMake), not env. PipelineDriver's per-commit callback (sink-&gt;onCommit) is compiled OUT by default; without this flag the .trc opens but never fills. REQUIRED for any retire trace.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_TRACE_WINDOW=1</text></para></td><td><para styleclass="Normal">Construct the windowed DecListingSink (.trc open, emission window-gated). REQUIRED for the trace-arm instrument.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_RETIRE_TRACE_DIR=&lt;dir&gt;</text></para></td><td><para styleclass="Normal">Output directory for the .trc / breakpoint / profiler trace files.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_TRACE_ARM_PA=0x2000</text></para></td><td><para styleclass="Normal">Arm trigger = the HWRPB self-pointer store (build_hwrpb entry).</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_TRACE_ARM_VAL=0x2000</text></para></td><td><para styleclass="Normal">Arm only when the stored value equals this (skips the memset zero-fill of the same address).</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_TRACE_ARM_INSTRS=8000000</text></para></td><td><para styleclass="Normal">Retire-window length in instructions; tune to cover the region of interest.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_TRACE_ARM_ON_IIC=0x40</text></para></td><td><para styleclass="Normal">Alternate arm at the IIC bus (the MMIO path the DRAM sink cannot see). Fires once on the first START transaction; 0/1 = any node, else only when (addr &amp; 0xFE) matches (e.g. 0x40 = first status-controller probe = iic_init at ~cyc 185M). Use to capture iic_init registration.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_TRACE_DISARM_PA=0x2000</text></para></td><td><para styleclass="Normal">Close the window on a store to this PA (+ optional <text styleclass="Code Example">EMULATR_TRACE_DISARM_VAL</text>). Backstop bound for an IIC-armed window: 0x2000/VAL=0x2000 stops at the HWRPB base store (build_hwrpb entry).</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_GMEM_WATCH=0x2058</text></para></td><td><para styleclass="Normal">Log the SYSVAR store (HWRPB+0x58) at the sink.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_IIC_TRACE=1</text></para></td><td><para styleclass="Normal">Correlate the fopen("iic_ocp0") path with IIC bus activity.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_FLASH_ROM=ds20_flash.rom</text></para></td><td><para styleclass="Normal">With <text styleclass="Code Example">rm -f ds20_flash.rom</text>: factory-fresh cold NVRAM.</para></td></tr>
+      <tr style="vertical-align:top"><td><para styleclass="Normal"><text styleclass="Code Example">EMULATR_PLATFORM=silicon</text></para></td><td><para styleclass="Normal">Optional: silicon (REAL_HW) path; unset = ISP (virtual) path. See Virtualization Methods.</para></td></tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Run recipe (HWRPB-build capture)</para>
+    <para styleclass="Normal">From a RelWithDebInfo run directory:</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="Code Example">source tools/vsenv.sh</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">cmake --build out/build/&lt;relwithdebinfo-dir&gt;          # NOT a Release config</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_TRACE_WINDOW=1</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_RETIRE_TRACE_DIR=./traces</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_TRACE_ARM_PA=0x2000</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_TRACE_ARM_VAL=0x2000</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_TRACE_ARM_INSTRS=8000000</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_GMEM_WATCH=0x2058</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_IIC_TRACE=1</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">export EMULATR_FLASH_ROM=ds20_flash.rom; rm -f ds20_flash.rom</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">unset EMULATR_PLATFORM</text></para>
+    <para styleclass="Normal"><text styleclass="Code Example">./run_fw.sh ds20 cold 2&gt;&amp;1 | tee fw_ds20_hwrpbtrace.out</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Reading the result</para>
+    <para styleclass="Normal">The .trc in <text styleclass="Code Example">EMULATR_RETIRE_TRACE_DIR</text> holds the executed instruction stream from build_hwrpb entry onward -- including <text styleclass="Code Example">get_sysvar()</text> -&gt; <text styleclass="Code Example">fopen("iic_ocp0")</text> -&gt; the member decision -&gt; the SYSVAR store. The <text styleclass="Code Example">GMEM-WATCH(0x2058)</text> line gives the SYSVAR store; correlate it against <text styleclass="Code Example">addr=0x40</text> in the IIC trace to determine whether the open reached the bus. Faithfulness note: these instruments are observe-only and the guest is cycle-deterministic across builds, so the RelWithDebInfo capture reflects the same guest behavior Release would produce.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text> Virtualization Methods; CMake Macro Guards; HWRPB Key/Value Offset Map. <link displaytype="text" defaultstyle="true" type="topiclink" href="--What-is-EmulatR">What is EmulatR</link></para>
+  </body>
+</topic>

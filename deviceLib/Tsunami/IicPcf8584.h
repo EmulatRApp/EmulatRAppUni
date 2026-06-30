@@ -58,6 +58,10 @@
 
 #include "chipsetLib/IDeviceHandlers.h"   // IIoPortHandler seam
 
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+#  include "traceLib/DecListingSink.h"     // setTraceWindowCountdown (IIC-armed retire window)
+#endif
+
 class IicPcf8584 : public IIoPortHandler
 {
 public:
@@ -281,6 +285,9 @@ private:
                          static_cast<unsigned>(addr & 0xFEu),
                          (addr & 0x01u) ? 'R' : 'W', tag);
         }
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+        iicTraceArmCheck(static_cast<uint8_t>(addr & 0xFEu));
+#endif
         if (idx < 0) {
             m_phase  = Phase::kAddrNak;
             m_curDev = -1;
@@ -366,6 +373,43 @@ private:
         static bool const on = (std::getenv("EMULATR_IIC_TRACE") != nullptr);
         return on;
     }
+
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+    // Observe-only retire-trace arm at the IIC bus (the MMIO device path the
+    // GuestMemory DRAM sink cannot see).  Pairs with EMULATR_TRACE_DISARM_PA
+    // (GuestMemory) so a window can span iic_init's registration probe up to
+    // the HWRPB base store (0x2000).  Runtime default-OFF; absent in Release.
+    //   EMULATR_TRACE_ARM_ON_IIC=<node|0|1>  arm on the first START transaction;
+    //       0 or 1 = any address, else only when (addr & 0xFE) == (node & 0xFE)
+    //       (e.g. 0x40 to arm on the first status-controller probe).
+    //   EMULATR_TRACE_ARM_INSTRS=<n>         window length in retired instrs
+    //       (default 8M; set large or rely on EMULATR_TRACE_DISARM_PA to bound).
+    // Fires once per run.
+    static void iicTraceArmCheck(uint8_t node) noexcept
+    {
+        static bool const s_enabled =
+            (std::getenv("EMULATR_TRACE_ARM_ON_IIC") != nullptr);
+        if (!s_enabled) return;
+        static uint64_t const s_armNode = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_TRACE_ARM_ON_IIC");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        static int64_t const s_armInstrs = []() -> int64_t {
+            char const* e = std::getenv("EMULATR_TRACE_ARM_INSTRS");
+            return (e && *e) ? std::strtoll(e, nullptr, 0) : 8000000LL; }();
+        static bool s_fired = false;
+        if (s_fired) return;
+        if (s_armNode > 1ULL &&
+            (node & 0xFEu) != static_cast<uint8_t>(s_armNode & 0xFEu)) {
+            return;                                   // waiting for the chosen node
+        }
+        s_fired = true;
+        traceLib::DecListingSink::setTraceWindowCountdown(s_armInstrs);
+        std::fprintf(stderr,
+            "IIC-TRACE-ARM node=0x%02x -> retire window %lld instrs\n",
+            static_cast<unsigned>(node & 0xFEu), (long long)s_armInstrs);
+        std::fflush(stderr);
+    }
+#endif
 
     // One-shot note for non-byte access (house width discipline).
     static void noteNonByteAccess() noexcept
