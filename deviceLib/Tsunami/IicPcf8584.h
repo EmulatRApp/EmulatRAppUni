@@ -205,6 +205,29 @@ public:
         switch (port) {
         case kOffCtrlSt:                          // S1 control (write)
             m_control = v;
+#if defined(EMULATR_DIAGNOSTIC_LOGGING)
+            // DS20 badge diag (2026-06-29): observe every IIC control write so
+            // we can tell whether iic_init's verify of node 0x40 ever enters
+            // interrupt mode (ENI=0x08 -> value 0xcd) vs the polled PAL path
+            // (0xc5).  Throttled; gated by EMULATR_IIC_CTRL_TRACE.
+            if (std::getenv("EMULATR_IIC_CTRL_TRACE")) {
+                // Log the first 40 writes AND, separately, the first 40 writes
+                // that set ENI (0x08) -- so an interrupt-mode verify (0xcd) is
+                // never hidden behind the polled bus-scan's 0xc5/0xc3 volume.
+                static unsigned s_n = 0, s_eni = 0;
+                bool const eni = (v & kCtl_ENI) != 0;
+                if (s_n++ < 40 || (eni && s_eni++ < 40)) {
+                    std::fprintf(stderr,
+                        "IIC-CTRL wr=0x%02x ENI=%d node=0x%02x phase=%d\n",
+                        static_cast<unsigned>(v),
+                        eni ? 1 : 0,
+                        static_cast<unsigned>(m_curDev >= 0
+                            ? m_devices[static_cast<size_t>(m_curDev)].address : 0),
+                        static_cast<int>(m_phase));
+                    std::fflush(stderr);
+                }
+            }
+#endif
             if (v & kCtl_STA) {
                 startTransaction(v);              // (repeated) START + address
             } else if (v & kCtl_STO) {
@@ -346,6 +369,29 @@ public:
             std::memcpy(m_devices[i].image.data(),
                         in + i * kImageSize, kImageSize);
         }
+    }
+
+    // ------------------------------------------------------------------------
+    // IIC completion-interrupt level (DS20 badge root-cause fix, 2026-06-29).
+    // The PCF8584 asserts its INT output while a transfer step is complete
+    // (S1<PIN> == 0) AND external interrupts are enabled (the last control
+    // write carried ENI = 0x08).  The interrupt-driven SRM driver
+    // (apisrm/ref/iic_driver.c) does krn$_wait on a semaphore the iic_service
+    // ISR posts; the iic_init .trc (20260629-175659) proved that with no INT
+    // the wait runs its full IIC_MAS_TIMEOUT, pb->rec_count stays 0, and
+    // iic_init skips registering the node as iic_ocp0 -- so get_sysvar's
+    // fopen("iic_ocp0") misses, SYSVAR = 0x405 (member 1), and the DS20
+    // mis-badges "AlphaPC 264DP" instead of member 6 "AlphaServer DS20".
+    // TsunamiChipset::evalDeviceIrqs feeds this level to a Cchip DRIR bit so
+    // the guest IIC ISR actually runs.  Level-derived from existing state --
+    // no new mutable field, snapshot-clean; reads false (no behavior change)
+    // until interrupt mode is enabled by the guest.  The polled PALcode path
+    // (sys__iic_read, ev6_osf_pc264_pal.mar) does not set ENI and so is
+    // unaffected -- it keeps spinning on PIN as before.
+    // ------------------------------------------------------------------------
+    [[nodiscard]] bool interruptPending() const noexcept
+    {
+        return ((m_status & kSt_PIN) == 0) && ((m_control & kCtl_ENI) != 0);
     }
 
 private:
