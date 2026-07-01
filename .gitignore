@@ -157,3 +157,4 @@ traces/
 sysvar_dump.txt
 rpcc_probe.txt
 firmware/
+/journals/DS20_Badge_IIC_Completion_Interrupt_topic.xml
