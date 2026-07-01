@@ -706,6 +706,23 @@ int main(int argc, char* argv[])
               << "  instr/s=" << (profSecs > 0.0 ? static_cast<unsigned long long>(profRetires / profSecs) : 0ull)
               << "  cyc/s="   << (profSecs > 0.0 ? static_cast<unsigned long long>(profCycles  / profSecs) : 0ull)
               << '\n';
+    // WARP accounting (2026-06-30).  cycleCount conflates executed + warped
+    // cycles; warpCycles isolates the fast-forwarded (idle/delay) part.
+    //   MHz_real = execCycles/wall  -- honest EmulatR throughput (build-relative)
+    //   MHz_eff  = cycleCount/wall   -- warp-inflated effective machine speed
+    //   K = MHz_eff/MHz_real         -- warp free-time factor (workload-invariant)
+    // Guest-invisible; the guest clock stays warp-invariant (see WARP topic).
+    unsigned long long const profWarp = static_cast<unsigned long long>(mach.cpu().warpCycles);
+    unsigned long long const profExec = (profCycles >= profWarp) ? (profCycles - profWarp) : profCycles;
+    double const mhzReal = (profSecs > 0.0) ? (static_cast<double>(profExec)   / profSecs / 1.0e6) : 0.0;
+    double const mhzEff  = (profSecs > 0.0) ? (static_cast<double>(profCycles) / profSecs / 1.0e6) : 0.0;
+    double const warpK   = (profExec > 0ull) ? (static_cast<double>(profCycles) / static_cast<double>(profExec)) : 1.0;
+    std::cout << "WARP-ACCOUNTING: exec_cyc=" << profExec
+              << " warp_cyc=" << profWarp
+              << "  MHz_real=" << mhzReal
+              << "  MHz_eff="  << mhzEff
+              << "  K="        << warpK
+              << '\n';
 #endif
 
     // ------------------------------------------------------------------

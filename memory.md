@@ -10,7 +10,48 @@ them from here.
 
 ---
 
+## 2026-06-29 (EOD) -- DS20 badge: IIC-INTERRUPT THEORY DISPROVEN; IIC runs POLLED. Cause still OPEN.
+
+**Headline: the "AlphaPC 264DP" badge is NOT caused by a missing IIC completion interrupt.
+Direct measurement shows the DS20 V7.3-2 IIC driver runs POLLED -- ENI (0x08) is never written
+across the whole boot.** Two earlier same-day theories (PA-watch incomplete-open, then
+IIC-completion-IRQ) were both pursued too far before being falsified. Resume from the A-vs-B
+trace below; do NOT re-assume a mechanism. Full correction: `journals/20260629_ds20_badge_iic_completion_irq_rootcause_and_fix.md` Sec. 8.
+
+- **DISPROVEN:** added `EMULATR_IIC_CTRL_TRACE` (IicPcf8584::ioWrite) + `IIC-IRQ-ASSERT`
+  (TsunamiChipset::evalDeviceIrqs). Cold boot: every IIC control write is 0xc5/0xc3/0xc0/0x80/
+  0x00/0x20, ENI never set; `IIC-IRQ-ASSERT` never fired. The bit 48-52 sweep was inert because
+  no IRQ was ever raised. The `IicPcf8584::interruptPending()` + `EMULATR_IIC_IRQ_BIT` wiring is
+  left in tree but DEFAULT-OFF / INERT -- not the fix.
+- **Facts that SURVIVE (use these):** `get_sysvar()` (pc264.c:636) = `fopen("iic_ocp0","sr+")?6 :
+  fopen("iic_8574_ocp")?8 : 1`; member 1 == both fopen NULL. `iic_ocp0` = static node_list entry
+  @ IIC node 0x40, IIC_LED_TYPE, test=1 (iic_driver.c:225); inode created iff verify
+  `iic_rw_common(0x40,1,READ)` returns rec_count==1 (iic_driver.c:1071-1076). `iic_open` returns
+  msg_failure if `pb->mode != DDB$K_INTERRUPT` (iic_driver.c:672). The 0x40 verify READ physically
+  completes (ACK + 1 byte v=0x00).
+- **OPEN QUESTION (measure, don't assume):** (A) polled verify returns rec_count!=1 -> no inode ->
+  fopen misses; or (B) inode IS created but iic_open's mode-gate rejects fopen -> NULL.
+- **NEXT (resume here):** trace armed at the 0x40 verify (`EMULATR_TRACE_ARM_ON_IIC=0x40`,
+  `EMULATR_TRACE_ARM_INSTRS=4000000`); find iic_rw_common's return R0 feeding `if(status!=1)
+  continue`, and whether `allocinode("iic_ocp0")` runs. Also READ `iic_create`/`iic_set_mode` for
+  pc264 to learn the intended `pb->mode` and why no ENI is emitted.
+- **Tool state:** retire trace now WORKS (requires CMake `-DEMULATR_TRACE_HOOKS=ON` + levers
+  EMULATR_TRACE_WINDOW / _RETIRE_TRACE_DIR / _TRACE_ARM_ON_IIC / _TRACE_ARM_INSTRS /
+  _TRACE_DISARM_PA). Three latent trace-infra bugs fixed earlier (relative-dir, shouldEmitNow
+  countdown gate, the compile-gated onCommit call site). Diag instruments all default-off, cheap.
+- **Milestone:** SRM now reaches `P00>>>` and proceeds into LFU -- far past the old stall (badge
+  fallback is non-fatal). dva0/LFU "interrupt-driven wait" hypothesis still untested; lower priority
+  than the badge A-vs-B question.
+- **CAUTION FOR FUTURE ME:** I asserted "ROOT CAUSE PROVEN" twice on incomplete evidence today.
+  The badge is cosmetic/non-blocking; treat the next step as a measurement, not a fix to ship.
+
+---
+
 ## 2026-06-29 -- DS20 badge ROOT-CAUSED from apisrm source: incomplete iic_ocp0 open interface
+
+**[PARTLY SUPERSEDED by the 2026-06-29 (EOD) entry above -- the get_sysvar chain here is correct,
+but the "incomplete open / interrupt" conclusion was disproven: the IIC is polled.]**
+
 
 **Headline: the "AlphaPC 264DP" badge is a deterministic consequence of `fopen("iic_ocp0")`
 returning NULL -- an incomplete interface, NOT a value to patch.** Found entirely in the

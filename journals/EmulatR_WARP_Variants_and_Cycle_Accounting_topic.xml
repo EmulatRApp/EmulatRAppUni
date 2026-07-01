@@ -1,0 +1,137 @@
+<topic template="Default" modified="2026-06-30T20:10:00.000Z" lasteditedby="tim" version="1">
+  <title>WARP Variants and Cycle-Accounting for Reported CPU Speed</title>
+  <keywords>
+    <keyword>0x3c970</keyword>
+    <keyword>architectural CC</keyword>
+    <keyword>cycleCount</keyword>
+    <keyword>cycle_count_freq</keyword>
+    <keyword>effective MHz</keyword>
+    <keyword>IDLEWARP</keyword>
+    <keyword>interval timer</keyword>
+    <keyword>kCchipTimerMask</keyword>
+    <keyword>kProfileAlphaClockHz</keyword>
+    <keyword>RPCC</keyword>
+    <keyword>RSCCWARP</keyword>
+    <keyword>systemNow</keyword>
+    <keyword>tick counter</keyword>
+    <keyword>WARP</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">WARP Variants and Cycle-Accounting for Reported CPU Speed</para>
+    </header>
+    <para styleclass="Normal">WARP collapses idle and delay spins by fast-forwarding the simulation clock to a known target instead of executing every cycle. This topic catalogs the WARP variants, the counters each one touches, the single safety rule that separates the clean variant from the quarantined ones, and a cycle-accounting scheme that turns the warp deltas into an honest &quot;real vs effective&quot; performance number. It closes by relating that number to the SRM CPU-speed field so the badge and the perf gauge stay cleanly separated.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The three counters (do not conflate)</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">1. Simulation clock -- </text><text styleclass="Code Example">cpu.cycleCount</text>. The fundamental time base; advances per retired instruction AND by every WARP jump. The interval timer fires against it (<text styleclass="Code Example">cycleCount &amp; kCchipTimerMask</text>). This is the counter WARP is allowed to move.</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">2. Architectural cycle counter (RPCC / HW_CC)</text> -- the 2026-05-11 split. It is <text styleclass="Code Example">cpu.cycleCount + ccBias</text>, where <text styleclass="Code Example">ccBias</text> is the offset the guest last wrote via <text styleclass="Code Example">HW_MTPR HW_CC</text>. RPCC and HW_MFPR HW_CC both return that expression (IntArith.cpp). It is derived from counter 1, not independent.</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">3. Guest tick counter</text> -- DRAM word at <text styleclass="Code Example">0x3c970</text>, the SRM uptime-in-ticks, incremented by the interval-timer ISR. This is guest state and must be advanced only by the real ISR, never written out-of-band.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">WARP variants</para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Variant (gate)</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Where</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">What it does</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Status</text></para></td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">IDLEWARP (<text styleclass="Code Example">EMULATR_IDLEWARP</text>)</para></td>
+        <td><para styleclass="Normal">krn$_idle loop, pc <text styleclass="Code Example">0x7bad0..0x7bb10</text></para></td>
+        <td><para styleclass="Normal">Advances cycleCount to the NEXT tick edge: <text styleclass="Code Example">(c0 | kCchipTimerMask) + 1</text>. The FIRE path then runs the real ISR (bumps 0x3c970). One tick per hit.</para></td>
+        <td><para styleclass="Normal">CLEAN, active</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">Tick-delay warp (<text styleclass="Code Example">EMULATR_RSCCWARP</text>)</para></td>
+        <td><para styleclass="Normal">pc <text styleclass="Code Example">0x7c314</text></para></td>
+        <td><para styleclass="Normal">Data-driven: reads the firmware's own counter (R5 addr, R6 target, R0 cur); writes counter to target and advances cycleCount by <text styleclass="Code Example">delta * kTickInterval</text>.</para></td>
+        <td><para styleclass="Normal">QUARANTINED</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">RSCC-deadline warp (<text styleclass="Code Example">EMULATR_RSCCWARP</text>)</para></td>
+        <td><para styleclass="Normal">pc <text styleclass="Code Example">0x7c304</text></para></td>
+        <td><para styleclass="Normal">Data-driven: R19 elapsed, R07 duration; advances cycleCount by (duration - elapsed) AND writes 0x3c970 out-of-band.</para></td>
+        <td><para styleclass="Normal">QUARANTINED (0x3c970 rewrite = 0x7f4xx corruption)</para></td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The safety rule</para>
+    <para styleclass="Normal">WARP may advance <text style="font-weight:bold;">only the simulation counter</text> (<text styleclass="Code Example">cpu.cycleCount</text> / the system clock). The guest tick counter <text styleclass="Code Example">0x3c970</text> must be delivered by the real interval-timer ISR through the normal FIRE path, never written directly. IDLEWARP obeys this -- it moves the clock and lets <text styleclass="Code Example">fireIntervalTimer</text> deliver the tick. The RSCC-deadline warp violates it (out-of-band 0x3c970 write) and is quarantined. The delay-loop warps are otherwise sound (they are data-driven -- they read the firmware's OWN loop bounds, so they adapt to any clock), so re-homing them onto the IDLEWARP model (advance cycleCount, let the ISR post the ticks) is the path to un-quarantining them.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Cycle-accounting: the one new counter</para>
+    <para styleclass="Normal"><text styleclass="Code Example">cpu.cycleCount</text> conflates executed and warped cycles. Add a single accumulator that captures only the warp deltas; everything else derives from the invariant <text styleclass="Code Example">cycleCount = execCycles + warpCycles</text>.</para>
+    <para styleclass="Code Example">uint64_t s_warpCycles;                    // NEW: sum of every warp advance</para>
+    <para styleclass="Code Example">// at each warp:  cpu.cycleCount += delta;  s_warpCycles += delta;</para>
+    <para styleclass="Code Example">uint64_t execCycles = cpu.cycleCount - s_warpCycles;   // real executed cycles</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The math (T = kProfileAlphaClockHz / 1024 cycles per tick; W = host wall-clock seconds)</para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="11" colcount="3" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Quantity</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Meaning</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Formula</text></para></td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">cycleCount</text></para></td>
+        <td><para styleclass="Normal">system/guest clock (warped)</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">execCycles + warpCycles</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">warpCycles</text></para></td>
+        <td><para styleclass="Normal">NEW: accumulated warp advance</para></td>
+        <td><para styleclass="Normal">sum of warp deltas</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">execCycles</text></para></td>
+        <td><para styleclass="Normal">real executed cycles</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">cycleCount - warpCycles</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">ticks_total</text></para></td>
+        <td><para styleclass="Normal">all ticks (== 0x3c970)</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">cycleCount / T</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">ticks_warp</text></para></td>
+        <td><para styleclass="Normal">ticks fast-forwarded</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">warpCycles / T</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">ticks_exec</text></para></td>
+        <td><para styleclass="Normal">ticks actually executed</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">ticks_total - ticks_warp</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">MHz_real</text></para></td>
+        <td><para styleclass="Normal">honest EmulatR throughput</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">execCycles / W / 1e6</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">MHz_eff</text></para></td>
+        <td><para styleclass="Normal">warp-inflated (guest wall view)</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">cycleCount / W / 1e6</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal"><text styleclass="Code Example">K</text> (warp factor)</para></td>
+        <td><para styleclass="Normal">over-performance ratio</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">cycleCount / execCycles = ticks_total / ticks_exec = MHz_eff / MHz_real</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">relation</para></td>
+        <td><para styleclass="Normal">effective is K times real</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">MHz_eff = K * MHz_real</text></para></td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Why the guest cannot see the warp (and where the gauge must live)</para>
+    <para styleclass="Normal">Inside the guest, RPCC (<text styleclass="Code Example">cycleCount</text>) and the tick counter (<text styleclass="Code Example">0x3c970</text>) advance <text style="font-weight:bold;">coherently</text> through every warp. Any guest-side measurement -- cycles divided by ticks, times 1024 -- therefore recovers exactly <text styleclass="Code Example">kProfileAlphaClockHz</text>, warp-invariant. The over-performance <text styleclass="Code Example">K</text> exists only relative to the HOST clock, so it is observable only by correlating guest cycles against host wall-time <text styleclass="Code Example">W</text>. That is precisely what <text styleclass="Code Example">warpCycles</text> plus a host timestamp provide. The gauge is an EmulatR-side readout (PROFILE line), NOT a guest-visible register.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Relation to the CPU-speed badge</para>
+    <para styleclass="Normal">The SRM banner &quot;%3d MHz&quot; comes from <text styleclass="Code Example">krn$_timer_get_cycle_time()/1e6</text>, which on the ISP path reads the HWRPB cycle-counter-frequency field at PA <text styleclass="Code Example">0x2070</text> (the same self-built HWRPB whose SYSVAR is at 0x2058). That field is <text style="font-weight:bold;">functional</text> -- the firmware's delay/timeout loops key off it, and the WARP thresholds are tuned against the current value -- so it must NOT be repurposed as a raw performance gauge. Keep it frozen (or set it to a true model clock only as part of the warp refactor, since a realistic clock enlarges the delay loops and only the re-homed delay-loop warp collapses them for free). The build-relative performance number (<text styleclass="Code Example">MHz_real</text>, <text styleclass="Code Example">MHz_eff</text>, <text styleclass="Code Example">K</text>) lives EmulatR-side, computed from <text styleclass="Code Example">warpCycles</text> + wall-time, independent of the guest.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Implementation order</para>
+    <para styleclass="Normal">1. Add <text styleclass="Code Example">s_warpCycles</text> and increment it at every warp site (IDLEWARP now; the delay-loop warps when re-homed). Emit <text styleclass="Code Example">MHz_real / MHz_eff / K</text> on the PROFILE line. Zero guest impact; immediate build-relative perf gauge. 2. Re-home the delay-loop warps onto the clean sim-counter model (advance cycleCount, let the ISR post 0x3c970) to un-quarantine them. 3. Only then, if a realistic banner is wanted, set the model clock at PA 0x2070 -- now free, because the re-homed warp collapses the enlarged delay loops.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text> Model Badging: SRM Platform Identity from an IIC Discriminator Device; Diagnostics: GuestMemory Store-Watch and Retire-Trace Arm; <link displaytype="text" defaultstyle="true" type="topiclink" href="HWRPB---DS20">HWRPB - DS20</link>.</para>
+  </body>
+</topic>

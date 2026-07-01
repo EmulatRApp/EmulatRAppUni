@@ -1,0 +1,103 @@
+<topic template="Default" modified="2026-06-30T15:30:00.000-07:00" lasteditedby="tim" version="1">
+  <title>DS20 Badge: Polled IIC Completion (Diagnostic and Resolution)</title>
+  <keywords>
+    <keyword>264DP</keyword>
+    <keyword>AlphaServer DS20</keyword>
+    <keyword>get_sysvar</keyword>
+    <keyword>iic_init</keyword>
+    <keyword>iic_ocp0</keyword>
+    <keyword>iic_poll_rt</keyword>
+    <keyword>iic_service</keyword>
+    <keyword>IicPcf8584</keyword>
+    <keyword>krn$_wait</keyword>
+    <keyword>PCF8584</keyword>
+    <keyword>PIN</keyword>
+    <keyword>POLLED</keyword>
+    <keyword>srom_poll</keyword>
+    <keyword>SYSVAR</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">DS20 Badge: Polled IIC Completion (Diagnostic and Resolution)</para>
+    </header>
+    <para styleclass="Normal">A DS20 cold boot mis-badges itself as "AlphaPC 264DP" (SYSTYPE member 1) instead of "AlphaServer DS20" (member 6). The cause is a missing device-completion event, but it is delivered by a <text style="font-weight:bold;">polled kernel process</text>, not an interrupt. This topic supersedes the earlier interrupt-completion topic: it records the source-proven causal chain, the PCF8584 PIN handshake the polled driver depends on, proof that the EmulatR controller model already completes the transfer correctly, the one open question and how to settle it, and the resolution. The same missing element gates a whole class of device waits, so this is broader than the badge text.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Symptom</para>
+    <para styleclass="Normal">HWRPB scan reports <text styleclass="Code Example">SYSTYPE=0x22</text> (DEC_TSUNAMI) and <text styleclass="Code Example">SYSVAR=0x405</text>. Member = <text styleclass="Code Example">(SYSVAR &gt;&gt; 10) &amp; 0x3F</text> = 1, which the SRM banners as "AlphaPC 264DP". Member 6 would banner "AlphaServer DS20".</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Correction: the interrupt theory is disproven</para>
+    <para styleclass="Normal">A prior theory held that EmulatR never raised the PCF8584 transfer-completion interrupt the SRM IIC driver waits on. It is wrong on this platform. The shipped V7.3-2 DS20 firmware runs the IIC driver <text style="font-weight:bold;">polled</text>: <text styleclass="Code Example">iic_driver.c:138</text> defines <text styleclass="Code Example">#define POLLED (MIKASA || ALCOR || RAWHIDE || PC264 || K2 || TAKARA)</text>, and PC264 is the DS20 build. In <text styleclass="Code Example">iic_init</text> the <text styleclass="Code Example">#if POLLED</text> arm is compiled in; the <text styleclass="Code Example">#else</text> interrupt arm (<text styleclass="Code Example">int_vector_set(IIC_VECTOR, iic_service, ...)</text>, <text styleclass="Code Example">int_flag = IIC_ENI</text>, <text styleclass="Code Example">mode = DDB$K_INTERRUPT</text>) is compiled out. Measurement agrees: across the entire boot, ENI (control bit <text styleclass="Code Example">0x08</text>) is never written. The <text styleclass="Code Example">iic_service</text> ISR at SCB vectors 0xa9/0xaa and the Cchip DRIR bit 48 routing are therefore inert here, and the <text styleclass="Code Example">EMULATR_IIC_IRQ_BIT</text> sweep was correctly observed to do nothing.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Proven causal chain (polled)</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">1. The badge is a device-open result.</text> <text styleclass="Code Example">get_sysvar()</text> (<text styleclass="Code Example">pc264.c:636</text>) returns member 6 if <text styleclass="Code Example">fopen("iic_ocp0","sr+")</text> succeeds, member 8 if <text styleclass="Code Example">fopen("iic_8574_ocp")</text> succeeds, else member 1. Member 1 means both opens returned NULL. <text styleclass="Code Example">build_hwrpb</text> ORs <text styleclass="Code Example">member &lt;&lt; 10</text> into the base SYSVAR <text styleclass="Code Example">0x5</text> and stores it; member 1 yields <text styleclass="Code Example">0x405</text>.</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">2. The open misses because the node was never registered.</text> <text styleclass="Code Example">iic_ocp0</text> is a static node-table entry at IIC node <text styleclass="Code Example">0x40</text>, type <text styleclass="Code Example">IIC_LED_TYPE</text>, <text styleclass="Code Example">test = 1</text> (<text styleclass="Code Example">iic_driver.c:225</text>). <text styleclass="Code Example">iic_init</text> creates its inode only if the verify read <text styleclass="Code Example">iic_rw_common(0x40, 1, buf, IIC_READ_DIR)</text> returns <text styleclass="Code Example">rec_count == 1</text> (the loop guard <text styleclass="Code Example">if (status != 1) continue;</text>, <text styleclass="Code Example">iic_driver.c:1076</text>).</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">3. Completion is delivered by a poll process, not an interrupt.</text> Under <text styleclass="Code Example">#if POLLED</text>, <text styleclass="Code Example">iic_init</text> does <text styleclass="Code Example">krn$_create(iic_poll_rt, ... "srom_poll" ...)</text> (<text styleclass="Code Example">iic_driver.c:1031</text>). That process loops: read S1; <text styleclass="Code Example">if (status.bits.pin == 0) iic_service(pb);</text> (<text styleclass="Code Example">iic_driver.c:1247-1252</text>). <text styleclass="Code Example">iic_service</text> advances the transfer and, on completion, does <text styleclass="Code Example">krn$_post(&amp;pb-&gt;misr_t.sem, IIC_SR_DONE)</text>.</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">4. The verify blocks on that semaphore with a 2-second timeout.</text> <text styleclass="Code Example">iic_rw_common</text> stages the address, writes <text styleclass="Code Example">IIC_START | int_flag</text> (int_flag = 0 when polled), starts <text styleclass="Code Example">IIC_MAS_TIMEOUT</text> (2 s), and <text styleclass="Code Example">status = krn$_wait(&amp;pb-&gt;misr_t.sem)</text> (<text styleclass="Code Example">iic_driver.c:587-594</text>). If the poll process never posts the semaphore, the timer wins: <text styleclass="Code Example">TIMEOUT$K_SEM_VAL</text> -&gt; <text styleclass="Code Example">pb-&gt;rec_count = 0</text> (<text styleclass="Code Example">iic_driver.c:614</text>) -&gt; node not registered -&gt; <text styleclass="Code Example">fopen("iic_ocp0")</text> misses -&gt; member 1 -&gt; "AlphaPC 264DP".</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The PCF8584 PIN handshake the poll loop depends on</para>
+    <para styleclass="Normal">PIN ("Pending Interrupt Not", MSB of status register S1) is the synchronization flag the polled driver reads. Per the NXP/Philips PCF8584 datasheet (sec 6.8.2): PIN = 0 (active) means the controller has completed a byte and requires servicing; PIN = 1 (inactive) means idle/busy-not-ready. The driver tests PIN to know when a byte transfer/reception is complete.</para>
+    <table styleclass="Default" rowcount="6" colcount="2" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Event</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">PIN transition</text></para></td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">START issued (STA set), address clocked out</para></td>
+        <td><para styleclass="Normal">PIN -&gt; 1 (inactive) automatically</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">One byte transmitted/received (9 clocks incl. ACK)</para></td>
+        <td><para styleclass="Normal">PIN -&gt; 0 (active): byte complete, needs service</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">Data register S0 read (receiver mode)</para></td>
+        <td><para styleclass="Normal">PIN -&gt; 1 (inactive) until the next byte arrives</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">S1 written with PIN = 1 (control side)</para></td>
+        <td><para styleclass="Normal">All status bits reset to 0 (software reset)</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">Bus error (BER)</para></td>
+        <td><para styleclass="Normal">PIN -&gt; 0 (active)</para></td>
+      </tr>
+    </table>
+    <para styleclass="Normal"><text style="font-style:italic;">When ENI is also set, the same PIN = 0 edge additionally drives the external INT output. On the polled DS20 build ENI is never set, so PIN is read as a pure status flag.</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The controller model already completes the read</para>
+    <para styleclass="Normal">EmulatR's <text styleclass="Code Example">IicPcf8584</text> presents <text styleclass="Code Example">PIN = 0</text> (status <text styleclass="Code Example">0x00</text>) on an ACK'd address (<text styleclass="Code Example">startTransaction</text>), serves a P2 dummy on the first S0 read, and on an <text styleclass="Code Example">IIC_NACK</text> control write in the read phase shows <text styleclass="Code Example">LRB = 1</text> (status <text styleclass="Code Example">0x08</text>, P3). Tracing a 1-byte node-0x40 read (<text styleclass="Code Example">count = 1</text>, <text styleclass="Code Example">rec_count = -1</text>) through <text styleclass="Code Example">iic_service</text> against this model completes in exactly three service calls:</para>
+    <para styleclass="Code Example">call 1 (rec_count -1 -&gt; 0): status 0x00 ok; read S0 = dummy; buffer[0] staged</para>
+    <para styleclass="Code Example">call 2 (rec_count 0): status 0x00; read S0 = real byte; rec_count -&gt; 1;</para>
+    <para styleclass="Code Example">          count == rec_count -&gt; write IIC_NACK -&gt; model status -&gt; 0x08</para>
+    <para styleclass="Code Example">call 3 (rec_count 1): status 0x08 (not an error); count == rec_count -&gt;</para>
+    <para styleclass="Code Example">          write IIC_STOP; krn$_post(misr_t.sem, IIC_SR_DONE)</para>
+    <para styleclass="Normal"><text styleclass="Code Example">iic_rw_common</text> then returns <text styleclass="Code Example">pb-&gt;rec_count == 1</text>, so <text styleclass="Code Example">iic_init</text> would register <text styleclass="Code Example">iic_ocp0</text> and the DS20 would badge correctly. The controller model is therefore <text style="font-weight:bold;">not</text> the defect: it is ready to be polled.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">The open question: why the poll process is not serviced</para>
+    <para styleclass="Normal">Because the model would complete the read if driven, the live failure is that <text styleclass="Code Example">iic_service</text> is not called during <text styleclass="Code Example">iic_init</text>'s early verify (the verify runs at roughly cycle 185M, immediately after the <text styleclass="Code Example">krn$_create</text> of <text styleclass="Code Example">srom_poll</text>). The IIC-armed capture supports this: the waiter spins on a DRAM semaphore word with only about three controller MMIO touches in the window -- if <text styleclass="Code Example">iic_poll_rt</text> were alive its <text styleclass="Code Example">while(1)</text> would flood the window with S1 reads. Two candidates remain, and they must be measured, not assumed:</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">(A) Scheduler/dispatch gap.</text> The just-created <text styleclass="Code Example">srom_poll</text> process is not dispatched by the SRM cooperative scheduler in time to service the verify, so the 2 s timeout always wins. This is the broad-implications case: every <text styleclass="Code Example">krn$_create</text>'d poll/worker process plus <text styleclass="Code Example">krn$_wait</text>-on-completion driver would fail the same way at init time.</para>
+    <para styleclass="Normal"><text style="font-weight:bold;">(B) Controller PIN-presentation gap at this node.</text> The poll process runs but its S1 read does not see <text styleclass="Code Example">PIN == 0</text> for node 0x40 at that moment (e.g. an <text styleclass="Code Example">iic_fp1</text> vs <text styleclass="Code Example">iic_fp2</text> routing or phase detail), so <text styleclass="Code Example">iic_service</text> is never entered. This is IIC-model-local.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Diagnostic procedure</para>
+    <para styleclass="Normal">Build RelWithDebInfo with <text styleclass="Code Example">-DEMULATR_TRACE_HOOKS=ON</text>, arm the retire window on the first node-0x40 START, and read off whether the poll process executes:</para>
+    <para styleclass="Code Example">unset EMULATR_TRACE_ARM_PA</para>
+    <para styleclass="Code Example">export EMULATR_TRACE_WINDOW=1</para>
+    <para styleclass="Code Example">export EMULATR_RETIRE_TRACE_DIR=./traces</para>
+    <para styleclass="Code Example">export EMULATR_TRACE_ARM_ON_IIC=0x40</para>
+    <para styleclass="Code Example">export EMULATR_TRACE_ARM_INSTRS=4000000</para>
+    <para styleclass="Code Example">export EMULATR_GMEM_WATCH=0x2058</para>
+    <para styleclass="Code Example">export EMULATR_IIC_TRACE=1</para>
+    <para styleclass="Code Example">export EMULATR_FLASH_ROM=ds20_flash.rom; rm -f ds20_flash.rom</para>
+    <para styleclass="Code Example">unset EMULATR_PLATFORM</para>
+    <para styleclass="Code Example">./run_fw.sh ds20 cold 2&gt;&amp;1 | tee fw_ds20_iicpoll.out</para>
+    <para styleclass="Normal">Decision: count S1 (status) reads in the window and check whether the retired PC ever lands at <text styleclass="Code Example">iic_poll_rt</text>'s entry. A continuous stream of S1 reads, or PC at <text styleclass="Code Example">iic_poll_rt</text>, points to <text style="font-weight:bold;">(B)</text> -- then inspect the <text styleclass="Code Example">PIN</text> value the model returns for node 0x40. Essentially no S1 reads, and no dispatch of <text styleclass="Code Example">srom_poll</text>, points to <text style="font-weight:bold;">(A)</text> -- the cooperative scheduler is not running the created process; confirm by checking whether the <text styleclass="Code Example">krn$_create</text> for <text styleclass="Code Example">"srom_poll"</text> returns and whether the dispatcher ever selects it. Do <text style="font-weight:bold;">not</text> sweep <text styleclass="Code Example">EMULATR_IIC_IRQ_BIT</text>; the interrupt path is compiled out and any bit is inert.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Resolution</para>
+    <para styleclass="Normal">The fix is to deliver the <text style="font-weight:bold;">polled</text> completion: ensure <text styleclass="Code Example">iic_poll_rt</text> is dispatched and reaches <text styleclass="Code Example">iic_service</text> for node 0x40 during <text styleclass="Code Example">iic_init</text>, so the verify returns <text styleclass="Code Example">rec_count == 1</text>, the node registers, and the same deterministic firmware path badges member 6 "AlphaServer DS20" with no other change. If the measurement lands on (A), the work is at the cooperative-scheduler / <text styleclass="Code Example">krn$_create</text> dispatch layer (which also unblocks the device class below) -- not in the IIC model. If it lands on (B), it is a localized fix in <text styleclass="Code Example">IicPcf8584</text>'s PIN presentation for the verify. No SSOT change either way; <text styleclass="Code Example">interruptPending()</text> and <text styleclass="Code Example">EMULATR_IIC_IRQ_BIT</text> remain in the tree, default-off and inert on PC264, for the WEBBRICK-class interrupt path only.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Broader implications</para>
+    <para styleclass="Normal">The <text styleclass="Code Example">krn$_create</text> worker plus <text styleclass="Code Example">krn$_wait</text>-on-a-posted-semaphore plus 2 s timeout-fallback idiom is the SRM's standard device-completion pattern, shared by the floppy controller (the F3/F4/F5 recalibrate/seek timeouts) and IDE/ATAPI (the post-dva0 stall). If the completion is not delivered, each driver times out and the firmware takes its degraded fallback. The badge is the most visible instance of a general "block, then fall back" failure mode; resolving the completion delivery here is expected to clear the class.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text> DS20 Platform Identity: The IIC Completion Interrupt and the "AlphaPC 264DP" Badge [SUPERSEDED]; Diagnostics: GuestMemory Store-Watch and Retire-Trace Arm; HWRPB Key/Value Offset Map; Virtualization Methods.</para>
+  </body>
+</topic>

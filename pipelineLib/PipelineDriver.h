@@ -316,6 +316,7 @@ struct PipelineDriver
                     uint64_t const c0    = cpu.cycleCount;
                     (void)bus.write(cntAddr, target, 4);        // counter -> target ([[nodiscard]])
                     cpu.cycleCount += delta * kTickInterval;    // advance time coherently
+                    cpu.warpCycles += delta * kTickInterval;    // WARP accounting (2026-06-30)
                     bool const checksumOk =
                         (cpu.cycleCount - c0) == (delta * kTickInterval);
                     std::fprintf(stderr,
@@ -353,6 +354,7 @@ struct PipelineDriver
                 uint64_t const delta  = duration - elapsed;
                 uint64_t const c0     = cpu.cycleCount;
                 cpu.cycleCount += delta;                          // advance time to the deadline
+                cpu.warpCycles += delta;                          // WARP accounting (2026-06-30)
                 uint64_t const dticks = delta >> 20;              // ticks coherently skipped
                 memoryLib::BusResult const rd = bus.read(0x3c970ull, 4);
                 (void)bus.write(0x3c970ull,
