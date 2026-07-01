@@ -372,22 +372,38 @@ public:
     }
 
     // ------------------------------------------------------------------------
-    // IIC completion-interrupt level (DS20 badge root-cause fix, 2026-06-29).
-    // The PCF8584 asserts its INT output while a transfer step is complete
-    // (S1<PIN> == 0) AND external interrupts are enabled (the last control
-    // write carried ENI = 0x08).  The interrupt-driven SRM driver
-    // (apisrm/ref/iic_driver.c) does krn$_wait on a semaphore the iic_service
-    // ISR posts; the iic_init .trc (20260629-175659) proved that with no INT
-    // the wait runs its full IIC_MAS_TIMEOUT, pb->rec_count stays 0, and
-    // iic_init skips registering the node as iic_ocp0 -- so get_sysvar's
-    // fopen("iic_ocp0") misses, SYSVAR = 0x405 (member 1), and the DS20
-    // mis-badges "AlphaPC 264DP" instead of member 6 "AlphaServer DS20".
-    // TsunamiChipset::evalDeviceIrqs feeds this level to a Cchip DRIR bit so
-    // the guest IIC ISR actually runs.  Level-derived from existing state --
-    // no new mutable field, snapshot-clean; reads false (no behavior change)
-    // until interrupt mode is enabled by the guest.  The polled PALcode path
-    // (sys__iic_read, ev6_osf_pc264_pal.mar) does not set ENI and so is
-    // unaffected -- it keeps spinning on PIN as before.
+    // IIC completion-interrupt level -- RETAINED INERT (2026-06-30 correction).
+    //
+    // HISTORY: a 2026-06-29 theory held that the DS20 "AlphaPC 264DP" mis-badge
+    // came from EmulatR never raising the PCF8584 transfer-completion INT that
+    // an interrupt-driven SRM IIC driver waits on.  That theory is DISPROVEN.
+    //
+    // PROVEN (apisrm/ref/iic_driver.c): on the shipped V7.3-2 DS20 firmware the
+    // IIC driver is POLLED, not interrupt-driven.  iic_driver.c:138 sets
+    //   #define POLLED (MIKASA || ALCOR || RAWHIDE || PC264 || K2 || TAKARA)
+    // so on PC264 iic_init takes the #if POLLED arm: it krn$_create's the
+    // "srom_poll" process iic_poll_rt and NEVER sets int_flag = IIC_ENI or
+    // mode = DDB$K_INTERRUPT (the #else interrupt arm with int_vector_set is
+    // compiled out).  Measurement agrees: ENI (0x08) is never written all boot.
+    //
+    // Completion is delivered by the poll process, not an interrupt: iic_poll_rt
+    // spins reading S1, and on PIN == 0 calls iic_service, which advances the
+    // transfer and krn$_post's the misr_t.sem that iic_rw_common's krn$_wait
+    // blocks on.  A 1-byte node-0x40 read completes in exactly three iic_service
+    // calls (dummy, real byte + IIC_NACK -> status 0x08, then STOP +
+    // IIC_SR_DONE), returning rec_count == 1 so iic_init registers iic_ocp0 and
+    // get_sysvar's fopen("iic_ocp0") succeeds (member 6 = "AlphaServer DS20").
+    // This model already presents that exact sequence (PIN == 0 on ACK; P2
+    // dummy; P3 NACK -> 0x08), so the live badge failure is that the poll
+    // process is not serviced during iic_init's early verify -- NOT a missing
+    // interrupt and NOT a device-model gap.  The 2-second IIC_MAS_TIMEOUT then
+    // wins the race, rec_count stays 0, and the node is left unregistered.
+    // See journals/DS20_Badge_IIC_Polled_Completion_topic.xml.
+    //
+    // interruptPending() below is kept (default-OFF, snapshot-clean, reads false
+    // until the guest sets ENI -- which this firmware never does) only for the
+    // WEBBRICK-class interrupt-driven IIC path; it is INERT on PC264/DS20.  The
+    // paired EMULATR_IIC_IRQ_BIT wiring in TsunamiChipset is likewise inert here.
     // ------------------------------------------------------------------------
     [[nodiscard]] bool interruptPending() const noexcept
     {

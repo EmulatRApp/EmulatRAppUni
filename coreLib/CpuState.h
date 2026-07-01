@@ -224,6 +224,13 @@ struct CpuState
     // pipeline driver each cycle.
     uint64_t cycleCount = 0; // pipeline - TRACE only cycle counter
     uint64_t ccOffset = 0; // architectural CC
+    // WARP accounting (2026-06-30): running sum of cycles injected by WARP
+    // fast-forwards (IDLEWARP now; delay-loop warps when re-homed).  Invariant:
+    // cycleCount = executed + warpCycles.  Kept in step at every warp site so
+    // the PROFILE line can report MHz_real (execCycles/wall), MHz_eff
+    // (cycleCount/wall) and K = MHz_eff/MHz_real.  Guest-invisible; host metric
+    // only.  See journal EmulatR_WARP_Variants_and_Cycle_Accounting.
+    uint64_t warpCycles = 0; // cycles advanced by WARP (not executed)
 
     // ------------------------------------------------------------------
     // RPCC / HW_CC scale multiplier                            2026-05-29

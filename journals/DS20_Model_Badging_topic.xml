@@ -1,0 +1,88 @@
+<topic template="Default" modified="2026-06-30T19:20:00.000Z" lasteditedby="tim" version="3">
+  <title>Model Badging: SRM Platform Identity from an IIC Discriminator Device</title>
+  <keywords>
+    <keyword>264DP</keyword>
+    <keyword>AlphaServer DS20</keyword>
+    <keyword>badge</keyword>
+    <keyword>build_hwrpb</keyword>
+    <keyword>DSRDB</keyword>
+    <keyword>get_sysvar</keyword>
+    <keyword>iic_8574_ocp</keyword>
+    <keyword>iic_ocp0</keyword>
+    <keyword>iic_rcm_temp</keyword>
+    <keyword>IicPcf8584</keyword>
+    <keyword>KCRCM</keyword>
+    <keyword>member</keyword>
+    <keyword>platform manifest</keyword>
+    <keyword>SYSTYPE</keyword>
+    <keyword>SYSVAR</keyword>
+  </keywords>
+  <body>
+    <header>
+      <para styleclass="Heading1">Model Badging: SRM Platform Identity from an IIC Discriminator Device</para>
+    </header>
+    <para styleclass="Normal">The SRM firmware brands each machine with a platform name in its power-up banner (&quot;AlphaServer DS20&quot;, &quot;AlphaPC 264DP&quot;, and so on). That name is not configured anywhere in EmulatR -- the firmware derives it at boot from the <text styleclass="Code Example">member</text> id in the HWRPB <text styleclass="Code Example">SYSVAR</text> word, and it computes that member by probing the IIC bus for a <text style="font-weight:bold;">model-specific discriminator device</text>. For EmulatR to badge a model correctly, its platform manifest must populate the exact IIC device that model&apos;s firmware probes. This topic states the general pattern, the DS20 case (root-caused 2026-06-30), and how to diagnose badging for any model.</para>
+    <para styleclass="Normal"><text style="font-style:italic;">This topic supersedes &quot;DS20 Badge: Polled IIC Completion&quot;. That earlier thesis -- a missing polled IIC completion times out the node-0x40 verify -- was disproven: the completion is delivered correctly, node 0x40 reads cleanly, and the badge never depended on node 0x40 at all.</text></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Symptom</para>
+    <para styleclass="Normal">The banner shows the base / wrong model. The HWRPB scan reports <text styleclass="Code Example">SYSTYPE=0x22</text> (DEC_TSUNAMI) and <text styleclass="Code Example">SYSVAR=0x405</text>. Member = <text styleclass="Code Example">(SYSVAR &gt;&gt; 10) &amp; 0x3F</text> = 1, which the SRM banners as &quot;AlphaPC 264DP&quot;. The correct DS20 is member 6 (<text styleclass="Code Example">SYSVAR=0x1805</text>), bannered &quot;AlphaServer DS20&quot;.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">How the SRM computes the badge</para>
+    <para styleclass="Normal"><text styleclass="Code Example">build_hwrpb</text> calls <text styleclass="Code Example">get_sysvar()</text> (<text styleclass="Code Example">pc264.c:636</text>). <text styleclass="Code Example">get_sysvar</text> starts with the base <text styleclass="Code Example">sysvar = HWRPB$_SYSVAR = 0x5</text>, then attempts <text styleclass="Code Example">fopen()</text> on a model-specific IIC device; on success it ORs <text styleclass="Code Example">member &lt;&lt; 10</text> into <text styleclass="Code Example">SYSVAR&lt;15:10&gt;</text>, else it takes the member-1 default. The value is stored to the HWRPB SYSVAR word at physical address <text styleclass="Code Example">0x2058</text>.</para>
+    <para styleclass="Normal">Retire-trace of the running V7.3-2 binary confirms the exact chain: <text styleclass="Code Example">build_hwrpb</text> stores base <text styleclass="Code Example">0x5</text> to PA <text styleclass="Code Example">0x2058</text> (pc <text styleclass="Code Example">0x5c3e0</text>), calls <text styleclass="Code Example">get_sysvar</text> (pc <text styleclass="Code Example">0x7f5c0</text>), which byte-walks the discriminator device name and on failure branches at <text styleclass="Code Example">BEQ pc=0x7f608</text> (R16 == 0) to load the member-1 default <text styleclass="Code Example">0x405</text> as a literal (pc <text styleclass="Code Example">0x7f660</text>); <text styleclass="Code Example">build_hwrpb</text> then stores <text styleclass="Code Example">0x405</text> to PA <text styleclass="Code Example">0x2058</text> (pc <text styleclass="Code Example">0x5c3f8</text>).</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Member map (SYSTYPE 0x22, DEC_TSUNAMI / PC264)</para>
+    <para styleclass="Normal"><table styleclass="Default" rowcount="4" colcount="4" style="border-width:0px; border-spacing:0px; border-collapse:collapse; cell-border-width:1px; border-color:#000000; border-style:solid; head-row-background-color:#00ffff; alt-row-background-color:none;">
+      <thead style="vertical-align:top">
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Member &lt;15:10&gt;</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">SYSVAR</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Banner</text></para></td>
+        <td><para styleclass="Normal"><text style="font-weight:bold;">Discriminator device (IIC node)</text></para></td>
+      </thead>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">1</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">0x405</text></para></td>
+        <td><para styleclass="Normal">AlphaPC 264DP (default / fallback)</para></td>
+        <td><para styleclass="Normal">none -- reached when the others fail to open</para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">6</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">0x1805</text></para></td>
+        <td><para styleclass="Normal">AlphaServer DS20</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">iic_rcm_temp</text> @ <text styleclass="Code Example">0x9e</text></para></td>
+      </tr>
+      <tr style="vertical-align:top">
+        <td><para styleclass="Normal">8</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">0x2005</text></para></td>
+        <td><para styleclass="Normal">AlphaServer DS20E (Goldrack)</para></td>
+        <td><para styleclass="Normal"><text styleclass="Code Example">iic_8574_ocp</text> @ <text styleclass="Code Example">0x4E</text></para></td>
+      </tr>
+    </table></para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Root cause (DS20)</para>
+    <para styleclass="Normal">The DS20 discriminator is <text styleclass="Code Example">iic_rcm_temp</text> -- the temperature sensor on the KCRCM server-management card, which per the <text styleclass="Code Example">get_sysvar</text> source comment is &quot;only present on the AlphaServer DS20&quot;. It is a static node-table entry at IIC node <text styleclass="Code Example">0x9e</text> (<text styleclass="Code Example">iic_driver.c:264</text>, <text styleclass="Code Example">IIC_LED_TYPE</text>). EmulatR&apos;s <text styleclass="Code Example">IicPcf8584</text> populates its bus from the platform manifest; any node absent from the manifest NAKs. The DS20 manifest did not list node <text styleclass="Code Example">0x9e</text>, so the bus scan NAK&apos;d it (<text styleclass="Code Example">IIC-TXN addr=0x9e dir=R -&gt; NAK</text>), <text styleclass="Code Example">iic_init</text> never registered <text styleclass="Code Example">iic_rcm_temp</text>, <text styleclass="Code Example">fopen(&quot;iic_rcm_temp&quot;)</text> returned NULL, and <text styleclass="Code Example">get_sysvar</text> fell to the member-1 default.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Why node 0x40 (iic_ocp0) was a red herring</para>
+    <para styleclass="Normal">An earlier analysis, and an earlier manifest fix, targeted <text styleclass="Code Example">iic_ocp0</text> @ <text styleclass="Code Example">0x40</text>, believing it the discriminator. It is not. <text styleclass="Code Example">iic_ocp0</text> is the OCP LED panel, present on <text style="font-weight:bold;">both</text> AlphaPC 264DP and AlphaServer DS20, so it cannot distinguish them. The reference apisrm <text styleclass="Code Example">get_sysvar</text> <text style="font-style:italic;">code</text> reads <text styleclass="Code Example">fopen(&quot;iic_ocp0&quot;)</text>, but its own <text style="font-style:italic;">comment</text> and the shipped V7.3-2 binary use the temperature sensor. The retire-trace of the running binary is authoritative: in the entire <text styleclass="Code Example">get_sysvar</text> window it byte-walks <text styleclass="Code Example">iic_rcm_temp</text> and never references <text styleclass="Code Example">iic_ocp0</text>. Decisive proof: node <text styleclass="Code Example">0x40</text> was already populated and read cleanly in every trace -- had it been the gate, the badge would already have been member 6.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">Resolution</para>
+    <para styleclass="Normal">Populate the model&apos;s discriminator device in its platform manifest. For DS20, add one entry to <text styleclass="Code Example">ds20_v7_3_platform.json</text> under <text styleclass="Code Example">iic_devices</text>:</para>
+    <para styleclass="Code Example">{ &quot;name&quot;: &quot;iic_rcm_temp&quot;, &quot;address&quot;: &quot;0x9e&quot;, &quot;class&quot;: &quot;status&quot;, &quot;byte&quot;: &quot;0x19&quot; }</para>
+    <para styleclass="Normal">With node <text styleclass="Code Example">0x9e</text> ACKing, <text styleclass="Code Example">iic_init</text>&apos;s verify read succeeds, <text styleclass="Code Example">iic_rcm_temp</text> registers, <text styleclass="Code Example">fopen</text> succeeds, and <text styleclass="Code Example">get_sysvar</text> returns member 6 -&gt; <text styleclass="Code Example">SYSVAR=0x1805</text> -&gt; &quot;AlphaServer DS20&quot;. Registration gates on the read <text style="font-style:italic;">succeeding</text> (<text styleclass="Code Example">rec_count</text>), not on the byte value, so <text styleclass="Code Example">byte 0x19</text> (~25 C) is cosmetic. The platform manifest is loaded at runtime -- <text style="font-weight:bold;">no rebuild</text>; edit the source manifest and sync the run-dir copy. Do <text style="font-weight:bold;">not</text> add <text styleclass="Code Example">iic_8574_ocp</text> (<text styleclass="Code Example">0x4E</text>) -- that yields member 8 = DS20E / Goldrack.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">How to diagnose model badging</para>
+    <para styleclass="Normal">Arm the retire window on the base-SYSVAR store so the <text styleclass="Code Example">get_sysvar</text> path is captured, and watch the SYSVAR word directly:</para>
+    <para styleclass="Code Example">unset  EMULATR_TRACE_ARM_ON_IIC          # do not consume the window at the ~185M IIC read</para>
+    <para styleclass="Code Example">export EMULATR_TRACE_ARM_PA=0x2058       # arm on the HWRPB SYSVAR store...</para>
+    <para styleclass="Code Example">export EMULATR_TRACE_ARM_VAL=0x5         # ...value 0x5 (base), just before get_sysvar</para>
+    <para styleclass="Code Example">export EMULATR_TRACE_ARM_INSTRS=2000000  # window over get_sysvar</para>
+    <para styleclass="Code Example">export EMULATR_GMEM_WATCH=0x2058         # log every store to the SYSVAR word</para>
+    <para styleclass="Code Example">export EMULATR_IIC_TRACE=1               # log IIC START / device reads + NAKs</para>
+    <para styleclass="Normal">Read it as follows. The <text styleclass="Code Example">GMEM-WATCH(0x2058)</text> final store value encodes the member (<text styleclass="Code Example">0x405</text>=1, <text styleclass="Code Example">0x1805</text>=6, <text styleclass="Code Example">0x2005</text>=8). In the retire <text styleclass="Code Example">.trc</text> between the base (<text styleclass="Code Example">0x5</text>) and final store, read which device name <text styleclass="Code Example">get_sysvar</text> byte-walks (the <text styleclass="Code Example">strlen</text> loop) -- that is the discriminator the running firmware actually probes. Cross-check its IIC node against the bus scan: an <text styleclass="Code Example">IIC-TXN ... -&gt; NAK</text> at that node means EmulatR does not populate the device.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Heading2">General rule</para>
+    <para styleclass="Normal">Every model&apos;s SRM brands itself by probing for a signature IIC device that is unique to that model. To badge a new model correctly: trace the running binary&apos;s <text styleclass="Code Example">get_sysvar</text> (the <text style="font-weight:bold;">trace</text>, not just the reference source, which can disagree with the shipped image), identify the device name and its IIC node, and populate a matching device at that node in the model&apos;s platform manifest. If the banner shows the base / wrong model, the discriminator node is NAKing -- add it.</para>
+    <para styleclass="Normal"></para>
+    <para styleclass="Normal"><text styleclass="SeeAlso">See Also.</text> DS20 Badge: Polled IIC Completion [SUPERSEDED]; Diagnostics: GuestMemory Store-Watch and Retire-Trace Arm; <link displaytype="text" defaultstyle="true" type="topiclink" href="HWRPB---DS20">HWRPB - DS20</link>; <link displaytype="text" defaultstyle="true" type="topiclink" href="Virtualization-Methods">Virtualization Methods</link>.</para>
+  </body>
+</topic>

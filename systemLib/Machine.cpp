@@ -1604,6 +1604,7 @@ bool Machine::systemTick(uint64_t i) noexcept
                 // correct system-clock-primary shape needs no STEP-4 revisit.
                 uint64_t const c0 = systemNow();
                 m_systemClock     = (c0 | Tsunami21272::Spec::kCchipTimerMask) + 1;
+                m_cpu.warpCycles += (m_systemClock - c0);   // WARP accounting: idle skip (2026-06-30)
                 m_cpu.cycleCount  = m_systemClock;
                 // process-global static; revisit under the threaded driver.
                 static uint64_t s_warpLog = 0;

@@ -11,9 +11,11 @@
       "manufacturer": "DEC", "model": "EV6", "part_class": "54-", "serial": "" },
     { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 },
 	{ "name": "iic_ocp0", "address": "0x40", "class": "status", "byte": "0x00",
-      "comment": "OCP LED panel (IIC_LED_TYPE @ 0x40, iic_driver.c). Presence is the get_sysvar (pc264.c) platform discriminator: fopen(iic_ocp0) success -> SYSVAR member 6 -> banner 'AlphaServer DS20' (vs default member 1 = 'AlphaPC 264DP'). Do NOT add iic_8574_ocp (0x4E) -> member 8 = DS20E/Goldrack." },
+      "comment": "OCP LED panel (IIC_LED_TYPE @ 0x40, iic_driver.c). NOT the badge discriminator (corrected 2026-06-30): the OCP LED is present on BOTH AlphaPC 264DP and AlphaServer DS20. The real get_sysvar DS20 discriminator is iic_rcm_temp @ 0x9e (see below). Do NOT add iic_8574_ocp (0x4E) -> member 8 = DS20E/Goldrack." },
     { "name": "iic_ocp1", "address": "0x42", "class": "status", "byte": "0x00",
-      "comment": "OCP data device (IIC_LED_TYPE @ 0x42). The OCP is a control+data PAIR: ocp0 (0x40)=control, ocp1 (0x42)=data (sable_ocp_driver.c). sable_ocp_init opens BOTH; presenting only ocp0 caused 'Device Open Error: IIC_OCP1' + sable_ocp_init exit status 1 (non-fatal)." }
+      "comment": "OCP data device (IIC_LED_TYPE @ 0x42). The OCP is a control+data PAIR: ocp0 (0x40)=control, ocp1 (0x42)=data (sable_ocp_driver.c). sable_ocp_init opens BOTH; presenting only ocp0 caused 'Device Open Error: IIC_OCP1' + sable_ocp_init exit status 1 (non-fatal)." },
+    { "name": "iic_rcm_temp", "address": "0x9e", "class": "status", "byte": "0x19",
+      "comment": "KCRCM server-management-card temperature sensor (IIC_LED_TYPE @ 0x9e, iic_driver.c:264). THIS is the get_sysvar (pc264.c:636) DS20 discriminator -- 'only present on the AlphaServer DS20' per source comment. fopen(iic_rcm_temp) success -> get_sysvar returns SYSVAR member 6 -> banner 'AlphaServer DS20'; absent (node 0x9e NAK) -> member 1 = 'AlphaPC 264DP'. Root-caused 2026-06-30 by retire-trace of get_sysvar. byte 0x19 (~25C) is cosmetic; registration gates on the read succeeding, not the value." }
 
   ],
   "pci_devices": [
