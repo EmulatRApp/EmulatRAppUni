@@ -105,31 +105,38 @@ export EMULATR_AUTOSNAP=off                  # no periodic autosnap during diag
 export EMULATR_FLASH_ROM="$DIAG_FLASH"       # dedicated flash, not ds20_v7_3.rom
 unset  EMULATR_PLATFORM                       # don't force a platform override
 unset  EMULATR_PLATFORM_CONFIG                # use <stem>_platform.json (ds20_v7_3)
-export EMULATR_IIC_TRACE=1                    # log every IIC START + device byte read
-export EMULATR_IIC_CTRL_TRACE=1              # log every S1 control write (START/PIN/NACK/STOP)
-# ---- retire-window arm mode: DIAG_ARM=iic (default) | sysvar --------------
-#   iic    : arm on the first node-0x40 IIC START (~cyc 185M) -- the read verify.
+# ---- instrumentation mode: DIAG_ARM = off | iic (default) | sysvar ---------
+#   off    : LEAN run -- no IIC/retire/watch instrumentation.  Only the console
+#            mirror stays on.  Use for a pure boot + PROFILE/WARP-ACCOUNTING /
+#            perf check (pairs with EMULATR_IDLEWARP=1).  No .trc written.
+#   iic    : arm the retire window on the first node-0x40 IIC START (~cyc 185M).
 #   sysvar : arm on the base-SYSVAR store (PA 0x2058 == 0x5, ~cyc 222M) just
-#            before get_sysvar()'s fopen("iic_ocp0") -- captures the badge
-#            (member 1 vs 6) decision.  Needs a run that breaks past the
-#            'Initializing table to defaults' point to reach cyc ~222M.
+#            before get_sysvar()'s badge decision (member 1 vs 6).
 : "${DIAG_ARM:=iic}"
-if [ "$DIAG_ARM" = "sysvar" ]; then
-    unset  EMULATR_TRACE_ARM_ON_IIC          # don't burn the single window at 185M
-    export EMULATR_TRACE_ARM_PA=0x2058       # arm on the SYSVAR store...
-    export EMULATR_TRACE_ARM_VAL=0x5         # ...value 0x5 (base), just before get_sysvar
-    export EMULATR_TRACE_ARM_INSTRS=2000000  # 2M-instr window over get_sysvar's fopen
+export EMULATR_CONSOLE_MIRROR=1              # banner + badge into the .out (all modes)
+if [ "$DIAG_ARM" = "off" ]; then
+    unset EMULATR_IIC_TRACE EMULATR_IIC_CTRL_TRACE EMULATR_TRACE_WINDOW \
+          EMULATR_RETIRE_TRACE_DIR EMULATR_TRACE_ARM_ON_IIC EMULATR_TRACE_ARM_PA \
+          EMULATR_TRACE_ARM_VAL EMULATR_TRACE_ARM_INSTRS EMULATR_GMEM_WATCH \
+          EMULATR_SYSVAR_WATCH
 else
-    unset  EMULATR_TRACE_ARM_PA              # arm via the IIC START, not a PA store
-    unset  EMULATR_TRACE_ARM_VAL
-    export EMULATR_TRACE_ARM_ON_IIC=0x40     # arm retire window on first node-0x40 START
-    export EMULATR_TRACE_ARM_INSTRS=4000000  # 4M-instr window
+    export EMULATR_IIC_TRACE=1               # log every IIC START + device byte read
+    export EMULATR_IIC_CTRL_TRACE=1          # log every S1 control write
+    export EMULATR_TRACE_WINDOW=1            # retire-compact stream (bounded by the arm)
+    export EMULATR_RETIRE_TRACE_DIR="$RUN_DIR/traces"
+    export EMULATR_GMEM_WATCH=0x2058         # watch the HWRPB SYSVAR-area store
+    export EMULATR_SYSVAR_WATCH=1            # log the HWRPB SYSVAR store (badge member)
+    if [ "$DIAG_ARM" = "sysvar" ]; then
+        unset  EMULATR_TRACE_ARM_ON_IIC      # don't burn the single window at 185M
+        export EMULATR_TRACE_ARM_PA=0x2058   # arm on the SYSVAR store...
+        export EMULATR_TRACE_ARM_VAL=0x5     # ...value 0x5 (base), just before get_sysvar
+        export EMULATR_TRACE_ARM_INSTRS=2000000
+    else
+        unset  EMULATR_TRACE_ARM_PA EMULATR_TRACE_ARM_VAL
+        export EMULATR_TRACE_ARM_ON_IIC=0x40 # arm on first node-0x40 START
+        export EMULATR_TRACE_ARM_INSTRS=4000000
+    fi
 fi
-export EMULATR_TRACE_WINDOW=1                 # force the DecListingSink retire-compact stream
-export EMULATR_RETIRE_TRACE_DIR="$RUN_DIR/traces"
-export EMULATR_GMEM_WATCH=0x2058             # watch the HWRPB SYSVAR-area store
-export EMULATR_CONSOLE_MIRROR=1              # mirror COM1 console (banner + badge) into the .out
-export EMULATR_SYSVAR_WATCH=1               # log the HWRPB SYSVAR store (encodes the badge member)
 
 echo "=============================================================="
 echo " DS20 badge A/B diagnostic"
@@ -139,7 +146,8 @@ echo "   flash   : $DIAG_FLASH (fresh)"
 echo "   log     : $RUN_DIR/$LOG"
 echo "   traces  : $RUN_DIR/traces"
 echo "   cap     : $MAXCYC cycles"
-echo "   arm     : $DIAG_ARM  (iic = node-0x40 read | sysvar = get_sysvar badge)"
+echo "   arm     : $DIAG_ARM  (off = lean/perf | iic = node-0x40 read | sysvar = get_sysvar badge)"
+echo "   idlewarp: $([ -n "${EMULATR_IDLEWARP:-}" ] && echo ON || echo off)  (WARP-ACCOUNTING K>1 only when ON)"
 if [ "$DIAG_HEADLESS" = "1" ]; then
     echo "   console : HEADLESS (no PuTTY; TCP 10023 still open)"
 else

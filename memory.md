@@ -10,7 +10,73 @@ them from here.
 
 ---
 
+## 2026-07-01 -- ES40 (Clipper) SRM bring-up kicked off; DS20 badge SOLVED; MHz badge injection landed
+
+**Headline: the DS20 "AlphaPC 264DP" mis-badge is FIXED (2026-06-30, one-line manifest
+add -- see below). Current workstream is now bringing the AlphaServer ES40 to `>>>`.**
+Full journals: `journals/20260701_es40_clipper_srm_initialization.md`,
+`journals/CHECKPOINT_2026-07-01.md`, `journals/20260630_ds20_model_badging_rootcause_and_fix.md`.
+
+- **DS20 BADGE -- ROOT-CAUSED + FIXED (2026-06-30).** Cause: a **missing IIC
+  discriminator device** in the platform manifest, NOT the IIC completion path and NOT
+  node 0x40 (both chased at length 06-29, both dead ends). `get_sysvar()` (pc264.c:636)
+  seeds SYSVAR=0x5 then `fopen`s a model-specific IIC device; success ORs `member<<10`
+  into SYSVAR<15:10>. The running **V7.3-2 binary probes `iic_rcm_temp` @ IIC node
+  0x9e** (the KCRCM temp sensor, "only present on the AlphaServer DS20") -- NOT the
+  `iic_ocp0` @ 0x40 that the apisrm *source* line reads (running binary is authoritative;
+  0x40 = OCP LED, present on both DP264 and DS20, so it can't discriminate). Node 0x9e
+  was absent from `ds20_v7_3_platform.json` -> NAK -> fopen NULL -> member 1 (0x405) =
+  "AlphaPC 264DP". **FIX (applied, no rebuild -- manifest is runtime-loaded):** added
+  `{ "name":"iic_rcm_temp", "address":"0x9e", "class":"status", "byte":"0x19" }` to
+  `iic_devices` (source + run-dir copy). Registration gates on the read succeeding
+  (rec_count), not the byte value. Expect member 6 -> SYSVAR 0x1805 -> "AlphaServer DS20".
+  Verify: `./tools/diag_ds20_badge_ab.sh`, watch `GMEM-WATCH(0x2058)` for `v=0x1805`
+  (~cyc 222M, before the banner). Pattern (probe-for-discriminator-device) applies
+  family-wide -- trace other models' get_sysvar + populate the matching manifest node.
+- **MHz badge injection LANDED + verified end-to-end (2026-07-01).** Cosmetic, TX-only
+  UART rewrite that injects live `MHz_eff` (= cycleCount/wall) into the SRM banner and
+  `show config` speed fields, right-justified to preserve `%3d` width; `>>>` and all other
+  numeric tokens pass through untouched. Files: new `deviceLib/BadgeMhzGauge.h`
+  (`bindCycleCount`/`markRunStart` wired at the `profT0` site in `main.cpp`); `Uart16550.h`
+  `writeTHR` routes the stream through `badgeTxEmit()`; console-mirror path (`EMULATR_CONSOLE_MIRROR=1`)
+  also rewritten. Runtime-confirmed: DS20 banner `5 MHz` (relwithdebinfo) / `8 MHz` (release).
+  Key finding: warp variants do NOT move the number -- the badge samples at banner-stream
+  time (~cyc 200M) BEFORE the warp-collapsible idle phases, so `K~=1`, `MHz_eff~=raw`.
+  Sample-point (banner-honest vs later warp-inflated readout) is a decision, not a knob.
+  Banner is now non-deterministic per run -- will churn any snapshot test pinning the speed
+  field. **STILL UNCOMMITTED -- commit Windows-side.**
+- **Known cosmetic nit (OPEN):** `show config` sometimes leaves `P00>>>PuTTY`. EmulatR
+  doesn't populate the SROM-revision field, so `SHOW_CONFIG_PC264.C:325` prints an
+  uninitialized `char[10]` containing a stray `ENQ` (0x05); PuTTY's answerback transmits
+  `PuTTY` back, remote-echoed at the prompt. Client-specific, cosmetic. Real fix: populate/
+  sanitize the SROM-rev field or strip control bytes on console TX.
+- **NEW WORKSTREAM -- ES40 "Clipper" SRM bring-up to `>>>`.** ES40 SRM build symbol =
+  CLIPPER, pc264 family, GCT__TSUNAMI, "Compaq AlphaServer ES40". ini set model=ES40,
+  cpuCount=1 (else GCT spins on absent secondaries), MEM 4 GiB (32 MB-aligned per CLIPPER
+  GCT data). Trace-capture launcher prepped: `out/build/relwithdebinfo/run_es40_srm_trace.sh`
+  ("I prep, you run" -- Claude can't execute the Windows binary). **First trace NOT yet
+  captured.** Watch-outs: (1) cold boot may spin in the cbox MCHK path -- cap with
+  `--max-cycles`; (2) confirm `es40_v7_3_platform.json` loads (missing -> silent fallback
+  to the DS10 bus = wrong device set); (3) clear `oem_string` or the banner masks the
+  platform name.
+- **Windows-instability risk to in-progress work:** host hit a Kernel-Power 0x9F
+  `DRIVER_POWER_STATE_FAILURE` bugcheck mid-sleep (2026-06-30); crash dumps being enabled.
+
+## 2026-07-01 -- Cowork project folder: connect D:\EmulatR, NOT the "EmulatR (1)" copy.
+
+The canonical project root on the PC is `D:\EmulatR`. Cowork had auto-connected a
+duplicate copy `D:\EmulatR (1)` (the " (1)" suffix marks a stray copy). Reconnected
+to `D:\EmulatR` so the git-tracked tree is the working set. If a future session opens
+against `EmulatR (1)`, re-point it at `D:\EmulatR` before doing any work -- edits made
+in the copy are lost / diverge from git.
+
 ## 2026-06-29 (EOD) -- DS20 badge: IIC-INTERRUPT THEORY DISPROVEN; IIC runs POLLED. Cause still OPEN.
+
+**[SUPERSEDED by the 2026-07-01 entry above -- badge SOLVED 2026-06-30. The "OPEN QUESTION"
+and A-vs-B trace below are RESOLVED: neither A nor B; the real cause was a missing manifest
+discriminator device (`iic_rcm_temp` @ node 0x9e), and the running binary probes 0x9e, not the
+`iic_ocp0` @ 0x40 assumed throughout this entry. The DISPROVEN/polled facts here remain correct;
+the node-0x40 focus was a red herring. Retained for the trace-infra tool-state notes only.]**
 
 **Headline: the "AlphaPC 264DP" badge is NOT caused by a missing IIC completion interrupt.
 Direct measurement shows the DS20 V7.3-2 IIC driver runs POLLED -- ENI (0x08) is never written
@@ -49,8 +115,10 @@ trace below; do NOT re-assume a mechanism. Full correction: `journals/20260629_d
 
 ## 2026-06-29 -- DS20 badge ROOT-CAUSED from apisrm source: incomplete iic_ocp0 open interface
 
-**[PARTLY SUPERSEDED by the 2026-06-29 (EOD) entry above -- the get_sysvar chain here is correct,
-but the "incomplete open / interrupt" conclusion was disproven: the IIC is polled.]**
+**[SUPERSEDED -- badge SOLVED 2026-06-30 (see 2026-07-01 entry above). The get_sysvar/member
+mechanism here is correct, but the specific device was wrong: the running V7.3-2 binary probes
+`iic_rcm_temp` @ node 0x9e, NOT `iic_ocp0` @ 0x40 (0x40 = OCP LED, on both models, can't
+discriminate). Fix was a one-line manifest add of node 0x9e -- no interface/open/interrupt work.]**
 
 
 **Headline: the "AlphaPC 264DP" badge is a deterministic consequence of `fopen("iic_ocp0")`

@@ -19,6 +19,11 @@ the project.
 When the user says "the project" without qualification, assume V4
 (`EmulatRAppUniV4`).
 
+**Canonical folder: `D:\EmulatR` (PC).** Do NOT work against `D:\EmulatR (1)`
+or any other " (N)" copy -- that is a stray duplicate, not the git-tracked tree.
+If a Cowork session is connected to such a copy, re-point it at `D:\EmulatR`
+before making changes.
+
 ## Reference documentation — read the index, not every PDF
 
 `D:\EmulatR\Processor Support\` contains a large library of Alpha CPU

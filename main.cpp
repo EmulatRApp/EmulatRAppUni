@@ -69,6 +69,7 @@
 #include "traceLib/DecListingSink.h"
 #include "traceLib/PaDump.h"
 #include "traceLib/RetireProfiler.h"   // 2026-06-08: totalRetires() for PROFILE line (task #10)
+#include "deviceLib/BadgeMhzGauge.h"    // 2026-07-01: live effMhz for cosmetic UART badge rewrite
 #if defined(EMULATR_FP_SOFTFLOAT)
 #include "fpBoxLib/fp_host_guard.h"    // 2026-06-10: host-FP safety self-test (task #26 Phase A)
 #endif
@@ -679,6 +680,11 @@ int main(int argc, char* argv[])
     // and emit a PROFILE line so cold-boot-to->>> throughput is measurable.
     // ------------------------------------------------------------------
     [[maybe_unused]] auto const profT0 = std::chrono::steady_clock::now();
+    // 2026-07-01: arm the effective-MHz gauge so the UART TX path can rewrite
+    // the SRM banner's "100 MHz" with the live MHz_eff at the instant it
+    // streams.  EmulatR-side telemetry only; never written into guest state.
+    deviceLib::badge::bindCycleCount(&mach.cpu().cycleCount);
+    deviceLib::badge::markRunStart();
     // try/catch so an exception escaping the run cannot bypass the destructor
     // flush: `mach` is a main()-local, so falling through here (instead of
     // letting the exception propagate to std::terminate) guarantees
@@ -696,7 +702,11 @@ int main(int argc, char* argv[])
             "~Machine flushes the flash NVRAM\n");
     }
     [[maybe_unused]] auto const profT1 = std::chrono::steady_clock::now();
-#if EMULATR_BRINGUP_PROBES
+    // PROFILE + WARP-ACCOUNTING: one-shot end-of-run summary.  Moved OUT of the
+    // EMULATR_BRINGUP_PROBES gate 2026-06-30 -- it is a single exit-time line
+    // (zero hot-path cost, unlike the per-step probes the gate is meant for), and
+    // the perf gauge must be present on normal/release builds to serve as a
+    // build-relative performance check (trace vs debug vs release).
     double             const profSecs    = std::chrono::duration<double>(profT1 - profT0).count();
     unsigned long long const profCycles  = static_cast<unsigned long long>(mach.cpu().cycleCount);
     unsigned long long const profRetires = static_cast<unsigned long long>(traceLib::RetireProfiler::totalRetires());
@@ -723,7 +733,6 @@ int main(int argc, char* argv[])
               << "  MHz_eff="  << mhzEff
               << "  K="        << warpK
               << '\n';
-#endif
 
     // ------------------------------------------------------------------
     // Post-mortem dump to stdout.

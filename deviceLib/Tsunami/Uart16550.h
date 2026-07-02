@@ -135,11 +135,13 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>                              // std::getenv (console-snapshot gate)
+#include <cstring>                              // std::memcmp (badge suffix match)
 #include <deque>
 #include <string>
 #include <QDataStream>                          // snapshot serialize seam (v2)
 #include "chipsetLib/IDeviceHandlers.h"         // IIoPortHandler
 #include "deviceLib/IConsoleDevice.h"           // IConsoleDevice backend
+#include "deviceLib/BadgeMhzGauge.h"            // 2026-07-01: live effMhz for badge rewrite
 
 class Uart16550 : public IIoPortHandler
 {
@@ -222,6 +224,10 @@ public:
         m_threLatch    = false;
         m_lsrSticky    = 0x00;
         m_rxFifo.clear();
+        // Drop any withheld badge-rewrite bytes (transient TX-side only).
+        m_badgeState = BadgeState::Normal;
+        m_badgePend.clear();
+        m_badgeSuf.clear();
     }
 
     // ========================================================================
@@ -610,6 +616,13 @@ private:
     std::chrono::steady_clock::time_point m_mirrorLast{};
     bool                                  m_mirrorFirst = true;
 
+    // 2026-07-01: cosmetic "<n> MHz" badge-rewrite TX state (see badgeTxEmit).
+    // Transient, NOT serialized -- empty at every line boundary.
+    enum class BadgeState { Normal, Digits, Suffix };
+    BadgeState  m_badgeState = BadgeState::Normal;
+    std::string m_badgePend;   // withheld digit run
+    std::string m_badgeSuf;    // withheld bytes matched against " MHz"
+
     // ========================================================================
     // Register behavior implementations
     // ========================================================================
@@ -675,13 +688,140 @@ private:
      */
     void writeTHR(uint8_t value) noexcept
     {
-        consoleMirror(value);   // gated, timestamped stderr mirror (#7 gate / #5,#8 profile)
-
-        if (m_backend) {
-            m_backend->putChar(value);
-        }
+        // 2026-07-01: cosmetic badge rewrite.  The console stream goes through
+        // badgeTxEmit(), which replaces the digits of any "<n> MHz" token with
+        // the live effective MHz (see badgeTxEmit).  Emitted bytes fan out to
+        // BOTH the backend and the stderr console mirror (badgeEmitByte), so
+        // the injected value is visible in headless/batch runs captured via
+        // EMULATR_CONSOLE_MIRROR (e.g. 2> run.log), not just in an attached
+        // PuTTY.  The raw firmware value (100) is a known constant if needed.
+        badgeTxEmit(value);
 
         m_threLatch = true;     // THR empty again (instantaneous TX)
+    }
+
+    // ------------------------------------------------------------------------
+    // Cosmetic "<n> MHz" badge rewrite on the console TX stream (2026-07-01).
+    // ------------------------------------------------------------------------
+    // The SRM banner speed ("AlphaServer DS20 100 MHz") is a firmware compile-
+    // time constant surfaced by the ISP path (see BadgeMhzGauge.h).  We edit
+    // only the bytes leaving the console: a small state machine withholds a
+    // "<digits> MHz" token and substitutes the live MHz_eff for its digits.
+    // Everything else -- including the ">>>" prompt (no digits) -- passes
+    // through unbuffered, so streaming/interactivity is unchanged.  Guest
+    // memory and the functional HWRPB CC_FREQ field are never touched.
+    //
+    // Withholding is bounded: at most a run of digits plus up to 4 lookahead
+    // bytes (" MHz").  Any newline or divergence from " MHz" flushes the
+    // withheld bytes verbatim.  These buffers are transient and NOT serialized
+    // (they are empty at every line boundary, hence at any snapshot point).
+
+    void badgeEmitByte(uint8_t b) noexcept
+    {
+        consoleMirror(b);           // gated stderr mirror sees the rewritten bytes
+        if (m_backend) {
+            m_backend->putChar(b);
+        }
+    }
+
+    void badgeEmitBytes(char const* s, std::size_t n) noexcept
+    {
+        for (std::size_t i = 0; i < n; ++i) {
+            badgeEmitByte(static_cast<uint8_t>(s[i]));
+        }
+    }
+
+    // Flush any withheld digit/suffix bytes verbatim and return to Normal.
+    void badgeFlushPending() noexcept
+    {
+        if (!m_badgePend.empty()) {
+            badgeEmitBytes(m_badgePend.data(), m_badgePend.size());
+            m_badgePend.clear();
+        }
+        if (!m_badgeSuf.empty()) {
+            badgeEmitBytes(m_badgeSuf.data(), m_badgeSuf.size());
+            m_badgeSuf.clear();
+        }
+        m_badgeState = BadgeState::Normal;
+    }
+
+    void badgeTxEmit(uint8_t value) noexcept
+    {
+        char const  c        = static_cast<char>(value);
+        bool const  isDigit  = (value >= '0' && value <= '9');
+        char const* const kSuffix = " MHz";   // token tail we rewrite before
+        std::size_t const kSuffixLen = 4;
+
+        switch (m_badgeState) {
+        case BadgeState::Normal:
+            if (isDigit) {
+                m_badgePend.assign(1, c);        // begin withholding a digit run
+                m_badgeState = BadgeState::Digits;
+            } else {
+                badgeEmitByte(value);
+            }
+            return;
+
+        case BadgeState::Digits:
+            if (isDigit) {
+                if (m_badgePend.size() < 24) {   // cap: no real speed field is this long
+                    m_badgePend.push_back(c);
+                } else {
+                    // Absurd digit run -- not a speed field; flush and move on.
+                    badgeFlushPending();
+                    badgeEmitByte(value);
+                }
+                return;
+            }
+            // Digit run ended; begin matching the " MHz" suffix with this byte.
+            m_badgeSuf.clear();
+            m_badgeState = BadgeState::Suffix;
+            [[fallthrough]];
+
+        case BadgeState::Suffix: {
+            m_badgeSuf.push_back(c);
+            std::size_t const n = m_badgeSuf.size();
+            bool const stillPrefix =
+                (n <= kSuffixLen)
+                && (std::memcmp(m_badgeSuf.data(), kSuffix, n) == 0);
+            if (stillPrefix) {
+                if (n == kSuffixLen) {
+                    // Full "<digits> MHz" -- substitute the live effective MHz,
+                    // right-justified to the original digit-field width so the
+                    // firmware's "%3d" column alignment is preserved.
+                    unsigned const    v   = deviceLib::badge::effMhzNow();
+                    std::string       rep = std::to_string(v);
+                    while (rep.size() < m_badgePend.size()) {
+                        rep.insert(rep.begin(), ' ');
+                    }
+                    badgeEmitBytes(rep.data(), rep.size());
+                    badgeEmitBytes(m_badgeSuf.data(), m_badgeSuf.size());
+                    m_badgePend.clear();
+                    m_badgeSuf.clear();
+                    m_badgeState = BadgeState::Normal;
+                }
+                // else: partial " MHz" match -- keep withholding.
+            } else {
+                // Not a speed token.  Flush the withheld digit run verbatim,
+                // then re-feed the suffix bytes from Normal so that a digit
+                // which begins a NEW token is re-withheld rather than leaked.
+                // This matters because the model name "DS20" abuts the real
+                // speed ("...DS20 100 MHz"): the "20" is a false digit run
+                // whose mismatch must not swallow the leading "1" of "100".
+                std::string suf;
+                suf.swap(m_badgeSuf);
+                if (!m_badgePend.empty()) {
+                    badgeEmitBytes(m_badgePend.data(), m_badgePend.size());
+                    m_badgePend.clear();
+                }
+                m_badgeState = BadgeState::Normal;
+                for (char const sc : suf) {
+                    badgeTxEmit(static_cast<uint8_t>(sc));
+                }
+            }
+            return;
+        }
+        }
     }
 
     // Console output mirror to stderr -- gated, line-buffered, timestamped.
