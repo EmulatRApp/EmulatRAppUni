@@ -31,22 +31,42 @@ Follow-up debugging (lldb + the authoritative `$cserve_def` from
   `write8` crash. The `CSERVE 0x66` storm is just the last thing logged before the
   faulting store.
 
-**Suspected mechanism / fix:** `write8` computes
-`pidx = static_cast<uint32_t>(pa >> kPageShift)` (`GuestMemory.cpp:240`; same
-truncation on the read paths, lines 199/223) and relies solely on
-`ensurePage(pidx)`'s `pidx >= m_pageCount` check. There is **no explicit
-`pa >= m_size` upper-bound guard**, and the `uint32_t` truncation can alias a PA
-outside backed RAM. **Recommended fix:** add an explicit bound at the top of the
-byte accessors — `if (pa >= m_size) return MemStatus::OutOfRange;` (or route
-above-RAM PAs to the MMIO path) — and, to capture the exact offending PA in one
-line, log `pa` when `pa >= m_size`. This is a host-robustness bug worth fixing
-regardless of ES40: **a guest store to an out-of-range PA must not segfault the
-emulator.**
+## CONFIRMED root cause + fix (2026-07-02, later still) — sparse-page straddle
 
-**Revised next action (replaces #1 below):** fix `GuestMemory::write8`
-out-of-range handling; re-run ES40; capture the offending PA to learn what the
-firmware's CSERVE-0x66 memory op is actually addressing; only then revisit the
-IIC/device phase.
+The out-of-range/truncation hypothesis above was **disproven and replaced by a
+confirmed one**. Adding a `pa >= m_size` guard did **not** fire (no OOB) yet the
+crash persisted at the identical cycle — so the faulting PA is **in-bounds**.
+
+**Root cause (confirmed): a multi-byte access that crosses a 64 KB sparse-page
+boundary.** `GuestMemory` is a sparse pager: each 64 KB page is a *separate*
+allocation (`allocPage()` → per-page `mmap`/`calloc`). The accessors do
+`memcpy(&page[pa & kPageMask], …, N)` with **no page-boundary check**, so when an
+**unaligned** N-byte access lands within N-1 bytes of a page's end, the `memcpy`
+spills past that page into the next, unrelated allocation → **SIGSEGV** (or silent
+corruption for `calloc` pages). The ES40 SRM memory scan issues exactly such
+unaligned 8-byte stores (the `UNALIGN-FIXUP` events). The captured culprit:
+
+```
+WRITE8-CROSS pa=0xc03dfff9 off=0xfff9      ← offset 0xFFF9, 8 bytes → spills into next page
+```
+
+Note `0xC03DFFF9` is ~3 GB — **well inside** the 4 GB backing. It crosses an
+*internal 64 KB page boundary*, **not** the RAM bound. So this is **not** a
+4 GB-vs-32 GB memory-sizing issue; total RAM is irrelevant. It is a pure
+sparse-memory host bug, latent for any guest doing an unaligned page-crossing
+access (loads too).
+
+**Fix (applied):** in all six multi-byte accessors (`read2/4/8`, `write2/4/8`),
+detect `((pa & kPageMask) > kPageMask - (N-1))` and split the access byte-wise via
+`read1`/`write1`, so each byte resolves to its own page; otherwise the fast
+`memcpy` path is unchanged. `write1`/`read1` are inherently single-page and already
+safe.
+
+**Verification:** with the fix, ES40 runs clean **past** the old crash point to my
+`--max-cycles` cap (301,989,888 cycles, exit = MaxCyclesExceeded, **no SIGSEGV**);
+the full unit suite passes (472 cases / 6058 assertions, 0 failed). ES40 does not
+yet reach `>>>` — 302 M was the test ceiling, not a fault; a longer/uncapped run is
+the next check.
 
 ---
 
