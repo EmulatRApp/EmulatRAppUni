@@ -1336,7 +1336,8 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_IVA_FORM:
         value = coreLib::computeVaForm(coreLib::iCtlVptb(c.cpu->i_ctl),
             c.cpu->excAddr,
-            coreLib::iCtlIsVaForm32(c.cpu->i_ctl));
+            coreLib::iCtlIsVaForm32(c.cpu->i_ctl),
+            coreLib::iCtlIsVa48(c.cpu->i_ctl));
 #if EMULATR_MEMDIAG
         {
             // MEMDIAG-VAFORM probe: confirm what PALcode actually sees
@@ -1360,9 +1361,10 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 #endif
         break;
     case coreLib::HW_VA_FORM:
-        value = coreLib::computeVaForm(c.cpu->va_ctl & uint64_t{ 0xFFFFFFFFC0000000 },
+        value = coreLib::computeVaForm(c.cpu->va_ctl,
             c.cpu->va,
-            ((c.cpu->va_ctl >> 2) & uint64_t{ 1 }) != 0);
+            coreLib::vaCtlIsVaForm32(c.cpu->va_ctl),
+            coreLib::vaCtlIsVa48(c.cpu->va_ctl));
 #if EMULATR_MEMDIAG
         {
             // MEMDIAG-VAFORM probe: PALcode reads HW_VA_FORM in the

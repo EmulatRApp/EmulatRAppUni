@@ -94,7 +94,7 @@ RUN_DIR="${RUN_DIR:-$DEFAULT_RUN_DIR}"
 RUN_DIR="$(cd "$RUN_DIR" 2>/dev/null && pwd || true)"
 [[ -n "$RUN_DIR" ]] || { echo "FATAL: no dir with a built Emulatr.exe found (looked in out/build/relwithdebinfo, RelWithDebInfo, Debug). Build first, or set RUN_DIR to where Emulatr.exe is."; exit 1; }
 cd "$RUN_DIR"
-if [[ "${RUN_DIR,,}" != *relwithdebinfo* ]]; then
+if [[ "$(printf '%s' "$RUN_DIR" | tr '[:upper:]' '[:lower:]')" != *relwithdebinfo* ]]; then
     echo "WARN: RUN_DIR is $RUN_DIR (not RelWithDebInfo). Diag instruments need a non-Release build; a Release exe here will emit NO GMEM-WATCH/IIC/.trc lines."
 fi
 
@@ -212,6 +212,13 @@ echo "  extra    : $*"
 echo "============================================================="
 
 # ---- launch ----------------------------------------------------------------
+# NOTRACE=1 drops the heavy per-retire dec/machine trace (roughly 2x faster);
+# stderr diagnostics (MEMDIAG-*, banner, GMEM-WATCH) are unaffected.
+TRACE_ARG=(--trace "$DEC_LOG,$MACHINE_LOG")
+if [ "${NOTRACE:-0}" = "1" ]; then
+    TRACE_ARG=()
+    echo "  trace    : DISABLED (NOTRACE=1) -- stderr MEMDIAG probes only"
+fi
 set +e
 "./$BIN" \
     --firmware "$DST_FW" \
@@ -219,7 +226,7 @@ set +e
     --no-autoload \
     --autosnapshot off \
     --max-cycles "$MAXCYC" \
-    --trace "$DEC_LOG,$MACHINE_LOG" \
+    ${TRACE_ARG[@]+"${TRACE_ARG[@]}"} \
     "$@" 2>&1 | tee "$CONSOLE_LOG"
 RC=${PIPESTATUS[0]}
 set -e
