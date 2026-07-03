@@ -653,7 +653,14 @@ void SRMConsoleDevice::launchPutty()
     // 2026-06-02: flag and value MUST be separate argv tokens (Qt quotes
     // each list element verbatim); a trailing space made PuTTY reject
     // "-sessionlog " as an unknown option.
-    args << "-sessionlog" << "d:/emulatr/traces/app_output_&Y&M&D&T.log";
+    // Per-instance, run-dir-relative sessionlog.  Concurrent Machines (DS10 /
+    // DS20 / ES40 side by side) must NOT share or clobber one logfile, and the
+    // old absolute "d:/emulatr/traces/" is frequently absent on the build tree.
+    // The console port disambiguates instances; the file lands in the run dir's
+    // traces/ (PuTTY, started detached, inherits the emulator's CWD).  PuTTY
+    // still expands the &Y&M&D&T date/time tokens itself.
+    args << "-sessionlog"
+         << QString("traces/putty_console_p%1_&Y&M&D&T.log").arg(m_config.port);
     args << "localhost";
 
     SPDLOG_INFO("SRM Console: Launching PuTTY: {} {}",
