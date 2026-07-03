@@ -246,6 +246,15 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::read2(coreLib::PAType pa, uint16_t& out) const noexcept {
+        if ((pa & kPageMask) > kPageMask - 1u) {   // crosses a 64KB page boundary
+            uint16_t v = 0;
+            for (unsigned i = 0; i < 2u; ++i) {
+                uint8_t b = 0; (void)read1(pa + i, b);
+                v |= static_cast<uint16_t>(static_cast<uint16_t>(b) << (8u * i));
+            }
+            out = v;
+            return MemStatus::Ok;
+        }
         uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
         uint32_t offset = static_cast<uint32_t>(pa & kPageMask);
 
@@ -255,6 +264,15 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::read4(coreLib::PAType pa, uint32_t& out) const noexcept {
+        if ((pa & kPageMask) > kPageMask - 3u) {   // crosses a 64KB page boundary
+            uint32_t v = 0;
+            for (unsigned i = 0; i < 4u; ++i) {
+                uint8_t b = 0; (void)read1(pa + i, b);
+                v |= static_cast<uint32_t>(b) << (8u * i);
+            }
+            out = v;
+            return MemStatus::Ok;
+        }
         uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
         uint32_t offset = static_cast<uint32_t>(pa & kPageMask);
 
@@ -264,6 +282,15 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::read8(coreLib::PAType pa, uint64_t& out) const noexcept {
+        if ((pa & kPageMask) > kPageMask - 7u) {   // crosses a 64KB page boundary
+            uint64_t v = 0;
+            for (unsigned i = 0; i < 8u; ++i) {
+                uint8_t b = 0; (void)read1(pa + i, b);
+                v |= static_cast<uint64_t>(b) << (8u * i);
+            }
+            out = v;
+            return MemStatus::Ok;
+        }
         uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
         uint32_t offset = static_cast<uint32_t>(pa & kPageMask);
 
@@ -288,6 +315,11 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::write2(coreLib::PAType pa, uint16_t value) noexcept {
+        if ((pa & kPageMask) > kPageMask - 1u) {   // crosses a 64KB page boundary
+            for (unsigned i = 0; i < 2u; ++i)
+                (void)write1(pa + i, static_cast<uint8_t>(value >> (8u * i)));
+            return MemStatus::Ok;
+        }
         uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
         uint8_t* page = ensurePage(pidx);
         if (!page) return MemStatus::OutOfRange;
@@ -301,6 +333,11 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::write4(coreLib::PAType pa, uint32_t value) noexcept {
+        if ((pa & kPageMask) > kPageMask - 3u) {   // crosses a 64KB page boundary
+            for (unsigned i = 0; i < 4u; ++i)
+                (void)write1(pa + i, static_cast<uint8_t>(value >> (8u * i)));
+            return MemStatus::Ok;
+        }
         uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
         uint8_t* page = ensurePage(pidx);
         if (!page) return MemStatus::OutOfRange;
@@ -314,6 +351,11 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::write8(coreLib::PAType pa, uint64_t value) noexcept {
+        if ((pa & kPageMask) > kPageMask - 7u) {   // crosses a 64KB page boundary
+            for (unsigned i = 0; i < 8u; ++i)
+                (void)write1(pa + i, static_cast<uint8_t>(value >> (8u * i)));
+            return MemStatus::Ok;
+        }
         uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
         uint8_t* page = ensurePage(pidx);
         if (!page) return MemStatus::OutOfRange;
