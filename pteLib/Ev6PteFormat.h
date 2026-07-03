@@ -98,8 +98,10 @@ constexpr uint64_t kItbPteLowFieldMask = uint64_t{0x0F70}; // 4,5,6,8..11
 // Decode a DTB_PTE0/DTB_PTE1 register value into a canonical AlphaPte.
 [[nodiscard]] inline AlphaPte canonicalFromDtbPte(uint64_t reg) noexcept
 {
-    uint64_t const pfnMask = (uint64_t{1} << AlphaPteBits::kPfnWidth) - 1;
-    uint64_t const pfn     = (reg >> 32) & pfnMask;          // PA[43:13] at [62:32]
+    // DTB_PTE0/1 carries PA[43:13] at register bits [62:32] (31 bits) per
+    // HRM Fig 5-27; bit 63 is a reserved/OS-software flag and must NOT enter the
+    // PFN (matches AlphaPte.h's stated 'bit 63 masked' contract).  [2026-07-02]
+    uint64_t const pfn     = (reg >> 32) & ((uint64_t{1} << 31) - 1); // PA[43:13] @ [62:32]
     uint64_t const low     = reg & kDtbPteLowFieldMask;      // FOR,FOW,ASM,GH,R/W
 
     AlphaPte p;
@@ -113,8 +115,9 @@ constexpr uint64_t kItbPteLowFieldMask = uint64_t{0x0F70}; // 4,5,6,8..11
 // Decode an ITB_PTE register value into a canonical AlphaPte.
 [[nodiscard]] inline AlphaPte canonicalFromItbPte(uint64_t reg) noexcept
 {
-    uint64_t const pfnMask = (uint64_t{1} << AlphaPteBits::kPfnWidth) - 1;
-    uint64_t const pfn     = (reg >> 13) & pfnMask;          // PA[43:13] natural pos
+    // ITB_PTE carries PFN=PA[43:13] at its NATURAL register position [43:13]
+    // (31 bits) per HRM Fig 5-9 -- distinct from DTB_PTE0's [62:32].  [2026-07-02]
+    uint64_t const pfn     = (reg >> 13) & ((uint64_t{1} << 31) - 1); // PA[43:13] @ [43:13]
     uint64_t const low     = reg & kItbPteLowFieldMask;      // ASM,GH,read enables
 
     AlphaPte p;
