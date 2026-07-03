@@ -120,6 +120,17 @@ starting net-new architectural work in the same area.
   short-term; a full tulip model is the larger lift. To pin the exact
   device, a one-shot STORE-WATCH on PA 0x800_FFFF_00xx gives the storing
   PC. LOWER PRIORITY than the path to `>>>` (this does not block boot).
+- **`Ev6Translator` harvest (reference -> V4)** -- an emailed reference
+  translator (`journals/ref_ev6Translation_struct_20260702.h`) supplies pieces
+  the in-tree `mmuLib/Ev6Translator.h` lacks: a 3-level HW page-table walk, DTB/
+  ITB PTE register-format converters (for `HW_MTPR/MFPR ITB_PTE/DTB_PTE`),
+  alignment-before-translation fault ordering, and VA-form-aware (43/48-bit)
+  segment decode. HARVEST-ONLY, NOT drop-in: foreign deps (Ev6SPAMShardManager,
+  HWPCB, PendingEvent, QMutex) + its own defects (kseg SPE still 48-bit-hardcoded;
+  walk omits the mode KRE/URE check). Full plan + do/don't list:
+  `journals/20260702_ev6translator_harvest_task.md`. SEQUENCE AFTER the ES40 R16
+  backtrace -- the ACV loop root is a garbage pointer, not the translator, though
+  the alignment-order + VA-form items may correct the fault classification.
 
 ---
 

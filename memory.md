@@ -1592,3 +1592,23 @@ Machine/GuestMemory, then add `EMULATR_DUMP_PA` + the MEMDSC decoder. The 264DP/
 is ONE PARALLEL ledger item, NOT the OS-boot critical path. NO instrument code landed today
 (plan/journal/memory only). Also this session: fixed the ini `model = ES40` -> `DS20` mismatch
 that was silently booting DS20 firmware on an ES40 chipset (platform now latches DS20/DS20).
+
+**2026-07-02 (Mac session).** (1) FIXED the ES40 boot SIGSEGV: `GuestMemory` is a sparse
+per-64KB-page pager; the multi-byte accessors `memcpy`'d across a page boundary and overran into
+the next (separate) allocation. An unaligned page-crossing store during the ES40 SRM memory scan
+(`write8 pa=0xC03DFFF9 off=0xFFF9`, ~cyc 282M) crashed it. Fix (commit `46151a0`): split
+page-crossing accesses byte-wise in all six accessors `read2/4/8`+`write2/4/8`. Latent host bug
+for ANY guest doing an unaligned page-crossing load/store; not ES40-specific. Verified: ES40 now
+runs clean to 2.46B cyc (no SIGSEGV); full unit suite green (472/6058). (2) NEW ES40 blocker after
+the fix: an infinite `kFaultAcv` loop -- `LDQ R0,0(R16)` @ pc `0x1b7dd4`, VA=R16=`0xFFFFFFFF7F827F5F`
+(misaligned 7-mod-8, canonical seg1 `VA<47:46>=0b11`), Kernel mode, ~1.8M-cyc period from cyc 282M.
+R16 is a GARBAGE pointer -> the SRM walks off into invalid high memory. ACV is a SYMPTOM; root =
+where R16 is miscomputed (upstream). NEXT: `tools/trace_reg_backtrace.py --reg R16 --pc 0x1b7dd4`
+on an ES40 retire trace (needs `EMULATR_TRACE_HOOKS=ON` build + the verbose `INS ...ops=...result=`
+channel from `DecListingSink.cpp:547`, NOT the compact `RET` .trc; and a late trace-arm over ~282M).
+(3) TASKED (deferred): harvest the emailed reference translator `journals/
+ref_ev6Translation_struct_20260702.h` into `mmuLib/Ev6Translator.h` -- it is complementary (3-level
+HW page-walk, DTB/ITB PTE register-format converters, alignment-before-translation ordering,
+VA-form-aware segment decode) but NOT drop-in (foreign deps; its own kseg-48bit-hardcode +
+walk-permission gaps). Full harvest plan: `journals/20260702_ev6translator_harvest_task.md`.
+Sequence AFTER the R16 backtrace.
