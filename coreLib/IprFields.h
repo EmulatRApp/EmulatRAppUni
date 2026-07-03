@@ -294,28 +294,52 @@ constexpr uint64_t kICtlVptbLowMask     = uint64_t{0x3FFFF} << 30;   // bits 47:
     return lower;
 }
 
-// VA_FORM / IVA_FORM value (HRM 5.1.4).  Returns the virtual address of
-// the PTE that maps `faultVa` in the self-mapped page table:
+// VA_FORM / IVA_FORM value (HRM 5.1.5, Figures 5-5/5-6/5-7).  Returns the
+// virtual address of the PTE that maps `faultVa` in the self-mapped page
+// table.  There are THREE forms, selected by VA_CTL/I_CTL[VA_48] and
+// [VA_FORM_32]; each places a different VPTB slice, a different VPN width,
+// and (48-bit only) a sign-extension segment:
 //
-//     VA_FORM = VPTB | (VPN << 3),   VPN = faultVa >> 13  (8 KiB page)
+//   Fig 5-5  VA_48=0, VA_FORM_32=0  (43-bit OSF/VMS default)
+//       [63:33]=VPTB[63:33]  [32:3]=VA[42:13]        [2:0]=0
+//   Fig 5-6  VA_48=1, VA_FORM_32=0  (48-bit)  -- THREE fields
+//       [63:43]=VPTB[63:43]  [42:38]=SEXT(VA[47])  [37:3]=VA[47:13]  [2:0]=0
+//   Fig 5-7  VA_48=0, VA_FORM_32=1  (NT 32-bit)
+//       [63:30]=VPTB[63:30]  [21:3]=VA[31:13]        [2:0]=0
 //
-// `vptb` is the page-table base already masked in place (iCtlVptb for the
-// I-side, va_ctl & kVaCtlVptbMask for the D-side).  `form32` selects the
-// NT 32-bit VPN width; clear selects the 43-bit OSF/VMS default.  PALcode
-// reads VA_FORM (D-side, faulting data VA) or IVA_FORM (I-side, EXC_ADDR)
-// on a TB miss to locate and load the PTE.  Formula matches EV5 SIMH
-// (FMT_*VA_* = vptbr | ((x >> 10) & mask)) and the EV6 AXPBox walk; both
-// reference emulators compute it -- V4 previously returned 0, starving the
-// firmware's page-table walk.  The mask keeps VPN*8: VMS bits[32:3],
-// NT bits[21:3].
+// `vptb` is passed in its full register position (va_ctl for the D-side,
+// iCtlVptb(i_ctl) for the I-side); this function applies the per-form VPTB
+// mask, so control bits below the mask are stripped here -- do NOT pre-mask
+// at the call site.  Applying the correct per-form VPTB mask also fixes the
+// former [63:30] overlap into the VPN field (latent for VPTB<32:30> != 0).
+//
+// The 48-bit SEXT(VA[47]) segment is trace-confirmed only for VA[47]=0 (the
+// ES40 4GB memory-fill self-map miss, cyc 250M, va=0x080103fb2000); the
+// VA[47]=1 half is exercised by doctest vector V2, not yet by a live trace.
+// PALcode reads VA_FORM (D-side, faulting VA) or IVA_FORM (I-side, EXC_ADDR)
+// on a TB miss to locate and load the PTE.
 [[nodiscard]] constexpr uint64_t computeVaForm(uint64_t vptb,
                                                uint64_t faultVa,
-                                               bool     form32) noexcept
+                                               bool     form32,
+                                               bool     va48) noexcept
 {
-    uint64_t const vpnByteField =
-        form32 ? uint64_t{0x00003FFFF8}    // NT  : VPN<31:13> -> bits[21:3]
-               : uint64_t{0x1FFFFFFF8};    // VMS : VPN<42:13> -> bits[32:3]
-    return vptb | ((faultVa >> 10) & vpnByteField);
+    if (form32) {
+        // Fig 5-7: VPTB[63:30] : VA[31:13] -> bits[21:3].
+        return (vptb & uint64_t{0xFFFFFFFFC0000000})
+             | ((faultVa >> 10) & uint64_t{0x00003FFFF8});
+    }
+    if (va48) {
+        // Fig 5-6: VPTB[63:43] : SEXT(VA[47])<42:38> : VA[47:13] -> bits[37:3].
+        uint64_t const sext = ((faultVa >> 47) & uint64_t{1}) != 0
+                                ? uint64_t{0x000007C000000000}   // bits[42:38] = 1
+                                : uint64_t{0};
+        return (vptb & uint64_t{0xFFFFF80000000000})
+             | sext
+             | ((faultVa >> 10) & uint64_t{0x0000003FFFFFFFF8});
+    }
+    // Fig 5-5: VPTB[63:33] : VA[42:13] -> bits[32:3].
+    return (vptb & uint64_t{0xFFFFFFFE00000000})
+         | ((faultVa >> 10) & uint64_t{0x00000001FFFFFFF8});
 }
 
 } // namespace coreLib
