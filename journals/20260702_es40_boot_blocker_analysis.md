@@ -398,3 +398,32 @@ the ACV cause. The ACV root stands: the page-walk reads a garbage PTE for the
 garbage VA `0xffffffff7f827f5f` (bad R16), consistent with `ptbr=0`. Next:
 `HW_MTPR PTBR` tracking + where R16's garbage value is computed upstream.
 ```
+
+---
+
+## PTBR / PT2 AUDIT (2026-07-02) — SRM is page-table-less here; a REAL latent gap for OS boot
+
+Checked whether `ptbr=0` is a dropped write (per architect's consideration).
+`HwrpbBuilder.cpp:95` starts the HWPCB with **PTBR=0 (boot ABI, no MMU yet)** —
+correct. Instrumented ALL page-table-base set paths on ES40 to the fault:
+- **SWPCTX** (loads `cpu.ptbr` from HWPCB+0x20): **0 calls**
+- **MTPR_VPTB** (`cpu.vptb`): **0 calls**
+- **HW_MTPR PT2** (`HW_PAL_TEMP_2` = OSF/1 working PTBR, `palTemp[2]`): **0 writes**
+
+So the ES40 SRM sets its page-table base by **no** path before the fault — it runs
+genuinely **page-table-less** (identity TB-fills; that's why legit VAs got `PA==VA`
+PTEs). `ptbr=0`/`PT2=0`/`vptb=0` are correct, NOT dropped. **This rules PTBR out as
+the ES40 ACV cause.** The ACV root stands: garbage R16 VA `0xffffffff7f827f5f`
+(from `BIS R0,R19 @ 0x6b884`) → identity-fill mangles the high PFN bits → ACV.
+
+**But the architect surfaced a REAL latent bug for eventual OS boot:** EmulatR's
+SWPCTX is a C++ **intrinsic** (`loadCpuFromHwpcb`) that sets the architectural
+`cpu.ptbr` but **does NOT propagate PTBR into `palTemp[2]` (PT2)**. On real OSF/1,
+the SWPCTX PALcode loads PTBR into PT2, and the **DTB-miss walker reads PT2**, not
+the architectural PTBR. So once an OS takes control and issues SWPCTX, EmulatR's
+walker context (PT2) stays 0 → the guest PAL walker runs off PT2=0 → exactly the
+"garbage PTE" failure, but then for *real* OS page tables. **FIX before OS boot:**
+`loadCpuFromHwpcb`/SWPCTX must mirror the loaded PTBR into `palTemp[2]` (and the OS
+personality's SYSPTBR into PT11), matching the OSF/1 PT assignment
+(`HW_IPR.h:224 PT2=PTBR`, `:233 PT11=SYSPTBR`). DEFERRED — does not affect the SRM
+ACV (SWPCTX never fires pre-OS).
