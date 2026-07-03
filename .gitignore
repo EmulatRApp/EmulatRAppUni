@@ -34,6 +34,15 @@ CTestTestfile.cmake
 compile_commands.json
 .cmake/
 
+# MSVC / Visual Studio generator output -- these are produced by CMake's VS
+# generator and must NOT be tracked. Builds now live under out/build/<preset>
+# (see CMakePresets.json), so no project/solution files belong in the tree.
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.qt/
+
 # Exception: the vendored SoftFloat host-config header (platform.h) lives
 # under a build/ path but is REQUIRED source, not build output -- a fresh
 # clone (any OS) cannot compile softfloat without it.  Re-include precisely

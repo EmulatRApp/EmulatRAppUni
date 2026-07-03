@@ -1,7 +1,7 @@
 {
   "version": 3,
   "configurePresets": [
-    { 
+    {
       "hidden": true,
       "name": "Qt",
       "cacheVariables": {
@@ -12,7 +12,19 @@
           "checksum": "wVa86FgEkvdCTVp1/nxvrkaemJc="
         }
       }
-    }
+    },
+    {
+      "hidden": true,
+      "name": "base",
+      "inherits": "Qt",
+      "comment": "All builds land under ./out/build/<preset>. Toolchain-agnostic: the generator is left to each platform's default so this preset does not dictate Ninja vs. Visual Studio.",
+      "binaryDir": "${sourceDir}/out/build/${presetName}"
+    },
+    { "name": "windows-release", "displayName": "Windows x64 Release", "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
+    { "name": "windows-debug",   "displayName": "Windows x64 Debug",   "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "mac-release",     "displayName": "Mac Release",         "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
+    { "name": "mac-diag",        "displayName": "Mac Release + Bringup Probes", "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "EMULATR_BRINGUP_PROBES": "ON" } },
+    { "name": "mac-debug",       "displayName": "Mac Debug",           "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } }
   ],
   "vendor": {
     "qt-project.org/Presets": {
