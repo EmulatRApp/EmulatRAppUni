@@ -10,6 +10,122 @@ them from here.
 
 ---
 
+## 2026-07-02 (pm) -- ES40 FIRST BOOT reviewed: IIC bus UNMAPPED (root gap) + concurrent-console fix
+
+**Headline: ES40 boots DEEP (manifest latched, SRM init through NVRAM access + memory
+test, get_sysvar seeds SYSVAR=0x5) but the ES40 IIC controller is UNMAPPED, so the badge
+discriminator can't resolve. This is the ES40 analog of the DS20 badge bug, one layer
+deeper.** Full review: `journals/20260702_es40_iic_base_unmapped_and_concurrent_console.md`
++ address landmarks in `journals/ES40_significant_address_regions_checkpoint_ref_20260702.md`.
+
+- **ROOT GAP -- ES40 IIC UNMAPPED.** `chipsetLib/TsunamiChipset.h:691 kIicBaseByModel`
+  has DS10 (0xFFFF0000) + DS20/DS20E (0xFFF80000) but NO ES40 row -> find-or-fail leaves
+  the PCF8584 range unregistered ("no proven IIC base for model 'ES40' -- IIC left
+  UNMAPPED"). The base is NOT chipset-fixed (DS10 != DS20 despite both Tsunami), so ES40's
+  must be MEASURED, not assumed. DS20 had a mapped bus missing a NODE (0x9e); ES40 has no
+  bus at all -> get_sysvar's discriminator fopen has no controller -> member can't resolve;
+  manifest IIC nodes are moot until the base exists. IicPcf8584 model itself is fine.
+- **RETRACTED + RE-CORRECTED (2026-07-02 pm, via Mac Claude Code 512M-cycle run):** my PC
+  read was WRONG on two counts, both because my PC runs were STOPPED at ~282M (and the console
+  MUTES the unalign storm after 16 lines, so it LOOKED wedged). (1) The pc=0x5afac "hang" is
+  NOT a hang -- it is the native-SRM memory scan; it PROGRESSES. A 512M-cycle Mac run shows
+  ES40 clear decompression + PAL reloc (->0x8000) into native SRM (0x1bxxxx) and run to ~282M.
+  (2) **The IIC is NOT the current blocker** -- the "IIC UNMAPPED" line prints at chipset
+  CONSTRUCTION, before the CPU runs; in 512M cycles the firmware never reaches IIC/PCI device
+  code (zero IIC/PCI/UNHANDLED traffic). **The REAL blocker is unimplemented CSERVE func 0x66
+  (102):** ES40 storms ~1300 `CSERVE 0x66` calls from PC 0x1b78f8 (~279.9M-282.06M), which
+  EmulatR no-ops (`PalEntries.cpp` implements only a short list; 0x66 -> reserved/no-op); the
+  run dies abnormally at cyc 282,057,652. Register args (R17=region base 0xC0000000/0x40000000,
+  R18=~0x7fffa count, R4=masks) => a memory scrub/scan service the SRM expects PAL to perform;
+  no-op'ing it derails boot. **IIC FIX REVERTED:** the `{ "ES40", 0xFFF80000ULL }` row +
+  iicBaseRequired + TODO edits in `TsunamiChipset.h` are UNDONE -- ES40 back to deliberately
+  UNMAPPED. Reason: the mechanism is CONTESTED -- my pc264_io.c (0xFFF80000 PCF8584) is the
+  OLDER CLIPPER tree; the NEWER `srmconsole/5.8/PC264` tree routes ES40=SHARK to the **ALi
+  M1543C SMBus** (base programmable via M7101 PCI cfg SBASMB 0x14), corroborated by EmulatR's
+  own ES40 I2C stubs (Cchip MPD static 0xFF; ALi SMBus not modeled). V7.3 late => SHARK/M1543C
+  likely => a fixed-base row is the WRONG mechanism. Full analysis:
+  `journals/20260702_es40_boot_blocker_analysis.md` (Claude Code, Mac).
+- **CSERVE 0x66 DECODED FROM SOURCE (2026-07-02, PC) -- KEY REFINEMENT:** the authoritative
+  `ev6_pc264_pal_defs.mar:59` `$cserve_def` is: SET_HWE=8, CLEAR_HWE=9, WRITE_BAD_CHECK_BITS=10,
+  LDLP=16, STLP=17, PC264_INT_ENABLE=52, PC264_INT_DISABLE=53, HALT=64(0x40), WHAMI=65(0x41),
+  **START=66(0x42)**, CALLBACK=67(0x43), MTPR_EXC_ADDR=68, JUMP_TO_ARC=69, BLOCK_INT=99,
+  UNBLOCK_INT=100, **MP_WORK_REQUEST=101(0x65)**. The LAST defined code is 101/0x65; **there is
+  NO 102/0x66 in either the OSF or VMS pc264 PAL def** (full apisrm sweep = zero hits).
+  CSERVE$START is 66 DECIMAL = 0x42, NOT 0x66. So Claude Code's "CSERVE func=0x66 (102)" is
+  **one past the last real code and UNDEFINED in the spec** -- it is NOT a documented service to
+  implement. IMPLICATIONS (verify next): (a) the real VMS PAL falls undefined CSERVE through to
+  a no-op too, so EmulatR's no-op is FAITHFUL and the abnormal death at cyc 282,057,652 is a
+  DIFFERENT problem (likely an EmulatR CRASH/segfault, since the 512M run died at 282M without
+  reaching its 536M cap or emitting a Stop-reason); OR (b) 0x66 is mis-decoded / a console-
+  callback namespace, not the PAL $cserve_def; OR (c) the firmware is LOOPING on a bogus call
+  because R0 comes back wrong -- an UPSTREAM divergence, with 0x66 the symptom not the root.
+- **REFINED NEXT:** (1) disassemble es40_v7_3.exe at caller PC 0x1b78f8 -- what does it do with
+  R0 after the CALL_PAL, and why loop ~1300x? (2) determine whether EmulatR CRASHED at ~282M
+  (run under a debugger / check exit code) vs the guest halting -- a crash is an EmulatR bug to
+  fix regardless. (3) Do NOT just "implement CSERVE 0x66" -- it isn't in the spec; find why the
+  firmware issues it. (4) re-baseline. (5) THEN the ES40 I2C = M1543C SMBus (not a fixed PCF8584
+  row). (6) housekeeping: EMULATR_IIC_WATCH is DS20-hardcoded (`MemDrainer.h:1024`).
+- **Run facts (PC, corrected):** manifest latched (usedDefault=0, iic_acks=[0x70 0x72 0xA2
+  0xA4 0xC0]); port was 10023 (older run_es40_srm_trace_full.sh) which is why the concurrent
+  DS20 collided; fault storm 65x kFaultDtbMissDouble @ pc=0x8321 (~249M); unalign @ pc=0x5afac
+  (~282M) = the native-SRM memory scan, NOT a hang. The 0x600920/0x6009a4 early poll is a
+  transient (~90,134-cyc cadence), not a wedge -- do not re-chase.
+- **CONCURRENT CONSOLES (DS10+DS20+ES40) -- now enabled.** (A) per-model ports in the new
+  `tools/run_srm_trace_full.sh`: 10023+offset -> ds10=10023, ds20=10024, ds25=10025,
+  es40=10026, es45=10027. (B) SOURCE FIX (applied, needs rebuild): SRMConsoleDevice.cpp:656
+  hardcoded shared `d:/emulatr/traces/app_output_...` sessionlog -> per-port run-dir-relative
+  `traces/putty_console_p<port>_&Y&M&D&T.log` (no clobber, dir exists). Recipe (no giant
+  .trc): `ARM=none ./tools/run_ds10_trace.sh & ARM=none ./tools/run_ds20_trace.sh &
+  ARM=none ./tools/run_es40_trace.sh &`.
+- **OPERATIONAL: the retire .trc was 78 GB.** RETIRE_COMPACT --trace channel dumped the
+  WHOLE run (the 2M GMEM-TRACE-ARM window gates a different sink). Use ARM=none for
+  concurrent/console runs; diff the model-tagged machine.log (84 MB) with tools/diff_traces.py.
+  The .trc-not-windowed behavior is a separate trace-infra bug to fix.
+
+## 2026-07-02 -- Session runtime stats retained; git push fixed; ES40 comprehensive-trace run set up
+
+**Headline: MHz-injection commit + docs are now COMMITTED AND PUSHED (remote main =
+`e5225c1`, PC local matches). Building a comprehensive-trace ES40 cold-boot launcher for
+the first `>>>` bring-up attempt.**
+
+- **RUNTIME STATS RETAINED (MHz_eff badge, this session).** MHz_eff = guest cycleCount /
+  host wall-seconds, sampled at the instant the SRM banner streams (~cyc 200M) -- so it is
+  near-RAW guest throughput, NOT the emulated DS20 clock (a real DS20 was ~500-833 MHz).
+  Measured: **PC RelWithDebInfo = 5 MHz; PC Release = 8 MHz; Mac = 9 MHz** (2026-07-01
+  run). The spread is pure host-speed / optimization variation (Release > RelWithDebInfo;
+  Mac host slightly faster than the PC). Warp variants do not move it (sample precedes the
+  warp-collapsible idle phases). All three runs reached the banner and printed the injected
+  live value correctly.
+- **GIT PUSH FROM THE PC -- FIXED (root cause + resolution).** Push to
+  `github.com/EmulatRApp/EmulatRAppUni` had been failing 403. Chain of causes, all cleared:
+  (1) Windows Credential Manager held a stale credential whose token authenticated as
+  `timothyPeer` (no write on the EmulatRApp org) even though its username *label* said
+  EmulatRApp -- label and token were out of sync; (2) web login worked but git was being
+  handed a PASSWORD, which GitHub has not accepted for git since 2021 -- must use a PAT;
+  (3) a bad `credential.credentialStore cache` setting is INVALID on Git-for-Windows (no
+  UNIX socket). RESOLUTION: `git config --global credential.credentialStore wincredman`,
+  cleared the `git:https://github.com` entry, re-authed as the correct account with a
+  classic PAT (`repo` scope). Push succeeded; `git rev-parse HEAD` == `git ls-remote origin
+  refs/heads/main` == `e5225c1`. NOTE for future: commit AUTHOR identity is intentionally
+  `EmulatRApp <peert@envysys.com>` (user.name/email) -- that is just the commit label and
+  is independent of the PAT that authorizes the push. Mac reconcile: `git pull --rebase`,
+  never `git push -f` (June-23 blob-strip rewrite still in play).
+- **ES40 COMPREHENSIVE-TRACE LAUNCHER built: `tools/run_es40_srm_trace_full.sh`.** Supersedes
+  the minimal `out/build/relwithdebinfo/run_es40_srm_trace.sh` for the bring-up run. Run dir =
+  **out/build/relwithdebinfo (the execution build dir, per Tim)**. Refreshes firmware +
+  `es40_v7_3_platform.json` from source into the run dir every run (guards watch-out #2: a
+  stale/missing manifest silently falls back to the DS10 bus). Fresh diagnostic flash
+  (`es40_diag_flash.rom`, wiped each run) => genuine cold NVRAM => `oem_string` empty =>
+  banner shows "Compaq AlphaServer ES40" (guards watch-out #3). Full observe-only
+  instrumentation ON: console mirror, IIC + IIC-CTRL trace, retire-window (armed on the
+  SYSVAR 0x2058 store to catch ES40's get_sysvar member decision), GMEM/SYSVAR watch, plus
+  the CLI `--trace` dec+machine channels (PAL_WINDOW|RETIRE_COMPACT -- NOT TRACE_ALL, which
+  needs an AppOptions rebuild). PuTTY auto-launch ON (console TCP 10023). `--max-cycles`
+  cap (guards watch-out #1: possible cbox MCHK spin). Post-run summary greps banner /
+  manifest-load / PROFILE / StopReason / HALTPROBE / SYSVAR-member. NOTE: RelWithDebInfo exe
+  was not visible in the Cowork sandbox view (only Debug) -- confirm the RelWithDebInfo build
+  is current on the PC before running, or the stale-exe / no-exe preflight will catch it.
+
 ## 2026-07-01 -- ES40 (Clipper) SRM bring-up kicked off; DS20 badge SOLVED; MHz badge injection landed
 
 **Headline: the DS20 "AlphaPC 264DP" mis-badge is FIXED (2026-06-30, one-line manifest
@@ -44,7 +160,7 @@ Full journals: `journals/20260701_es40_clipper_srm_initialization.md`,
   time (~cyc 200M) BEFORE the warp-collapsible idle phases, so `K~=1`, `MHz_eff~=raw`.
   Sample-point (banner-honest vs later warp-inflated readout) is a decision, not a knob.
   Banner is now non-deterministic per run -- will churn any snapshot test pinning the speed
-  field. **STILL UNCOMMITTED -- commit Windows-side.**
+  field. **COMMITTED + PUSHED 2026-07-02 (remote main = `e5225c1`).**
 - **Known cosmetic nit (OPEN):** `show config` sometimes leaves `P00>>>PuTTY`. EmulatR
   doesn't populate the SROM-revision field, so `SHOW_CONFIG_PC264.C:325` prints an
   uninitialized `char[10]` containing a stray `ENQ` (0x05); PuTTY's answerback transmits

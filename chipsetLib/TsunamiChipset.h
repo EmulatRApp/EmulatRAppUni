@@ -682,9 +682,16 @@ private:
         //   DS20  = 0xFFF80000  writeb @0x1ade60 (EMULATR_IIC_WATCH)  [2026-06-22]
         //   DS20E = 0xFFF80000  shares DS20 chassis/IIC mapping (defensive;
         //                       m_model is the raw INI string, unnormalized)
-        // TODO prove ES40/ES45/DS25 IIC bases via EMULATR_IIC_WATCH when those
-        // models are booted; until then they default to the DS10 base (which
-        // leaves today's ES40/ES45 behavior unchanged).  registerPciMemRange
+        // ES40/ES45/DS25 IIC base intentionally NOT mapped -- left UNMAPPED
+        // rather than guessed.  The ES40 (V7.3) IIC mechanism is CONTESTED
+        // between two SRM source generations: apisrm/ref/pc264_io.c (older
+        // CLIPPER/PC264) = fixed PCF8584 @ 0xFFF80000, vs srmconsole/5.8
+        // (SHARK/M1543C) = ALi M1543C SMBus with a PROGRAMMABLE base read from
+        // M7101 PCI cfg SBASMB (0x14).  V7.3 is late -> SHARK/M1543C is more
+        // likely, so a fixed-base row is the WRONG mechanism.  Cannot be
+        // confirmed until boot reaches IIC code -- currently blocked UPSTREAM by
+        // unimplemented CSERVE 0x66.  See journals/20260702_es40_boot_blocker_
+        // analysis.md.  registerPciMemRange
         // takes a WINDOW-RELATIVE offset, half-open [start,end); +2 claims the
         // two byte ports (S0,S1) exactly.
         static constexpr struct { char const* model; uint64_t base; }
