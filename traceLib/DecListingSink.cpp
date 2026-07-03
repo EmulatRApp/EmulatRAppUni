@@ -30,6 +30,14 @@ namespace traceLib {
 // so the symbol exists exactly once across translation units.
 std::atomic<int64_t> DecListingSink::s_traceWindowCountdown{ 0 };
 
+// Value-triggered ring-dump gate (setValueGate / EMULATR_VALUE_GATE).  Init
+// from env once at load so a wrapper can arm it without a code change.
+std::atomic<uint64_t> DecListingSink::s_valueGate{
+    []() -> uint64_t {
+        char const* e = std::getenv("EMULATR_VALUE_GATE");
+        return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
+    }() };
+
 namespace {
 
 // Render a CommitRecord into a LookbackEntry.  The lookback ring
@@ -613,6 +621,39 @@ void DecListingSink::onCommit(CommitRecord const&        record,
     // the first post-gate onPalEntry dump emit valid recent context.
     m_lookback[m_lookbackHead & (LOOKBACK_SIZE - 1)] = frozen;
     ++m_lookbackHead;
+
+    // Value-triggered ring dump: when this retire writes the gate value into
+    // its destination register, dump the ring ONCE (oldest -> newest, ending on
+    // this instruction).  Ungated by m_emitEnabled so it works pre-relocation.
+    {
+        uint64_t const vg = s_valueGate.load(std::memory_order_relaxed);
+        if (vg != 0
+            && record.result != nullptr
+            && record.result->regWriteIdx != coreLib::kNoRegWrite
+            && record.result->regWriteValue == vg) {
+            static std::atomic<bool> s_fired{ false };
+            bool expected = false;
+            if (s_fired.compare_exchange_strong(expected, true)) {
+                std::fprintf(stderr,
+                    "==== VALUE-GATE 0x%016llx hit @ cyc=%llu pc=0x%016llx -- ring dump ====\n",
+                    static_cast<unsigned long long>(vg),
+                    static_cast<unsigned long long>(frozen.cycle),
+                    static_cast<unsigned long long>(frozen.pc));
+                for (uint32_t k = 0; k < LOOKBACK_SIZE; ++k) {
+                    LookbackEntry const& e =
+                        m_lookback[(m_lookbackHead + k) & (LOOKBACK_SIZE - 1)];
+                    if (e.pc == 0 && e.mnemonic.empty()) continue;
+                    std::fprintf(stderr,
+                        "  o%llu cyc=%llu pc=0x%016llx %-8s %-26s %s\n",
+                        static_cast<unsigned long long>(e.ordinal),
+                        static_cast<unsigned long long>(e.cycle),
+                        static_cast<unsigned long long>(e.pc),
+                        e.mnemonic.c_str(), e.operands.c_str(), e.result.c_str());
+                }
+                std::fflush(stderr);
+            }
+        }
+    }
 
     // Phase C+: external emit gate.  When Machine has not yet flipped
     // m_emitEnabled true (cold boot pre-PAL-relocation, cyc < 4.2M on

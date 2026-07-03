@@ -221,6 +221,21 @@ public:
         return s_traceWindowCountdown.load(std::memory_order_relaxed) > 0;
     }
 
+    // ------------------------------------------------------------------
+    // Value-triggered lookback-ring dump (2026-07-02).
+    // ------------------------------------------------------------------
+    // Set a "gate value" (via setValueGate(v) or env EMULATR_VALUE_GATE=0x..).
+    // When a retire writes that exact value into its destination register,
+    // onCommit dumps the LOOKBACK_SIZE-deep ring ONCE -- the recent
+    // instruction history (pc / mnem / operands / result) that produced the
+    // value.  0 = disabled (zero cost).  For chasing "where did this garbage
+    // value come from" without knowing the PC.
+    static std::atomic<uint64_t> s_valueGate;
+    static void setValueGate(uint64_t v) noexcept
+    {
+        s_valueGate.store(v, std::memory_order_release);
+    }
+
 
 private:
     // Configuration captured at construction.
