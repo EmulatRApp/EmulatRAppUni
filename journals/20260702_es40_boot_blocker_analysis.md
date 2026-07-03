@@ -278,3 +278,50 @@ grep -oE "func=[0-9]+ \(0x[0-9a-f]+\)" es40_long.out | sort | uniq -c
   `0xFFF80000`) vs `.../srmconsole/5.8/PC264/SRC/{API_IIC,M1543C_IIC}.C`,
   `.../CFG/SHARK/PLATFORM.MAR` (SHARK/M1543C SMBus, programmable via M7101 `0x14`).
 ```
+
+---
+
+## MMU REFRAME (2026-07-02, later) — the ACV is a fault-CLASSIFICATION divergence, not a garbage pointer
+
+Captured the fault region with the BreakpointSink PC gate
+(`EMULATR_GATE=open:0x1b78f8,close:0x1b7dd4,rev:1`; the sink needs an **absolute**
+`EMULATR_RETIRE_TRACE_DIR` — a relative path silently DISABLES it). The
+`BRK`/`IPR_SNAP` trace overturns the "garbage R16" reading.
+
+**IPR state at the fault:** `va_ctl=0x2` (48-bit VA form → the **43-bit hypothesis
+is OUT**), **`i_spe=0`, `m_spe=0`** (superpage OFF), **`ptbr=0`**, `mode=0`
+(Kernel), `mm_stat=0x290`, `lastFaultCode=0x5` (ACV).
+
+**R16 is built by `BIS R0,R19` @ pc `0x6b884`** (subroutine called from
+`0x1b78f8`, return `0x1b7dd4`). At the earlier (cyc 248M) traversal
+`R16 = 0x0000080130000100` — a *normal seg0 address* — **and the `LDQ 0(R16)` at
+`0x1b7dd4` STILL faults ACV.** So the ACV is NOT about R16 being garbage; the
+`0xFFFFFFFF7F82…` value at 282M is a DOWNSTREAM symptom of the SRM mishandling the
+repeated ACV.
+
+**Decisive comparison — ACV vs DtbMiss:**
+- **ES40** @ `0x1b7dd4`: kernel virtual `LDQ` → **`fault=7` (ACV)**, never
+  resolved → infinite loop.
+- **DS20** (same-era SRM, progressing): kernel virtual accesses → **`fault=5`
+  (DtbMiss)**, PAL walks + refills the TLB → succeeds → boot advances (DS20 at
+  302M is at PC `0x1adb08`, native SRM, still moving; ZERO ACV).
+- DS20 does NOT traverse the ES40 PCs `0x1b78f8/0x1b7dd4` (separate per-platform
+  builds place this SRM code at different addresses, ~`0x1adxxx` on DS20), so a
+  same-PC IPR diff is unavailable — but the fault-TYPE difference is the signal.
+
+**Reframed root:** EmulatR returns **ACV where it should return DtbMiss/Success**
+for the ES40 kernel virtual `LDQ`. A `seg0` miss should be `TNV`/DtbMiss (PAL
+refills), not a protection ACV. Candidate mechanisms: a stale/wrong TLB entry
+(KRE=0) yielding an ACV on a bogus hit; or the kseg/segment decode mis-classifying
+under `spe=0`/`ptbr=0`. This is exactly the fault-classification + VA-form/segment
+surface the **reference-translator harvest** targets
+(`journals/20260702_ev6translator_harvest_task.md`) — raising that harvest from
+"eventual" toward "the likely ACV fix".
+
+**Next step:** trace `HW_MTPR` to `PTBR`/`I_CTL`/`M_CTL[SPE]` before the fault to
+decide (a) EmulatR dropped an MTPR the ES40 SRM issued (so `ptbr/spe` wrongly read
+0), vs (b) mis-classification in the translator; and inspect the TLB entry (if
+any) for the faulting VA. Tooling: the value-based `R16-WRITE` probe in
+`DecListingSink::onCommit` can't work standalone — `record.result` is empty
+without an active trace channel.
+```
