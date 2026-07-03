@@ -325,3 +325,76 @@ any) for the faulting VA. Tooling: the value-based `R16-WRITE` probe in
 `DecListingSink::onCommit` can't work standalone — `record.result` is empty
 without an active trace channel.
 ```
+
+---
+
+## ROOT MECHANISM (2026-07-02, later) — ACV = TLB hit on a permission-less, out-of-range PTE
+
+Instrumented the two decision points (`applyTlbHit` ACV return in
+`mmuLib/Ev6Translator.h`, and the `HW_DTB_PTE0` fill in
+`palBoxLib/grains/PalEntries.cpp` — both probes reverted, tree clean):
+
+```
+TLBHIT-ACV      va=0xffffffff7f827f5f mode=Kernel pte.raw=0x403bfc1300000001 KRE=0 ERE=0 SRE=0 URE=0 pfn=0x403bfc13
+DTBFILL-NOPERM  opB=0x403bfc1300000001 -> pte=0x403bfc1300000001 tag=0xffffffff7f827f5f pc=0xd2a9
+```
+
+**Decode of the offending PTE `0x403bfc1300000001`:** `valid`(bit0)=1;
+**KRE=ERE=SRE=URE=0** (no read for ANY mode); `PFN=0x403bfc13` →
+**PA=`0x8077f826000` (~8 GB, beyond the 4 GB backing).** Both the permissions
+*and* the PFN are wrong.
+
+**Chain:**
+1. The **guest PALcode DTB-miss handler @ pc `0xd2a9`** walks its page table,
+   obtains PTE `0x403bfc1300000001`, and installs it via `HW_MTPR DTB_PTE0`
+   (`c.opB` is the raw IPR; `canonicalFromDtbPte(opB)==opB` here — the converter
+   is a pass-through, so the bad value is what the walk *read*, not a conversion
+   bug).
+2. That PTE is valid but permission-less → every access to the page ACVs
+   (`applyTlbHit` → `!canRead(Kernel)` → AccessViolation).
+3. The garbage R16 (`0xFFFFFFFF7F82…`) and the whole 282M loop are downstream of
+   this: the SRM keeps DtbMiss→install-bad-PTE→ACV.
+
+**So the root is the page-table WALK reading a bad PTE.** Combined with the
+earlier `IPR_SNAP` **`ptbr=0`**, the lead hypothesis is that the guest walk (or
+its VPTB self-map) resolves to the wrong physical memory — because **`PTBR` is
+0** (an `HW_MTPR PTBR` the ES40 SRM issued was dropped / not reflected), so the
+L1/L2/L3 fetches read coincidental low-memory data. `0x403bfc1300000001` is a
+structured-but-wrong value (looks like a PTE-shaped word read from the wrong PA).
+
+**Next step (precise):** trace `HW_MTPR` to **`PTBR`** (and the VPTB) on the ES40
+path before the fault; confirm whether the SRM sets a non-zero PTBR that EmulatR
+fails to store, and whether the PALcode DTB-miss walk reads PTEs from the correct
+PA. If PTBR is dropped, that single IPR-tracking fix likely unblocks the whole
+ACV loop. (This is distinct from the `Ev6Translator` harvest — the DTB_PTE
+converter is NOT the culprit here; it passed the value through unchanged.)
+```
+
+---
+
+## PTE-FORMAT AUDIT + FIX (2026-07-02) — DTB/ITB PFN placement (vs Alpha ARM §11.6)
+
+Audited `pteLib/Ev6PteFormat.h` against Alpha ARM §11.6 (canonical PTE) + 21264
+HRM Figs 5-9 (ITB_PTE) / 5-27 (DTB_PTE0/1). **Empirical confirmation:** real
+DTB_PTE0 fills decode correctly — every legit fill is `opB=0x…0000ff01` → all
+protection bits set, small PFN, `PA==VA` identity (e.g. PFN `0x2ff` → PA
+`0x5fe000` = VA page `0x5fffd0`). So the **protection bits are already correct**:
+the canonical in-memory PTE is *grouped* (reads `KRE[8] ERE[9] SRE[10] URE[11]`,
+writes `KWE[12]…UWE[15]`) — the SAME ordering as DTB_PTE0 — so they copy straight
+across (no interleave/scramble). `V` is set by construction (not copied from the
+IPR); `FOE`/bit-3 excluded on the DTB side. All correct.
+
+**The one real gap fixed:** PFN *position*. Canonical PFN is `[63:32]`; DTB_PTE0
+carries `PA[43:13]` at `[62:32]` (bit 63 = reserved/SW flag); ITB_PTE at `[43:13]`.
+`canonicalFromDtbPte`/`canonicalFromItbPte` masked the full 32 bits, letting a
+reg bit-63 (DTB) / bit-44 (ITB) leak into the PFN. Fixed: mask to **31 bits**
+(`PA[43:13]`) in both converters. Unit suite green (472/6058).
+
+**Effect on the current ACV: none (as expected).** The offending PTE
+`0x403bfc1300000001` has **bit 63 = 0**, so the `[63:32]→[62:32]` correction does
+not change it; the ACV persists (`kFaultAcv` still fires, boot still ends at
+`0x1b7d34`). So the PFN fix is a correctness improvement per the ARM/HRM, **not**
+the ACV cause. The ACV root stands: the page-walk reads a garbage PTE for the
+garbage VA `0xffffffff7f827f5f` (bad R16), consistent with `ptbr=0`. Next:
+`HW_MTPR PTBR` tracking + where R16's garbage value is computed upstream.
+```
