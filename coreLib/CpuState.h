@@ -608,7 +608,15 @@ struct CpuState
     // handler bug is correctly diagnosed, this can be flipped back
     // to true (or made dynamically settable via HW_MTPR I_CTL when
     // the I_CTL.IC_EN equivalent is wired).
-    bool unalignTrapEnabled = false;
+    // 2026-07-03: FLIPPED to true -- restore faithful EV6 behaviour (unaligned
+    // LDQ/STQ trap to the PAL UNALIGN handler; guest chooses to emulate).  The
+    // silent host-fixup above diverges from real Alpha (the guest UNALIGN path
+    // never runs) and is a candidate root for the garbage-pointer ACV @ 0x1b7dd4
+    // and the pc=0x1 double-faults.  The 0xdb64 "handler bug (R20 zeroed before
+    // STQ to top-of-PA)" that motivated the bypass is suspected to be a SYMPTOM
+    // of the old truncated VA_FORM (its high-PA STQ faulted) -- now that VA_FORM
+    // is fixed (3-form 43/48/NT-32), re-enable and re-test.
+    bool unalignTrapEnabled = true;
 
     // Last BoxResult fault code recorded at retire.  Stays kNoFault
     // during normal execution; set to kFaultHalt on graceful HALT,
