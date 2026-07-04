@@ -41,7 +41,8 @@ TEST_CASE("variantFromModel maps platform models to the right variant")
 {
     CHECK(iv(variantFromModel("DS10")) == iv(ChipsetVariant::Tsunami));
     CHECK(iv(variantFromModel("DS20")) == iv(ChipsetVariant::Tsunami));
-    CHECK(iv(variantFromModel("ES40")) == iv(ChipsetVariant::Tsunami));
+    // 2026-07-03: ES40 is the Typhoon tier of the 21272 (8GB arrays, 32GB max).
+    CHECK(iv(variantFromModel("ES40")) == iv(ChipsetVariant::Typhoon));
     // 2026-06-16 taxonomy correction: DS15/DS25/ES45 are Titan (21274),
     // not Typhoon (which is a 21272 high-bandwidth variant).
     CHECK(iv(variantFromModel("DS15")) == iv(ChipsetVariant::Titan));
@@ -82,7 +83,7 @@ TEST_CASE("Model-string ctor derives variant and reports the model")
     CHECK(es45.model() == "ES45");
 
     TsunamiChipset es40("ES40");
-    CHECK(iv(es40.variant()) == iv(ChipsetVariant::Tsunami));
+    CHECK(iv(es40.variant()) == iv(ChipsetVariant::Typhoon));   // 2026-07-03: ES40=Typhoon
     CHECK(es40.model() == "ES40");
 }
 

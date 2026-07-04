@@ -248,7 +248,7 @@ public:
      */
     explicit TsunamiCchip(ChipsetVariant variant = ChipsetVariant::Tsunami,
                           int cpuCount = 4,
-        uint64_t memSizeBytes = 0x800000000ULL) noexcept
+        uint64_t memSizeBytes = 0x100000000ULL) noexcept
         : m_variant(variant)
         , m_cpuCount(cpuCount)
         , m_memSizeBytes(memSizeBytes)
@@ -299,8 +299,14 @@ public:
         // ------------------------------------------------------------------
         // AAR0-3: memory array address registers
         // ------------------------------------------------------------------
-        const bool isTyphoon = (m_variant == ChipsetVariant::Typhoon);
-        const uint64_t maxPerArray = isTyphoon
+        // Extended AAR (8GB arrays, 34:24 ADDR, ASIZ 0x8/0x9/0xA) applies to
+        // BOTH Typhoon (21272 high-bw) and Titan (21274) -- both are 32GB-capable
+        // per kTyphoonInfo/kTitanInfo.  Base Tsunami caps at 1GB arrays (4GB).
+        // 2026-07-03: was Typhoon-only, which mis-tiled Titan to 4GB and tripped
+        // the R3 over-capacity hard-stop on a 32GB Titan request.
+        const bool isExtendedAar = (m_variant == ChipsetVariant::Typhoon
+                                 || m_variant == ChipsetVariant::Titan);
+        const uint64_t maxPerArray = isExtendedAar
             ? (8ULL * 1024 * 1024 * 1024)
             : (1ULL * 1024 * 1024 * 1024);
 
@@ -315,7 +321,7 @@ public:
                 const uint64_t thisArray = std::min(remaining, maxPerArray);
 
                 // Correctly initializing all struct fields
-                m_aar[i].base = computeAAR(base, thisArray, isTyphoon);
+                m_aar[i].base = computeAAR(base, thisArray, isExtendedAar);
                 m_aar[i].mask = thisArray - 1;
                 m_aar[i].enabled = true;
 
@@ -335,7 +341,7 @@ public:
                 "(4 arrays x %lluGB = 0x%llx); surplus 0x%llx is unaddressable. "
                 "Reduce --mem or select a higher-capacity chipset variant.\n",
                 static_cast<unsigned long long>(m_memSizeBytes),
-                (isTyphoon ? "Typhoon" : "Tsunami"),
+                (isExtendedAar ? "Typhoon/Titan" : "Tsunami"),
                 static_cast<unsigned long long>(maxPerArray >> 30),
                 static_cast<unsigned long long>(4ULL * maxPerArray),
                 static_cast<unsigned long long>(remaining));
@@ -348,7 +354,7 @@ public:
         m_csc = 0;
         for (int i = 0; i < m_cpuCount && i < kMaxCPUs; ++i)
             m_csc |= (1ULL << i);
-        m_csc |= isTyphoon ? 0x03ULL : 0x01ULL;
+        m_csc |= (m_variant == ChipsetVariant::Typhoon) ? 0x03ULL : 0x01ULL;
         m_csc |= (2ULL << 52) | (1ULL << 48) | (1ULL << 44) |
             (1ULL << 40) | (1ULL << 36) | (1ULL << 31) |
             (2ULL << 26) | (3ULL << 20) | (3ULL << 18) | (3ULL << 16);
