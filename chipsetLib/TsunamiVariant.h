@@ -37,7 +37,7 @@
 // MODEL-TO-CHIPSET MAPPING:
 //   DS10   -> Tsunami (21272)
 //   DS20   -> Tsunami (21272)
-//   ES40   -> Tsunami (21272)   [Typhoon-capable high-bw 21272 in HW]
+//   ES40   -> Typhoon (21272 high-bw)  [8GB arrays, 32GB max; ES40 HW is Typhoon]
 //   DS15   -> Titan   (21274)
 //   DS25   -> Titan   (21274)
 //   ES45   -> Titan   (21274)
@@ -61,8 +61,8 @@
 
 enum class ChipsetVariant : uint8_t
 {
-    Tsunami = 0,    // 21272 -- DS10, DS20, ES40
-    Typhoon = 1,    // 21272 high-bandwidth (dual-Dchip) variant -- ES40-class
+    Tsunami = 0,    // 21272 -- DS10, DS20
+    Typhoon = 1,    // 21272 high-bandwidth (dual-Dchip) variant -- ES40
     Titan   = 2,    // 21274 -- DS15, DS25, ES45 (dual G/A-port PA-chips + AGP)
     Unknown = 0xFF
 };
@@ -136,7 +136,8 @@ inline constexpr ChipsetVariantInfo kTitanInfo = {
  * @return       ChipsetVariant (Tsunami, Titan, or Unknown)
  *
  * The mapping is fixed by the Alpha platform architecture:
- *   DS10, DS20, ES40       -> Tsunami (21272)
+ *   DS10, DS20             -> Tsunami (21272)
+ *   ES40                   -> Typhoon (21272 high-bw; 8GB arrays, 32GB max)
  *   DS15, DS25, ES45       -> Titan   (21274)
  *   GS80, GS160, GS320    -> Unknown (Wildfire -- not supported)
  *
@@ -149,8 +150,11 @@ inline ChipsetVariant variantFromModel(const std::string& model) noexcept
     m.erase(m.find_last_not_of(" \t") + 1);
     std::ranges::transform(m, m.begin(), ::toupper);
 
-    if (m == "DS10" || m == "DS20" || m == "ES40")
+    if (m == "DS10" || m == "DS20")
         return ChipsetVariant::Tsunami;
+    if (m == "ES40")
+        return ChipsetVariant::Typhoon;   // Typhoon-tier 21272 (high-bw dual-Dchip):
+                                          // 8GB arrays, 32GB max -- ES40 HW is Typhoon
     if (m == "DS15" || m == "DS25" || m == "ES45")
         return ChipsetVariant::Titan;
     return ChipsetVariant::Unknown;
