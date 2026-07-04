@@ -539,6 +539,7 @@ set(EMULATR_TEST_SOURCES
     tests/chipsetLib/test_ticket01_dispatch.cpp
     tests/chipsetLib/test_ticket01_5_variant_binding.cpp
     tests/chipsetLib/test_ticket02_aar_encoding.cpp
+    tests/chipsetLib/test_memsize_profiles.cpp
     tests/chipsetLib/test_ticket03_interrupts.cpp
     tests/chipsetLib/test_ticket04_timer.cpp
     tests/chipsetLib/test_ticket05_pci_enum.cpp
