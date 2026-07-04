@@ -39,7 +39,11 @@ TsunamiChipset::TsunamiChipset(ChipsetVariant variant,
                                int cpuCount,
                                uint64_t memSizeBytes) noexcept
     : m_variant(variant) // Initialize the passive byte-store
-    , m_model(variant == ChipsetVariant::Typhoon ? "ES45" : "ES40")
+    // Fallback representative model for the variant-ONLY ctor (RAM-only /
+    // doc snippets).  The real Machine path uses the model-string ctor, which
+    // sets m_model from the ini.  Corrected 2026-07-03: Typhoon is ES40-class
+    // (21272 high-bw), NOT ES45 (that is Titan/21274); base Tsunami is DS10/DS20.
+    , m_model(variant == ChipsetVariant::Typhoon ? "ES40" : "DS20")
     , m_guestMemory(memSizeBytes)
     , m_cchip(variant, cpuCount, memSizeBytes)
     , m_dchip(variant, memSizeBytes)
@@ -48,7 +52,7 @@ TsunamiChipset::TsunamiChipset(ChipsetVariant variant,
     if (variant == ChipsetVariant::Tsunami)
         std::fprintf(stderr, "  Chipset:       Tsunami 21272 (wired)\n");
     else if (variant == ChipsetVariant::Typhoon)
-        std::fprintf(stderr, "  Chipset:       Typhoon 21274 (wired)\n");
+        std::fprintf(stderr, "  Chipset:       Typhoon 21272 (wired)\n");
     else
         std::fprintf(stderr, "  Chipset:       Disabled (RAM-only mode)\n");
 
