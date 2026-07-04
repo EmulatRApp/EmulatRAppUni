@@ -324,6 +324,24 @@ public:
             }
         }
 
+        // R3 hard-stop (2026-07-03): reject over-capacity LOUDLY instead of
+        // silently dropping the surplus.  After 4 arrays x maxPerArray any
+        // non-zero `remaining` means --mem exceeds this variant's max DRAM
+        // (Tsunami 4x1GB=4GB; Typhoon 4x8GB=32GB).  Charter: no silent
+        // degradation -- a too-large request is a config error, fail fast.
+        if (remaining != 0) {
+            std::fprintf(stderr,
+                "FATAL: memory size 0x%llx exceeds %s max DRAM "
+                "(4 arrays x %lluGB = 0x%llx); surplus 0x%llx is unaddressable. "
+                "Reduce --mem or select a higher-capacity chipset variant.\n",
+                static_cast<unsigned long long>(m_memSizeBytes),
+                (isTyphoon ? "Typhoon" : "Tsunami"),
+                static_cast<unsigned long long>(maxPerArray >> 30),
+                static_cast<unsigned long long>(4ULL * maxPerArray),
+                static_cast<unsigned long long>(remaining));
+            std::abort();
+        }
+
         // ------------------------------------------------------------------
         // CSC: System Configuration Register
         // ------------------------------------------------------------------
