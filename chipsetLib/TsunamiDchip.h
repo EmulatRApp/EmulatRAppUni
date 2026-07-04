@@ -102,7 +102,7 @@ public:
      * @param memSizeBytes Total physical memory in bytes
      */
     explicit TsunamiDchip(ChipsetVariant variant = ChipsetVariant::Tsunami,
-                          uint64_t memSizeBytes = 0x800000000ULL) noexcept
+                          uint64_t memSizeBytes = 0x100000000ULL) noexcept
         : m_variant(variant)
         , m_memSizeBytes(memSizeBytes)
     {

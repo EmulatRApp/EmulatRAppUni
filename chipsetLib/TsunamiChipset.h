@@ -87,7 +87,7 @@ class TsunamiChipset : public memoryLib::ISystemBus
 public:
     explicit TsunamiChipset(const std::string& model,
         int cpuCount = 4,
-        uint64_t memSizeBytes = 0x800000000ULL) noexcept
+        uint64_t memSizeBytes = 0x100000000ULL) noexcept
         : m_variant(normalizeVariant(variantFromModel(model)))
         , m_model(model)
         , m_guestMemory(memSizeBytes)
@@ -101,7 +101,7 @@ public:
 
     explicit TsunamiChipset(ChipsetVariant variant,
         int cpuCount = 4,
-        uint64_t memSizeBytes = 0x800000000ULL) noexcept;
+        uint64_t memSizeBytes = 0x100000000ULL) noexcept;
 
     void reset() noexcept {
         m_cchip.reset();
