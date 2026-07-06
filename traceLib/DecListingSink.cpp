@@ -38,6 +38,24 @@ std::atomic<uint64_t> DecListingSink::s_valueGate{
         return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
     }() };
 
+// Optional cycle floor for the value gate (EMULATR_VALUE_GATE_FLOOR).  0 = off.
+std::atomic<uint64_t> DecListingSink::s_valueGateCycleFloor{
+    []() -> uint64_t {
+        char const* e = std::getenv("EMULATR_VALUE_GATE_FLOOR");
+        return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
+    }() };
+
+// Optional PC gate for the ring dump (EMULATR_PC_GATE).  Dumps the ring ONCE
+// when a retire's PC equals this value (and cycle >= the shared floor).  Lets
+// the ring END on a chosen instruction so its predecessors are guaranteed
+// captured -- e.g. gate one instr past an mtpr to see the mtpr + its setup.
+// 0 = off.
+std::atomic<uint64_t> DecListingSink::s_pcGate{
+    []() -> uint64_t {
+        char const* e = std::getenv("EMULATR_PC_GATE");
+        return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
+    }() };
+
 namespace {
 
 // Render a CommitRecord into a LookbackEntry.  The lookback ring
@@ -627,16 +645,24 @@ void DecListingSink::onCommit(CommitRecord const&        record,
     // this instruction).  Ungated by m_emitEnabled so it works pre-relocation.
     {
         uint64_t const vg = s_valueGate.load(std::memory_order_relaxed);
-        if (vg != 0
+        uint64_t const vgFloor = s_valueGateCycleFloor.load(std::memory_order_relaxed);
+        uint64_t const pcg = s_pcGate.load(std::memory_order_relaxed);
+        bool const valueHit = (vg != 0
+            && frozen.cycle >= vgFloor
             && record.result != nullptr
             && record.result->regWriteIdx != coreLib::kNoRegWrite
-            && record.result->regWriteValue == vg) {
+            && record.result->regWriteValue == vg);
+        bool const pcHit = (pcg != 0
+            && frozen.cycle >= vgFloor
+            && frozen.pc == pcg);
+        if (valueHit || pcHit) {
             static std::atomic<bool> s_fired{ false };
             bool expected = false;
             if (s_fired.compare_exchange_strong(expected, true)) {
                 std::fprintf(stderr,
-                    "==== VALUE-GATE 0x%016llx hit @ cyc=%llu pc=0x%016llx -- ring dump ====\n",
-                    static_cast<unsigned long long>(vg),
+                    "==== RING-GATE (%s) key=0x%016llx hit @ cyc=%llu pc=0x%016llx -- ring dump ====\n",
+                    pcHit ? "pc" : "value",
+                    static_cast<unsigned long long>(pcHit ? pcg : vg),
                     static_cast<unsigned long long>(frozen.cycle),
                     static_cast<unsigned long long>(frozen.pc));
                 for (uint32_t k = 0; k < LOOKBACK_SIZE; ++k) {
