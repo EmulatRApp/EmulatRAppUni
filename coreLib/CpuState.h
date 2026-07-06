@@ -616,7 +616,16 @@ struct CpuState
     // STQ to top-of-PA)" that motivated the bypass is suspected to be a SYMPTOM
     // of the old truncated VA_FORM (its high-PA STQ faulted) -- now that VA_FORM
     // is fixed (3-form 43/48/NT-32), re-enable and re-test.
-    bool unalignTrapEnabled = true;
+    // 2026-07-05: REVERTED to false -- the true-flip was re-tested on ES40 only
+    // and REGRESSED DS10 (git-bisected: DS10 boots past the 0x13d34 device poll
+    // at 5c306d6, hangs after the unalign flip at b6e4c67). The 0xdb64 UNALIGN
+    // handler bug (R20 zeroed before STQ) is NOT fully resolved by the VA_FORM
+    // fix -- DS10's unaligned-access pattern still drives it into the ground.
+    // Faithful trapping is the correct EV6 behavior (CPU axis), but it must wait
+    // on fixing the PAL UNALIGN handler, not just enabling the trap. Keep the
+    // known-good bring-up value until the 0xdb64 handler is corrected + verified
+    // boot-to->>> on DS10 AND ES40. See journals/20260705_platform_axis_classification.md.
+    bool unalignTrapEnabled = false;
 
     // Last BoxResult fault code recorded at retire.  Stays kNoFault
     // during normal execution; set to kFaultHalt on graceful HALT,
