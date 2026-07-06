@@ -341,6 +341,16 @@ dumps the SPE-computation instruction history + live register values at the
 producing retire, and the `palMode` flag at pc=0x13edd tells whether that PC is
 even PAL.  Result to be appended.
 
+> **SUPERSEDED 2026-07-06 (read first).** Section 11 is retained only as the record
+> of two misreads, both now disproven with direct evidence — do not act on it:
+> (1) "0x2d = SL_XMIT" — WITHDRAWN in §12 (SL_XMIT/SL_RCV are I_CTL[13]/[14], not IPR
+> indices). (2) "the OPCDEC handler does a NULL-base load at 0xd94c (base=0 →
+> 0xffffffffffffffc0)" — SUPERSEDED: the ES40 OPCDEC handler returns cleanly, and the
+> actual `0x1b7dd4` DtbMiss uses R16 = `0x801_0000_0000` (a VALID Typhoon MMIO
+> address), not zero — it is an unmapped-virtual-MMIO translation miss, not a NULL
+> deref. Full evidence + the three-bug decomposition:
+> `journals/20260706_0x2d_path_selector_and_three_bug_decomposition.md`.
+
 ## 11. ROOT CAUSE CONFIRMED 2026-07-05 -- missing Tbox serial-line IPR SL_XMIT (0x2d)
 
 The Hook C capture (VA-gate on 0xffffffffffffffc0) + fault-log correlation
