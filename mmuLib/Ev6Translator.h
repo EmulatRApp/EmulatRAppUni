@@ -69,6 +69,8 @@
 #define MMULIB_EV6TRANSLATOR_H
 
 #include <cstdint>
+#include <cstdio>   // EMULATR_BRINGUP_PROBES ACVPROBE Hook A
+#include <cstdlib>  // EMULATR_BRINGUP_PROBES getenv/strtoull for Hook A floor
 
 #include "coreLib/CpuState.h"
 #include "coreLib/VA_types.h"
@@ -319,6 +321,73 @@ struct Ev6Translator
         if (r.isHit()) {
             return applyTlbHit(r.pte, va, access, cpu.mode, pa_out);
         }
+#if defined(EMULATR_BRINGUP_PROBES)
+        // ACVPROBE Hook A: the SPE regime at the Dstream miss that feeds the ACV.
+        // spe_shape is the RAW SPE-window match, independent of cpu.m_spe, so it
+        // distinguishes H1 (VA is superpage-shaped but m_spe lacks the bit) from
+        // H4 (VA matches no SPE window).  Fires for kernel-mode misses (the
+        // console 1-1 regime) OR any superpage-shaped VA, capped.
+        {
+            unsigned const s2 = (((va >> 46) & 0x3ULL)   == 0x2ULL)   ? 1u : 0u;
+            unsigned const s1 = (((va >> 41) & 0x7FULL)  == 0x7EULL)  ? 1u : 0u;
+            unsigned const s0 = (((va >> 30) & 0x3FFFFULL)== 0x3FFFEULL)? 1u : 0u;
+            bool const kern = (cpu.mode == coreLib::Mode_Privilege::Kernel);
+            // Re-gated (2026-07-05) to the ~248M ACV window: earlier misses
+            // exhausted the 40-print cap long before the console's 1-1 ACV.
+            // Floor overridable via EMULATR_HOOKA_CYC_FLOOR (default 248000000).
+            static unsigned long long const s_acvAFloor = []() -> unsigned long long {
+                char const* e = std::getenv("EMULATR_HOOKA_CYC_FLOOR");
+                return (e && *e) ? std::strtoull(e, nullptr, 0) : 248000000ULL;
+            }();
+            static unsigned long s_acvA = 0;
+            if ((kern || s2 || s1 || s0) && cpu.cycleCount >= s_acvAFloor
+                && s_acvA < 40) { ++s_acvA;
+                std::fprintf(stderr,
+                    "ACVPROBE HOOKA cyc=%llu va=%016llx mode=%d va_ctl=%llx "
+                    "m_spe=%u i_spe=%u shape=S2:%u,S1:%u,S0:%u canon=%d\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(va),
+                    static_cast<int>(cpu.mode),
+                    static_cast<unsigned long long>(cpu.va_ctl),
+                    static_cast<unsigned>(cpu.m_spe),
+                    static_cast<unsigned>(cpu.i_spe),
+                    s2, s1, s0,
+                    static_cast<int>(isCanonicalVA(va, cpu.va_ctl)));
+            }
+        }
+        // ACVPROBE Hook C (2026-07-05): pointer-root capture.  When
+        // EMULATR_HOOKA_VA is set and the faulting VA matches EXACTLY, dump the
+        // issuing PC + full GPR file.  Identifies the base register (va = base +
+        // small offset) and records its VALUE -- exactly 0 (NULL) vs
+        // garbage-nonzero forks the diagnosis.  Follow with a PC-gate ring dump
+        // on ISSUING-pc for the base register's last-writer provenance.
+        {
+            static unsigned long long const s_hookaVa = []() -> unsigned long long {
+                char const* e = std::getenv("EMULATR_HOOKA_VA");
+                return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
+            }();
+            static unsigned long s_hookC = 0;
+            if (s_hookaVa != 0
+                && static_cast<unsigned long long>(va) == s_hookaVa
+                && s_hookC < 8) { ++s_hookC;
+                std::fprintf(stderr,
+                    "ACVPROBE HOOKC cyc=%llu ISSUING-pc=%016llx va=%016llx mode=%d\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(cpu.pcAddr()),
+                    static_cast<unsigned long long>(va),
+                    static_cast<int>(cpu.mode));
+                for (int r = 0; r < 32; r += 4) {
+                    std::fprintf(stderr,
+                        "  R%02d=%016llx R%02d=%016llx R%02d=%016llx R%02d=%016llx\n",
+                        r,   static_cast<unsigned long long>(cpu.intReg[r]),
+                        r+1, static_cast<unsigned long long>(cpu.intReg[r+1]),
+                        r+2, static_cast<unsigned long long>(cpu.intReg[r+2]),
+                        r+3, static_cast<unsigned long long>(cpu.intReg[r+3]));
+                }
+                std::fflush(stderr);
+            }
+        }
+#endif
         return TranslationResult::DtbMiss;
     }
 
