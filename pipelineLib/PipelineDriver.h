@@ -1061,6 +1061,67 @@ private:
     {
         coreLib::BoxResult const& r = slot.result;
 
+        // ------------------------------------------------------------------
+        // Retire-time diagnostic facility (env-driven; inert unless set).
+        // Two reusable techniques that proved decisive in the 0x2d / three-bug
+        // investigation (journals/20260706_0x2d_path_selector_and_three_bug_
+        // decomposition.md).  Both parse env once via function-local statics,
+        // so the steady-state cost with the vars unset is a couple of compares.
+        //
+        //   (1) PC-window instruction trace -- EMULATR_DIAG_PCLO/PCHI.  Logs
+        //       every retired instruction (pc/enc/pal/fault/memAddr) whose
+        //       aligned PC is in [PCLO,PCHI], capped at EMULATR_DIAG_CAP
+        //       (default 200).  Reads out spin/poll loops, what a load reads,
+        //       and faulting VAs (memAddr) alike -- decode enc offline.
+        //
+        //   (2) Register last-writer provenance -- EMULATR_DIAG_WREG (0..31)
+        //       + EMULATR_DIAG_WMIN.  Logs the instruction that writes that
+        //       integer GPR with an unsigned value >= WMIN.  Names who set a
+        //       register (e.g. the LDAH/LDA pair that loads a delay constant).
+        // ------------------------------------------------------------------
+        {
+            auto envU64 = [](char const* name, uint64_t dflt) {
+                char const* e = std::getenv(name);
+                return e ? std::strtoull(e, nullptr, 0) : dflt;
+            };
+            static uint64_t const diagPcLo = envU64("EMULATR_DIAG_PCLO", ~uint64_t{0});
+            static uint64_t const diagPcHi = envU64("EMULATR_DIAG_PCHI", uint64_t{0});
+            static int const diagCap =
+                static_cast<int>(envU64("EMULATR_DIAG_CAP", 200));
+            uint64_t const diagApc = slot.grain.pc & ~uint64_t{3};
+            static int diagPcN = 0;
+            if (diagApc >= diagPcLo && diagApc <= diagPcHi && diagPcN < diagCap) {
+                ++diagPcN;
+                std::fprintf(stderr,
+                    "DIAG-PC: cyc=%llu pc=0x%llx enc=0x%08x pal=%d fault=%d "
+                    "memAddr=0x%llx\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(diagApc),
+                    static_cast<unsigned>(slot.grain.encoded),
+                    cpu.inPalMode() ? 1 : 0,
+                    static_cast<int>(r.faultCode),
+                    static_cast<unsigned long long>(r.memAddr));
+                std::fflush(stderr);
+            }
+            static int const diagWReg =
+                static_cast<int>(envU64("EMULATR_DIAG_WREG", ~uint64_t{0}));
+            static uint64_t const diagWMin = envU64("EMULATR_DIAG_WMIN", 0);
+            static int diagWN = 0;
+            if (diagWReg >= 0 && diagWReg < 32 && !r.regWriteIsFp &&
+                r.regWriteIdx == static_cast<uint8_t>(diagWReg) &&
+                r.regWriteValue >= diagWMin && diagWN < diagCap) {
+                ++diagWN;
+                std::fprintf(stderr,
+                    "DIAG-WR: cyc=%llu pc=0x%llx enc=0x%08x R%d<=0x%llx\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(diagApc),
+                    static_cast<unsigned>(slot.grain.encoded),
+                    diagWReg,
+                    static_cast<unsigned long long>(r.regWriteValue));
+                std::fflush(stderr);
+            }
+        }
+
         // HALT: graceful shutdown signal, not a trap.
         if (r.faultCode == coreLib::kFaultHalt) {
             cpu.halted        = true;
