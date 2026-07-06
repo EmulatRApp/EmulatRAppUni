@@ -73,6 +73,7 @@
 #include "pipelineLib/MmioRegistry.h"
 #include "systemLib/SrmLoader.h"
 #include "systemLib/SpinSkip.h"
+#include "systemLib/PlatformCapabilities.h"
 #include "systemLib/StopReason.h"
 #include "config/EmulatorSettings.h"   // SSOT: config threaded into Machine (Slice A)
 
@@ -466,6 +467,16 @@ private:
     // proven side-effect-free countdown loops. Refuse-by-default; inert unless
     // enabled. See systemLib/SpinSkip.h.
     systemLib::SpinSkip       m_spinSkip;
+
+    // Platform capabilities (model -> manifest-enumerated features). Latched at
+    // construction; a behavior gate tests the capability, not the model. Inert
+    // (no call sites yet). See systemLib/PlatformCapabilities.h.
+    systemLib::PlatformCapabilities m_caps;
+
+public:
+    // Capability gate: `platHas(PlatCap::SbAli)`, never `model == "ES40"`.
+    bool platHas(systemLib::PlatCap c) const noexcept { return m_caps.has(c); }
+private:
     // m_memory removed -- m_chipset owns the single GuestMemory backing.
     mmuLib::Ev6Translator    m_translator;   // owned for future TLB state
 
