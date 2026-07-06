@@ -236,6 +236,28 @@ public:
         s_valueGate.store(v, std::memory_order_release);
     }
 
+    // Optional cycle floor for the value gate (setValueGateCycleFloor(c) or
+    // env EMULATR_VALUE_GATE_FLOOR=<dec/hex>).  When non-zero the gate is
+    // armed only for retires with cycle >= floor -- lets a common value
+    // (e.g. an M_CTL source operand 0x20) be caught at a specific late
+    // window instead of its first appearance millions of cycles earlier.
+    // 0 = no floor (original behavior).
+    static std::atomic<uint64_t> s_valueGateCycleFloor;
+    static void setValueGateCycleFloor(uint64_t c) noexcept
+    {
+        s_valueGateCycleFloor.store(c, std::memory_order_release);
+    }
+
+    // Optional PC gate for the ring dump (setPcGate(pc) or env EMULATR_PC_GATE).
+    // Dumps the lookback ring ONCE when a retire's PC equals this value (and
+    // cycle >= the shared value-gate floor).  Ends the ring on a chosen PC so
+    // its predecessors are guaranteed captured.  0 = off.
+    static std::atomic<uint64_t> s_pcGate;
+    static void setPcGate(uint64_t pc) noexcept
+    {
+        s_pcGate.store(pc, std::memory_order_release);
+    }
+
 
 private:
     // Configuration captured at construction.
