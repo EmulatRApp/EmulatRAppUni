@@ -1964,6 +1964,17 @@ bool Machine::stepCycle(uint64_t i) noexcept
     // +1 per quantum), whether or not the CPU halted on this tick.  For the
     // single running agent m_systemClock stays == m_cpu.cycleCount, so
     // systemNow() reads identically -> the dispatch gate is byte-identical.
+    // Spin-skip: if this tick starts at a certified side-effect-free countdown
+    // loop head, collapse it to its exit (interrupt-aware) instead of stepping.
+    if (m_spinSkip.enabled()) {
+        systemLib::SpinSkip::Plan const p =
+            m_spinSkip.onTickStart(m_cpu, m_chipset.guestMemory());
+        if (p.valid) {
+            applySpinSkip(p);
+            return systemTick(i);   // collapsed the loop; continue the run loop
+        }
+    }
+
     uint64_t const pccBefore = m_cpu.cycleCount;
     bool const     alive     = cpuKernel(m_cpu);
     m_systemClock += (m_cpu.cycleCount - pccBefore);
@@ -1971,6 +1982,42 @@ bool Machine::stepCycle(uint64_t i) noexcept
         return false;   // CPU halted -> BREAK the run loop
     }
     return systemTick(i);
+}
+
+// ============================================================================
+// applySpinSkip -- apply a certified countdown fast-forward.
+// ----------------------------------------------------------------------------
+// Collapses `iters` iterations to their exit state in closed form. The advance
+// is INTERRUPT-AWARE: the Cchip interval timer is a pure function of cycleCount
+// (fires at every multiple of kCchipTimerMask+1), so we replay fireIntervalTimer
+// at each period boundary crossed in the skipped span, in order. For a delay the
+// guest ran uninterrupted (the loop reached the hot threshold without diverting,
+// which itself proves interrupts were masked across it), these fires just latch
+// b_irq<2> -- exactly the pending state a literal run would have left, so the
+// timer interrupt is delivered when the guest later unmasks. The induction
+// register and PC are set to their proven exit values.
+// ============================================================================
+void Machine::applySpinSkip(systemLib::SpinSkip::Plan const& p) noexcept
+{
+    uint64_t const start = m_cpu.cycleCount;
+    uint64_t const span  = p.iters * p.cyclesPerIter;
+    uint64_t const end   = start + span;
+
+    uint64_t const period =
+        Tsunami21272::Spec::kCchipTimerMask + 1ULL;
+    if (period > 1) {
+        uint64_t boundary = ((start / period) + 1ULL) * period;
+        for (int guard = 0; boundary <= end && guard < 1000000;
+             boundary += period, ++guard) {
+            m_cpu.cycleCount = boundary;          // fire predicate reads cycleCount
+            m_chipset.cchip().fireIntervalTimer();
+        }
+    }
+
+    m_cpu.cycleCount       = end;
+    if (p.indReg != 31) m_cpu.intReg[p.indReg] = p.exitReg;  // never write R31
+    m_cpu.pc               = p.exitPc;
+    m_systemClock         += span;
 }
 
 
