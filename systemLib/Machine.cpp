@@ -540,6 +540,16 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
         }
 
         // ------------------------------------------------------------
+        // Capability latch (2026-07-05): resolve model -> manifest-enumerated
+        // capabilities NOW, before any guest instruction retires, so a behavior
+        // gate (platHas(PlatCap::...)) is live everywhere by construction. INERT
+        // -- no call sites yet. See systemLib/PlatformCapabilities.h +
+        // journals/20260705_platform_axis_classification.md.
+        // ------------------------------------------------------------
+        m_caps = systemLib::PlatformCapabilities::derive(
+            m_settings.system.model, m_chipset.variant(), mr.manifest);
+
+        // ------------------------------------------------------------
         // Storage attach (2026-06-11, dqa0 boot): for each AtaDisk target
         // behind a named storage controller, resolve the manifest media
         // FILENAME against [Storage] diskDir (absolute media used as-is;
