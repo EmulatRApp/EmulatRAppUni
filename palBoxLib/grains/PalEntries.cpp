@@ -1500,6 +1500,12 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_CC_CTL:       // counter control + offset
         value = 0; break;
 
+        // ---- Unassigned IPR index 0x2d (real HW: UNPREDICTABLE on read) ----
+        // NOT the serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]).  Return 0.
+        // See journals/ACV_Superpage_Enable_Probe_20260705.md sec 12.
+    case coreLib::HW_RESERVED_2D:
+        value = 0; break;
+
         // PAL_TEMP range handled above by isPalTemp gate; the labels
         // are still listed in the enum but cannot reach here.
     case coreLib::HW_PAL_TEMP_0:  case coreLib::HW_PAL_TEMP_1:
@@ -1892,6 +1898,17 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_CC_CTL:
     case coreLib::HW_VA:            // architecturally read-only; permissive
     case coreLib::HW_VA_FORM:       // architecturally read-only; permissive
+        break;
+
+        // Unassigned IPR index 0x2d.  The SRM's register-init sweep issues
+        // HW_MTPR R31 (write 0) to this index; real 21264 ignores writes to
+        // unassigned indices, so absorb as a no-op instead of faulting.  This
+        // is NOT the serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]); the
+        // earlier "SL_XMIT" label was wrong.  OPEN: byte-compare 0x13f40-0x13f48
+        // vs the authoritative image to confirm the firmware deliberately writes
+        // 0x2d vs V4 fetching a wrong word.  See
+        // journals/ACV_Superpage_Enable_Probe_20260705.md sec 12.
+    case coreLib::HW_RESERVED_2D:
         break;
 
         // PAL_TEMP range handled above by isPalTemp gate; the labels

@@ -182,7 +182,14 @@ enum HW_IPR : uint16_t {
     HW_DC_CTL       = 0x0129,   // D-cache Control Register.
     HW_DC_STAT      = 0x012A,   // D-cache Status (read-only).
     HW_C_DATA       = 0x012B,
-    HW_C_SHFT       = 0x012C,
+    HW_C_SHFT       = 0x012C,   // last DEFINED IPR index; table ends here (21264 HRM).
+    // 0x2d/0x2e are UNASSIGNED IPR indices.  NOTE: SL_XMIT/SL_RCV (the on-chip
+    // serial line) are NOT here -- they are I_CTL[13]/[14] (21264 HRM 10039-10040);
+    // an earlier revision misfiled them as 0x2d/0x2e.  The SRM's register-init
+    // sweep issues HW_MTPR R31 to index 0x2d (write 0); real 21264 ignores writes
+    // to unassigned indices, so V4 absorbs it as a no-op rather than faulting
+    // kFaultUnimplemented.  See journals/ACV_Superpage_Enable_Probe_20260705.md sec 12.
+    HW_RESERVED_2D  = 0x012D,   // Unassigned index; write no-op / read UNPREDICTABLE.
 
     // -----------------------------------------------------------------
     // Process Context (packed register)
