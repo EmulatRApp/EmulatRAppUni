@@ -185,11 +185,15 @@ enum HW_IPR : uint16_t {
     HW_C_SHFT       = 0x012C,   // last DEFINED IPR index; table ends here (21264 HRM).
     // 0x2d/0x2e are UNASSIGNED IPR indices.  NOTE: SL_XMIT/SL_RCV (the on-chip
     // serial line) are NOT here -- they are I_CTL[13]/[14] (21264 HRM 10039-10040);
-    // an earlier revision misfiled them as 0x2d/0x2e.  The SRM's register-init
-    // sweep issues HW_MTPR R31 to index 0x2d (write 0); real 21264 ignores writes
-    // to unassigned indices, so V4 absorbs it as a no-op rather than faulting
-    // kFaultUnimplemented.  See journals/ACV_Superpage_Enable_Probe_20260705.md sec 12.
-    HW_RESERVED_2D  = 0x012D,   // Unassigned index; write no-op / read UNPREDICTABLE.
+    // an earlier revision misfiled them as 0x2d/0x2e.  The DS10/DS20/ES40 SRM
+    // register-init sweep issues HW_MTPR R31 to index 0x2d (write 0).  V4 currently
+    // FAULTS it (kFaultUnimplemented) as a KEPT-AND-LABELED SCAFFOLD: 0x2d is a
+    // PATH-SELECTOR, not a proven-correct choice (silicon most likely ignores the
+    // write).  Fault delivery is faithful; the fault/no-op choice merely routes
+    // each platform to a different downstream defect.  Full analysis + the open
+    // architect decision: journals/20260706_0x2d_path_selector_and_three_bug_
+    // decomposition.md.  Handled in PalEntries.cpp HW_MFPR/HW_MTPR.
+    HW_RESERVED_2D  = 0x012D,   // Unassigned index; V4 faults MFPR/MTPR (see note above).
 
     // -----------------------------------------------------------------
     // Process Context (packed register)

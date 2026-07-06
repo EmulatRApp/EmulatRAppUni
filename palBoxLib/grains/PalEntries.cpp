@@ -1500,11 +1500,20 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_CC_CTL:       // counter control + offset
         value = 0; break;
 
-        // ---- Unassigned IPR index 0x2d (real HW: UNPREDICTABLE on read) ----
-        // NOT the serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]).  Return 0.
-        // See journals/ACV_Superpage_Enable_Probe_20260705.md sec 12.
+        // ---- Unassigned IPR index 0x2d -- FAULT (do NOT silent-zero) ----
+        // 0x2d is an unassigned EV6 IPR index (table ends at C_SHFT=0x2c).  The
+        // 21264 HRM is SILENT on HW_MFPR/HW_MTPR to an unassigned index (its
+        // "writes ignored" rule is for reserved BIT-FIELDS within a register,
+        // not an unassigned INDEX).  The decisive evidence is the guest PAL: the
+        // DS10/DS20 SRM issues HW_MTPR R31->0x2d (encoded 0x77e72d40) once in its
+        // register-init sweep and RELIES on it faulting -- treating it as a no-op
+        // freezes DS10 in a DtbMiss loop at 0x13d38; restoring kFaultUnimplemented
+        // lets DS10 advance to the console region (verified 2026-07-06,
+        // journals/20260706_0x2d_rollback_experiment.md).  So fault, do not
+        // silent-zero.  (NOT the serial line: SL_XMIT/SL_RCV are I_CTL[13]/[14].)
     case coreLib::HW_RESERVED_2D:
-        value = 0; break;
+        r.faultCode = coreLib::kFaultUnimplemented;
+        return r;
 
         // PAL_TEMP range handled above by isPalTemp gate; the labels
         // are still listed in the enum but cannot reach here.
@@ -1900,16 +1909,23 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_VA_FORM:       // architecturally read-only; permissive
         break;
 
-        // Unassigned IPR index 0x2d.  The SRM's register-init sweep issues
-        // HW_MTPR R31 (write 0) to this index; real 21264 ignores writes to
-        // unassigned indices, so absorb as a no-op instead of faulting.  This
-        // is NOT the serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]); the
-        // earlier "SL_XMIT" label was wrong.  OPEN: byte-compare 0x13f40-0x13f48
-        // vs the authoritative image to confirm the firmware deliberately writes
-        // 0x2d vs V4 fetching a wrong word.  See
-        // journals/ACV_Superpage_Enable_Probe_20260705.md sec 12.
+        // Unassigned IPR index 0x2d (SRM register-init sweep, HW_MTPR R31->0x2d,
+        // encoded 0x77e72d40).  V4 raises kFaultUnimplemented here.  IMPORTANT --
+        // this is a KEPT-AND-LABELED SCAFFOLD, not a proven-correct choice: 0x2d
+        // is a PATH-SELECTOR.  Faulting vs no-op'ing it routes each platform to a
+        // DIFFERENT, independent downstream defect (DS10 -> a device-model poll at
+        // 0x13d38; ES40 -> a virtual-MMIO DtbMiss at 0x1b7dd4; DS20 -> a benign
+        // 300M settling delay).  Delivery itself is FAITHFUL (correct OPCDEC
+        // vector 0x8400, clean saved excAddr, no shadow-bank artifact) -- the old
+        // "ES40 mis-delivers this fault" claim is WITHDRAWN.  Silicon most likely
+        // IGNORES the write (no-op); the fault is kept only because it currently
+        // routes DS10/DS20 to `>>>`.  Final disposition is an open architect
+        // decision (going no-op REQUIRES fixing DS10's device bit first).  NOT the
+        // serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]).  Full analysis:
+        // journals/20260706_0x2d_path_selector_and_three_bug_decomposition.md.
     case coreLib::HW_RESERVED_2D:
-        break;
+        r.faultCode = coreLib::kFaultUnimplemented;
+        return r;
 
         // PAL_TEMP range handled above by isPalTemp gate; the labels
         // are still listed for switch exhaustiveness.
