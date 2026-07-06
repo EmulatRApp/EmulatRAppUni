@@ -72,6 +72,7 @@
 #include "pipelineLib/IFetchOverride.h"
 #include "pipelineLib/MmioRegistry.h"
 #include "systemLib/SrmLoader.h"
+#include "systemLib/SpinSkip.h"
 #include "systemLib/StopReason.h"
 #include "config/EmulatorSettings.h"   // SSOT: config threaded into Machine (Slice A)
 
@@ -200,6 +201,9 @@ public:
     // (reads m_cpu.pc) stay in systemTick; both are flagged STEP-4/SMP seams.
     bool cpuKernel(coreLib::CpuState& cpu) noexcept;   // per-CPU: PipelineDriver::step
     bool systemTick(uint64_t i) noexcept;              // system: once per quantum
+
+    // Spin-skip: apply a certified countdown fast-forward (interrupt-aware).
+    void applySpinSkip(systemLib::SpinSkip::Plan const& p) noexcept;
 
     // EMULATR_HWRPB_SCAN one-shot probe (2026-06-25).  Triggered by the
     // m_hwrpbScanSentinel file; scans guest physical RAM for the HWRPB and
@@ -457,6 +461,11 @@ private:
     // ccOffset, not raw cycleCount) cannot perturb it.  Resynced to
     // m_cpu.cycleCount on reset / snapshot load.  systemNow() reads this.
     uint64_t                 m_systemClock{ 0 };
+
+    // Spin-skip optimizer (env EMULATR_SPINSKIP): detects + fast-forwards
+    // proven side-effect-free countdown loops. Refuse-by-default; inert unless
+    // enabled. See systemLib/SpinSkip.h.
+    systemLib::SpinSkip       m_spinSkip;
     // m_memory removed -- m_chipset owns the single GuestMemory backing.
     mmuLib::Ev6Translator    m_translator;   // owned for future TLB state
 
