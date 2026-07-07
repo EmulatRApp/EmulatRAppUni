@@ -1923,9 +1923,17 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         // decision (going no-op REQUIRES fixing DS10's device bit first).  NOT the
         // serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]).  Full analysis:
         // journals/20260706_0x2d_path_selector_and_three_bug_decomposition.md.
-    case coreLib::HW_RESERVED_2D:
+    case coreLib::HW_RESERVED_2D: {
+        // PHASE SCAFFOLD (DS10 device-model work): EMULATR_2D_NOOP=1 flips 0x2d
+        // to the faithful no-op path so DS10 reaches its real 0x13d38 I2C poll.
+        // Default = the labeled fault scaffold.  Remove when 0x2d disposition is
+        // finalized (journals/20260706_0x2d_path_selector_and_three_bug_*.md).
+        static int const noop2d =
+            (std::getenv("EMULATR_2D_NOOP") != nullptr) ? 1 : 0;
+        if (noop2d) break;
         r.faultCode = coreLib::kFaultUnimplemented;
         return r;
+    }
 
         // PAL_TEMP range handled above by isPalTemp gate; the labels
         // are still listed for switch exhaustiveness.
