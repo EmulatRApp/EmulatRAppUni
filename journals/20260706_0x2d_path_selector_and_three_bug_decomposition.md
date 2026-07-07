@@ -10,6 +10,17 @@ Depends on: 20260706_0x2d_rollback_experiment.md (the rollback + its DS10/DS20 b
 
 # 0x2d as Path-Selector; Three-Bug Decomposition (2026-07-06)
 
+> **CORRECTION (2026-07-06 PM) — the ES40 row below is WRONG on two points.** After the
+> TIGbus fix (commit 70ccd4b), ES40 advances on the FAITHFUL no-op path to `0x1b7dd4`, so
+> (1) `0x1b7dd4` is NOT "fault-path archaeology" — it is the REAL faithful frontier; and
+> (2) it is NOT a "virtual-MMIO DtbMiss / MMU-translation" bug. The authoritative root is a
+> **garbage R16** from a LEGITIMATE `SUBQ` (~1GB − ~3.2GB memory-scan-end) mis-used as an
+> address → `kFaultAcv`; root = upstream **HWRPB MEMDSC / configured-memory region layout**.
+> ALU/CSERVE exonerated. See journals/20260702_es40_acv_garbage_origin_traced.md and project
+> memory.md (~L1603). The "DS10 = unmodeled PCI device" row is also superseded — DS10's root
+> was V4 mis-routing the TIGbus window as PCI sparse memory (fixed, 70ccd4b).
+
+
 ## 0. One-paragraph summary
 
 The 0x2d reserved-IPR write is **not** the ES40 boot blocker and its fault delivery
