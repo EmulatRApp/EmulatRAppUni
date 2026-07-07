@@ -218,6 +218,11 @@ public:
 
         switch (MMIOOffset::routeMmioOffset(off)) {
         case MMIOOffset::RegionId::Pchip0_SparseMem:
+            // 0x801_0000_0000-0x801_3FFF_FFFF: PCI Sparse Memory (HRM Table 10-1),
+            // physically the Cchip TIGbus window on Tsunami boards.  Flash + TIG
+            // control registers are decoded ahead of here (TsunamiChipset.cpp);
+            // unmodeled reads are unpopulated TIGbus and read 0.  readSparseMem()
+            // returns 0 -- NOT the PCI-empty all-ones float.  See readSparseMem().
             return m_pchip.readSparseMem(off - MMIOOffset::kPchip0_SparseMem);
         case MMIOOffset::RegionId::Pchip0_SparseIO:
             return m_pchip.readSparseIO(off - MMIOOffset::kPchip0_SparseIO);

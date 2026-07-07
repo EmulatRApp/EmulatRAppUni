@@ -327,7 +327,10 @@ namespace Tsunami21272 {
     //   0x3FC000000 - 0x3FDFFFFFF       Pchip1 PCI I/O (dense)
     //   0x3FE000000 - 0x3FEFFFFFF       Pchip1 PCI Config Type 0
     //
-    // IMPORTANT: The gap 0x100000000 - 0x17FFFFFFF is PCI sparse memory.
+    // IMPORTANT: 0x100000000 - 0x13FFFFFFF is PCI Sparse Memory in HRM Table 10-1,
+    //            but on Tsunami boards it is the Cchip TIGbus-interface window (flash
+    //            + TIG control regs decoded ahead); unmodeled reads there are
+    //            unpopulated TIGbus and read 0, NOT the PCI-empty all-ones float.
     //            The gap 0x190000000 - 0x19FFFFFFF is between Pchip0 CSR and Cchip.
     //            The gap 0x1C0000000 - 0x1F7FFFFFF is between Dchip and PCI IACK.
     //            Accesses to gaps should return 0 or log warnings.
