@@ -517,9 +517,13 @@ public:
         }
 #endif
 
-        // PCI sparse memory: offset 0x100000000 - 0x13FFFFFFF
+        // 0x100000000-0x13FFFFFFF: PCI Sparse Memory in HRM Table 10-1, but on
+        // Tsunami boards it is the Cchip TIGbus-interface window (flash + TIG
+        // control registers decoded ahead in TsunamiChipset.cpp).  Unmodeled reads
+        // are unpopulated TIGbus and read 0 -- NOT the PCI-empty all-ones float.
+        // (Real DS10 boot-poll of 0x801_2800_0000 needs bit0=0; see readSparseMem.)
         if (offset >= 0x100000000ULL && offset < 0x140000000ULL)
-            return 0xFFFFFFFFULL;  // no PCI memory device present
+            return 0x0ULL;  // unpopulated TIGbus -> 0
 
         // Pchip1 stub -- no second PCI hose present
         if (offset >= 0x200000000ULL && offset < 0x400000000ULL)
@@ -1074,8 +1078,21 @@ public:
         (void)byteLane;
         (void)xferLen;
 
-        // For now: no PCI memory devices mapped
-        return 0xFFFFFFFFULL;  // empty slot
+        // Window 0x801_0000_0000-0x801_3FFF_FFFF is PCI Sparse Memory in the
+        // Tsunami/Typhoon 21272 HRM Table 10-1, but on Tsunami boards (DS10/DS20)
+        // it is physically the Cchip TIGbus-interface window: flash (0x801_0000_0000)
+        // and the TIG control registers (smir @0x801_3000_0040, Clear-IRQ4 @..0440,
+        // halt-IPI, ...) are decoded AHEAD of this fall-through in TsunamiChipset.cpp.
+        // There are no PCI sparse-memory devices on these boards, so an unmodeled
+        // read here is an unpopulated TIGbus address, which reads 0 -- NOT the
+        // PCI-empty all-ones float.  This was the DS10 boot hang: firmware polls
+        // 0x801_2800_0000 with BLBS bit0 (wait until bit0=0); V4 floated 0xFFFFFFFF,
+        // so bit0 was stuck at 1 and the poll spun forever.  Real DS10 reads 0 here
+        // and boots.  See journals/20260706_0x2d_path_selector_and_three_bug_
+        // decomposition.md and the TIGbus map in TsunamiTig.h.
+        return 0x0ULL;   // unpopulated TIGbus address -> 0 (bit0 clear = ready).
+                         // Confirmed correct: advances DS10 to the LFU (UPD>) stage,
+                         // the expected pre-`>>>` step; all-ones stalled before LFU.
     }
 
     inline auto readSparseIO(uint64_t sparseOffset) const noexcept -> uint64_t
