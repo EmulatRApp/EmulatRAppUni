@@ -9,7 +9,20 @@
       "manufacturer": "DEC", "model": "ES40", "part_class": "54-", "serial": "" },
     { "name": "iic_cpu0", "address": "0xA4", "class": "fru_eeprom",
       "manufacturer": "DEC", "model": "EV6", "part_class": "54-", "serial": "" },
-    { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 }
+    { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 },
+    { "name": "iic_cpu1", "address": "0xAC", "class": "fru_eeprom",
+      "manufacturer": "DEC", "model": "EV6", "part_class": "54-", "serial": "",
+      "comment": "PC264 CPU1 FRU (iic_driver.c #if PC264 !WEBBRICK @0xAC). Present on 2+ CPU boards; unread at cpuCount=1." },
+    { "name": "iic_rcm_temp", "address": "0x9E", "class": "status", "byte": "0x00",
+      "comment": "KCRCM temperature node (iic_driver.c common KCRCM @0x9E, IIC_LED_TYPE size 4). All-platform." },
+    { "name": "iic_rcm_nvram1", "address": "0xC2", "class": "nvram", "size": 256 },
+    { "name": "iic_rcm_nvram2", "address": "0xC4", "class": "nvram", "size": 256 },
+    { "name": "iic_rcm_nvram3", "address": "0xC6", "class": "nvram", "size": 256 },
+    { "name": "iic_rcm_nvram4", "address": "0xC8", "class": "nvram", "size": 256 },
+    { "name": "iic_rcm_nvram5", "address": "0xCA", "class": "nvram", "size": 256 },
+    { "name": "iic_rcm_nvram6", "address": "0xCC", "class": "nvram", "size": 256 },
+    { "name": "iic_rcm_nvram7", "address": "0xCE", "class": "nvram", "size": 256,
+      "comment": "PC264/Clipper IIC set per srmconsole/IIC_DRIVER.C + galaxy_pc264.c. SOURCED FROM THE CONSUMER: build_power_hw reads ONLY iic_system0@0x70 (->fail_register) and iic_system1@0x72 (->func_register), 1 byte each, then `if(!status) return` -- so its reachability/pass gate is the IIC CONTROLLER BASE (kIicBaseByModel[ES40], so the PCF8584 fread completes) + the fail_register BIT VALUES (ps_present clear = power supplies present), NOT any OCP node. The OCP LEDs (0x40/0x42/0x4E) + iic_cont@0xB6 are read by the SEPARATE build_led_hw path and are NOT needed for build_power_hw -- do NOT add them to force a SYSVAR badge. ES40 = CLASS_CLIPPER var=5 (galaxy_pc264.c:366/714/1356), NOT DS20(6)/DS20E(8): the SYSVAR>>10 gate is binary (member 1=264DP skips build_power_hw, !=1 runs it), not an OCP selector, and the member is not OCP-keyed. FRU roots iic_smb0@0xA2 + iic_cpu0@0xA4 + iic_cpu1@0xAC + KCRCM iic_rcm_*@0x9E/0xC0-0xCE feed build_fru_root (SMB-rooted hierarchy, BUILD_FRU.C, a deeper IIC-model feature)." }
   ],
   "pci_devices": [
     { "name": "isa_bridge", "model": "cypress_isa", "hose": 0, "bus": 0, "slot": 5, "func": 0,
