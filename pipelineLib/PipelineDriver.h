@@ -1086,21 +1086,32 @@ private:
             };
             static uint64_t const diagPcLo = envU64("EMULATR_DIAG_PCLO", ~uint64_t{0});
             static uint64_t const diagPcHi = envU64("EMULATR_DIAG_PCHI", uint64_t{0});
+            // 2026-07-07: optional cycle-window gate (EMULATR_DIAG_CYCLO/CYCHI)
+            // lets a wide PC window be pinned to a specific cycle span -- used to
+            // capture the ES40 post-tick excAddr-zeroing window, which sits past
+            // the DecListingSink lookback depth.  Defaults (0 .. ~0) pass all, so
+            // existing DIAG_PC recipes are unaffected.  excAddr is now emitted on
+            // every line so the exact instruction that clears it is visible.
+            static uint64_t const diagCycLo = envU64("EMULATR_DIAG_CYCLO", 0);
+            static uint64_t const diagCycHi = envU64("EMULATR_DIAG_CYCHI", ~uint64_t{0});
             static int const diagCap =
                 static_cast<int>(envU64("EMULATR_DIAG_CAP", 200));
             uint64_t const diagApc = slot.grain.pc & ~uint64_t{3};
             static int diagPcN = 0;
-            if (diagApc >= diagPcLo && diagApc <= diagPcHi && diagPcN < diagCap) {
+            if (diagApc >= diagPcLo && diagApc <= diagPcHi
+                && cpu.cycleCount >= diagCycLo && cpu.cycleCount <= diagCycHi
+                && diagPcN < diagCap) {
                 ++diagPcN;
                 std::fprintf(stderr,
                     "DIAG-PC: cyc=%llu pc=0x%llx enc=0x%08x pal=%d fault=%d "
-                    "memAddr=0x%llx\n",
+                    "memAddr=0x%llx excAddr=0x%llx\n",
                     static_cast<unsigned long long>(cpu.cycleCount),
                     static_cast<unsigned long long>(diagApc),
                     static_cast<unsigned>(slot.grain.encoded),
                     cpu.inPalMode() ? 1 : 0,
                     static_cast<int>(r.faultCode),
-                    static_cast<unsigned long long>(r.memAddr));
+                    static_cast<unsigned long long>(r.memAddr),
+                    static_cast<unsigned long long>(cpu.excAddr));
                 std::fflush(stderr);
             }
             static int const diagWReg =
@@ -1163,7 +1174,27 @@ private:
                 r.faultCode != coreLib::kFaultItbMiss) {
                 coreLib::logFaultEvent(cpu.cycleCount, slot.grain.pc,
                                        slot.grain.encoded, r.faultCode,
-                                       cpu.inPalMode());
+                                       cpu.inPalMode(), cpu.va);
+            }
+
+            // 2026-07-08: arm a decoded retire window on the FIRST DTB double
+            // miss (env EMULATR_TRACE_ARM_ON_DTBM=<instrs>, one-shot).  The
+            // sink's PAL-entry lookback already dumps the pre-fault context;
+            // this adds the forward window so we see the PAL DTBM_DOUBLE_3 walk
+            // and the console's retry -- i.e. the VA the console SCB fill
+            // computes and how V4 translates it (ES40 SCB null-vector halt,
+            // task #29).  Zero-cost when unset; setTraceWindowCountdown is a
+            // no-op unless a .trc sink is active, matching the UART/GMEM arms.
+            if (r.faultCode == coreLib::kFaultDtbMissDouble) {
+                static long const s_armDtbm = []() -> long {
+                    char const* e = std::getenv("EMULATR_TRACE_ARM_ON_DTBM");
+                    return (e && *e) ? std::strtol(e, nullptr, 0) : 0L; }();
+                static bool s_armedDtbmOnce = false;
+                if (s_armDtbm > 0 && !s_armedDtbmOnce) {
+                    s_armedDtbmOnce = true;
+                    traceLib::DecListingSink::setTraceWindowCountdown(
+                        static_cast<int64_t>(s_armDtbm));
+                }
             }
 
             // FIX 2026-05-27: REMOVED  cpu.va = cpu.mm_stat;

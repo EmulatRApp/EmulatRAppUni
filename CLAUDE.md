@@ -57,6 +57,28 @@ behavior, so future sessions inherit it.
 - For any non-trivial change in V4, summarize the intended diff before
   applying it.
 
+### Build & run conventions
+
+- Format all command-line examples as executable **bash** (not
+  PowerShell/cmd), so they paste-and-run in Git Bash (Windows) or a
+  Mac/Linux shell alike.
+- Root every build/run at the per-config tree
+  `<project>/out/build/<config>`, where `<config>` is one of
+  `release`, `relwithdebinfo`, or `debug`. `cd` into that root before
+  launching so relative paths (`firmware/…`, log outputs) resolve, and
+  the launch path is `out/build/<config>/Emulatr[.exe]` on both hosts.
+  `tools/build_emulatr.sh <config>` builds and populates that tree
+  (on Windows it keeps the in-source VS build and mirrors the artifact
+  there; on Mac/Linux it builds out-of-source directly into it).
+- `cmake` is not on PATH in a bare Git Bash shell — it arrives with the
+  VS environment. Build via `tools/build_emulatr.sh`, which sources
+  `tools/vsenv.sh` (vcvars) first; don't call `cmake` directly there.
+- Use `relwithdebinfo` (or `debug`) for any diagnostic capture: the
+  `EMULATR_DIAG_*` retire-time facility is compiled OUT of `release`.
+- After any pull that touches runtime code, rebuild, then confirm the
+  facility you need is actually in the binary before a long run, e.g.
+  `grep -a -c 'EMULATR_DIAG_WREG' out/build/<config>/Emulatr.exe` (> 0).
+
 ## Deferred / planned work
 
 Project-level notes about work intentionally postponed until a

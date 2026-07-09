@@ -115,13 +115,17 @@ public:
 
     void reset() noexcept
     {
-        m_dsc  = 0x01;      // DRAM present, single array
-        m_str  = 0;         // no striping
-        m_dsc2 = 0;         // default single-array config
+        m_dsc  = 0x01;      // BC<1:0>=1 (4 Dchips, 1 memory bus).  RO + P1P<6> + byte-
+                            // slice = task T-DH2/T-SM1 (HRM 10.2.4.1 T10-31).
+        m_str  = 0x2828282828282828ULL;  // HRM 10.2.4.3 T10-33 per-byte reset 0x28
+                                         // (IDDW=2, IDDR=4); byte-sliced replicate.
+        m_dsc2 = 0;         // HRM 10.2.4.2 T10-32 reset 0 (RO = task T-RO1)
 
-        // DREV from variant info
-        const auto* info = variantInfo(m_variant);
-        m_drev = info ? info->drev : 0x10;
+        // DREV: HRM 10.2.4.4 T10-34 is byte-sliced -- a 4-bit REVn per Dchip, init 1,
+        // read as 0x0101010101010101.  The variant drev (0x10/0x20) was the WRONG
+        // encoding: it landed in the RAZ high nibble, leaving REV0<3:0>=0.  Byte-slice
+        // datapath = task T-SM1.  See journal 20260707_tsunami_typhoon_hrm_faithfulness_audit.
+        m_drev = 0x0101010101010101ULL;
 
        /* INFO_LOG(QString("TsunamiDchip: reset -- %1, DREV=0x%2, %3 MB RAM")
             .arg(info ? info->chipName : "Unknown")
@@ -225,16 +229,18 @@ public:
         switch (offset)
         {
         case Dchip::DSC:
-            CSR_LOG_W("Dchip", "DSC",  value, offset, cpuId, kPhaseBNoCycle);
-            m_dsc = value;
+            // RO per HRM 10.2.4.1 T10-31 (powers up from CPM pins) -- writes discarded.
+            CSR_LOG_W("Dchip", "DSC(ignored)", value, offset, cpuId, kPhaseBNoCycle);
             break;
         case Dchip::STR:
+            // RW per HRM 10.2.4.3.  TODO(unwired): byte-slice replicate across 8 bytes +
+            // Cchip CSC<13:8> sync (tasks T-SM1/T-SM2).
             CSR_LOG_W("Dchip", "STR",  value, offset, cpuId, kPhaseBNoCycle);
             m_str = value;
             break;
         case Dchip::DSC2:
-            CSR_LOG_W("Dchip", "DSC2", value, offset, cpuId, kPhaseBNoCycle);
-            m_dsc2 = value;
+            // RO per HRM 10.2.4.2 T10-32 (powers up from PADCMD pins) -- writes discarded.
+            CSR_LOG_W("Dchip", "DSC2(ignored)", value, offset, cpuId, kPhaseBNoCycle);
             break;
         case Dchip::DREV:
             // RO per HRM -- writes logged but discarded.

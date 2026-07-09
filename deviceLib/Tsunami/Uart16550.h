@@ -659,6 +659,25 @@ private:
     {
         uint8_t const prev = m_ier;
         m_ier = value & 0x0F;   // only low 4 bits valid
+#if EMULATR_BRINGUP_PROBES
+        // TODO(diag-ier): D1 IER-write census -- ES40 combott_txready localize
+        // (journals/20260708_es40_txready_diag_sequence.md).  Env EMULATR_UARTWATCH.
+        // Answers "was interrupt-mode TX (ETBEI) armed, and on which COM port?".
+        // One-shot getenv, capped; remove when the D-sequence lands a fix.
+        {
+            static bool const s_on = (std::getenv("EMULATR_UARTWATCH") != nullptr);
+            if (s_on) {
+                static unsigned long s_ierN = 0;
+                if (s_ierN < 128) { ++s_ierN;
+                    std::fprintf(stderr,
+                        "IERWATCH port=%s base=0x%03x val=0x%02x etbei=%d\n",
+                        m_name.c_str(), unsigned(m_basePort), unsigned(value),
+                        (value & kIER_ETBEI) ? 1 : 0);
+                    std::fflush(stderr);
+                }
+            }
+        }
+#endif
 
         bool const etbeiRose = ((prev & kIER_ETBEI) == 0)
                             && ((m_ier & kIER_ETBEI) != 0);
@@ -688,6 +707,27 @@ private:
      */
     void writeTHR(uint8_t value) noexcept
     {
+#if EMULATR_BRINGUP_PROBES
+        // TODO(diag-thr): D2 THR-write census -- ES40 combott_txready localize
+        // (journals/20260708_es40_txready_diag_sequence.md).  Env EMULATR_UARTWATCH.
+        // Answers "which COM port does the console drive (COM1 wired vs COM2
+        // dropped), and is the stream the banner (progress) or a repeated byte
+        // (wedge)?".  One-shot getenv, capped; remove when the D-sequence lands.
+        {
+            static bool const s_on = (std::getenv("EMULATR_UARTWATCH") != nullptr);
+            if (s_on) {
+                static unsigned long s_thrN = 0;
+                if (s_thrN < 512) { ++s_thrN;
+                    char const ch = (value >= 0x20 && value < 0x7f)
+                                        ? static_cast<char>(value) : '.';
+                    std::fprintf(stderr,
+                        "THRWATCH port=%s base=0x%03x val=0x%02x ch='%c'\n",
+                        m_name.c_str(), unsigned(m_basePort), unsigned(value), ch);
+                    std::fflush(stderr);
+                }
+            }
+        }
+#endif
         // 2026-07-01: cosmetic badge rewrite.  The console stream goes through
         // badgeTxEmit(), which replaces the digits of any "<n> MHz" token with
         // the live effective MHz (see badgeTxEmit).  Emitted bytes fan out to
@@ -909,10 +949,21 @@ private:
      */
     uint8_t readMSR() const noexcept
     {
-        uint8_t msr = 0x30;                      // CTS + DSR asserted
+        // A COM with NO backend is an UNWIRED port (COM2 on Tsunami/ES40 is
+        // constructed with a null backend and never gets setBackend()). Real
+        // hardware presents no modem lines on an empty port, so return 0x00.
+        // Fabricating CTS+DSR (0x30) on an unwired port makes the ES40 SRM
+        // console driver treat COM2 as populated and spin in combott_txready()
+        // polling MSR/LSR for a line that never changes (guest PC 0x1b7d80).
+        // See journals/20260706_es40_com2_txready_spin_root.md.
+        if (m_backend == nullptr) {
+            return 0x00;                         // unwired port: no modem lines
+        }
 
-        if (m_backend && m_backend->isConnected()) {
-            msr |= 0x80;                         // DCD asserted
+        uint8_t msr = 0x30;                      // wired port: CTS + DSR asserted
+
+        if (m_backend->isConnected()) {
+            msr |= 0x80;                         // DCD asserted when a client is attached
         }
 
         return msr;

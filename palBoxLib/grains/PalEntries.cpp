@@ -90,6 +90,8 @@
 #include "deviceLib/Hwrpb.h"          // deviceLib::hwrpb::Hwpcb layout (SWPCTX)
 #include "deviceLib/HwpcbContext.h"   // loadCpuFromHwpcb / storeCpuToHwpcb (SWPCTX)
 #include "memoryLib/GuestMemory.h"   // CSERVE PUTS reads its buffer via ExecCtx::memory
+// 2026-07-08: ToyRtc.h include removed with the CSERVE 0x66 get_time case (its
+// only user).  Time is read via the internal get_timestamp bsr, not a CSERVE.
 
 #include <cstdint>
 #include <cstdio>
@@ -575,6 +577,28 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             return r;                // R0 untouched
         }
 
+        // 2026-07-08: CSERVE 0x66 (=102 dec) "get_time" REMOVED.  It was an
+        // UNSOURCED mislabel: it wrote R0 with a TOY timestamp, but the
+        // authoritative PC264 PAL sys__cserve dispatch
+        // (Processor Support/.../ref/ev6_vms_pc264_pal.mar:3911) hw_ret's with R0
+        // UNTOUCHED for every undefined code -- and 102 IS undefined (the last
+        // defined code is MP_WORK_REQUEST=101).  sys__get_timestamp in that PAL
+        // is an INTERNAL bsr routine, not a CSERVE.  The spurious R0 write shifted
+        // the ES40 console's SCB base (it computes base = R0 + 0x28000, expecting
+        // R0 = phys_base 0): 0x01010000 (Jan-1 00:00 BCD) + 0x28000 = 0x1038000
+        // instead of 0x28000, so the PAL read the interval-clock vector off a
+        // timestamp-shifted base, found zero, and HW_REI'd to PC 0 -> halt.  See
+        // journals/20260708_es40_scb_base_mismatch_root.md.  Removing the case
+        // lets 0x66 fall to the default (R0 untouched), matching the PAL.
+        //
+        // DEFERRED INVESTIGATION (task: "time handling / memory-test get_time"):
+        // get_time was originally added here to paper over an ES40 memory-test
+        // SYSFAULT at guest 0x8c2d0 ("return = input - get_time()").  With 0x66
+        // now a faithful no-op, that path must obtain time some other way (most
+        // likely the internal get_timestamp bsr, NOT a CSERVE).  Confirm the
+        // memory-test's real time source before trusting this no-op on the full
+        // cold-boot path.
+
         default: {
             // Every other CSERVE function code: the real EV6 OSF PAL falls
             // through to `hw_ret (p23)` -- return, nothing done, R0 left as
@@ -758,6 +782,27 @@ auto execMtprVptb_vms([[maybe_unused]] InstructionGrain const& g,
     BoxResult r;
     r.semFlags = g.semFlags;
     c.cpu->vptb = c.cpu->intReg[16];   // R16 (a0) is the standard CALL_PAL arg
+#if EMULATR_BRINGUP_PROBES
+    // 2026-07-08: VPTB-write probe (env EMULATR_VPTB_DIAG).  ES40 SCB null-vector
+    // hunt (task #29): MTPR_VPTB deposits R16 into cpu.vptb, but VA_FORM reads
+    // cpu.va_ctl -- so if the console programs a REAL base here while va_ctl stays
+    // ~0x2, the written VPTB is being stranded (confirms the propagate-to-va_ctl
+    // fix, and lets us diff ES40 vs a clean DS20).  Env-gated, capped at 64,
+    // zero-cost when unset.
+    static bool const s_vptbDiag = (std::getenv("EMULATR_VPTB_DIAG") != nullptr);
+    if (s_vptbDiag) {
+        static unsigned long s_vptbN = 0;
+        if (s_vptbN < 64) { ++s_vptbN;
+            std::fprintf(stderr,
+                "VPTB-DIAG cyc=%llu pc=0x%016llx MTPR_VPTB=0x%016llx va_ctl=0x%016llx\n",
+                static_cast<unsigned long long>(c.cpu->cycleCount),
+                static_cast<unsigned long long>(g.pc),
+                static_cast<unsigned long long>(c.cpu->intReg[16]),
+                static_cast<unsigned long long>(c.cpu->va_ctl));
+            std::fflush(stderr);
+        }
+    }
+#endif
     return r;
 }
 
@@ -1734,10 +1779,32 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         // is clear.  Cold-boot reset value 0 masks every source.
     case coreLib::HW_IER:
         c.cpu->ier = coreLib::ierCmIerPortion(c.opB);
+#if EMULATR_IRQDIAG
+        // TEMP IRQDIAG (2026-07-07): watch the SRM's HW_IER writes so we can see
+        // whether ei[2] (bit 35 = interval timer, IPL 22) is ever enabled.
+        std::fprintf(stderr,
+            "IRQDIAG-IER   pc=0x%016llx opB=0x%016llx ier=0x%016llx ei2=%d cyc=%llu\n",
+            static_cast<unsigned long long>(c.cpu->pc),
+            static_cast<unsigned long long>(c.opB),
+            static_cast<unsigned long long>(c.cpu->ier),
+            int((c.cpu->ier >> 35) & 1u),
+            static_cast<unsigned long long>(c.cpu->cycleCount));
+#endif
         break;
     case coreLib::HW_IER_CM:
         c.cpu->ier = coreLib::ierCmIerPortion(c.opB);
         c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
+#if EMULATR_IRQDIAG
+        // TEMP IRQDIAG (2026-07-07): same watch on the combined IER+CM form,
+        // which is the write the OpenVMS PAL MTPR_IPL path typically uses.
+        std::fprintf(stderr,
+            "IRQDIAG-IERCM pc=0x%016llx opB=0x%016llx ier=0x%016llx ei2=%d cyc=%llu\n",
+            static_cast<unsigned long long>(c.cpu->pc),
+            static_cast<unsigned long long>(c.opB),
+            static_cast<unsigned long long>(c.cpu->ier),
+            int((c.cpu->ier >> 35) & 1u),
+            static_cast<unsigned long long>(c.cpu->cycleCount));
+#endif
         break;
     case coreLib::HW_MM_STAT:  c.cpu->mm_stat = c.opB;                                          break;
     case coreLib::HW_VA_CTL:   c.cpu->va_ctl = c.opB;                                          break;

@@ -93,7 +93,8 @@ void logFaultEvent(uint64_t cycle,
                    uint64_t pc,
                    uint32_t encoded,
                    uint16_t faultCode,
-                   bool     palMode) noexcept
+                   bool     palMode,
+                   uint64_t va) noexcept
 {
     uint64_t const n      = s_count.fetch_add(1, std::memory_order_relaxed);
     unsigned const opcode = static_cast<unsigned>((encoded >> 26) & 0x3Fu);
@@ -101,9 +102,9 @@ void logFaultEvent(uint64_t cycle,
     if (n < kLoudThreshold) {
         SPDLOG_WARN(
             "FAULT[{}]: cyc={} pc=0x{:016x} encoded=0x{:08x} op=0x{:02x} "
-            "fault={} ({}) palMode={}",
+            "fault={} ({}) palMode={} va=0x{:016x}",
             n, cycle, pc, encoded, opcode,
-            faultCode, faultName(faultCode), palMode ? 1 : 0);
+            faultCode, faultName(faultCode), palMode ? 1 : 0, va);
     } else if (((n - kLoudThreshold) % kSummaryStride) == 0) {
         SPDLOG_INFO("FAULT: {} total deliveries "
                     "(loud-stderr muted past first {})",
@@ -121,7 +122,8 @@ void logFaultEvent(uint64_t cycle,
                  << "0x" << opcode << '\t'
                  << std::dec << faultCode << '\t'
                  << faultName(faultCode) << '\t'
-                 << (palMode ? 1 : 0) << '\n';
+                 << (palMode ? 1 : 0) << '\t'
+                 << "0x" << std::hex << va << '\n';
     }
 }
 

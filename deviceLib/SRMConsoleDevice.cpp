@@ -660,7 +660,7 @@ void SRMConsoleDevice::launchPutty()
     // traces/ (PuTTY, started detached, inherits the emulator's CWD).  PuTTY
     // still expands the &Y&M&D&T date/time tokens itself.
     args << "-sessionlog"
-         << QString("traces/putty_console_p%1_&Y&M&D&T.log").arg(m_config.port);
+         << QString("putty_console_p%1_&Y&M&D&T.log").arg(m_config.port);
     args << "localhost";
 
     SPDLOG_INFO("SRM Console: Launching PuTTY: {} {}",
