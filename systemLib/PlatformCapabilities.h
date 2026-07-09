@@ -81,6 +81,28 @@ enum class PlatCap : uint32_t {
 
     // Topology.
     DualPchip       = 1u << 6,   // hose 1 populated (dual-Pchip box)
+
+    // Console-wiring axis (2026-07-08) -- which UART the primary SRM console
+    // rides.  Named as its own axis because the DS/ES families cross over on
+    // BOTH chipset and south-bridge (DS15/ES45 share them), so neither the
+    // Chipset* nor SbAli axis can express "primary console on the second UART
+    // (ISA 0x2F8, COM2)" without sweeping in a model that does not use it.
+    // Sourced from the DERIVED RUNTIME MODEL (resolve()), not a hardware trait.
+    ConsoleUartCom2 = 1u << 7,   // primary console on 0x2F8 (COM2); e.g. ES40 pc264
+};
+
+// Derived runtime model identity (2026-07-08) -- the reconciled key from
+// Channel A ([System] model) and Channel B (<stem>_platform.json "platform").
+// Model-granular so a gate can be scoped to exactly one box even when families
+// share a chipset/south-bridge.  Extend as models are brought up; Unknown
+// asserts nothing (fail-inert).
+enum class ResolvedModel : uint8_t {
+    Unknown = 0,
+    DS10,
+    DS15,
+    DS20,
+    ES40,
+    ES45,
 };
 
 class PlatformCapabilities
@@ -117,7 +139,18 @@ public:
             if (d.hose > 0) bits |= u(PlatCap::DualPchip);
         }
 
-        (void)model;   // reserved: model-specific capability overrides land here
+        // Console-wiring axis (2026-07-08): the DERIVED RUNTIME MODEL -- not a
+        // shared hardware trait -- decides which UART the primary console rides.
+        // Only models CONFIRMED to bind console to 0x2F8 set the bit; ES45/DS15
+        // are excluded until their console wiring is confirmed (see task: why
+        // ES40 boots on COM2).  This is the reserved model hook, and is NOT a
+        // per-model bit -- ConsoleUartCom2 names the axis, resolve() supplies
+        // the model-granular value.
+        switch (resolve(model, manifest.platform)) {
+        case ResolvedModel::ES40: bits |= u(PlatCap::ConsoleUartCom2); break;
+        default: break;   // Unknown/other -- assert nothing (fail-inert)
+        }
+
         PlatformCapabilities c;
         c.m_bits    = bits;
         c.m_latched = true;
@@ -143,6 +176,25 @@ private:
     static bool contains(std::string const& hay, char const* needle) noexcept
     {
         return hay.find(needle) != std::string::npos;
+    }
+
+    // Map the reconciled model identity to a ResolvedModel.  manifestPlatform
+    // (Channel B, the firmware-badged identity) wins when present; iniModel
+    // (Channel A) is the fallback.  Token match, not exact-equal, tolerates
+    // decoration like "AlphaServer ES40".  More specific tokens are tested
+    // first so a substring probe cannot alias a shorter model name.
+    static ResolvedModel resolve(std::string const& iniModel,
+                                 std::string const& manifestPlatform) noexcept
+    {
+        std::string key = manifestPlatform.empty() ? iniModel : manifestPlatform;
+        for (char& ch : key) if (ch >= 'a' && ch <= 'z') ch = char(ch - 'a' + 'A');
+        auto tok = [&](char const* t) noexcept { return key.find(t) != std::string::npos; };
+        if (tok("ES45")) return ResolvedModel::ES45;
+        if (tok("ES40")) return ResolvedModel::ES40;
+        if (tok("DS15")) return ResolvedModel::DS15;
+        if (tok("DS20")) return ResolvedModel::DS20;
+        if (tok("DS10")) return ResolvedModel::DS10;
+        return ResolvedModel::Unknown;
     }
 
     uint32_t m_bits    = 0;      // 0 = matches nothing (fail-inert)

@@ -542,12 +542,29 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
         // ------------------------------------------------------------
         // Capability latch (2026-07-05): resolve model -> manifest-enumerated
         // capabilities NOW, before any guest instruction retires, so a behavior
-        // gate (platHas(PlatCap::...)) is live everywhere by construction. INERT
-        // -- no call sites yet. See systemLib/PlatformCapabilities.h +
+        // gate (platHas(PlatCap::...)) is live everywhere by construction. First
+        // call site landed 2026-07-08 (ConsoleUartCom2, just below). See
+        // systemLib/PlatformCapabilities.h +
         // journals/20260705_platform_axis_classification.md.
         // ------------------------------------------------------------
         m_caps = systemLib::PlatformCapabilities::derive(
             m_settings.system.model, m_chipset.variant(), mr.manifest);
+
+        // ------------------------------------------------------------
+        // Console-UART backend gate (2026-07-08): the ES40/pc264 SRM binds its
+        // primary console to the SECOND UART (ISA 0x2F8, COM2), not 0x3F8, so on
+        // those platforms every banner byte is dropped unless COM2 is given the
+        // same host sink COM1 receives above (com1().setBackend, this ctor).
+        // Gated on the console-wiring capability -- model-granular via the
+        // resolved runtime model -- NOT on the shared south-bridge/chipset axis,
+        // so DS15/ES45 are not swept in.  MUST run AFTER the caps latch above:
+        // reading platHas() before derive() would gate nothing (see
+        // PlatformCapabilities.h latched()).  Ref: PlatCap::ConsoleUartCom2;
+        // 20260708_es40_console_com2_backend_gap.md; task "why ES40 uses COM2".
+        // ------------------------------------------------------------
+        if (platHas(systemLib::PlatCap::ConsoleUartCom2)) {
+            m_chipset.com2().setBackend(&m_com1Backend);   // ES40 console rides COM2 (0x2F8)
+        }
 
         // ------------------------------------------------------------
         // Storage attach (2026-06-11, dqa0 boot): for each AtaDisk target
@@ -1640,12 +1657,40 @@ bool Machine::systemTick(uint64_t i) noexcept
             // single atomic flush once the flash has been quiescent for W
             // cycles (D1).  Cheap; polled at the ~2^18-cycle timer cadence.
             m_chipset.flash().tryFlush(systemNow());
+
+#if EMULATR_IRQDIAG
+            // TEMP IRQDIAG (2026-07-07): on each interval-timer FIRE, snapshot the
+            // DELIVER gate so we see WHICH of the four canAcceptInterrupt(22)
+            // conditions blocks the clock interrupt (reloc / palBase / !PALmode /
+            // ier<ei2>), plus whether the b_irq<2> latch is actually pending.
+            std::fprintf(stderr,
+                "IRQDIAG-FIRE  cyc=%llu pc=0x%016llx pend2=%d accept=%d "
+                "[reloc=%d palBase=0x%llx inPal=%d ei2=%d ier=0x%016llx]\n",
+                static_cast<unsigned long long>(m_cpu.cycleCount),
+                static_cast<unsigned long long>(m_cpu.pc),
+                int(m_chipset.cchip().pendingIrq2(0)),
+                int(canAcceptInterrupt(22)),
+                int(m_palImageRelocated),
+                static_cast<unsigned long long>(m_cpu.palBase),
+                int(m_cpu.inPalMode()),
+                int((m_cpu.ier >> 35) & 1u),
+                static_cast<unsigned long long>(m_cpu.ier));
+            std::fflush(stderr);
+#endif
         }
 
         // DELIVER: divert only when the CPU can accept the latched request.
         // Single-CPU build today; cpuId=0.  Phase C+ extends to the per-CPU
         // loop when SMP arrives.
         if (canAcceptInterrupt(22) && m_chipset.cchip().pendingIrq2(0)) {
+#if EMULATR_IRQDIAG
+            // TEMP IRQDIAG (2026-07-07): positive confirmation the clock actually
+            // diverted -- the counterpart to IRQDIAG-FIRE's blocked snapshots.
+            std::fprintf(stderr, "IRQDIAG-DELIVER cyc=%llu savedPc=0x%016llx\n",
+                static_cast<unsigned long long>(m_cpu.cycleCount),
+                static_cast<unsigned long long>(m_cpu.pc));
+            std::fflush(stderr);
+#endif
             // Throttled stderr -- timer divert at ~954 Hz on a long run would
             // otherwise drown other diagnostics.  First 32 fires loud, then a
             // summary every 64K.  Matches the CBOX/UNALIGN throttle policy.
