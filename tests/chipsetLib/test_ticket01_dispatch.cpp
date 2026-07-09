@@ -78,10 +78,13 @@ TEST_CASE("MMIO read at Cchip CSC routes to the Cchip")
     CHECK(cs.mmioRead(pa, 8) == cs.cchip().read(Cchip::CSC, 0));
 }
 
-TEST_CASE("MMIO read at Dchip DREV returns the Tsunami revision 0x10")
+TEST_CASE("MMIO read at Dchip DREV returns byte-sliced per-Dchip revision")
 {
+    // HRM 10.2.4.4 T10-34 (audit task T-RV6): DREV is byte-sliced -- a 4-bit
+    // REVn per Dchip, init 1 in each low nibble -> reads 0x0101010101010101.
+    // It is a per-Dchip silicon revision, NOT a chipset-variant discriminator.
     TsunamiChipset cs(ChipsetVariant::Tsunami, 1, 1ULL << 30);
-    CHECK(cs.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x10);
+    CHECK(cs.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x0101010101010101ULL);
 }
 
 TEST_CASE("MMIO read in the Pchip1 half returns off-bus all-ones")

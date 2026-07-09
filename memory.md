@@ -10,6 +10,74 @@ them from here.
 
 ---
 
+## 2026-07-08 -- ES40 console is HEALTHY; output lands on an UNBACKED UART (0x2F8) -> blank PuTTY
+
+**Headline: after the CSERVE-0x66 SCB fix, the ES40 SRM runs its FULL console-init banner to
+near-completion, but every byte is written to the UART at ISA base `0x2F8` -- a port V4 never
+`setBackend()`s -- so PuTTY stays blank. This is a console-WIRING gap, NOT a firmware wedge.**
+Full evidence + authoritative wiring + fix options: `journals/20260708_es40_console_com2_backend_gap.md`.
+
+- **Reconstructed COM2-THR (`0x2f8`) byte stream** (es40_uartwatch.log, ~1000 dropped writes):
+  "starting console on CPU 0.. initialized idle PCB.. initializing semaphores/heap/drivers/
+  file system/hardware/timers.. lowering IPL.. create dead_eater/poll/timer/powerup.. access
+  NVRAM.. M..." = normal SRM bring-up running to near-completion. Firmware is NOT stuck.
+- **AUTHORITATIVE (combo_driver.c `combott_init`).** Non-Galaxy/non-Rawhide (== ES40/pc264)
+  wires `console_ttpb = com_devtab[0].ttpb` (source: "wire it to COM1"). Writes go
+  `combott_txsend -> combo_outportb(cp->port + THR)`. ISA bases (smcc669_def.h):
+  COM1_BASE=0x3F8, COM2_BASE=0x2F8. V4 empirically drives `0x2F8`, so in the ES40 build
+  `com_devtab[0].port` resolves to `0x2F8` (the pc264 `COM1` macro value is the one loose
+  end -- not defined in apisrm/ref, comes from the platform header at build time).
+- **UART is behind Pchip0 PCI I/O** -- every dump has `R20=0x801fc000000` (HRM Table 10-1
+  `801.FC00.0000`); console addr = `0x801fc0002f8`. T. Peer's PCI-path instinct confirmed;
+  addressing is CORRECT, not the blocker.
+- **SETTLED:** CSERVE 0x66 no-op is faithful (pal.mar hw_ret); `R16=0x80000d0000000000` ACV is
+  INCIDENTAL (console streams to the retire cap; ends MaxCyclesExceeded, not a halt).
+- **FIX (discuss-before-code):** back the ES40 `0x2F8` console port with the same PuTTY/console
+  backend `0x3F8` gets (`Machine.cpp:417`). Prefer resolving the console port from the platform
+  manifest/firmware console-base over hard-coding COM1, once the pc264 `COM1` value is confirmed.
+
+---
+
+## 2026-07-08 -- ES40 first-tick HALT RESOLVED: CSERVE 0x66 "get_time" clobbered R0 -> SCB base off by a timestamp
+
+**Headline: the ES40 post-first-tick null-clock-vector halt (cyc ~1.2395B, HW_REI to PC 0)
+is FIXED by REMOVING the CSERVE 0x66 (=102) "get_time" case from `execCserve`. That case
+(added 2026-07-07) wrote R0 with a TOY timestamp `0x01010000` (= Jan-1 00:00 BCD); the ES40
+console computes SCB base = R0 + 0x28000, so the R0 pollution shifted the base from the real
+`0x28000` to `0x1038000` -- the PAL then read the interval-clock vector (SCB$V_INTV=0x600)
+off the wrong, empty page.** Full chain + ruled-out list + fix:
+`journals/20260708_es40_scb_base_mismatch_root.md`.
+
+- **ROOT (authoritative).** `sys__cserve` (`ref/ev6_vms_pc264_pal.mar:3911`) `hw_ret`s with R0
+  UNTOUCHED for every undefined code, and 102/0x66 IS undefined (last defined =
+  MP_WORK_REQUEST=101).  `sys__get_timestamp` is an internal `bsr`, NOT a CSERVE.  This
+  VINDICATES the 2026-07-02 memory ("0x66 undefined -> no-op is faithful"); the 2026-07-07
+  get_time addition was the regression.  Fix = delete case 0x66 -> falls to the default (R0
+  untouched); also removed the orphaned `ToyRtc.h` include.  `PalEntries.cpp`.
+- **KEY EVIDENCE -- DS20 differential.** ES40 and DS20 build the SCB IDENTICALLY at PA
+  `0x28000` (`scb_init` 12,288-store fill).  DS20 PAL base = `0x28000` (phys_base 0) -> boots;
+  ES40 = `0x1038000` (get_time `0x01010000` + `0x28000`) -> halt.  GMEM `[0x1038000,0x1039000)`
+  empty whole-boot; `[0x28000,0x2a000)` fully filled on BOTH.
+- **CONFIRMED.** ES40 now runs `1.24B -> 2.33B` cyc, stops on MaxCyclesExceeded (NOT
+  kFaultHalt), ~5x more retires; the 282M memory-test SYSFAULT that motivated get_time did
+  NOT recur.  Gate GREEN: `Emulatr_tests` 474 cases / 6066 asserts; DS10 -> SRM `>>>`; DS20 ->
+  `AlphaServer DS20` banner (interactive).
+- **RULED OUT -- do NOT re-chase.** superpage/kseg READ decode; "SCB never installed" (it is,
+  at 0x28000); PuTTY/console-client gating; VPTB=0 / EV6 page-walk double-miss (shared with
+  DS20, survivable; console never calls MTPR_VPTB; EV6 has no HW walker -- software TLB is
+  faithful); PCI/device enumeration.
+- **NEXT FRONTIER (new plan).** Non-canonical R16 ACV: `excAddr=0x1b7d34`,
+  `R16=0x80000d0000000000` (bit63 set, bits62:48 zero = sign-ext violation), Kernel mode.
+  ES40 does not yet reach `P00>>>`.  Pre-existing (Ev6Translator harvest / ACVPROBE hooks),
+  NOT a regression from this fix.
+- **Also this session.** Diagnostics (env-gated): fault-VA column in `logs/faults.log`,
+  `EMULATR_TRACE_ARM_ON_DTBM`, `EMULATR_VPTB_DIAG`, `EMULATR_VECWATCH_VAL`.  DREV test
+  faithfulness reframe (byte-sliced `0x0101010101010101`, HRM T10-34).  Config footgun: ini
+  `[System] model` is a separate channel from firmware/manifest; align it per firmware for
+  cross-model runs (mismatch guard `Machine.cpp:516`).  New skills: `emulatr-oracle`
+  (faithfulness discipline), `emulatr-launch` (always raise PuTTY).  Flip
+  `EMULATR_BRINGUP_PROBES=OFF` for release builds.
+
 ## 2026-07-02 (pm) -- ES40 FIRST BOOT reviewed: IIC bus UNMAPPED (root gap) + concurrent-console fix
 
 **Headline: ES40 boots DEEP (manifest latched, SRM init through NVRAM access + memory

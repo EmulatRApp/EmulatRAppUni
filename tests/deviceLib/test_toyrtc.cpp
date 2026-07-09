@@ -213,3 +213,29 @@ TEST_CASE("ToyRtc: determinism -- same cycles, same bytes")
         CHECK(rtcRead(a, idx) == rtcRead(b, idx));    // byte-identical
     }
 }
+
+
+TEST_CASE("ToyRtc: timestampMMDDhhmm (CSERVE get_time) matches a 24h/BCD RTC read")
+{
+    // get_time (CSERVE 0x66) returns sys__get_timestamp's packed value:
+    //   R0 = (month<<24)|(dom<<16)|(hour<<8)|min, BCD / 24-hour.  The static
+    // helper shares calendarFromCycles() with the RTC port path, so it must
+    // byte-match a 24h/BCD RTC materialized from the same cycles.
+    uint64_t cycles = (40ull * 86400ull + 13ull * 3600ull + 45ull * 60ull + 30ull)
+                    * 1000000000ull;                     // ToyRtc default cyclesPerSecond
+    ToyRtc t;                                            // default cyclesPerSecond
+    rtcWrite(t, ToyRtc::kRegB, ToyRtc::kRegB_H24);       // 24-hour, BCD (DM = 0)
+    t.bindCycleSource(&cycles);
+
+    uint8_t const mo = rtcRead(t, ToyRtc::kRegMonth);
+    uint8_t const dd = rtcRead(t, ToyRtc::kRegDom);
+    uint8_t const hh = rtcRead(t, ToyRtc::kRegHours);
+    uint8_t const mm = rtcRead(t, ToyRtc::kRegMinutes);
+    uint32_t const expected = (static_cast<uint32_t>(mo) << 24)
+                            | (static_cast<uint32_t>(dd) << 16)
+                            | (static_cast<uint32_t>(hh) <<  8)
+                            |  static_cast<uint32_t>(mm);
+
+    CHECK(ToyRtc::timestampMMDDhhmm(cycles) == expected);
+    CHECK(ToyRtc::timestampMMDDhhmm(cycles) == 0x02101345u);   // 2026-02-10 13:45 BCD
+}

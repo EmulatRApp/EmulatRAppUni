@@ -18,7 +18,7 @@
       "hidden": false,
       "name": "Qt-Release",
       "inherits": "Qt-Default",
-      "binaryDir": "${sourceDir}/out/build/release",
+      "binaryDir": "${sourceDir}/out/build/release_ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
@@ -27,7 +27,7 @@
       "hidden": false,
       "name": "Qt-RelWithDebInfo",
       "inherits": "Qt-Default",
-      "binaryDir": "${sourceDir}/out/build/relwithdebinfo",
+      "binaryDir": "${sourceDir}/out/build/relwithdebinfo_ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
@@ -54,7 +54,10 @@
         "value": "x64"
       },
       "generator": "Ninja",
-      "vendor": {
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe"
+      },
+       "vendor": {
         "qt-project.org/Version": {
           "checksum": "aJ3lFFO8bymJoBDH1cz/tAf/LHU="
         }
@@ -72,6 +75,9 @@
         "value": "x64"
       },
       "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe"
+      },
       "vendor": {
         "qt-project.org/Version": {
           "checksum": "Gg2FfUSYcZOADgNk67A1AI/CeRM="

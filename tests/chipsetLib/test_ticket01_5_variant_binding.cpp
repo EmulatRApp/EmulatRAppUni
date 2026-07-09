@@ -94,11 +94,16 @@ TEST_CASE("Unknown model normalizes to Tsunami; consistency guard holds")
     CHECK(iv(cs.pchip().variant()) == iv(ChipsetVariant::Tsunami));
 }
 
-TEST_CASE("DREV via MMIO reflects the platform-derived variant")
+TEST_CASE("DREV reads byte-sliced per-Dchip revision, variant-independent")
 {
+    // HRM 10.2.4.4 T10-34 (audit task T-RV6): DREV is a byte-sliced 4-bit
+    // per-Dchip revision (init 1 per low nibble -> 0x0101010101010101) and is
+    // IDENTICAL across Tsunami and Typhoon.  DREV does NOT encode the chipset
+    // variant (the old 0x10/0x20 placed variant in a RAZ nibble -- retired);
+    // variant is asserted from cs.variant() in the cases above, not from DREV.
     TsunamiChipset es40(ChipsetVariant::Tsunami, 2, 4ULL << 30);
-    CHECK(es40.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x10);
+    CHECK(es40.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x0101010101010101ULL);
 
     TsunamiChipset es45(ChipsetVariant::Typhoon, 4, 8ULL << 30);
-    CHECK(es45.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x20);
+    CHECK(es45.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x0101010101010101ULL);
 }

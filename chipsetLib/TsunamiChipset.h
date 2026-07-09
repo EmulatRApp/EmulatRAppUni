@@ -34,13 +34,16 @@
  *
  * TSUNAMI controller interface constraint applies to **main memory (DRAM)**. 
  * I/O space is completely separate and is not affected by it. 
- **  RAM is constrained to 4GB on Tsunami:**
+ **  DRAM capacity is set by the Cchip AAR ASIZ encoding and differs by 21272
+ **  variant (base Tsunami vs Typhoon):**
  *
- **  The Cchip AAR registers encode the physical base address of each DRAM 
- **  array in bits '[34:24]' - that is a 35-bit PA field. The ASIZ encoding caps 
- **  at '0x7 = 1GB' per array on Tsunami. Four arrays x 1GB = 4GB maximum DRAM. 
- **  The Cchip simply cannot tell the memory controller about DRAM above 4GB. 
- **  It is a silicon limit of the 21272.
+ **  The Cchip AAR registers encode each DRAM array's base in ADDR<34:24> and its
+ **  size in ASIZ<15:12> (HRM Table 10-15). BASE Tsunami caps ASIZ at 0x7 = 1GB
+ **  per array -> 4 arrays x 1GB = 4GB max (DS10/DS20/DS20E). TYPHOON (the 21272
+ **  high-bandwidth variant, ES40) uses the ASIZ<15> extension bit: 0x8=2GB,
+ **  0x9=4GB, 0xA=8GB per array -> 4 x 8GB = 32GB max. Same 21272 part; the
+ **  difference is the extended ASIZ range (+ dual-Dchip bandwidth), NOT a
+ **  different chipset. computeAAR()/reset() in TsunamiCchip.h implement both.
  ** 
  * Why I/O space is not affected:**
  ** I/O space is decoded entirely separately. The chip field 'bits[43:32]' of 
@@ -60,27 +63,27 @@
     +_ Pchip decodes independently of Cchip AAR registers
     +- PCI Dense Memory, CSRs, PCI I/O, PCI Config all live here
 
-**The real problem with 32GB on Tsunami:**
-* The configured 32GB exists in 'GuestMemory' but SRM will only discover 4GB 
-* of it through the AAR registers. The remaining 28GB is invisible to the guest 
-* - SRM builds its memory descriptor table from the AAR values, so the HWRPB 
-* memory map will show only 4GB. The OS inherits that map and never 
-* allocates from the missing 28GB. It is not a crash - it is silent capacity loss.
+**Per-model DRAM ceilings (HRM-verified; see chipsetLib/TsunamiVariant.h):**
 
-**The correct solution:**
+  DS10 / DS20 / DS20E  = Tsunami (21272)            ->  4GB   (ASIZ 0x7 = 1GB x 4)
+  ES40                 = Typhoon (21272 high-bw)    ->  32GB  (ASIZ 0xA = 8GB x 4)
+  DS15 / DS25 / ES45   = Titan   (21274, separate)  ->  32GB  (TitanChipset path)
 
-ES40  + Tsunami (21272)  ->  4GB RAM maximum   (ASIZ max 0x7 = 1GB x 4 arrays)
-ES45  + Typhoon (21274)  ->  32GB RAM maximum  (ASIZ extends to 0xA = 8GB x 4 arrays)
-
-For 32GB,  switch the variant to 'ChipsetVariant::Typhoon' in the config, which changes the model string to 'ES45' 
-and enables the extended ASIZ encodings in 'computeAAR'. The I/O stack, Pchip, and MMIO handlers are 
-identical between the two variants - only the Cchip AAR encoding and the 'MISC.REV' field differ.
-
-If you want to stay with ES40/Tsunami, the honest RAM limit is 4GB. 
-Anything above that in the config is silently discarded by the AAR register initialization.
+variantFromModel(model) selects the variant; reset() sets isExtendedAar for
+Typhoon AND Titan so computeAAR emits ASIZ 0x8/0x9/0xA. A --mem request above
+the selected variant's ceiling is a LOUD hard-stop in TsunamiCchip::reset()
+(no silent capacity loss). The I/O stack, Pchip, and MMIO decode are identical
+across Tsunami/Typhoon; only the Cchip AAR ASIZ range, MISC<REV> (Tsunami=1,
+Typhoon=8) and Dchip DREV (0x10 / 0x20) differ. Titan (21274) is a DISTINCT
+chipset (dual discrete Pchips + AGP) with its own path.
  
  *
  */
+
+namespace scsi
+{
+    struct IBlockMedia;
+}
 
 class TsunamiChipset : public memoryLib::ISystemBus
 {
@@ -687,16 +690,20 @@ private:
         //   DS20  = 0xFFF80000  writeb @0x1ade60 (EMULATR_IIC_WATCH)  [2026-06-22]
         //   DS20E = 0xFFF80000  shares DS20 chassis/IIC mapping (defensive;
         //                       m_model is the raw INI string, unnormalized)
-        // ES40/ES45/DS25 IIC base intentionally NOT mapped -- left UNMAPPED
-        // rather than guessed.  The ES40 (V7.3) IIC mechanism is CONTESTED
-        // between two SRM source generations: apisrm/ref/pc264_io.c (older
-        // CLIPPER/PC264) = fixed PCF8584 @ 0xFFF80000, vs srmconsole/5.8
-        // (SHARK/M1543C) = ALi M1543C SMBus with a PROGRAMMABLE base read from
-        // M7101 PCI cfg SBASMB (0x14).  V7.3 is late -> SHARK/M1543C is more
-        // likely, so a fixed-base row is the WRONG mechanism.  Cannot be
-        // confirmed until boot reaches IIC code -- currently blocked UPSTREAM by
-        // unimplemented CSERVE 0x66.  See journals/20260702_es40_boot_blocker_
-        // analysis.md.  registerPciMemRange
+        // ES45/DS25 IIC base intentionally NOT mapped -- left UNMAPPED rather
+        // than guessed.  ES40 (V7.3) is now TRIAL-mapped at 0xFFF80000 below
+        // (2026-07-07): the apisrm/ref/pc264_io.c:1229 CLIPPER/PC264 path uses a
+        // fixed PCF8584 @ 0xFFF80000, and the es40_v7_3 image carries that base
+        // (per-model base table @ decompressed VA 0x8d28 + inline LDAH 0xfff8).
+        // The older "blocked UPSTREAM by CSERVE 0x66" note is SUPERSEDED: the
+        // build_power_hw/IIC read IS the gate (authoritative call stack +
+        // err_printf storm) -- see journals/20260707_es40_interface_coverage_
+        // audit.md (sec 2.7/4) and 20260707_es40_printf_deadlock_root.md.  The
+        // contested alternative -- srmconsole/5.8 SHARK/M1543C ALi SMBus with a
+        // PROGRAMMABLE base (M7101 PCI cfg SBASMB 0x14) -- remains possible; the
+        // ES40 row is a SELF-FALSIFYING trial (wrong base -> mapping simply
+        // never touched, clean revert; DS10/DS20 unaffected -- model-keyed,
+        // southbridge axis).  registerPciMemRange
         // takes a WINDOW-RELATIVE offset, half-open [start,end); +2 claims the
         // two byte ports (S0,S1) exactly.
         static constexpr struct { char const* model; uint64_t base; }
@@ -704,6 +711,9 @@ private:
                 { "DS10",  0xFFFF0000ULL },   // proven: iic_write_csr     [2026-06-03]
                 { "DS20",  0xFFF80000ULL },   // proven: writeb@0x1ade60    [2026-06-22]
                 { "DS20E", 0xFFF80000ULL },   // shares DS20 chassis/IIC map (defensive)
+                { "ES40",  0xFFF80000ULL },   // TRIAL 2026-07-07: pc264/CLIPPER PCF8584 (apisrm
+                                              // pc264_io.c:1229); img base table @0x8d28 + inline
+                                              // LDAH 0xfff8.  See audit sec 2.7/4 (self-falsifying).
             };
         // No silent default: an unmatched model is NOT laundered into DS10's
         // base (that converts "unknown" into "confidently wrong" and re-hangs
@@ -720,11 +730,13 @@ private:
             // not a runtime unknown -- hard-stop (same posture as the fpBox x87
             // guard) rather than paper over it.  Expand as models reach console
             // bring-up.  NOTE this set is intentionally narrower than
-            // variantFromModel's recognized models: ES40/ES45/DS25 are accepted
+            // variantFromModel's recognized models: ES45/DS25 are accepted
             // configs but their IIC base is not yet proven, so they are NOT
-            // hard-stopped here.
+            // hard-stopped here.  ES40 is IIC-required as of 2026-07-07 (it now
+            // has a proven-trial row above); the hard-stop is hygiene -- if the
+            // row is ever removed, abort instead of silently unmapping.
             auto const iicBaseRequired = [](std::string const& m) noexcept {
-                return m == "DS10" || m == "DS20" || m == "DS20E";
+                return m == "DS10" || m == "DS20" || m == "DS20E" || m == "ES40";
             };
             std::fprintf(stderr,
                 "TsunamiChipset: no proven IIC base for model '%s' -- IIC left "

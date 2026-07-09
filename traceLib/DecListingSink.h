@@ -111,8 +111,13 @@ constexpr uint32_t TRACE_NONE           = 0x00000000;
 
 
 // Lookback ring size and pre/post-PAL window depths.
-constexpr uint32_t LOOKBACK_SIZE  = 16;
-constexpr uint32_t LOOKBACK_DUMP  = 10;
+// 2026-07-07: DUMP restored 10 -> 60 (ring 16 -> 64) to capture the full
+// decoded path into a clean CALL_PAL HALT at onRunEnd -- the ES40 post-first-
+// tick halt sits ~a dozen-plus instructions past the clock ISR, so 10 was too
+// shallow.  LOOKBACK_SIZE must stay a power of two (indexed & (SIZE-1)); 64 > 60
+// so all 60 dumped entries are always valid.
+constexpr uint32_t LOOKBACK_SIZE  = 64;
+constexpr uint32_t LOOKBACK_DUMP  = 60;
 constexpr uint32_t POST_PAL_TAIL  = 10;
 
 // Heartbeat: emit a "still alive" marker every N retired instructions,

@@ -315,6 +315,25 @@ if(EMULATR_CHIPSET_DIAG)
 endif()
 
 # ----------------------------------------------------------------------------
+# EMULATR_IRQDIAG -- one-shot interval-timer / HW_IER interrupt-delivery probe.
+# ----------------------------------------------------------------------------
+# TEMP diagnostic (2026-07-07) for the ES40 "lowering IPL" clock-interrupt halt
+# (journals/20260707_es40_printf_deadlock_root.md sec.12).  Narrates two seams:
+#   (1) palBoxLib execHwMtpr HW_IER / HW_IER_CM writes -- opB + resulting
+#       cpu.ier, so we see whether the SRM ever sets ei[2] (bit 35).
+#   (2) systemLib Machine interval-timer FIRE (b_irq<2> latch) + the
+#       canAcceptInterrupt(22) DELIVER gate result (which condition is false).
+# OFF by default; opt in per build with -DEMULATR_IRQDIAG=ON.  Delete this block
+# and both #if EMULATR_IRQDIAG sites once the clock-interrupt path is proven.
+option(EMULATR_IRQDIAG
+       "Compile-in the interval-timer / HW_IER interrupt-delivery probe"
+       ON)
+
+if(EMULATR_IRQDIAG)
+    target_compile_definitions(Emulatr PRIVATE EMULATR_IRQDIAG=1)
+endif()
+
+# ----------------------------------------------------------------------------
 # EMULATR_USE_OS_PAGES -- platform page allocator for GuestMemory.
 # ----------------------------------------------------------------------------
 # Selects between OS-backed virtual memory (VirtualAlloc on Windows,

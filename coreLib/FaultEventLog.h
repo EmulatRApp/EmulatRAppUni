@@ -47,7 +47,13 @@ void logFaultEvent(uint64_t cycle,
                    uint64_t pc,
                    uint32_t encoded,
                    uint16_t faultCode,
-                   bool     palMode) noexcept;
+                   bool     palMode,
+                   uint64_t va) noexcept;   // 2026-07-08: faulting VA (D-side
+                                            // r.memAddr latched into cpu.va;
+                                            // I-side pc).  Added for the ES40
+                                            // SCB DTB-double-miss diagnosis
+                                            // (task #29): names which VA the
+                                            // console SCB fill fails to map.
 
 // Total fault rows logged since the last reset.
 uint64_t faultEventCount() noexcept;

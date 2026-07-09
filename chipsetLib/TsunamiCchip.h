@@ -369,10 +369,10 @@ public:
         // ------------------------------------------------------------------
         // Registers (TTR, TDR, MTR, MPD)
         // ------------------------------------------------------------------
-        m_ttr = 0;
-        m_tdr = 0;
-        m_mtr = 0;
-        m_mpd = 0xFFULL;
+        m_ttr = 0x7330ULL;   // HRM 10.2.2.14 T10-23 reset: ID<14:12>=7, IRT<9:8>=3, IS<5:4>=3
+        m_tdr = 0;           // HRM 10.2.2.15 T10-24 reset 0 (faithful)
+        m_mtr = 0x000000EF00000000ULL; // HRM 10.2.2.2 T10-11 + 6.5: PHCW<39:36>=14 (Rev C), PHCR<35:32>=15
+        m_mpd = 0x0FULL;     // HRM 10.2.2.4 T10-13 reset: DR<3>=CKR<2>=DS<1>=CKS<0>=1 (was 0xFF)
 
         // ------------------------------------------------------------------
         // Interrupt and Probe state
@@ -385,7 +385,8 @@ public:
             m_pendingIrq3[i].store(false, std::memory_order_relaxed);
             m_mpr[i] = 0;
         }
-        m_prben = 0xFFFFFFFFFFFFFFFFULL;
+        m_prben = 0;   // HRM 10.2.2.9 T10-19 reset 0 (was 0xFFFF...F).  Per-CPU probe-
+                       // enable; read-to-clear / write-to-set semantics = task T-SM4.
     }
 
     // ========================================================================
@@ -780,7 +781,8 @@ public:
             return m_mtr;
 
         case Cchip::MPD:
-            // TODO(unwired): SPD pin discovery -- value pinned at 0xFF.
+            // TODO(unwired): I2C SPD bit-bang interface (DS/CKS out, DR/CKR in) +
+            // synthetic SPD EEPROM -- task T-SM6.  Reset now 0x0F per HRM 10.2.2.4.
             CSR_LOG_R("Cchip", "MPD",  m_mpd,  offset, cpuId, kPhaseBNoCycle);
             return m_mpd;
 

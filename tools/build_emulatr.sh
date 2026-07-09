@@ -3,12 +3,15 @@
 # build_emulatr.sh -- host-aware build of Emulatr, any config, trace-ready.
 # Project: EmulatR -- Alpha AXP / EV6 (V4).  ASCII(128) only.  2026-07-02.
 # ----------------------------------------------------------------------------
-# Supports BOTH host toolchains from one entry point:
-#   * MSVC (Windows, Git Bash) -- the build is IN-SOURCE at the project root
-#     (VS 17 2022 generator; root has CMakeLists.txt + CMakeCache.txt).  Exe ->
-#     <root>/<Config>/Emulatr.exe.  Toolchain via tools/vsenv.sh (vcvars).
-#   * macOS (clang) -- out-of-source Ninja build, mirroring scripts/build_mac.sh
-#     (Qt via aqt under ~/Qt).  Exe -> out/build/<mac-subdir>/Emulatr (bare).
+# Both hosts converge on the project run convention (CLAUDE.md "Build & run
+# conventions"): the launch artifact is out/build/<config>/Emulatr[.exe],
+# <config> = release|relwithdebinfo|debug.
+#   * MSVC (Windows, Git Bash) -- build stays IN-SOURCE at the project root
+#     (VS 17 2022 generator; root has CMakeLists.txt + CMakeCache.txt), then the
+#     exe + firmware/ are MIRRORED into out/build/<config> (non-destructive to
+#     the VS/IDE cache).  Toolchain via tools/vsenv.sh (vcvars).
+#   * macOS/Linux (clang) -- out-of-source Ninja build DIRECTLY into
+#     out/build/<config> (Qt via aqt under ~/Qt).  Exe -> out/build/<config>/Emulatr.
 #
 # CONFIG (1st arg, default relwithdebinfo):
 #   relwithdebinfo  -O2 -g -DNDEBUG ; diagnostics + trace hooks ON (recommended)
@@ -68,15 +71,32 @@ if [ "$HOST" = "win" ]; then
     cmake -DEMULATR_TRACE_HOOKS="$HOOKS" .
     echo "--- build $TARGET ($BUILD_TYPE) ---"
     cmake --build . --config "$BUILD_TYPE" --target "$TARGET"
-    EXE="$SRC/$BUILD_TYPE/Emulatr.exe"
+    # Conform to the run convention WITHOUT disturbing the in-source VS cache/
+    # IDE workflow: the in-source <root>/<Config>/ is a COMPLETE runnable dir --
+    # Emulatr.exe PLUS its Qt6*.dll / runtime deps and the firmware/ tree that
+    # CMake stages beside it. Mirror the WHOLE directory into out/build/<config>
+    # so the launch path out/build/<config>/Emulatr.exe finds every DLL it loads
+    # next to it (mirroring only the exe leaves it unable to load Qt6Core.dll).
+    OUT="$SRC/out/build/$CONFIG"
+    mkdir -p "$OUT"
+    # Mirror runtime deps (exe, Qt6*.dll, icuuc.dll, config/, tls/,
+    # networkinformation/, firmware/, *_platform.json, *.rom). SKIP the run-
+    # OUTPUT dirs -- traces/ alone can be 100+ GB; logs/ and snapshots/ are also
+    # emitted at run time, not build inputs. Copying them would be catastrophic.
+    for item in "$SRC/$BUILD_TYPE"/*; do
+        case "$(basename "$item")" in
+            traces|logs|snapshots) continue ;;
+            *) cp -rf "$item" "$OUT/" ;;
+        esac
+    done
+    EXE="$OUT/$TARGET.exe"
 else
     # ---- macOS / Linux clang, out-of-source Ninja (mirrors build_mac.sh) ---
-    case "$BUILD_TYPE" in
-        Release)        SUB="mac-release" ;;
-        RelWithDebInfo) SUB="mac-debug" ;;      # legacy dir name, kept for parity
-        Debug)          SUB="mac-debug-g" ;;
-    esac
-    BUILD="$SRC/out/build/$SUB"
+    # Root the build at the project run convention: out/build/<config>,
+    # <config> = release|relwithdebinfo|debug (see CLAUDE.md "Build & run
+    # conventions"). CMake copies firmware/ into the build tree, so the launch
+    # path is out/build/<config>/Emulatr with firmware/ alongside.
+    BUILD="$SRC/out/build/$CONFIG"
     # Qt prefix (aqt layout: ~/Qt/<ver>/macos).  Same discovery build_mac.sh uses.
     QT_PREFIX="$(ls -d "$HOME"/Qt/6.*/macos 2>/dev/null | sort -V | tail -1 || true)"
     QT_ARG=()
@@ -94,7 +114,7 @@ else
     JOBS="$( (command -v sysctl >/dev/null 2>&1 && sysctl -n hw.ncpu) || nproc 2>/dev/null || echo 4)"
     echo "--- build $TARGET ($BUILD_TYPE, -j$JOBS) ---"
     cmake --build "$BUILD" --target "$TARGET" -j"$JOBS"
-    EXE="$BUILD/Emulatr"
+    EXE="$BUILD/$TARGET"
 fi
 
 echo "=== done ==="

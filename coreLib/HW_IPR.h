@@ -64,6 +64,25 @@
 //   CpuState-backed return kFaultUnimplemented; adding storage
 //   later is a CpuState extension plus a switch case.
 //
+// CHANGE HISTORY:
+//   FILE: coreLib/HW_IPR.h  FUNCTION: enum PAL_MTPR
+//   CHANGE (2026-07-07): MTPR_IPL corrected 0x000E -> 0x000F.  The prior
+//     value aliased MFPR_IPL (0x000E), collapsing the read/write pair into
+//     one code.  Authoritative sources (all in-tree under Processor Support):
+//       - instops_alpha.mar : EVX$PAL_MFPR_IPL = 14, EVX$PAL_MTPR_IPL = 15
+//       - Palcode/.../fwtools/hal/alpha_opcode.h L722-723 : OPC32_MFPR_IPL 14,
+//         OPC32_MTPR_IPL 15
+//       - Palcode/.../fwtools/pvc/alpha_op.h L722-723 : same OPC32_* values
+//       - Palcode/.../fwtools/pvc/opcode.h L711-712 : EVX$PAL_* 14 / 15
+//     The HRM text and architect references are annotated with this bug.
+//     Every other
+//     MxPR pair here already follows read=N / write=N+1 (MCES 0x10/0x11, PRBR
+//     0x13/0x14, SCBB 0x16/0x17); IPL was the lone collision.  These enums are
+//     currently documentation / forward-compat (live CALL_PAL dispatch is by
+//     raw function code via computeCallPalEntry), so no behavior changes today,
+//     but the corrected value prevents a future handler that switches on
+//     MTPR_IPL from silently aliasing MFPR_IPL.
+//
 // ============================================================================
 
 #ifndef CORELIB_HW_IPR_H
@@ -100,7 +119,11 @@ enum PAL_MFPR : uint16_t {
 
 enum PAL_MTPR : uint16_t {
     MTPR_IPIR    = 0x000D,
-    MTPR_IPL     = 0x000E,
+    MTPR_IPL     = 0x000F,   // FIX 2026-07-07: was 0x000E (aliased MFPR_IPL).
+                             // EVX$PAL_MTPR_IPL = 15 (instops_alpha.mar); MFPR_IPL
+                             // is 14/0x0E.  Matches the read=N / write=N+1 pairing
+                             // of every other MxPR pair (MCES 0x10/0x11, PRBR
+                             // 0x13/0x14, SCBB 0x16/0x17).
     MTPR_MCES    = 0x0011,
     MTPR_PRBR    = 0x0014,
     MTPR_SCBB    = 0x0017,

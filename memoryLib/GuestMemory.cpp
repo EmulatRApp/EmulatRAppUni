@@ -125,6 +125,9 @@ namespace memoryLib {
     // (e.g. the HWRPB build at PA 0x2000).  Runtime default-OFF; absent in
     // Release (guarded).  See journals/20260629_guestmemory_diag_instrumentation.md.
     //   EMULATR_GMEM_WATCH=<pa>        log every store overlapping that quadword
+    //   EMULATR_GMEM_WATCH_LO=<pa>     with _HI: log every store landing in the
+    //   EMULATR_GMEM_WATCH_HI=<pa>     half-open PA range [LO,HI) (page/table watch;
+    //                                  2026-07-07, ES40 SCB-page install probe)
     //   EMULATR_TRACE_ARM_PA=<pa>      arm the retire .trc window on a store to <pa>
     //   EMULATR_TRACE_ARM_VAL=<v>      (optional) only when the stored value == v
     //   EMULATR_TRACE_ARM_INSTRS=<n>   window length in retired instrs (default 8M)
@@ -169,6 +172,47 @@ namespace memoryLib {
                     size, (unsigned long long)value);
                 std::fflush(stderr);
             }
+        }
+        // 2026-07-07: half-open PA range watch (ES40 SCB-page install probe).
+        // Logs every store landing in [LO,HI); catches an install store at ANY
+        // offset in the table page without needing to know the stored value.
+        static uint64_t const s_watchLo = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_GMEM_WATCH_LO");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        static uint64_t const s_watchHi = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_GMEM_WATCH_HI");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        if (s_watchHi != 0ULL) {
+            uint64_t const sHi = pa + (size ? size : 1u);
+            if (pa < s_watchHi && sHi > s_watchLo) {
+                std::fprintf(stderr,
+                    "GMEM-WATCH-RANGE[0x%llx..0x%llx) STORE pa=0x%llx sz=%u v=0x%llx\n",
+                    (unsigned long long)s_watchLo, (unsigned long long)s_watchHi,
+                    (unsigned long long)pa, size, (unsigned long long)value);
+                std::fflush(stderr);
+            }
+        }
+        // 2026-07-08: VALUE-keyed store probe (ES40 SCB vector-install split,
+        // task #29 Step 1).  The range watch above keys on the target PA; this
+        // keys on the stored VALUE so it catches the vector-install store at ANY
+        // PA the kseg/superpage decode lands it on (splits Q2a "never installed"
+        // vs Q2b-far "installed at a PA outside the watched page").  Two run keys:
+        //   EMULATR_VECWATCH_VAL=0x1038000  -> whoever caches the SCB base
+        //   EMULATR_VECWATCH_VAL=<CLK_ISR>  -> the install store itself
+        // The (v & ~3) mask mirrors the console PAL's BIC Rx,#3 PAL-bit tagging
+        // (the low 2 bits carry the PAL/mode flag, not part of the target PC).
+        // Env-gated, zero-cost when unset; guarded by EMULATR_DIAGNOSTIC_LOGGING.
+        static bool const s_vecValSet =
+            (std::getenv("EMULATR_VECWATCH_VAL") != nullptr);
+        static uint64_t const s_vecVal = []() -> uint64_t {
+            char const* e = std::getenv("EMULATR_VECWATCH_VAL");
+            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL; }();
+        if (s_vecValSet && ((value & ~3ULL) == (s_vecVal & ~3ULL))) {
+            std::fprintf(stderr,
+                "VECWATCH-VAL(0x%llx) STORE pa=0x%llx sz=%u v=0x%llx\n",
+                (unsigned long long)s_vecVal, (unsigned long long)pa,
+                size, (unsigned long long)value);
+            std::fflush(stderr);
         }
         if (s_armPa != 0ULL && pa == s_armPa &&
             (!s_armValSet || value == s_armVal)) {

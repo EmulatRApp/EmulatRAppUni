@@ -86,7 +86,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "chipsetLib/IDeviceHandlers.h"  // IIoPortHandler
+#include "../../chipsetLib/IDeviceHandlers.h"  // IIoPortHandler
 
 
 // ============================================================================
@@ -143,12 +143,17 @@ public:
     static constexpr int      kEpochYear   = 2026;  // four-digit epoch year
     static constexpr int      kEpochDow    = 5;     // Thursday (1 = Sunday)
 
+    // Default modeled-second rate.  One named source for the ~1 GHz second,
+    // shared by the ctor default and the static get_time helper
+    // (timestampMMDDhhmm / CSERVE 0x66) so both time paths agree.  [2026-07-07]
+    static constexpr uint64_t kDefaultCyclesPerSecond = 1000000000ull;
+
     // ------------------------------------------------------------------
     // Construction.  cyclesPerSecond converts the bound cycle counter to
     // elapsed seconds; the default matches the established ~1 GHz modeled
     // second (see DETERMINISM INVARIANT in the header comment).
     // ------------------------------------------------------------------
-    explicit ToyRtc(uint64_t cyclesPerSecond = 1000000000ull) noexcept
+    explicit ToyRtc(uint64_t cyclesPerSecond = kDefaultCyclesPerSecond) noexcept
         : m_cyclesPerSecond(cyclesPerSecond ? cyclesPerSecond : 1ull)
     {
         reset();
@@ -159,6 +164,34 @@ public:
     void bindCycleSource(uint64_t const* cycleCounter) noexcept
     {
         m_cycleSource = cycleCounter;
+    }
+
+    // ------------------------------------------------------------------
+    // get_time (CSERVE func 0x66) return value -- the packed TOY timestamp
+    // sys__get_timestamp produces (ev6_vms_pc264_pal.mar:5336):
+    //   R0 = (month << 24) | (day << 16) | (hour << 8) | minute
+    // each byte in the RTC's encoding.  The SRM runs the TOY in BCD /
+    // 24-hour, so this encodes BCD, 24-hour.  DETERMINISTIC (cycle-derived
+    // from the same epoch as the RTC port path) -- NEVER host wall-clock,
+    // which would break the AXPBox byte-identical oracle.  Consumed by
+    // execCserve (palBoxLib) for the ES40 memory-test timing primitive at
+    // guest 0x8c2d0 (return = input - get_time()).  Self-consistent for the
+    // firmware's elapsed-time deltas; if it must byte-match a direct RTC read
+    // in a non-24h/binary mode, honor Reg B here.  [2026-07-07]
+    // ------------------------------------------------------------------
+    static uint32_t timestampMMDDhhmm(
+        uint64_t cycles,
+        uint64_t cyclesPerSecond = kDefaultCyclesPerSecond) noexcept
+    {
+        CalFields const f = calendarFromCycles(cycles, cyclesPerSecond);
+        uint8_t const mo = encode(static_cast<uint8_t>(f.mon),  false);  // BCD
+        uint8_t const dd = encode(static_cast<uint8_t>(f.dom),  false);
+        uint8_t const hh = encode(static_cast<uint8_t>(f.hour), false);  // 24-hour
+        uint8_t const mm = encode(static_cast<uint8_t>(f.min),  false);
+        return (static_cast<uint32_t>(mo) << 24)
+             | (static_cast<uint32_t>(dd) << 16)
+             | (static_cast<uint32_t>(hh) <<  8)
+             |  static_cast<uint32_t>(mm);
     }
 
     // Volatile CMOS (G1b): everything zero, latch clear, index 0.
@@ -293,20 +326,28 @@ private:
     // deterministic time source, honoring Reg B DM (binary vs BCD) and
     // H24 (24 vs 12 hour).  Alarm registers are untouched.
     // ------------------------------------------------------------------
-    void materializeClock() noexcept
+    // ------------------------------------------------------------------
+    // Pure calendar fields from a deterministic cycle count.  ONE source of
+    // truth for both the lazy RTC materialization (port reads) and the static
+    // get_time helper (timestampMMDDhhmm / CSERVE 0x66).  No device or host
+    // state.  cyclesPerSecond converts cycles -> seconds.  [2026-07-07]
+    // ------------------------------------------------------------------
+    struct CalFields { int sec; int min; int hour; int dow; int dom; int mon; int year; };
+
+    static CalFields calendarFromCycles(uint64_t cycles,
+                                        uint64_t cyclesPerSecond) noexcept
     {
-        uint64_t const cycles  = m_cycleSource ? *m_cycleSource : 0ull;
-        uint64_t const elapsed = cycles / m_cyclesPerSecond;
-
-        // Split elapsed seconds into day count + time of day.
+        uint64_t const elapsed = cycles / (cyclesPerSecond ? cyclesPerSecond : 1ull);
         uint64_t const daySecs = elapsed % 86400ull;
-        uint64_t       days    = elapsed / 86400ull;
-        int const sec  = static_cast<int>(daySecs % 60ull);
-        int const min  = static_cast<int>((daySecs / 60ull) % 60ull);
-        int const hour = static_cast<int>(daySecs / 3600ull);
+        uint64_t const days    = elapsed / 86400ull;
 
-        // Walk the calendar forward from the epoch.  Boot runs cover
-        // minutes of modeled time, so the simple loop is never hot.
+        CalFields f{};
+        f.sec  = static_cast<int>(daySecs % 60ull);
+        f.min  = static_cast<int>((daySecs / 60ull) % 60ull);
+        f.hour = static_cast<int>(daySecs / 3600ull);
+
+        // Walk the calendar forward from the epoch.  Boot runs cover minutes
+        // of modeled time, so the simple loop is never hot.
         int year = kEpochYear;                       // four-digit working year
         int mon  = 1;                                // January
         int dom  = 1;                                // walking day-of-month
@@ -321,7 +362,19 @@ private:
             dom = 1;
             if (++mon > 12) { mon = 1; ++year; }
         }
-        int const dow = 1 + ((kEpochDow - 1) + static_cast<int>(days % 7ull)) % 7;
+        f.year = year;
+        f.mon  = mon;
+        f.dom  = dom;
+        f.dow  = 1 + ((kEpochDow - 1) + static_cast<int>(days % 7ull)) % 7;
+        return f;
+    }
+
+    void materializeClock() noexcept
+    {
+        // 2026-07-07: calendar math factored into calendarFromCycles() so the
+        // RTC port path and CSERVE get_time (timestampMMDDhhmm) stay identical.
+        uint64_t const cycles = m_cycleSource ? *m_cycleSource : 0ull;
+        CalFields const f = calendarFromCycles(cycles, m_cyclesPerSecond);
 
         bool const binary = (m_cmos[kRegB] & kRegB_DM)  != 0;
         bool const h24    = (m_cmos[kRegB] & kRegB_H24) != 0;
@@ -329,22 +382,22 @@ private:
         // Hours register: 24-hour straight, or 12-hour with PM in bit 7.
         uint8_t hourReg;
         if (h24) {
-            hourReg = encode(static_cast<uint8_t>(hour), binary);
+            hourReg = encode(static_cast<uint8_t>(f.hour), binary);
         } else {
-            int const h12 = (hour % 12 == 0) ? 12 : (hour % 12);
+            int const h12 = (f.hour % 12 == 0) ? 12 : (f.hour % 12);
             hourReg = encode(static_cast<uint8_t>(h12), binary);
-            if (hour >= 12) {
+            if (f.hour >= 12) {
                 hourReg = static_cast<uint8_t>(hourReg | kHourPmBit);
             }
         }
 
-        m_cmos[kRegSeconds] = encode(static_cast<uint8_t>(sec), binary);
-        m_cmos[kRegMinutes] = encode(static_cast<uint8_t>(min), binary);
+        m_cmos[kRegSeconds] = encode(static_cast<uint8_t>(f.sec), binary);
+        m_cmos[kRegMinutes] = encode(static_cast<uint8_t>(f.min), binary);
         m_cmos[kRegHours]   = hourReg;
-        m_cmos[kRegDow]     = encode(static_cast<uint8_t>(dow), binary);
-        m_cmos[kRegDom]     = encode(static_cast<uint8_t>(dom), binary);
-        m_cmos[kRegMonth]   = encode(static_cast<uint8_t>(mon), binary);
-        m_cmos[kRegYear]    = encode(static_cast<uint8_t>(year % 100), binary);
+        m_cmos[kRegDow]     = encode(static_cast<uint8_t>(f.dow), binary);
+        m_cmos[kRegDom]     = encode(static_cast<uint8_t>(f.dom), binary);
+        m_cmos[kRegMonth]   = encode(static_cast<uint8_t>(f.mon), binary);
+        m_cmos[kRegYear]    = encode(static_cast<uint8_t>(f.year % 100), binary);
         // NOTE: no century byte is written.  PC CMOS convention parks the
         // century at NVRAM index 0x32; wire it here if SRM SHOW DATE ever
         // reports the wrong century.
