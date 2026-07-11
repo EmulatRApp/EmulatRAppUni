@@ -1,0 +1,32 @@
+# Set VS CMake and Ninja paths
+export PATH="/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin:/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja:$PATH"
+
+# Opt-in MSVC toolchain import. Run `msvcenv` before building; leaves other shells clean.
+
+msvcenv() {
+    local vcdir="/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build"
+    if [ ! -f "$vcdir/vcvars64.bat" ]; then
+        echo "msvcenv: vcvars64.bat not found in $vcdir" >&2
+        return 1
+    fi
+    local dump line key
+    dump="$( cd "$vcdir" && cmd //c vcvars64.bat "&&" set 2>/dev/null | tr -d '\r' )"
+    while IFS= read -r line; do
+        key="${line%%=*}"
+        case "$key" in
+            INCLUDE|LIB|LIBPATH) export "$key=${line#*=}" ;;
+            PATH|Path|path)      export PATH="$(cygpath -up "${line#*=}")" ;;
+        esac
+    done <<< "$dump"
+    if command -v cl >/dev/null 2>&1; then
+        echo "msvcenv: MSVC ready -- $(command -v cl)"
+    else
+        echo "msvcenv: import ran but cl still not found" >&2
+        return 1
+    fi
+}
+
+#Auto-load MSVC toolchain (this box is build-only). Guard prevents double-import in child shells.
+if [ -z "$MSVC_ENV_DONE" ]; then
+    msvcenv && export MSVC_ENV_DONE=1
+fi

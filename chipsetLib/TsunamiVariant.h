@@ -37,7 +37,12 @@
 // MODEL-TO-CHIPSET MAPPING:
 //   DS10   -> Tsunami (21272)
 //   DS20   -> Tsunami (21272)
-//   ES40   -> Typhoon (21272 high-bw)  [8GB arrays, 32GB max; ES40 HW is Typhoon]
+//   ES40   -> Typhoon (21272 high-bw)  [ES40 HW is Typhoon.  NOTE: the loaded
+//             pc264 SRM decodes 3-bit ASIZ -> <=1GB arrays, 4GB max via the
+//             8-bit base<31:24>.  8GB arrays / 32GB need a 4-bit-ASIZ firmware;
+//             the AAR decode width is a FIRMWARE property (TsunamiCchip
+//             m_extendedAsizDecode), not the board.  See journals/
+//             20260710_es40_memtest_acv_RESOLVED_aar_asiz_and_tiling.md.]
 //   DS15   -> Titan   (21274)
 //   DS25   -> Titan   (21274)
 //   ES45   -> Titan   (21274)

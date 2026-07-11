@@ -1626,7 +1626,12 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         return r;
     }
 
-#if EMULATR_MEMDIAG
+#if EMULATR_MEMDIAG || defined(EMULATR_BRINGUP_PROBES)
+    // 2026-07-09: guard widened to EMULATR_BRINGUP_PROBES so this capped,
+    // low-volume MMU-ctl probe compiles in the CLI diag build WITHOUT enabling
+    // the EMULATR_MEMDIAG per-retire flooder.  Decides ES40 memtest ACV
+    // branch B1 vs B2: empty for the 0x7f826000 region => no VPTB/DTB setup =>
+    // superpage(kseg) probe intended => R16 is a malformed kseg VA (upstream).
     // MMU-control MTPR probe.  Logs writes to the IPRs whose state governs TB
     // fills and page-table-walk addressing, so we can answer:
     //   (a) does the SROM ever set VPTB via I_CTL/M_CTL/VA_CTL (bits 47:30 on

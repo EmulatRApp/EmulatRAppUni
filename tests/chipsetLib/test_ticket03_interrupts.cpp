@@ -63,7 +63,9 @@ TEST_CASE("Deassert clears DIR for all CPUs")
 
 TEST_CASE("Per-CPU masks are independent")
 {
-    TsunamiCchip c(ChipsetVariant::Typhoon, 4, 8ULL << 30);
+    // 4 GiB: 3-bit-ASIZ representable (was 8 GB; >4 GB needs a 4-bit-ASIZ
+    // firmware -- pass extendedAsizDecode=true or use <=4 GB).  Tests interrupts.
+    TsunamiCchip c(ChipsetVariant::Typhoon, 4, 4ULL << 30);
     c.write(Cchip::DIM0, 1ULL << 50);
     c.write(Cchip::DIM2, 1ULL << 50);
     c.assertInterrupt(50);

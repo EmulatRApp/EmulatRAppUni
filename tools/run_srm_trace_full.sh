@@ -110,7 +110,14 @@ INI="config/EmulatrV4.ini"
 MEM=4294967296
 PORT="${PORT:-$((10023 + POFF))}"          # per-model default so models can run concurrently
 MAXCYC="${MAXCYC:-3000000000}"
+ARM_USER="${ARM:-}"                        # was ARM set explicitly by the caller?
 ARM="${ARM:-sysvar}"
+# NOTRACE=1 -- fast boot check: omit --trace so the RETIRE_COMPACT firehose
+# (traceMask 0x80 -> the multi-GB srm.trc) never opens; console + fault log
+# only.  Defaults ARM=none (all sinks closed) UNLESS the caller set ARM
+# explicitly -- e.g. NOTRACE=1 ARM=cyc opens ONLY the gated retire .trc window
+# (the one-shot cycle arm in PipelineDriver.h) with the firehose still off.
+if [ "${NOTRACE:-0}" = "1" ] && [ -z "$ARM_USER" ]; then ARM=none; fi
 TS="$(date +%Y%m%d-%H%M%S)"
 TRACE_DIR="traces"
 DEC_LOG="${TRACE_DIR}/${TS}_${NAME}_dec.log"
@@ -176,6 +183,12 @@ else
         unset  EMULATR_TRACE_ARM_PA EMULATR_TRACE_ARM_VAL
         export EMULATR_TRACE_ARM_ON_IIC=0x40
         export EMULATR_TRACE_ARM_INSTRS=4000000
+    elif [ "$ARM" = "cyc" ]; then
+        # window OPEN, but NO PA/IIC/instr arm -- the ONLY trigger is the compiled
+        # one-shot cycle arm in PipelineDriver.h (kTraceArmCyc/kTraceLen).  Bounded
+        # pre-fault capture for Stream A / task #10.
+        unset  EMULATR_TRACE_ARM_ON_IIC EMULATR_TRACE_ARM_PA \
+               EMULATR_TRACE_ARM_VAL EMULATR_TRACE_ARM_INSTRS
     else
         unset  EMULATR_TRACE_ARM_ON_IIC
         export EMULATR_TRACE_ARM_PA=0x2058
@@ -208,6 +221,14 @@ echo "  extra    : ${PASS[*]:-<none>}"
 echo "============================================================="
 
 # ---- launch ----------------------------------------------------------------
+# --trace arms TRACE_RETIRE_COMPACT (0x80) -> the srm.trc firehose.  Under
+# NOTRACE=1 we omit it entirely for a fast, low-I/O boot check (console +
+# fault log still captured).  Safe empty-array expansion under set -u.
+TRACE_OPT=(--trace "$DEC_LOG,$MACHINE_LOG")
+if [ "${NOTRACE:-0}" = "1" ]; then
+    TRACE_OPT=()
+    echo "NOTRACE=1: --trace omitted -- no RETIRE_COMPACT srm.trc (console + fault log only)"
+fi
 set +e
 "./$BIN" \
     --firmware "$DST_FW" \
@@ -215,7 +236,7 @@ set +e
     --no-autoload \
     --autosnapshot off \
     --max-cycles "$MAXCYC" \
-    --trace "$DEC_LOG,$MACHINE_LOG" \
+    ${TRACE_OPT[@]+"${TRACE_OPT[@]}"} \
     "${PASS[@]}" 2>&1 | tee "$CONSOLE_LOG"
 RC=${PIPESTATUS[0]}
 set -e

@@ -45,6 +45,11 @@ TsunamiChipset::TsunamiChipset(ChipsetVariant variant,
     // (21272 high-bw), NOT ES45 (that is Titan/21274); base Tsunami is DS10/DS20.
     , m_model(variant == ChipsetVariant::Typhoon ? "ES40" : "DS20")
     , m_guestMemory(memSizeBytes)
+    // TODO(aar-decode-width): pass the loaded firmware's ASIZ decode width as
+    // the 4th arg (default false = 3-bit, pc264-consumable).  The AAR encoding
+    // width is a FIRMWARE property, not the board -- task #5.  A 4-bit-decoding
+    // firmware would pass true to re-enable 2/4/8 GB arrays.  See TsunamiCchip
+    // reset() + journals/20260710_es40_memtest_acv_RESOLVED_aar_asiz_and_tiling.md.
     , m_cchip(variant, cpuCount, memSizeBytes)
     , m_dchip(variant, memSizeBytes)
     , m_pchip(variant)

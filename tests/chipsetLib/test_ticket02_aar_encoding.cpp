@@ -69,20 +69,25 @@ TEST_CASE("Tsunami 4GB: 4 x 1GB arrays at bases 0, 1G, 2G, 3G")
 // Typhoon encoding
 // ============================================================================
 
-TEST_CASE("Typhoon 32GB: 4 x 8GB arrays, ASIZ = 0xA")
+// 2026-07-10: the extended (4-bit ASIZ<15>) encodings are only produced when
+// the LOADED FIRMWARE decodes 4 bits.  These cases opt in explicitly via the
+// extendedAsizDecode ctor arg; the DEFAULT (3-bit) path is exercised by the
+// "Typhoon ES40 default" case below and would refuse >4GB.  See journals/
+// 20260710_es40_memtest_acv_RESOLVED_aar_asiz_and_tiling.md.
+TEST_CASE("Typhoon 32GB (4-bit-ASIZ firmware): 4 x 8GB arrays, ASIZ = 0xA")
 {
-    TsunamiCchip c(ChipsetVariant::Typhoon, 4, 32ULL << 30);
+    TsunamiCchip c(ChipsetVariant::Typhoon, 4, 32ULL << 30, /*extendedAsizDecode=*/true);
     for (int i = 0; i < 4; ++i) {
         uint64_t const aar = c.read(Cchip::AAR0 + i * 0x40);
         CHECK(asizOf(aar) == 0xA);       // 8GB per HRM 10-15
     }
 }
 
-TEST_CASE("Typhoon 2GB and 4GB single-array ASIZ encodings")
+TEST_CASE("Typhoon 2GB and 4GB single-array ASIZ (4-bit-ASIZ firmware)")
 {
-    TsunamiCchip c2(ChipsetVariant::Typhoon, 1, 2ULL << 30);
+    TsunamiCchip c2(ChipsetVariant::Typhoon, 1, 2ULL << 30, /*extendedAsizDecode=*/true);
     CHECK(asizOf(c2.read(Cchip::AAR0)) == 0x8);   // 2GB
-    TsunamiCchip c4(ChipsetVariant::Typhoon, 1, 4ULL << 30);
+    TsunamiCchip c4(ChipsetVariant::Typhoon, 1, 4ULL << 30, /*extendedAsizDecode=*/true);
     CHECK(asizOf(c4.read(Cchip::AAR0)) == 0x9);   // 4GB
 }
 
@@ -93,7 +98,9 @@ TEST_CASE("Typhoon 2GB and 4GB single-array ASIZ encodings")
 TEST_CASE("AAR base + size never exceeds 2^35")
 {
     for (uint64_t mem : {1ULL<<30, 2ULL<<30, 4ULL<<30, 8ULL<<30, 32ULL<<30}) {
-        TsunamiCchip c(ChipsetVariant::Typhoon, 4, mem);
+        // 4-bit decoder so the 8/32GB sweep points tile (the 3-bit default
+        // refuses >4GB by design -- see the "not representable" abort).
+        TsunamiCchip c(ChipsetVariant::Typhoon, 4, mem, /*extendedAsizDecode=*/true);
         for (int i = 0; i < 4; ++i) {
             uint64_t const aar = c.read(Cchip::AAR0 + i * 0x40);
             if (aar == 0) continue;
@@ -171,4 +178,44 @@ TEST_CASE("M2: 64MB -> AAR0 low word 0x3009; 1GiB -> 0x7009 (firmware-observed)"
     CHECK((c64.read(Cchip::AAR0) & 0xFFFFULL) == 0x3009ULL);
     TsunamiCchip c1g(ChipsetVariant::Tsunami, 1, 1ULL << 30);
     CHECK((c1g.read(Cchip::AAR0) & 0xFFFFULL) == 0x7009ULL);
+}
+
+// ============================================================================
+// M3 (2026-07-10, fixes #6): the permutation the old suite SKIPPED.
+// The M2 round-trip above ran only for Tsunami; the comment above deferred
+// "Typhoon 0x8..0xA needs a different read -- M3 platform-gating, out of scope."
+// That out-of-scope deferral is exactly where the ES40 memtest ACV lived:
+// Typhoon with the DEFAULT (pc264, 3-bit) firmware presented a single extended
+// 4GB array (AAR0=0x9009) that the firmware mis-read as 16MB.  These cases put
+// the Typhoon 3-bit permutation IN scope and pin it firmware-consumable.
+// Root cause: journals/20260710_es40_memtest_acv_RESOLVED_aar_asiz_and_tiling.md.
+// ============================================================================
+
+TEST_CASE("M3: Typhoon default 3-bit firmware sizes are pc264-consumable")
+{
+    for (uint64_t mem : {1ULL << 30, 2ULL << 30, 4ULL << 30}) {
+        TsunamiCchip c(ChipsetVariant::Typhoon, 4, mem);   // default: 3-bit decode
+        uint64_t total = 0;
+        for (int i = 0; i < 4; ++i) {
+            uint64_t const aar = c.read(Cchip::AAR0 + i * 0x40);
+            if (aar == 0) continue;
+            CHECK(asizOf(aar) <= 0x7);                      // 3-bit-consumable (no 0x8..0xA)
+            total += firmwareArraySizeBytes(aar);           // firmware (AAR>>12)&7 view
+        }
+        CHECK(total == mem);                                // firmware sees the full memSize
+    }
+}
+
+TEST_CASE("M3: Typhoon ES40 4GB -> 4 x 1GB, ASIZ 0x7 (root-cause regression #6)")
+{
+    // The exact defect: a Typhoon ES40 must NOT present AAR0=0x9009 (a single
+    // 4GB array, ASIZ 0x9) -- pc264 get_array_size reads (0x9009>>12)&7 = 16MB.
+    // With the decode width defaulting to 3-bit it tiles four 1GB banks instead.
+    TsunamiCchip c(ChipsetVariant::Typhoon, 4, 4ULL << 30);   // default: 3-bit
+    for (int i = 0; i < 4; ++i) {
+        uint64_t const aar = c.read(Cchip::AAR0 + i * 0x40);
+        CHECK(asizOf(aar) == 0x7);                            // 1GB, NOT 0x9 (4GB)
+        CHECK(((aar >> 12) & 0x7) == 0x7);                    // firmware 3-bit view == 1GB
+        CHECK(addrOf(aar) == (static_cast<uint64_t>(i) << 6));// bases 0/1G/2G/3G
+    }
 }
