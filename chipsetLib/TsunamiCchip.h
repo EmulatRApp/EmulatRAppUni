@@ -102,7 +102,14 @@
 //             power-on defaults (the topology SROM would program) from
 //             cpuCount/memSize; firmware may reprogram array sizes during
 //             memory init and those writes stick.  ASIZ encoding is
-//             byte-correct (Ticket 2 doctests pin it).
+//             byte-correct (Ticket 2 doctests pin it).  ENCODING fidelity is
+//             necessary but NOT sufficient: the extended 4-bit ASIZ<15>
+//             (2/4/8 GB, codes 0x8/0x9/0xA) is UNCONSUMABLE by a 3-bit-decoding
+//             firmware (pc264 get_array_size: (AAR>>12)&7 -> reads 0x9009 as
+//             16 MB).  reset() gates the extended path on m_extendedAsizDecode
+//             (default false, firmware-derived per task #5); see the reset()
+//             CHANGE note and journals/20260710_es40_memtest_acv_RESOLVED_aar_
+//             asiz_and_tiling.md.
 //   MPR0-3 -- storage RO (Phase B leaves them zero-init; WO per HRM).
 //             Wire when SDRAM mode-register programming becomes
 //             load-bearing.
@@ -183,6 +190,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>   // std::exit / EXIT_FAILURE for the NotRepresentable refusal
 #include "TsunamiVariant.h"
 #include <algorithm>
 
@@ -246,14 +254,20 @@ public:
      * @param cpuCount     Number of CPUs present (1-4)
      * @param memSizeBytes Total physical memory in bytes
      */
+    // extendedAsizDecode (2026-07-10): does the LOADED FIRMWARE decode the
+    // 4-bit extended ASIZ<15> (codes 0x8/0x9/0xA = 2/4/8 GB)?  Defaults false:
+    // no SRM in Processor Support/.../apisrm decodes it (pc264 get_array_size
+    // reads (AAR>>12)&7, 3-bit).  See the reset() CHANGE note.
     explicit TsunamiCchip(ChipsetVariant variant = ChipsetVariant::Tsunami,
                           int cpuCount = 4,
-        uint64_t memSizeBytes = 0x100000000ULL) noexcept
+        uint64_t memSizeBytes = 0x100000000ULL,
+        bool extendedAsizDecode = false) noexcept
         : m_variant(variant)
         , m_cpuCount(cpuCount)
         , m_memSizeBytes(memSizeBytes)
+        , m_extendedAsizDecode(extendedAsizDecode)
     {
-        //static_assert(cpuCount >= 1 && cpuCount <= kMaxCPUs); 
+        //static_assert(cpuCount >= 1 && cpuCount <= kMaxCPUs);
         reset();
     }
     // --- Bus Arbiter Gatekeeper Logic ---
@@ -284,14 +298,18 @@ public:
     // # TsunamiCchip.h -- reset() rewrite for multi - array memory splitting
     // # ============================================================================
     // #
-    // # Tsunami: max 1GB per array, 4 arrays = 4GB max
-    // # Typhoon : max 8GB per array, 4 arrays = 32GB max
+    // # 3-bit-ASIZ firmware (default): max 1GB per array, 4 arrays = 4GB max
+    // # 4-bit-ASIZ firmware (extendedAsizDecode): max 8GB/array, 32GB max
     // #
-    // # Examples :
-    // #   4GB on Tsunami : 4 x 1GB arrays(AAR0 - AAR3 each 1GB)
-    // #   8GB on Typhoon : 4 x 2GB arrays(AAR0 - AAR3 each 2GB)
-    // #   16GB on Typhoon : 4 x 4GB arrays
-    // #   32GB on Typhoon : 4 x 8GB arrays
+    // # The tier is the LOADED FIRMWARE's decode width (m_extendedAsizDecode),
+    // # NOT the chipset variant -- pc264 (ES40) decodes 3-bit, so ES40 tiles
+    // # 4 x 1GB even though the Typhoon silicon could express 8GB arrays.
+    // #
+    // # Examples (3-bit default) :
+    // #   4GB : 4 x 1GB arrays (AAR0-AAR3 each 1GB, ASIZ 0x7)
+    // # Examples (4-bit, extendedAsizDecode=true) :
+    // #   8GB : greedy 1 x 8GB (task #5 will make this 4 x 2GB per the policy)
+    // #   32GB : 4 x 8GB arrays (ASIZ 0xA)
     // #
     // # ============================================================================
     void reset() noexcept
@@ -304,8 +322,25 @@ public:
         // per kTyphoonInfo/kTitanInfo.  Base Tsunami caps at 1GB arrays (4GB).
         // 2026-07-03: was Typhoon-only, which mis-tiled Titan to 4GB and tripped
         // the R3 over-capacity hard-stop on a 32GB Titan request.
-        const bool isExtendedAar = (m_variant == ChipsetVariant::Typhoon
-                                 || m_variant == ChipsetVariant::Titan);
+        // FILE: chipsetLib/TsunamiCchip.h  FUNCTION: reset()
+        // CHANGE (2026-07-10): the extended 4-bit ASIZ (bit<15>, codes
+        // 0x8/0x9/0xA = 2/4/8 GB) is a property of the LOADED FIRMWARE's AAR
+        // decoder, NOT the chipset variant.  The pc264 SRM's get_array_size
+        // reads (AAR>>12)&7 (3-bit); a single 4 GiB array encoded 0x9009 is
+        // mis-decoded as 16 MB, corrupting the memory-array geometry the powerup
+        // memtest builds from -- the ES40 memtest ACV root cause.  This was
+        // gated on (Typhoon || Titan), which asserts a firmware capability the
+        // loaded firmware may not have.  Now gated on m_extendedAsizDecode
+        // (default false): no SRM in apisrm decodes 4-bit ASIZ, so every array
+        // is presented 3-bit-consumable (<=1 GiB, ASIZ<=0x7) unless a caller
+        // opts in.  For the ES40 4 GiB/3-bit config the existing greedy fill
+        // yields the pc264-consumable 4 x 1 GiB (ASIZ 0x7), bases 0/1G/2G/3G.
+        // TODO(aar-decode-width): (1) derive m_extendedAsizDecode from the
+        // loaded firmware image (task #5); (2) adopt the power-of-2-total /
+        // four-equal-bank tiling from journals/20260710_es40_memtest_acv_
+        // RESOLVED_aar_asiz_and_tiling.md (this interim keeps greedy fill,
+        // which coincides with 4x1 GiB for the ES40 case).
+        const bool isExtendedAar = m_extendedAsizDecode;   // was variant-derived
         const uint64_t maxPerArray = isExtendedAar
             ? (8ULL * 1024 * 1024 * 1024)
             : (1ULL * 1024 * 1024 * 1024);
@@ -336,16 +371,26 @@ public:
         // (Tsunami 4x1GB=4GB; Typhoon 4x8GB=32GB).  Charter: no silent
         // degradation -- a too-large request is a config error, fail fast.
         if (remaining != 0) {
+            // NotRepresentable: refuse loudly rather than truncate.  A silent
+            // squeeze (4-bit value through a 3-bit field) is exactly the defect
+            // this fix removes; the honest failure is an error, not a clamp.
             std::fprintf(stderr,
-                "FATAL: memory size 0x%llx exceeds %s max DRAM "
-                "(4 arrays x %lluGB = 0x%llx); surplus 0x%llx is unaddressable. "
-                "Reduce --mem or select a higher-capacity chipset variant.\n",
+                "FATAL: memory size 0x%llx not representable by the loaded "
+                "firmware's %s AAR decoder (4 arrays x %lluGB max = 0x%llx); "
+                "surplus 0x%llx is unaddressable. Reduce --mem, or load a "
+                "4-bit-ASIZ firmware for larger arrays.\n",
                 static_cast<unsigned long long>(m_memSizeBytes),
-                (isExtendedAar ? "Typhoon/Titan" : "Tsunami"),
+                (isExtendedAar ? "4-bit-ASIZ (<=8GB/array)"
+                               : "3-bit-ASIZ (<=1GB/array)"),
                 static_cast<unsigned long long>(maxPerArray >> 30),
                 static_cast<unsigned long long>(4ULL * maxPerArray),
                 static_cast<unsigned long long>(remaining));
-            std::abort();
+            // Clean shutdown + exit, NOT std::abort(): flush the diagnostic and
+            // std::exit(EXIT_FAILURE) so the refusal is an orderly fail-fast at
+            // construction (no SIGABRT / crash dialog).  A config that the loaded
+            // firmware cannot address is a fatal setup error, not a runtime crash.
+            std::fflush(stderr);
+            std::exit(EXIT_FAILURE);
         }
 
         // ------------------------------------------------------------------
@@ -1552,6 +1597,13 @@ private:
     ChipsetVariant  m_variant;
     int             m_cpuCount;
     uint64_t         m_memSizeBytes;
+    // Does the loaded firmware decode the 4-bit extended ASIZ<15> (2/4/8 GB,
+    // codes 0x8/0x9/0xA)?  Default false -- pc264 (and every apisrm SRM) reads
+    // (AAR>>12)&7 (3-bit), so reset() presents only 3-bit-consumable arrays
+    // (<=1 GiB, ASIZ<=0x7) unless a caller opts in.  Set at construction.
+    // TODO(aar-decode-width): derive from the loaded firmware image (task #5).
+    // See journals/20260710_es40_memtest_acv_RESOLVED_aar_asiz_and_tiling.md.
+    bool            m_extendedAsizDecode = false;
 
     // ========================================================================
     // Read-only after init

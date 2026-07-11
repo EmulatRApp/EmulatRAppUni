@@ -66,11 +66,14 @@ namespace {
 // ----------------------------------------------------------------------------
 struct TsunamiUnderTest
 {
-    // ES45 configuration: Typhoon variant, 4 CPUs, 32 GB main memory.
-    // Memory size only affects Cchip AAR initialization (not the CSR
-    // registry); the test does not exercise DRAM accesses.
+    // ES45 configuration: Typhoon variant, 4 CPUs.  Memory size only affects
+    // Cchip AAR initialization (not the CSR registry); the test does not
+    // exercise DRAM accesses.  2026-07-10: reduced 32 GB -> 4 GiB, a size the
+    // default 3-bit-ASIZ decoder can represent.  A 32 GB config needs a
+    // 4-bit-ASIZ firmware (extendedAsizDecode), which TsunamiChipset does not
+    // yet thread (task #5); without it reset() correctly refuses 32 GB.
     static constexpr int      kEs45CpuCount     = 4;
-    static constexpr uint64_t kEs45MemSizeBytes = 0x800000000ULL;  // 32 GB
+    static constexpr uint64_t kEs45MemSizeBytes = 0x100000000ULL;  // 4 GiB (was 32 GB)
 
     // Tsunami MMIO window: 0x800.0000.0000 -- 0xFFF.FFFF.FFFF (8 TB).
     // Per the Tsunami HRM and TsunamiChipset.h's address-map comment.

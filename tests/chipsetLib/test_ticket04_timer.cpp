@@ -73,7 +73,9 @@ TEST_CASE("step() fires again on the next interval after a clear")
 
 TEST_CASE("step() fires for all enabled CPUs (4-CPU ES45)")
 {
-    TsunamiChipset cs(ChipsetVariant::Typhoon, 4, 8ULL << 30);
+    // 4 GiB: 3-bit-ASIZ representable (was 8 GB; >4 GB needs a 4-bit-ASIZ
+    // firmware not yet threaded, task #5).  This case tests the timer, not memory.
+    TsunamiChipset cs(ChipsetVariant::Typhoon, 4, 4ULL << 30);
     cs.step(kInterval);
     CHECK(cs.cchip().pendingIrq2(0) == true);
     CHECK(cs.cchip().pendingIrq2(1) == true);

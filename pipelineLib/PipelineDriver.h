@@ -247,15 +247,24 @@ struct PipelineDriver
 #endif
         // ---- END TEMP probe ----
 
-        // ---- TEMP one-shot trace-window arm 2026-06-01 (REMOVE after capture) ----
-        // Arms DecListingSink's retire-trace window ~20 instr before the UART entry so
-        // the next kTraceLen retires are logged to the _srm.trc (decoded mnemonic, reg
-        // write, ld/st va/pa/value -- richer than PCWIN). Run with EMULATR_TRACE_WINDOW=1
-        // and NO --trace so the global firehose stays off; only this bounded window is
-        // captured. One-shot: arms once at/after the threshold, counts down, self-disables.
+        // ---- TEMP one-shot trace-window arm 2026-07-10 (REMOVE after capture) ----
+        // FILE: pipelineLib/PipelineDriver.h  FUNCTION: retire loop (driver step)
+        // CHANGE: repoint the one-shot retire-window arm from the stale UART-entry
+        // cycle to the ES40 powerup-memtest ACV.  Stream A / task #10: localize the
+        // birth of the malformed kseg base R16=0xFFFFFFFF7F827F5F that faults the
+        // memtest at PC 0x1B7DD4, cyc ~282,107,640 (VA=R3=R16; good base
+        // R20=0x801FC000000).  Hypothesis per PalEntries.cpp:594-600: the memtest
+        // timing idiom "return = input - get_time()" (caller ~0x8c228; ACV R26=0x8c228)
+        // reads time via CSERVE 0x66, which is a FAITHFUL no-op (R0 untouched) -> the
+        // garbage in R0 propagates into R16.  Arm ~20k cyc before the fault and log
+        // kTraceLen retires so the .trc brackets R16's write + the CSERVE 0x66 return
+        // + the faulting deref.  Open the retire sink WITHOUT the firehose:
+        //   NOTRACE=1 ARM=cyc bash tools/run_es40_trace.sh
+        // (window gated by s_traceWindowCountdown; no --trace, so RETIRE_COMPACT stays
+        // off).  One-shot: arms once at/after the threshold, counts down, self-disables.
         {
-            constexpr uint64_t kTraceArmCyc = 0xaa461cf2ull - 20;
-            constexpr int64_t  kTraceLen    = 600;
+            constexpr uint64_t kTraceArmCyc = 282088000ull;    // ~20k cyc pre-fault
+            constexpr int64_t  kTraceLen    = 30000;           // retires to log
             static bool s_traceArmed = false;
             if (!s_traceArmed && cpu.cycleCount >= kTraceArmCyc) {
                 s_traceArmed = true;

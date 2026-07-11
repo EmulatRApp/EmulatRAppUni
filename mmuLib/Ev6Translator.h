@@ -319,7 +319,51 @@ struct Ev6Translator
         pteLib::LookupResult const r =
             cpu.dtbMgr.lookup(pteLib::TlbRealm::Dtb, va, cpu.asn);
         if (r.isHit()) {
-            return applyTlbHit(r.pte, va, access, cpu.mode, pa_out);
+            TranslationResult const hit =
+                applyTlbHit(r.pte, va, access, cpu.mode, pa_out);
+#if defined(EMULATR_BRINGUP_PROBES)
+            // ACVPROBE Hook B (2026-07-09): the ES40 memtest ACV (task: ES40
+            // memtest ACV, PC 0x1b7dd4 LDQ probe on VA 0xFFFFFFFF_7F827F5F) is
+            // raised on a TLB HIT whose installed PTE denies kernel read
+            // (applyTlbHit !pte.canRead at this same file's :222), NOT on a
+            // miss -- so Hook A below (miss-only) cannot observe it.  Dump the
+            // resident PTE + permission decode across the memtest sweep window
+            // to split (A) canRead/mode miseval [valid=1,kre=1 yet ACV] from
+            // (B/C) a deny PTE the PAL installed [valid=0 or kre=0].  Keyed to
+            // the sweep VA range, capped at 40, zero-cost when the flag is off.
+            if (hit == TranslationResult::AccessViolation
+             || hit == TranslationResult::FaultOnRead) {
+                static unsigned long s_acvB = 0;
+                bool const keyed = (va >= 0xFFFFFFFF7F827000ULL
+                                 &&  va <  0xFFFFFFFF7F829000ULL);
+                if (keyed && s_acvB < 40) { ++s_acvB;
+                    // vptb/vactl added 2026-07-09 for the VPTB-propagation
+                    // check (web-variant analysis D1): cpu.vptb is what
+                    // MTPR_VPTB stored; VA_FORM's base is va_ctl<63:43>
+                    // (computeVaForm masks va_ctl & 0xFFFFF80000000000).
+                    // vptb != 0 while va_ctl<63:43> == 0 confirms the
+                    // stranded-base defect that yields the 0x7ffffdfe098
+                    // (VPTB=0) self-map fetch.
+                    std::fprintf(stderr,
+                        "ACVPROBE HOOKB cyc=%llu va=%016llx mode=%d res=%d "
+                        "pte=%016llx valid=%d kre=%d for=%d pfn=%llx "
+                        "vptb=%016llx vactl=%016llx\n",
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(va),
+                        static_cast<int>(cpu.mode),
+                        static_cast<int>(hit),
+                        static_cast<unsigned long long>(r.pte.raw),
+                        static_cast<int>(r.pte.isValid()),
+                        static_cast<int>(r.pte.bitKRE()),
+                        static_cast<int>(r.pte.faultOnRead()),
+                        static_cast<unsigned long long>(r.pte.pfn()),
+                        static_cast<unsigned long long>(cpu.vptb),
+                        static_cast<unsigned long long>(cpu.va_ctl));
+                    std::fflush(stderr);
+                }
+            }
+#endif
+            return hit;   // ACVPROBE Hook B wraps this hit-path return
         }
 #if defined(EMULATR_BRINGUP_PROBES)
         // ACVPROBE Hook A: the SPE regime at the Dstream miss that feeds the ACV.
@@ -446,7 +490,7 @@ struct Ev6Translator
     //     2. PAL mode -> PA = VA (PAL-mode PC<0> bit cleared)
     //     3. VA_CTL physical-mode bit -> identity map
     //     4. Canonical VA window check
-    //     5. Kseg detection (i_spe)
+    //     5. Kseg detection (i_spe) 
     //     6. TODO (ITB walk -- not yet implemented) -> ItbMiss
     // -------------------------------------------------------------
     static TranslationResult translateInstruction(

@@ -112,7 +112,9 @@ TEST_CASE("Static shim reaches the same Cchip register as the instance method")
 
 TEST_CASE("cpuId threads to Cchip MISC.CPUID; static shim defaults to CPU 0")
 {
-    TsunamiChipset cs(ChipsetVariant::Typhoon, 4, 8ULL << 30);
+    // 4 GiB: 3-bit-ASIZ representable (was 8 GB; >4 GB needs a 4-bit-ASIZ
+    // firmware not yet threaded, task #5).  This case tests dispatch, not memory.
+    TsunamiChipset cs(ChipsetVariant::Typhoon, 4, 4ULL << 30);
     uint64_t const pa     = Base::kCchip_CSR + Cchip::MISC;
     uint64_t const offset = MMIOOffset::kCchip_CSR + Cchip::MISC;
 

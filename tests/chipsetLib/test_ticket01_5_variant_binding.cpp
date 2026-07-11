@@ -59,7 +59,10 @@ TEST_CASE("ChipsetVariantInfo caps match the documented AAR limits")
 
 TEST_CASE("All three sub-chips agree on variant (ES45 / Typhoon, 4 CPUs)")
 {
-    TsunamiChipset cs(ChipsetVariant::Typhoon, 4, 8ULL << 30);
+    // 4 GiB: default 3-bit-ASIZ representable (was 8 GB; a >4 GB Typhoon config
+    // needs a 4-bit-ASIZ firmware not yet threaded through TsunamiChipset,
+    // task #5).  This case checks variant binding, not memory sizing.
+    TsunamiChipset cs(ChipsetVariant::Typhoon, 4, 4ULL << 30);
     CHECK(iv(cs.variant())         == iv(ChipsetVariant::Typhoon));
     CHECK(iv(cs.cchip().variant()) == iv(ChipsetVariant::Typhoon));
     CHECK(iv(cs.dchip().variant()) == iv(ChipsetVariant::Typhoon));
@@ -104,6 +107,8 @@ TEST_CASE("DREV reads byte-sliced per-Dchip revision, variant-independent")
     TsunamiChipset es40(ChipsetVariant::Tsunami, 2, 4ULL << 30);
     CHECK(es40.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x0101010101010101ULL);
 
-    TsunamiChipset es45(ChipsetVariant::Typhoon, 4, 8ULL << 30);
+    // 4 GiB: 3-bit-ASIZ representable (was 8 GB; DREV is variant-independent, so
+    // memory size is incidental -- >4 GB needs a 4-bit-ASIZ firmware, task #5).
+    TsunamiChipset es45(ChipsetVariant::Typhoon, 4, 4ULL << 30);
     CHECK(es45.mmioRead(Base::kDchip_CSR + Dchip::DREV, 8) == 0x0101010101010101ULL);
 }
