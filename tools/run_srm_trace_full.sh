@@ -107,7 +107,7 @@ SRC_FW="$PROJ_ROOT/firmware/${NAME}_v7_3.exe"
 DST_FW="firmware/${NAME}_v7_3.exe"
 SRC_MANIFEST="$PROJ_ROOT/${NAME}_v7_3_platform.json"
 INI="config/EmulatrV4.ini"
-MEM=4294967296
+MEM="${MEM:-4294967296}"                   # 4 GiB default; override e.g. MEM=34359738368 (32 GiB)
 PORT="${PORT:-$((10023 + POFF))}"          # per-model default so models can run concurrently
 MAXCYC="${MAXCYC:-3000000000}"
 ARM_USER="${ARM:-}"                        # was ARM set explicitly by the caller?
