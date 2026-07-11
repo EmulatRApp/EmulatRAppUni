@@ -401,6 +401,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             case 0x44: return "MTPR_EXC_ADDR";
             case 0x45: return "JUMP_TO_ARC";
             case 0x65: return "MP_WORK_REQUEST";
+            case 0x66: return "GET_PAL_BASE (masked)";
             default:   return "(reserved / no-op)";
         }
     };
@@ -577,27 +578,43 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             return r;                // R0 untouched
         }
 
-        // 2026-07-08: CSERVE 0x66 (=102 dec) "get_time" REMOVED.  It was an
-        // UNSOURCED mislabel: it wrote R0 with a TOY timestamp, but the
-        // authoritative PC264 PAL sys__cserve dispatch
-        // (Processor Support/.../ref/ev6_vms_pc264_pal.mar:3911) hw_ret's with R0
-        // UNTOUCHED for every undefined code -- and 102 IS undefined (the last
-        // defined code is MP_WORK_REQUEST=101).  sys__get_timestamp in that PAL
-        // is an INTERNAL bsr routine, not a CSERVE.  The spurious R0 write shifted
-        // the ES40 console's SCB base (it computes base = R0 + 0x28000, expecting
-        // R0 = phys_base 0): 0x01010000 (Jan-1 00:00 BCD) + 0x28000 = 0x1038000
-        // instead of 0x28000, so the PAL read the interval-clock vector off a
-        // timestamp-shifted base, found zero, and HW_REI'd to PC 0 -> halt.  See
-        // journals/20260708_es40_scb_base_mismatch_root.md.  Removing the case
-        // lets 0x66 fall to the default (R0 untouched), matching the PAL.
-        //
-        // DEFERRED INVESTIGATION (task: "time handling / memory-test get_time"):
-        // get_time was originally added here to paper over an ES40 memory-test
-        // SYSFAULT at guest 0x8c2d0 ("return = input - get_time()").  With 0x66
-        // now a faithful no-op, that path must obtain time some other way (most
-        // likely the internal get_timestamp bsr, NOT a CSERVE).  Confirm the
-        // memory-test's real time source before trusting this no-op on the full
-        // cold-boot path.
+        case 0x66: {   // CSERVE 0x66 -- return masked PAL_BASE
+            // 2026-07-11: REINSTATED with CORRECTED semantics; machine-code
+            // confirmed from the running image's OWN PAL (decompressed_es40_v7_3,
+            // load base 0x8000).  HISTORY: a 2026-07-08 change REMOVED an earlier
+            // "get_time" case here because it wrote R0 with a BCD TOY value that
+            // shifted the SCB base (base = R0 + 0x28000 -> 0x1038000, HW_REI to
+            // PC 0 halt; journals/20260708_es40_scb_base_mismatch_root.md), and
+            // ev6_vms_pc264_pal.mar (which stops at code 0x65) made 0x66 look
+            // undefined.  That .mar was the WRONG variant: the compiled es40_v7_3
+            // PAL DOES define 0x66.  Ground-truth disassembly --
+            //   sys__cserve: cmpeq r16,#0x66 @guest 0x133f4 -> handler @0x139e8:
+            //     HW_MFPR R0, 0x1010    ; read IPR
+            //     SRL     R0, #0x15, R0 ; >> 21
+            //     SLL     R0, #0x15, R0 ; << 21   (clear low 21 bits = 2MB-align)
+            //     HW_RET
+            // Per 21264ev67 HRM Figure 6-4 the HW_MFPR field is INDEX[15:8] +
+            // SCBD_MASK[7:0], so index16 0x1010 -> IPR index 0x10 = PAL_BASE
+            // (calibrated against the trace's EXC_ADDR read at PAL 0x8300 =
+            // index 0x06).  So 0x66 returns the 2MB-aligned PAL base -- a
+            // base-relative-address primitive, NOT a time/TOY value.
+            //
+            // BUG THIS FIXES: the ES40 powerup memtest helper at guest 0x8c2d0
+            // computes `R0 = arg - cserve(0x66)`.  With 0x66 no-op'd, the stale
+            // walk pointer (0xc03ea0a1) survived into the SUBQ, yielding the wild
+            // VA 0xffffffff7f827f5f, dereferenced at guest 0x1b7dd4 -> ACV.
+            // Returning the real palBase makes `arg - palBase_aligned` a valid
+            // address and clears the ACV.  DETERMINISTIC (palBase is fixed once
+            // seeded) -- same source as HW_MFPR HW_PAL_BASE (HW_IPR.h) /
+            // CpuState.h palBase.  Does NOT reprise the 2026-07-08 regression:
+            // the single 0x66 contract is palBase (not a TOY), so the SCB path's
+            // base = R0 + 0x28000 = palBase_aligned + 0x28000 is also correct.
+            // Ref: journals/20260711_es40_memtest_acv_cserve_0x66_CONFIRMED_machinecode.md
+            r.regWriteIdx   = 0;     // R0
+            r.regWriteIsFp  = false;
+            r.regWriteValue = (c.cpu->palBase >> 21) << 21;   // PAL_BASE, 2MB-aligned
+            return r;
+        }
 
         default: {
             // Every other CSERVE function code: the real EV6 OSF PAL falls

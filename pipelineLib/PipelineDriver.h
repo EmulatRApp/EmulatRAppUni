@@ -247,31 +247,12 @@ struct PipelineDriver
 #endif
         // ---- END TEMP probe ----
 
-        // ---- TEMP one-shot trace-window arm 2026-07-10 (REMOVE after capture) ----
-        // FILE: pipelineLib/PipelineDriver.h  FUNCTION: retire loop (driver step)
-        // CHANGE: repoint the one-shot retire-window arm from the stale UART-entry
-        // cycle to the ES40 powerup-memtest ACV.  Stream A / task #10: localize the
-        // birth of the malformed kseg base R16=0xFFFFFFFF7F827F5F that faults the
-        // memtest at PC 0x1B7DD4, cyc ~282,107,640 (VA=R3=R16; good base
-        // R20=0x801FC000000).  Hypothesis per PalEntries.cpp:594-600: the memtest
-        // timing idiom "return = input - get_time()" (caller ~0x8c228; ACV R26=0x8c228)
-        // reads time via CSERVE 0x66, which is a FAITHFUL no-op (R0 untouched) -> the
-        // garbage in R0 propagates into R16.  Arm ~20k cyc before the fault and log
-        // kTraceLen retires so the .trc brackets R16's write + the CSERVE 0x66 return
-        // + the faulting deref.  Open the retire sink WITHOUT the firehose:
-        //   NOTRACE=1 ARM=cyc bash tools/run_es40_trace.sh
-        // (window gated by s_traceWindowCountdown; no --trace, so RETIRE_COMPACT stays
-        // off).  One-shot: arms once at/after the threshold, counts down, self-disables.
-        {
-            constexpr uint64_t kTraceArmCyc = 282088000ull;    // ~20k cyc pre-fault
-            constexpr int64_t  kTraceLen    = 30000;           // retires to log
-            static bool s_traceArmed = false;
-            if (!s_traceArmed && cpu.cycleCount >= kTraceArmCyc) {
-                s_traceArmed = true;
-                traceLib::DecListingSink::setTraceWindowCountdown(kTraceLen);
-            }
-        }
-        // ---- END one-shot trace-window arm ----
+        // (2026-07-11: the TEMP one-shot trace-window arm was REMOVED here --
+        // capture complete.  It bracketed the ES40 powerup-memtest ACV at guest
+        // 0x1B7DD4 while that fault was root-caused to CSERVE 0x66 (which the
+        // image's PAL implements as masked PAL_BASE, not a no-op) and fixed in
+        // palBoxLib/grains/PalEntries.cpp -- ES40 now boots to P00>>>.  See
+        // journals/20260711_es40_memtest_acv_cserve_0x66_CONFIRMED_machinecode.md.)
 
         // ---- TEMP tick-delay warp (Task #5) 2026-06-02 -- arm with EMULATR_TICKWARP=1 ----
         // Fast-forwards the console-init tick-counted real-time delays. At the delay-loop
