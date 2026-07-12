@@ -53,6 +53,9 @@ TsunamiChipset::TsunamiChipset(ChipsetVariant variant,
     , m_cchip(variant, cpuCount, memSizeBytes)
     , m_dchip(variant, memSizeBytes)
     , m_pchip(variant)
+    // task #25: DPR present on the RMC platform (ES40 == Typhoon) only.
+    , m_hasRmcDpr(variant == ChipsetVariant::Typhoon)
+    , m_dpr(cpuCount)
 {
     if (variant == ChipsetVariant::Tsunami)
         std::fprintf(stderr, "  Chipset:       Tsunami 21272 (wired)\n");
@@ -143,6 +146,13 @@ BusResult TsunamiChipset::read(uint64_t pa, uint8_t width) noexcept {
     // all-ones default and the firmware refused `boot`.  See TsunamiTig.h.
     if (m_tig.decodes(pa)) {
         return { BusStatus::Ok, m_tig.read(pa) };
+    }
+    // RMC Dual-Port RAM (task #25) -- the TIG-bus mailbox at 0x801_1000_0000.
+    // Gated on the RMC platform (ES40 == Typhoon); on DS10/DS20 m_hasRmcDpr is
+    // false so this window falls through to NXM (byte-identical).  Clears the
+    // "TIG load failure" console error (DPR ram[0xda]=0xaa).  See TsunamiDpr.h.
+    if (m_hasRmcDpr && m_dpr.decodes(pa)) {
+        return { BusStatus::Ok, m_dpr.read(pa, width) };
     }
     // I/O window -> Cchip / Dchip / Pchip CSR + PCI routing (existing dispatch).
     if (pa >= Tsunami21272::Base::kMMIO_Start) {
@@ -251,6 +261,13 @@ BusResult TsunamiChipset::write(uint64_t pa, uint64_t value, uint8_t width) noex
     // and TsunamiTig.h.
     if (m_tig.decodes(pa)) {
         m_tig.write(pa, value);
+        return { BusStatus::Ok, 0 };
+    }
+    // RMC Dual-Port RAM (task #25) -- host-side writes to the TIG-bus mailbox
+    // (RMC commands: FRU/OCP/flash + secondary-CPU start).  Gated on the RMC
+    // platform (ES40 == Typhoon); DS10/DS20 fall through (byte-identical).
+    if (m_hasRmcDpr && m_dpr.decodes(pa)) {
+        m_dpr.write(pa, width, value);
         return { BusStatus::Ok, 0 };
     }
     if (pa >= Tsunami21272::Base::kMMIO_Start) {

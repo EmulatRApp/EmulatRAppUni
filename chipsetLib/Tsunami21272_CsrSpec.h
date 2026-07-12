@@ -427,11 +427,9 @@ namespace Dchip {
     // HRM 10.2.3.1 -- 10.2.3.4.
     //
     // Known so far (from V4 reset() and the existing register map):
-    //   DREV reset = 0x10 on Tsunami, 0x20 on Typhoon.
-    //   DSC, STR, DSC2 all reset to 0; storage stub only today.
-
-    inline constexpr uint64_t DREV_RESET_TSUNAMI = 0x10;
-    inline constexpr uint64_t DREV_RESET_TYPHOON = 0x20;
+    // (2026-07-11 T0-3: dead DREV_RESET_TSUNAMI/TYPHOON constants removed.  The
+    //  live DREV reset is the byte-sliced 0x0101010101010101 in TsunamiDchip.h;
+    //  the old 0x10/0x20 encoding was WRONG -- it landed in the RAZ high nibble.)
 
 } // namespace Dchip
 
@@ -481,12 +479,8 @@ inline constexpr uint64_t resetMiscRev(ChipsetVariant v) noexcept
          : Cchip::MISC::REV_RESET_TSUNAMI;
 }
 
-inline constexpr uint64_t resetDchipDrev(ChipsetVariant v) noexcept
-{
-    return (v == ChipsetVariant::Typhoon)
-         ? Dchip::DREV_RESET_TYPHOON
-         : Dchip::DREV_RESET_TSUNAMI;
-}
+// (2026-07-11 T0-3: resetDchipDrev() removed -- 0 call sites; the live DREV
+//  reset is set directly (byte-sliced 0x0101...) in TsunamiDchip.h reset().)
 
 // ============================================================================
 // INTERVAL TIMER PROFILE (Phase C consumer)

@@ -49,10 +49,10 @@
 //
 // REGISTER MAP:
 //   Offset    Name     R/W    Description
-//   0x0000    CSC      RO     System Configuration (CPU present mask)
-//   0x0040    MTR      RO     Memory Timing Register
+//   0x0000    CSC      RW     System Configuration (RW; CPU-present/rev/P1P<14> RO-from-pins)
+//   0x0040    MTR      RW     Memory Timing Register
 //   0x0080    MISC     RW     Miscellaneous (interval timer, NXM)
-//   0x00C0    MPD      RO     Memory Presence Detect
+//   0x00C0    MPD      RW     Memory Presence Detect (RW; I2C SPD bit-bang, DR/CKR are RO inputs)
 //   0x0100    AAR0     RW     Array Address Register 0
 //   0x0140    AAR1     RW     Array Address Register 1
 //   0x0180    AAR2     RW     Array Address Register 2
@@ -192,6 +192,7 @@
 #include <cstdio>
 #include <cstdlib>   // std::exit / EXIT_FAILURE for the NotRepresentable refusal
 #include "TsunamiVariant.h"
+#include "ChipsetTopology.h"       // T-TOPO: latched chipset topology SSOT
 #include <algorithm>
 
 #include <QDataStream>
@@ -266,6 +267,7 @@ public:
         , m_cpuCount(cpuCount)
         , m_memSizeBytes(memSizeBytes)
         , m_extendedAsizDecode(extendedAsizDecode)
+        , m_topo(ChipsetTopology::make(variant, cpuCount))   // T-TOPO: latch topology facts
     {
         //static_assert(cpuCount >= 1 && cpuCount <= kMaxCPUs);
         reset();
@@ -396,10 +398,14 @@ public:
         // ------------------------------------------------------------------
         // CSC: System Configuration Register
         // ------------------------------------------------------------------
-        m_csc = 0;
-        for (int i = 0; i < m_cpuCount && i < kMaxCPUs; ++i)
-            m_csc |= (1ULL << i);
-        m_csc |= (m_variant == ChipsetVariant::Typhoon) ? 0x03ULL : 0x01ULL;
+        // T-TOPO.1 (2026-07-11): the CPU-present + BC<1:0> topology bits now derive
+        // from the ChipsetTopology SSOT (m_topo) instead of being fabricated here.
+        // BYTE-IDENTICAL to the prior code -- cscTopoBits() = cpuPresentMask (the
+        // (1<<cpuCount)-1 low mask the old `for(i<cpuCount) |= (1<<i)` loop made)
+        // OR bcConfig (0x03 Typhoon / 0x01 Tsunami).  The HRM CxCFP<3:2>/BC<1:0>/
+        // P1P<14> re-encoding is task #30, firmware-trace-gated (ChipsetTopology.h
+        // cscTopoBits).  The upper timing/config fields below are unchanged.
+        m_csc = m_topo.cscTopoBits();
         m_csc |= (2ULL << 52) | (1ULL << 48) | (1ULL << 44) |
             (1ULL << 40) | (1ULL << 36) | (1ULL << 31) |
             (2ULL << 26) | (3ULL << 20) | (3ULL << 18) | (3ULL << 16);
@@ -1113,13 +1119,16 @@ public:
             break;
 
         // ------------------------------------------------------------------
-        // RO-from-software registers -- writes ignored per HRM (CSC, DIR).
-        // The ignored writes are still logged through CSR_LOG_W so the
-        // diagnostic stream shows the attempt.  CSC writes during PAL
-        // diagnostics are normal.
+        // 2026-07-11 T0-4: CSC is HRM Table 10-7 Type=RW, NOT RO.  Its write-
+        // honor is DEFERRED to Tier 1 (T-SM3) because CSC carries RO-from-pins
+        // fields (CPU-present, revision, P1P<14>): a blanket store would let
+        // firmware clobber the RO bits it reads back later, so the faithful path
+        // is FIELD-AWARE (preserve RO, store only RW) and depends on T-TOPO.
+        // Until that lands the write is DROPPED (logged), not because CSC is RO.
+        // DIR (below) is genuinely RO.  CSC writes during PAL diags are normal.
         // ------------------------------------------------------------------
         case Cchip::CSC:
-            CSR_LOG_W("Cchip", "CSC(ignored)", value, offset, cpuId, kPhaseBNoCycle);
+            CSR_LOG_W("Cchip", "CSC(deferred-RW/T-SM3)", value, offset, cpuId, kPhaseBNoCycle);
             break;
 
         // ------------------------------------------------------------------
@@ -1185,7 +1194,12 @@ public:
             CSR_LOG_W("Cchip", "MPD(ignored)", value, offset, cpuId, kPhaseBNoCycle);
             break;
         case Cchip::MTR:
-            CSR_LOG_W("Cchip", "MTR(ignored)", value, offset, cpuId, kPhaseBNoCycle);
+            // 2026-07-11 T0-2: MTR is HRM Table 10-7 Type=RW.  The SRM programs
+            // SDRAM timing and reads it back; no timing side effect is modeled,
+            // so read-back-consistent storage is the faithful minimum.  MTR has
+            // NO RO sub-fields to preserve (unlike CSC), so a plain store is safe.
+            m_mtr = value;
+            CSR_LOG_W("Cchip", "MTR", value, offset, cpuId, kPhaseBNoCycle);
             break;
 
         default: {
@@ -1604,6 +1618,12 @@ private:
     // TODO(aar-decode-width): derive from the loaded firmware image (task #5).
     // See journals/20260710_es40_memtest_acv_RESOLVED_aar_asiz_and_tiling.md.
     bool            m_extendedAsizDecode = false;
+
+    // T-TOPO (2026-07-11): latched chipset topology SSOT.  CSC's topology bits
+    // derive from this (m_topo.cscTopoBits()); DSC/PCTL consume it when their
+    // encodings are corrected (tasks #29 / #27).  Init from the ctor's
+    // variant/cpuCount; never mutated by a CSR write (RO-from-pins facts).
+    ChipsetTopology m_topo;
 
     // ========================================================================
     // Read-only after init
