@@ -247,12 +247,12 @@ struct PipelineDriver
 #endif
         // ---- END TEMP probe ----
 
-        // (2026-07-11: the TEMP one-shot trace-window arm was REMOVED here --
-        // capture complete.  It bracketed the ES40 powerup-memtest ACV at guest
-        // 0x1B7DD4 while that fault was root-caused to CSERVE 0x66 (which the
-        // image's PAL implements as masked PAL_BASE, not a no-op) and fixed in
-        // palBoxLib/grains/PalEntries.cpp -- ES40 now boots to P00>>>.  See
-        // journals/20260711_es40_memtest_acv_cserve_0x66_CONFIRMED_machinecode.md.)
+        // (2026-07-11: TEMP one-shot trace-window arm REMOVED -- capture complete.
+        // It bracketed the ES40 "starting drivers" SROM/TIG validation band; the
+        // trace (20260711-170950_srm.trc) showed the "Flash SROM invalid" check
+        // reads ISA option-ROM space (pa 0x800_000c0000 = ISA 0xC0000) for a 0xAA55
+        // option-ROM signature -- absent on a headless (VGA-less) ES40.  See
+        // journals/20260711_es40_srom_tig_validation_trace.md, task #20.)
 
         // ---- TEMP tick-delay warp (Task #5) 2026-06-02 -- arm with EMULATR_TICKWARP=1 ----
         // Fast-forwards the console-init tick-counted real-time delays. At the delay-loop

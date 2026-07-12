@@ -12,6 +12,7 @@
 #include "TsunamiDchip.h"
 #include "TsunamiPchip.h"
 #include "TsunamiTig.h"     // TIG-bus device register file (smir/halt/ipcr/arbiter)
+#include "TsunamiDpr.h"     // task #25: RMC Dual-Port RAM (ES40/Typhoon; TIG-bus mailbox)
 #include "Cypress_CY82C693ISABridge.h"
 #include "AliM1543C.h"   // ES40/ES45 south bridge (ALi M1543C) -- model-gated in wireDevices()
 #include "deviceLib/Tsunami/Uart16550.h"
@@ -97,6 +98,9 @@ public:
         , m_cchip(m_variant, cpuCount, memSizeBytes)
         , m_dchip(m_variant, memSizeBytes)
         , m_pchip(m_variant)
+        // task #25: DPR present on the RMC platform (ES40 == Typhoon) only.
+        , m_hasRmcDpr(m_variant == ChipsetVariant::Typhoon)
+        , m_dpr(cpuCount)
     {
         assertVariantConsistency();
         wireDevices();
@@ -111,6 +115,7 @@ public:
         m_dchip.reset();
         m_pchip.reset();
         m_tig.reset();
+        m_dpr.reset();     // task #25: re-seed the RMC DPR structure
     }
 
     // Inject an already-open block medium built by the media_kind factory.
@@ -506,6 +511,11 @@ public:
     TsunamiTig& tig()           noexcept { return m_tig; }
     const TsunamiTig& tig() const noexcept { return m_tig; }
 
+    // task #25: RMC Dual-Port RAM accessor (tests / diagnostics).
+    TsunamiDpr&       dpr()       noexcept { return m_dpr; }
+    const TsunamiDpr& dpr() const noexcept { return m_dpr; }
+    bool              hasRmcDpr() const noexcept { return m_hasRmcDpr; }
+
     // Direct byte-store access for boot-strap loaders / initialization that
     // legitimately bypass the arbiter (ROM/firmware load into DRAM before the
     // CPU runs).  Steady-state CPU traffic always goes through read/write/fetch.
@@ -849,6 +859,13 @@ private:
     TsunamiDchip    m_dchip;
     TsunamiPchip    m_pchip;
     TsunamiTig      m_tig;     // TIG-bus device register file (smir/halt/ipcr/arbiter)
+
+    // task #25: RMC Dual-Port RAM.  m_hasRmcDpr gates the DPR window decode to
+    // the RMC-bearing platform (ES40 == Typhoon); DS10/DS20 (Tsunami) leave the
+    // window unclaimed -> byte-identical (they never access 0x801_1000_0000).
+    // ES45 is Titan (separate TitanChipset) and gets its own DPR wiring later.
+    bool            m_hasRmcDpr;
+    TsunamiDpr      m_dpr;      // RMC dual-port RAM device (see TsunamiDpr.h)
 
     // (Bus arbiter surface is now the public ISystemBus override above.)
 

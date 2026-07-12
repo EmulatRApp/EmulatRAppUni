@@ -117,7 +117,8 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <fmt/base.h>
+// (2026-07-11 T0-1: removed orphaned #include <fmt/base.h> -- its sole user was
+//  the deleted Arbiter Gatekeeper's fmt::detail::state::width garbage token.)
 
 #include "CsrDiag.h"                // Phase B: per-CSR-access diagnostic sink
 #include "Tsunami21272_CsrSpec.h"   // Phase B: spec parity
@@ -163,13 +164,8 @@ public:
     virtual auto FindDevice(uint8_t device_num) -> std::shared_ptr<IPciDevice> = 0;
 };
 
-// Interface for PCI Memory/IO operations
-class IPciMemoryHandler
-{
-public:
-    virtual auto write(uint64_t addr, uint64_t val, uint8_t width) -> bool = 0;
-    virtual auto read(uint64_t addr, uint64_t& val, uint8_t width) -> bool = 0;
-};
+// (2026-07-11 T0-1: class IPciMemoryHandler removed with the dead Arbiter
+//  Gatekeeper decoder -- its only referent was the dead m_pciMemory member.)
 
 // IPciDeviceHandler, IIoPortHandler, and IoPortRange moved to the neutral
 // plug-in-seam header IDeviceHandlers.h (included above) so device modules
@@ -272,72 +268,14 @@ public:
         static_assert(kBasePA + kCfgType0Offset == 0x801FE000000ULL, "Pchip config address mismatch with HRM");
     }
 
-    // --- Bus Arbiter Gatekeeper Interface ---
-    // These methods replace the old Pchip0 direct access logic.
-    auto routeMmioRead(uint64_t pa, uint8_t width, uint64_t& out) noexcept -> bool
-    {
-        // 1. Calculate offset relative to Pchip base
-        uint64_t offset = pa - Tsunami21272::Base::kTsunamiBase;
-        auto     region = Tsunami21272::MMIOOffset::routeMmioOffset(offset);
-
-        // 2. Dispatch based on RegionId
-        switch (region)
-        {
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_CSR:
-        case Tsunami21272::MMIOOffset::RegionId::Cchip_CSR:
-        case Tsunami21272::MMIOOffset::RegionId::Dchip_CSR:
-            out = handleCsrRead(offset, width);
-            return true;
-        // Route to ISA/IO Bus bridge
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_SparseIO:
-            // Route via interface, NOT direct bridge member
-            if (m_ioPortHandler)
-            {
-                // The port calculation is specific to Sparse I/O mapping
-                uint16_t port = static_cast<uint16_t>((offset >> 5) & 0xFFFF);
-                out           = m_ioPortHandler->ioRead(port, width);
-                return true;
-            }
-
-        default:
-            return false; // NXM
-        }
-    }
-
-    auto routeMmioWrite(uint64_t pa, uint8_t width, uint64_t val) noexcept -> bool
-    {
-        uint64_t offset = pa - Tsunami21272::Base::kTsunamiBase;
-        auto     region = Tsunami21272::MMIOOffset::routeMmioOffset(offset);
-
-        switch (region)
-        {
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_CSR:
-        case Tsunami21272::MMIOOffset::RegionId::Cchip_CSR:
-        case Tsunami21272::MMIOOffset::RegionId::Dchip_CSR:
-            handleCsrWrite(offset, width, val);
-            return true;
-
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_SparseMem:
-            return handleSparseMemWrite(offset, width, val);
-
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_SparseIO:
-            return handleSparseIoWrite(offset, width, val);
-
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_IODense:
-            return handleDenseWrite(offset, width, val);
-
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_CfgType0:
-            return handleConfigWrite(offset, width, val);
-
-        case Tsunami21272::MMIOOffset::RegionId::Pchip0_IACK:
-            // IACK is usually read-only; writes may be ignored or fault
-            return false;
-
-        case Tsunami21272::MMIOOffset::RegionId::None:
-        default:
-            return false; // NXM / Unmapped
-        }
-    }
+    // (2026-07-11 T0-1: the "Bus Arbiter Gatekeeper" decode path
+    //  (routeMmioRead/routeMmioWrite + its handlers + offsetToBDF, below) was
+    //  removed -- a fully self-contained DEAD subgraph: the two entry points had
+    //  ZERO callers, every callee was reachable only from them (or an orphan),
+    //  and the LIVE decode is readCSR/writeCSR + readPciConfig0/writePciConfig0.
+    //  It also dereferenced the always-null m_pciMemory (latent crash) and used a
+    //  garbage token (fmt::detail::state::width) that only compiled because it
+    //  never ran.  setIoPortHandler (below) is LIVE and retained.)
 
     // Add this setter to allow the Chipset to wire the bridge
     auto setIoPortHandler(IIoPortHandler* handler) noexcept -> void
@@ -1337,188 +1275,15 @@ private:
             static_cast<uint32_t>(function);
     }
 
-    // --- MMIO Dispatch Handlers ---
-    // Dispatches based on the MMIOOffset::RegionId we defined earlier.
-
-    auto handleCsrRead(uint64_t offset, uint8_t width) const noexcept -> uint64_t
-    {
-        // The offset is relative to the Pchip CSR base.
-        // Ensure access aligns with architectural register map.
-        switch (offset)
-        {
-        // Window Space Base Addresses
-        case 0x000: return m_wsba[0];
-        case 0x008: return m_wsba[1];
-        case 0x010: return m_wsba[2];
-        case 0x018: return m_wsba[3];
-
-        // Window Space Masks
-        case 0x020: return m_wsm[0];
-        case 0x028: return m_wsm[1];
-        case 0x030: return m_wsm[2];
-        case 0x038: return m_wsm[3];
-
-        // Translated Base Addresses
-        case 0x040: return m_tba[0];
-        case 0x048: return m_tba[1];
-        case 0x050: return m_tba[2];
-        case 0x058: return m_tba[3];
-
-        // Control and Status Registers
-        case 0x060: return m_pctl;
-        case 0x068: return m_plat;
-        case 0x070: return m_perror;
-        case 0x078: return m_perrmask;
-
-        // Performance Monitor
-        case 0x080: return m_pmonctl;
-        case 0x088: return m_pmoncnt;
-
-        default:
-            // Log access to undefined CSR if debugging is enabled
-            return 0;
-        }
-    }
-
-    // --- CSR Write Handler ---
-    auto handleCsrWrite(uint64_t offset, uint8_t width, uint64_t val) noexcept -> void
-    {
-        // Tsunami Pchip CSRs are 64-bit; check alignment
-        if (offset & 0x7) return;
-
-        switch (offset)
-        {
-        // Window 0-3: WSBA (Window Space Base Address)
-        case 0x000: m_wsba[0] = val;
-            break;
-        case 0x008: m_wsba[1] = val;
-            break;
-        case 0x010: m_wsba[2] = val;
-            break;
-        case 0x018: m_wsba[3] = val;
-            break;
-
-        // Window 0-3: WSM (Window Space Mask)
-        case 0x020: m_wsm[0] = val;
-            break;
-        case 0x028: m_wsm[1] = val;
-            break;
-        case 0x030: m_wsm[2] = val;
-            break;
-        case 0x038: m_wsm[3] = val;
-            break;
-
-        // Window 0-3: TBA (Translated Base Address)
-        case 0x040: m_tba[0] = val;
-            break;
-        case 0x048: m_tba[1] = val;
-            break;
-        case 0x050: m_tba[2] = val;
-            break;
-        case 0x058: m_tba[3] = val;
-            break;
-
-        // PCI Control and Status
-        case 0x060: m_pctl = val;
-            break;
-        case 0x068: m_plat = val;
-            break;
-        case 0x070: m_perror = val; // Often W1C (Write 1 to Clear) in real silicon
-            break;
-        case 0x078: m_perrmask = val;
-            break;
-
-        // Performance Monitoring
-        case 0x080: m_pmonctl = val;
-            break;
-        case 0x088: m_pmoncnt = val;
-            break;
-
-        default:
-            // Optional: Log an implementation trap for reserved address space
-            break;
-        }
-    }
-
-    // --- Sparse Memory Handler ---
-    // Sparse memory writes use the bottom 5 bits of the offset as a mask.
-    auto handleSparseMemWrite(uint64_t offset, uint8_t width, uint64_t val) const noexcept -> bool
-    {
-        // In sparse space, [4:0] are the byte enable mask
-        uint64_t actualAddr = (offset >> 5);
-        // Dispatch to system bus / PCI memory
-        return m_pciMemory->write(actualAddr, val, static_cast<uint8_t>(fmt::detail::state::width));
-    }
-
-    // --- Dense Memory Handler ---
-    auto handleDenseWrite(uint64_t offset, uint8_t width, uint64_t val) const noexcept -> bool
-    {
-        // Dense space is direct-mapped; offset is the address
-        return m_pciMemory->write(offset, val, static_cast<uint8_t>(fmt::detail::state::width));
-    }
-
-    // --- Configuration Space Handler ---
-
-    auto handleConfigRead(uint64_t offset, uint8_t width, uint64_t& out) noexcept -> bool
-    {
-        uint32_t bdf = offsetToBDF(offset);
-        uint32_t reg = static_cast<uint32_t>(offset & 0xFC);
-
-        auto it = m_pciDevices.find(bdf);
-        if (it != m_pciDevices.end())
-        {
-            // Perform the read
-            out = static_cast<uint64_t>(it->second->pciConfigRead(reg, width));
-            return true;
-        }
-
-        // Master Abort: PCI specification requires returning all 1s (0xFFFFFFFF)
-        // for config space reads to non-existent devices.
-        out = 0xFFFFFFFF;
-        return true; // Still returns 'true' because the bus cycle completed (aborted)
-    }
-
-    auto handleConfigWrite(uint64_t offset, uint8_t width, uint64_t val) noexcept -> bool
-    {
-        uint32_t bdf = offsetToBDF(offset);
-        uint32_t reg = static_cast<uint32_t>(offset & 0xFC);
-
-        auto it = m_pciDevices.find(bdf);
-        if (it != m_pciDevices.end())
-        {
-            it->second->pciConfigWrite(reg, static_cast<uint32_t>(val),
-                                       static_cast<uint8_t>(fmt::detail::state::width));
-            return true;
-        }
-        return false; // Master Abort
-    }
-
-    auto handleSparseIoWrite(uint64_t offset, uint8_t width, uint64_t val) noexcept -> bool
-    {
-        // 1. Calculate Port
-        uint16_t port = static_cast<uint16_t>((offset >> 5) & 0xFFFF);
-
-        // 2. Dispatch using the Pchip's registry scan logic
-        for (const auto& range : m_ioPortRegistry)
-        {
-            if (port >= range.startPort && port < range.endPort)
-            {
-                range.handler->ioWrite(port, val, width);
-                return true; // Write handled
-            }
-        }
-
-        // 3. No device claimed it
-        return false; // Signals Master Abort to the bus
-    }
-
-    // Helper to extract BDF from config window offsets
-    static constexpr auto offsetToBDF(uint64_t offset) noexcept -> uint32_t
-    {
-        return (static_cast<uint32_t>((offset >> 16) & 0xFF) << 16) |
-            (static_cast<uint32_t>((offset >> 11) & 0x1F) << 8) |
-            (static_cast<uint32_t>((offset >> 8) & 0x07));
-    }
+    // (2026-07-11 T0-1: the "MMIO Dispatch Handlers" -- handleCsrRead/handleCsrWrite,
+    //  handleSparseMemWrite/handleDenseWrite, handleConfigRead/handleConfigWrite,
+    //  handleSparseIoWrite, and the offsetToBDF helper -- were removed with the dead
+    //  Arbiter Gatekeeper decoder (see the note at routeMmio* above).  They were
+    //  reachable only from the dead routeMmio* entry points (or orphaned).  The LIVE
+    //  Pchip decode is readCSR/writeCSR + readPciConfig0/writePciConfig0, which own
+    //  and use m_wsba/m_wsm/m_tba/m_pctl/... and m_pciDevices/m_ioPortRegistry.
+    //  Two of the removed handlers dereferenced the always-null m_pciMemory and
+    //  referenced the garbage token fmt::detail::state::width -- dead scaffolding.)
 
 
     // Assume m_ioPorts is an object implementing a write/read interface
@@ -1526,7 +1291,8 @@ private:
 
    
     IIoPortHandler*    m_ioPortHandler{nullptr};
-    IPciMemoryHandler* m_pciMemory{nullptr}; // Link to the PCI bus memory space
+    // (2026-07-11 T0-1: IPciMemoryHandler* m_pciMemory removed -- dead; it was
+    //  dereferenced only by the deleted handleSparseMemWrite/handleDenseWrite.)
     // ========================================================================
     // CSR register storage
     // ========================================================================
