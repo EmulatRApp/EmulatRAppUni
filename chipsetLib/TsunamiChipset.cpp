@@ -44,6 +44,10 @@ TsunamiChipset::TsunamiChipset(ChipsetVariant variant,
     // sets m_model from the ini.  Corrected 2026-07-03: Typhoon is ES40-class
     // (21272 high-bw), NOT ES45 (that is Titan/21274); base Tsunami is DS10/DS20.
     , m_model(variant == ChipsetVariant::Typhoon ? "ES40" : "DS20")
+    // 2026-07-12: derive the south-bridge lever from the representative m_model
+    // (Typhoon->ES40->ALi; else DS20->Cypress) -- byte-identical to the prior
+    // isAliPlatform(m_model) selection this ctor produced.
+    , m_southBridge(southBridgeFromModel(m_model))
     , m_guestMemory(memSizeBytes)
     // TODO(aar-decode-width): pass the loaded firmware's ASIZ decode width as
     // the 4th arg (default false = 3-bit, pc264-consumable).  The AAR encoding

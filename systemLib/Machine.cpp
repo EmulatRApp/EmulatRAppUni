@@ -551,6 +551,31 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
             m_settings.system.model, m_chipset.variant(), mr.manifest);
 
         // ------------------------------------------------------------
+        // South-bridge lever reconciliation (2026-07-12): the chipset selects
+        // its ISA bridge (and, in Phase 2, its IDE) from the MODEL key
+        // (southBridgeFromModel, TsunamiVariant.h).  The manifest ISA-bridge
+        // identity (PlatCap::SbAli) is the VALUE source that must AGREE.  A
+        // mismatch means the <model>_platform.json declares a different south
+        // bridge than the model implies -- surface it LOUDLY (faithfulness: the
+        // manifest must not lie), not silently trust one lever.  NOT fatal: the
+        // model key drives the wiring; this only flags manifest drift for fix.
+        // ------------------------------------------------------------
+        {
+            bool const modelSaysAli =
+                (southBridgeFromModel(m_settings.system.model) == SouthBridge::AliM1543C);
+            bool const manifestSaysAli = platHas(systemLib::PlatCap::SbAli);
+            if (modelSaysAli != manifestSaysAli) {
+                spdlog::warn("south-bridge lever DRIFT: model '{}' -> {} but manifest "
+                             "ISA-bridge -> {} (SbAli={}).  Align the "
+                             "<model>_platform.json ISA-bridge \"model\" with the silicon.",
+                             m_settings.system.model,
+                             southBridgeName(southBridgeFromModel(m_settings.system.model)),
+                             manifestSaysAli ? "ALi M1543C" : "Cypress CY82C693",
+                             manifestSaysAli ? 1 : 0);
+            }
+        }
+
+        // ------------------------------------------------------------
         // Console-UART backend gate (2026-07-08): the ES40/pc264 SRM binds its
         // primary console to the SECOND UART (ISA 0x2F8, COM2), not 0x3F8, so on
         // those platforms every banner byte is dropped unless COM2 is given the
