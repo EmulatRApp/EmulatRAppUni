@@ -180,4 +180,51 @@ inline const ChipsetVariantInfo* variantInfo(ChipsetVariant v) noexcept
     }
 }
 
+// ============================================================================
+// SouthBridge -- PCI-to-ISA south-bridge identity (2026-07-12)
+// ----------------------------------------------------------------------------
+// FILE: chipsetLib/TsunamiVariant.h
+// FUNCTION: SouthBridge / southBridgeFromModel / southBridgeName (NEW)
+// CHANGE: Single model-bifurcation lever for the south bridge, replacing the
+//   ad-hoc TsunamiChipset::isAliPlatform(model) string bool.  The SAME lever
+//   selects the ISA bridge (func0) AND the IDE controller (func1), and future
+//   Titan models (DS15/DS25/ES45) fold in here.  Per the PlatformCapabilities
+//   doctrine the MODEL is the selection KEY; the <model>_platform.json manifest
+//   is the VALUE source that must AGREE (Machine warns on drift).  The
+//   south-bridge axis is ORTHOGONAL to ChipsetVariant: ES40 (Typhoon) and
+//   ES45/DS25 (Titan) share the ALi M1543C, so this cannot be derived from the
+//   chipset variant.  Real HW: DS10/DS20 -> Cypress CY82C693; ES40/ES45/DS25 ->
+//   ALi M1543C (integrated M5229 IDE).
+// ============================================================================
+enum class SouthBridge : uint8_t
+{
+    Cypress    = 0,   // Cypress CY82C693 (DS10, DS20)
+    AliM1543C  = 1,   // ALi M1543C + integrated M5229 IDE (ES40, ES45, DS25)
+};
+
+// Map machine model -> south-bridge identity.  Default (unrecognized/empty) is
+// Cypress, matching the pre-2026-07-12 default so an unknown model stays on the
+// byte-identical DS-class path.  Mirrors variantFromModel's trim+uppercase.
+inline SouthBridge southBridgeFromModel(const std::string& model) noexcept
+{
+    std::string m = model;
+    m.erase(0, m.find_first_not_of(" \t"));
+    m.erase(m.find_last_not_of(" \t") + 1);
+    std::ranges::transform(m, m.begin(), ::toupper);
+
+    if (m == "ES40" || m == "ES45" || m == "DS25")
+        return SouthBridge::AliM1543C;
+    return SouthBridge::Cypress;   // DS10, DS20, and unknown -> Cypress
+}
+
+// Printable helper (NOT named toString -- doctest ADL clash; see project rules).
+inline const char* southBridgeName(SouthBridge sb) noexcept
+{
+    switch (sb) {
+    case SouthBridge::Cypress:   return "Cypress CY82C693";
+    case SouthBridge::AliM1543C: return "ALi M1543C";
+    }
+    return "Unknown";
+}
+
 #endif // TSUNAMI_VARIANT_H

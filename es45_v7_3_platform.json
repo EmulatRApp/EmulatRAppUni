@@ -12,11 +12,11 @@
     { "name": "iic_rcm_nvram0", "address": "0xC0", "class": "nvram", "size": 256 }
   ],
   "pci_devices": [
-    { "name": "isa_bridge", "model": "cypress_isa", "hose": 0, "bus": 0, "slot": 5, "func": 0,
+    { "name": "ali_isa", "model": "ali_m1543c", "hose": 0, "bus": 0, "slot": 5, "func": 0,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x060100",
       "comment": "STAND-IN: real ES40 south bridge is ALi M1543C (vendor 0x10b9, device 0x1533 bridge / 0x1533+0x1543 funcs). EmulatR has no ALi model yet; the Cypress stand-in carries the ISA/UART/PIC console path at standard ports.",
       "option_rom": false, "interrupt_pin": 0 },
-    { "name": "ide", "model": "cypress_ide", "hose": 0, "bus": 0, "slot": 5, "func": 1,
+    { "name": "ali_ide", "model": "ali_m5229", "hose": 0, "bus": 0, "slot": 5, "func": 1,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x010100",
       "comment": "STAND-IN IDE/ATAPI (DS10-style). ES40 boots on-board SCSI; this carries dqa0/dqa1 for parity with the DS10 harness.",
       "option_rom": false, "interrupt_pin": 0,

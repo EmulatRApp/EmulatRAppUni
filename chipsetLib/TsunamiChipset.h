@@ -27,6 +27,7 @@
 #include "memoryLib/ISystemBus.h"
 #include "deviceLib/Tsunami/IicPcf8584.h"  // PCF8584 IIC controller model (2026-06-03)
 #include "deviceLib/Tsunami/Cy82C693Ide.h" // CY82C693 IDE func1 + ATAPI CD (2026-06-08)
+#include "deviceLib/Tsunami/AliM5229Ide.h" // ALi M5229 IDE func1 (ES40/ES45/DS25, Phase 2B)
 #include "deviceLib/Tsunami/Smc37c669SuperIo.h" // FDC37C669 SuperIO: config port + FDC (#22)
 #include "deviceLib/scsi/VirtualIsoDevice.h"
 
@@ -94,6 +95,7 @@ public:
         uint64_t memSizeBytes = 0x100000000ULL) noexcept
         : m_variant(normalizeVariant(variantFromModel(model)))
         , m_model(model)
+        , m_southBridge(southBridgeFromModel(m_model))   // 2026-07-12: model-keyed south-bridge
         , m_guestMemory(memSizeBytes)
         , m_cchip(m_variant, cpuCount, memSizeBytes)
         , m_dchip(m_variant, memSizeBytes)
@@ -124,7 +126,8 @@ public:
     // IBlockMedia and no longer open files themselves.  2026-06-12 (seam).
     bool setDiskMedia(int channel, int unit,
                       std::unique_ptr<scsi::IBlockMedia> media) noexcept {
-        return m_ide.attachMedia(channel, unit, std::move(media));
+        return m_activeIde ? m_activeIde->attachMedia(channel, unit, std::move(media))
+                           : m_ide.attachMedia(channel, unit, std::move(media));
     }
     bool setCdMedia(std::unique_ptr<scsi::IBlockMedia> media) noexcept {
         m_cdrom.setMedia(std::move(media));
@@ -622,21 +625,20 @@ public:
 
 private:
 
-    // South-bridge selection (2026-06-17): the DS10/DS20 (PC264) use the
-    // Cypress CY82C693; the ES40/ES45 use the ALi M1543C.  Gated on the model
-    // string so the working DS10/DS20 path is byte-identical (default =
-    // Cypress when model is empty/DS10/DS20).  ES40 is Tsunami silicon, so
-    // only the south bridge differs -- everything else in wireDevices() (the
-    // ISA devices at fixed ports) is bridge-agnostic and reused.
-    static bool isAliPlatform(const std::string& model) noexcept {
-        return model == "ES40" || model == "ES45" || model == "DS25";
-    }
+    // South-bridge selection (2026-07-12): driven by the single model-keyed
+    // lever m_southBridge (southBridgeFromModel, TsunamiVariant.h), which
+    // RETIRES the former isAliPlatform(model) string bool.  The SAME lever
+    // selects the IDE controller (func1) in Phase 2, so bridge + IDE stay
+    // consistent by construction.  DS10/DS20 -> Cypress (byte-identical);
+    // ES40/ES45/DS25 -> ALi M1543C.  The manifest ISA-bridge identity
+    // (PlatCap::SbAli) is the VALUE source that must agree; Machine warns on
+    // drift.  The south-bridge axis is orthogonal to the chipset variant.
 
     void wireDevices() noexcept {
         // 1. Register the south bridge (func0) in the PCI device map, and wire
-        //    it as the I/O-port fallback handler.  ALi for ES40/ES45, else
+        //    it as the I/O-port fallback handler.  ALi for ES40/ES45/DS25, else
         //    Cypress (DS10/DS20).
-        if (isAliPlatform(m_model)) {
+        if (m_southBridge == SouthBridge::AliM1543C) {
             m_pchip.registerPciDevice(0, 5, 0, &m_ali);     // ALi M1543C ISA bridge (0x10B9/0x1533)
             m_pchip.setIoPortHandler(&m_ali);
         } else {
@@ -668,12 +670,21 @@ private:
        // Machine's media_kind factory (path resolved from [Storage] diskDir +
        // the manifest media).  The ATAPI CD is primary slave (dqa1), media via
        // setCdMedia().  Both enumerate no-media until a backing is provided.
-        m_ide.attachDevice(0, 1, &m_cdrom);                 // primary slave = ATAPI CD (dqa1)
-        m_pchip.registerPciDevice(0, 5, 1, &m_ide);          // func 1 config space
-        m_pchip.registerIoPortRange(0x1F0, 0x1F8, &m_ide);   // primary command block
-        m_pchip.registerIoPortRange(0x170, 0x178, &m_ide);   // secondary command block
-        m_pchip.registerIoPortRange(0x3F6, 0x3F7, &m_ide);   // primary alt-status/control
-        m_pchip.registerIoPortRange(0x376, 0x377, &m_ide);   // secondary alt-status/control
+        // Phase 2B: select the model's IDE controller via the SAME south-bridge
+        // lever that picks the bridge (m_southBridge).  ES40/ES45/DS25 -> the
+        // faithful ALi M5229 (so the pc264 console recognizes the controller it
+        // expects and probes the taskfile / IDENTIFY); DS10/DS20 -> the Cypress
+        // CY82C693 (byte-identical).  Both wrap the shared AtaTaskfileEngine; the
+        // ATAPI CD attach + func-1 config + taskfile ports route to the active one.
+        m_activeIde = (m_southBridge == SouthBridge::AliM1543C)
+                    ? static_cast<ITsunamiIde*>(&m_aliIde)
+                    : static_cast<ITsunamiIde*>(&m_ide);
+        m_activeIde->attachDevice(0, 1, &m_cdrom);              // primary slave = ATAPI CD (dqa1)
+        m_pchip.registerPciDevice(0, 5, 1, m_activeIde);        // func 1 config space
+        m_pchip.registerIoPortRange(0x1F0, 0x1F8, m_activeIde); // primary command block
+        m_pchip.registerIoPortRange(0x170, 0x178, m_activeIde); // secondary command block
+        m_pchip.registerIoPortRange(0x3F6, 0x3F7, m_activeIde); // primary alt-status/control
+        m_pchip.registerIoPortRange(0x376, 0x377, m_activeIde); // secondary alt-status/control
 
         // FDC37C669 SuperIO (#22): owns the 0x3F0 window.  In config mode
         // 0x3F0/0x3F1 are the config index/data port (detect reads CR0D=0x03 so
@@ -787,6 +798,10 @@ private:
 
     ChipsetVariant  m_variant;
     std::string     m_model;
+    // 2026-07-12: single model-keyed south-bridge lever (func0 ISA bridge now;
+    // func1 IDE in Phase 2).  Derived from m_model via southBridgeFromModel();
+    // replaces the retired isAliPlatform() string bool.
+    SouthBridge     m_southBridge;
 
     // Internal routing
     bool isDramAddress(uint64_t pa) const noexcept;
@@ -875,7 +890,7 @@ private:
     // Pchip0 in wireDevices().  Declared after m_pchip so it constructs
     // first (the Pchip registries hold raw pointers into these members).
     Cy82C693IsaBridge m_cypress;
-    AliM1543C         m_ali;       // ES40/ES45 south bridge; wired only when isAliPlatform(m_model)
+    AliM1543C         m_ali;       // ES40/ES45/DS25 south bridge; wired when m_southBridge==AliM1543C
     Uart16550         m_com1{ nullptr, 0x3F8, "COM1" };
     Uart16550         m_com2{ nullptr, 0x2F8, "COM2" };
 
@@ -883,7 +898,9 @@ private:
    // After m_pchip (registries hold raw pointers); m_cdrom before m_ide so the
    // CD outlives the controller that points at it.
     scsi::VirtualIsoDevice m_cdrom;          // no-media ATAPI CD
-    Cy82C693Ide            m_ide;            // CY82C693 IDE controller (func 1)
+    Cy82C693Ide            m_ide;            // CY82C693 IDE controller (func 1; DS10/DS20)
+    AliM5229Ide            m_aliIde;         // ALi M5229 IDE controller (func 1; ES40/ES45/DS25)
+    ITsunamiIde*           m_activeIde = nullptr;  // -> m_ide or m_aliIde; set in wireDevices()
     Smc37c669SuperIo       m_superio;       // FDC37C669 SuperIO: config port + FDC LDN (#22)
 
 
