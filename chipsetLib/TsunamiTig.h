@@ -45,6 +45,22 @@ public:
         m_ipcr[0] = m_ipcr[1] = m_ipcr[2] = m_ipcr[3] = 0;
         m_cpuStartReq = 0;
         m_arbCtrl = 0;
+        m_resetArmed     = false;   // ES40 TIG-reset prototype (2026-07-13)
+        m_resetRequested = false;
+    }
+
+    // ---- ES40 TIG-bus module-reset request (prototype, 2026-07-13) ----------
+    // The console_restart / LFU-exit reset issues a co-gated TIG triad (ARM
+    // outtig(+0x280)=bit2, COMMIT outtig(+0x600)=bits4/5) then BR . expecting a
+    // module reset (HRM 12.1.1 -- b_modrst_l via the RMC).  write() raises the
+    // request (behind EMULATR_TIG_RESET); Machine::run applies the reset at the
+    // next tick boundary and clears it.  DS10/DS20 issue ZERO of the triad, so
+    // this is ES40-scoped by absence.  0x4/0x30 are _PROVISIONAL literals until
+    // the RMC/TIG-map reset-commit bit (within 0x30 = bits 4,5) is confirmed.
+    [[nodiscard]] bool resetRequested() const noexcept { return m_resetRequested; }
+    void clearResetRequest() noexcept {
+        m_resetRequested = false;
+        m_resetArmed     = false;
     }
 
     // Snapshot deferral guard (decision 3).  TIG state is NOT yet serialized
@@ -133,6 +149,31 @@ public:
     }
 
     void write(uint64_t pa, uint64_t v) noexcept {
+#if EMULATR_BRINGUP_PROBES
+        // ES40 TIG module-reset trigger (prototype).  Decode on the co-gated
+        // PROTOCOL -- ARM (+0x280, bit2 = 0x4) must precede COMMIT (+0x600,
+        // bits4/5 = 0x30) -- never a bare commit (web-variant cond #1).  The arm
+        // persists across the intervening kHaltCpu0=0 write in the sequence.
+        // Gated on EMULATR_TIG_RESET -> inert unless armed.  _PROVISIONAL.
+        {
+            static bool const s_tigReset =
+                std::getenv("EMULATR_TIG_RESET") != nullptr;
+            if (s_tigReset) {
+                if (pa == kResetArm && (v & 0x4ULL) != 0) {
+                    m_resetArmed = true;
+                } else if (pa == kResetCommit && m_resetArmed
+                           && (v & 0x30ULL) != 0) {
+                    m_resetArmed     = false;
+                    m_resetRequested = true;
+                    std::fprintf(stderr,
+                        "EMULATR_TIG_RESET: co-gated reset triad seen (+0x280 "
+                        "arm, +0x600 commit v=0x%llx) -> module reset requested\n",
+                        static_cast<unsigned long long>(v));
+                    std::fflush(stderr);
+                }
+            }
+        }
+#endif
         switch (pa) {
         case kSmir:      return;                      // absorb; NO store (see read)
         case kHaltCpu0:  m_halt[0] = v; return;
@@ -168,6 +209,9 @@ private:
     static constexpr uint64_t kArbRev    = 0x80138000140ULL;  // arb +0x140 (intig 0xE00005)
     static constexpr uint64_t kTigPldRev = 0x80138000180ULL;  // arb +0x180 (intig 0xE00006)
     static constexpr uint64_t kArbRev2   = 0x801380001C0ULL;  // arb +0x1C0 (intig 0xE00007)
+    // ES40 module-reset triad registers (prototype, 2026-07-13).  ctrl bank.
+    static constexpr uint64_t kResetArm    = 0x80130000280ULL; // ctrl +0x280 (outtig 0xC0000A) ARM
+    static constexpr uint64_t kResetCommit = 0x80130000600ULL; // ctrl +0x600 (outtig 0xC00018) COMMIT
 
     // Revision: PROVISIONAL 0.  XREF-confirmed display/store-only -- no
     // firmware gate (show_config_pc264.c:346 printf; galaxy_pc264.c:373
@@ -202,6 +246,11 @@ private:
     // Transient SMP-signalling state; consumed/cleared by the secondary bring-up.
     uint32_t m_cpuStartReq = 0;
     uint64_t m_arbCtrl = 0;
+    // ES40 TIG module-reset request latch (prototype, EMULATR_TIG_RESET).  Arm
+    // set by outtig(+0x280) bit2; request set by outtig(+0x600) bits4/5 while
+    // armed; both cleared by clearResetRequest()/reset().
+    bool m_resetArmed     = false;
+    bool m_resetRequested = false;
 };
 
 #endif // TSUNAMI_TIG_H

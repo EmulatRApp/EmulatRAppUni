@@ -390,6 +390,89 @@ struct PipelineDriver
         }
         // ---- END 0x7bef0 dump ----
 
+        // ---- RSCC delay-loop capture at 0x6a514 (spec 20260713 EDIT 2) ------
+        // The silicon LFU-reset "Initializing...." hang spins here: CMPLE
+        // r4,r0,r0 with r4 = current System Cycle Counter (RSCC) just read via
+        // the 0x1b78e8 stub (CALL_PAL 0x9d), r0 = the precomputed delay target.
+        // Logging target vs current + cleanRSCC (cycleCount - warpCycles) reads
+        // the verdict: an inflated target that a warp-off run does NOT show =>
+        // a cycle-count warp is inflating the delay (H-warp); a sane target with
+        // current jumping/resetting across ticks => operand corruption
+        // (H-corrupt).  Gated at runtime on EMULATR_RSCC_DIAG; throttled.
+        {
+            static bool const s_rsccDiag =
+                std::getenv("EMULATR_RSCC_DIAG") != nullptr;
+            if (s_rsccDiag && cpu.pcAddr() == 0x000000000006a514ull) {
+                static uint64_t s_n = 0;
+                if (s_n < 64 || (s_n & 0x3FFull) == 0) {
+                    uint64_t const clean = cpu.cycleCount - cpu.warpCycles;
+                    std::fprintf(stderr,
+                        "RSCCDIAG-DELAY pc=0x6a514 iter=%llu cur=r4=0x%llx "
+                        "target=r0=0x%llx r3=0x%llx cyc=%llu warpTot=%llu "
+                        "cleanRSCC=%llu\n",
+                        static_cast<unsigned long long>(s_n),
+                        static_cast<unsigned long long>(cpu.intReg[4]),
+                        static_cast<unsigned long long>(cpu.intReg[0]),
+                        static_cast<unsigned long long>(cpu.intReg[3]),
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(cpu.warpCycles),
+                        static_cast<unsigned long long>(clean));
+                    std::fflush(stderr);
+                }
+                ++s_n;
+            }
+        }
+        // ---- END RSCC delay-loop capture ----
+
+        // ---- micro-delay warp at 0x6a514 (2026-07-13) -- arm EMULATR_UDELAYWARP -
+        // The console's krn$_micro_delay / RSCC busy-wait at 0x6a4f8-0x6a520 spins
+        // reading the System Cycle Counter until it reaches a deadline computed
+        // ONCE in the prologue: r3 = start_RSCC + N (0x6a4f0 ADDQ r3,r0,r3); the
+        // loop exits when current (r4) exceeds the deadline (r3).  IDLEWARP
+        // (gated at PC ~0x7bafc) does NOT cover this loop, so an un-warped silicon
+        // boot grinds every delay cycle-for-cycle -- this is the loop the PCSAMPLE
+        // stream sits in for long stretches.  Collapse it: at the compare PC, if
+        // the remaining wait (r3 - r4) is large, advance cycleCount to the
+        // deadline so the next RSCC read satisfies the exit.
+        //
+        // CLEAN BY CONSTRUCTION: it ONLY advances the clock (+ warpCycles
+        // accounting).  It does NOT rewrite guest memory -- that out-of-band
+        // 0x3c970 rewrite is exactly why the RSCCWARP/SPINWARP family below was
+        // quarantined.  Pure time delay (both exit tests are RSCC-vs-RSCC, no
+        // hardware condition), so fast-forwarding it cannot change control flow
+        // or state -- only wall-time.  Self-limiting (next pass r3-r4 -> 0, below
+        // threshold) and thresholded (leave sub-threshold real delays alone).
+        // RSCC == cycleCount (kCcMultiplier=1), so a cycleCount delta IS an RSCC
+        // delta.  Off unless EMULATR_UDELAYWARP is set.
+        {
+            static bool const s_uDelayWarp =
+                std::getenv("EMULATR_UDELAYWARP") != nullptr;
+            if (s_uDelayWarp && cpu.pcAddr() == 0x000000000006a514ull) {
+                uint64_t const cur      = cpu.intReg[4];   // current RSCC (0x6a50c)
+                uint64_t const deadline = cpu.intReg[3];   // start_RSCC + N
+                constexpr uint64_t kUDelayWarpThresh = (1ull << 16);  // skip short waits
+                if (deadline > cur && (deadline - cur) > kUDelayWarpThresh) {
+                    uint64_t const delta = deadline - cur;
+                    uint64_t const c0    = cpu.cycleCount;
+                    cpu.cycleCount += delta;    // advance the clock to the deadline
+                    cpu.warpCycles += delta;    // WARP accounting (no memory write)
+                    static uint64_t s_uwLog = 0;
+                    if ((s_uwLog++ & 0x3FFull) == 0) {      // throttle 1/1024
+                        std::fprintf(stderr,
+                            "UDELAYWARP cyc=%llu->%llu cur=0x%llx deadline=0x%llx "
+                            "delta=%llu\n",
+                            static_cast<unsigned long long>(c0),
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(cur),
+                            static_cast<unsigned long long>(deadline),
+                            static_cast<unsigned long long>(delta));
+                        std::fflush(stderr);
+                    }
+                }
+            }
+        }
+        // ---- END micro-delay warp ----
+
         // ---- General RSCC-spin warp (Task #5) 2026-06-02 -- arm EMULATR_TICKWARP ----
         // The firmware does MANY real-time delays at different PCs, each spinning on the
         // rscc wrapper (0x1c655c) comparing elapsed-SCC to a per-loop duration. Rather than

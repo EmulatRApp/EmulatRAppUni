@@ -507,6 +507,12 @@ public:
 
     TsunamiCchip& cchip()       noexcept { return m_cchip; }
     const TsunamiCchip& cchip() const noexcept { return m_cchip; }
+
+    // ES40 TIG-bus module-reset request (prototype, 2026-07-13).  Delegates to
+    // the TIG device, which raises the request on the co-gated reset triad
+    // (behind EMULATR_TIG_RESET).  Machine::run polls this and applies the reset.
+    [[nodiscard]] bool tigResetRequested() const noexcept { return m_tig.resetRequested(); }
+    void clearTigResetRequest() noexcept { m_tig.clearResetRequest(); }
     TsunamiDchip& dchip()       noexcept { return m_dchip; }
     const TsunamiDchip& dchip() const noexcept { return m_dchip; }
     TsunamiPchip& pchip()       noexcept { return m_pchip; }
