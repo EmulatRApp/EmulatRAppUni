@@ -212,39 +212,15 @@ public:
     static constexpr uint64_t kBasePA = 0x801A0000000ULL;
     static constexpr uint64_t kSize = 0x10000000ULL;    // 256 MB
     static constexpr int     kMaxCPUs = 4;
-   /*
-
-    // ========================================================================
-    // Register offsets
-    // ========================================================================
-    static constexpr uint64_t kCSC       = 0x0000;
-    static constexpr uint64_t kMTR       = 0x0040;
-    static constexpr uint64_t kMISC      = 0x0080;
-    static constexpr uint64_t kMPD       = 0x00C0;
-    static constexpr uint64_t kAAR0      = 0x0100;
-    static constexpr uint64_t kAAR1      = 0x0140;
-    static constexpr uint64_t kAAR2      = 0x0180;
-    static constexpr uint64_t kAAR3      = 0x01C0;
-    static constexpr uint64_t kDIM0      = 0x0200;
-    static constexpr uint64_t kDIM1      = 0x0240;
-    static constexpr uint64_t kDIR0      = 0x0280;
-    static constexpr uint64_t kDIR1      = 0x02C0;
-    static constexpr uint64_t kDRIR      = 0x0300;
-    static constexpr uint64_t kPRBEN     = 0x0340;
-    static constexpr uint64_t kIIC0      = 0x0380;
-    static constexpr uint64_t kIIC1      = 0x03C0;
-    static constexpr uint64_t kMPR0      = 0x0400;
-    static constexpr uint64_t kMPR1      = 0x0440;
-    static constexpr uint64_t kMPR2      = 0x0480;
-    static constexpr uint64_t kMPR3      = 0x04C0;
-    static constexpr uint64_t kDIM2      = 0x0500;
-    static constexpr uint64_t kDIM3      = 0x0540;
-    static constexpr uint64_t kDIR2      = 0x0580;
-    static constexpr uint64_t kDIR3      = 0x05C0;
-    static constexpr uint64_t kIIC2      = 0x0600;
-    static constexpr uint64_t kIIC3      = 0x0640;
-
-*/
+    // NOTE 2026-07-13: the Cchip register OFFSETS live in ONE place --
+    // Tsunami21272_RegisterMap.h (namespace Tsunami21272::Spec::Cchip), which
+    // the read/write switch resolves via `using namespace Tsunami21272`.  A
+    // stale duplicate offset table used to sit here inside a /* */ block with
+    // pre-audit WRONG values (e.g. DIM2=0x0500 instead of the correct 0x0600).
+    // It compiled to nothing but caused a false "register-map bug" mis-audit,
+    // so it was deleted.  Do NOT reintroduce a second copy; the RegisterMap
+    // header is the single source of truth.  See
+    // journals/20260713_es40_tig_reset_and_cchip_register_audit.md sec 5.
     // ========================================================================
     // Construction
     // ========================================================================

@@ -2071,12 +2071,22 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 // new header; both TUs link into the Emulatr image.
 // ----------------------------------------------------------------------------
 namespace palDiag {
-uint64_t g_divertPendingPc[2]      = {};   // savedPc of an in-flight divert
-uint64_t g_divertPendingCyc[2]     = {};   // cycle the divert fired
-uint64_t g_divertPendingReg[2][10] = {};   // natives R2-R7, R20-R23 at divert
-bool     g_divertPendingLive[2]    = {};   // slot occupied
-// Register-number map for the 10 tracked slots (R2-R7, R20-R23).
-constexpr int kDivertRegMap[10] = { 2, 3, 4, 5, 6, 7, 20, 21, 22, 23 };
+// EDIT 4 (spec 20260713): exact divert->REI pairing.  A LIFO STACK of pending
+// diverts, each with a FULL 32-int-reg snapshot + a monotonic id + the raw
+// i_ctl at divert (for the SDE<1> state).  The matching HW_REI pops the NEWEST
+// unmatched entry whose resume PC equals the divert's savedPc -- interrupts nest
+// LIFO, so newest-first is the correct pairing.  This replaces the old 2-slot
+// FIFO keyed on resumePc, whose cross-pairing at a repeatedly-interrupted spin
+// PC made DS20 report 19,449 false mismatches.  Bounds (8) duplicated at the
+// Machine.cpp fill site (namespace-scope constexpr has internal linkage).
+constexpr int kDivertStackDepth = 8;
+uint64_t g_divertStackPc[kDivertStackDepth]      = {};   // savedPc (word-aligned)
+uint64_t g_divertStackCyc[kDivertStackDepth]     = {};   // cycle the divert fired
+uint64_t g_divertStackReg[kDivertStackDepth][32] = {};   // full R0-R31 at divert
+uint64_t g_divertStackIctl[kDivertStackDepth]    = {};   // i_ctl at divert (SDE)
+uint64_t g_divertStackId[kDivertStackDepth]      = {};   // monotonic divert id
+int      g_divertStackTop                        = 0;    // # live entries (LIFO)
+uint64_t g_divertIdCounter                       = 0;    // last id handed out
 
 // ---- TEMP (SDE shadow-swap ledger) -- REMOVE WITH the DIVERT-REI block ----
 // Arms on a clock divert whose interrupted PC is in the 0x1ad600-0x1adbff
@@ -2259,62 +2269,81 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
     }
 #endif
 
-    // TEMP DIAGNOSTIC (DIVERT-REI register ledger compare) -- REMOVE AFTER
-    // the nvram_get fclose(&spl_kernel) corruption is root-caused.
-    // Runs AFTER setPalMode so the SDE shadow swap (PAL->native) has
-    // already published the native view the resumed code will see.
-    // Match on the resume target == a pending divert's savedPc; the
-    // divert only fires outside PAL mode, so savedPc bit 0 is clear.
-    if (!resumeInPal) {
-        uint64_t const resumePc = rawTarget & ~uint64_t{3};
-        for (int s = 0; s < 2; ++s) {
-            if (!palDiag::g_divertPendingLive[s] ||
-                palDiag::g_divertPendingPc[s] != resumePc) {
-                continue;
+    // DIVERT-REI EXACT compare (spec 20260713 EDIT 4).  Runs AFTER setPalMode so
+    // the SDE PAL->native swap has published the native view the resumed code
+    // sees.  Pops the NEWEST unmatched pending divert whose savedPc == this
+    // resume PC (LIFO -- interrupts nest newest-first), diffs ALL 32 registers,
+    // and records SDE at divert vs at REI so an unpaired shadow swap is visible.
+    // Gated at runtime on EMULATR_RSCC_DIAG -> inert (and no stack churn) unless
+    // armed.  Replaces the old 2-slot FIFO whose resumePc cross-pairing produced
+    // 19,449 false mismatches on DS20 (which boots clean).
+    {
+        static bool const s_rsccDiag =
+            std::getenv("EMULATR_RSCC_DIAG") != nullptr;
+        if (s_rsccDiag && !resumeInPal) {
+            uint64_t const resumePc = rawTarget & ~uint64_t{3};
+            int match = -1;
+            for (int s = palDiag::g_divertStackTop - 1; s >= 0; --s) {
+                if (palDiag::g_divertStackPc[s] == resumePc) { match = s; break; }
             }
-            palDiag::g_divertPendingLive[s] = false;
-            int bad = 0;
-            for (int i = 0; i < 10; ++i) {
-                int const rn = palDiag::kDivertRegMap[i];
-                uint64_t const was = palDiag::g_divertPendingReg[s][i];
-                uint64_t const now = c.cpu->intReg[rn];
-                if (was != now) {
-                    ++bad;
-#if EMULATR_BRINGUP_PROBES
-                    std::fprintf(stderr,
-                        "DIVERT-REI MISMATCH R%02d was=0x%016llx now=0x%016llx "
-                        "savedPc=0x%llx divertCyc=%llu reiCyc=%llu\n",
-                        rn,
-                        static_cast<unsigned long long>(was),
-                        static_cast<unsigned long long>(now),
-                        static_cast<unsigned long long>(resumePc),
-                        static_cast<unsigned long long>(
-                            palDiag::g_divertPendingCyc[s]),
-                        static_cast<unsigned long long>(c.cpu->cycleCount));
-#endif
+            if (match >= 0) {
+                bool const sdeDiv =
+                    coreLib::iCtlSdeHigh(palDiag::g_divertStackIctl[match]);
+                bool const sdeRei = coreLib::iCtlSdeHigh(c.cpu->i_ctl);
+                int bad = 0;
+                for (int rn = 0; rn < 32; ++rn) {
+                    uint64_t const was = palDiag::g_divertStackReg[match][rn];
+                    uint64_t const now = c.cpu->intReg[rn];
+                    if (was != now) {
+                        ++bad;
+                        std::fprintf(stderr,
+                            "DIVERT-REI-EXACT id=%llu R%02d was=0x%016llx "
+                            "now=0x%016llx savedPc=0x%llx divCyc=%llu reiCyc=%llu "
+                            "sdeDiv=%d sdeRei=%d\n",
+                            static_cast<unsigned long long>(
+                                palDiag::g_divertStackId[match]),
+                            rn,
+                            static_cast<unsigned long long>(was),
+                            static_cast<unsigned long long>(now),
+                            static_cast<unsigned long long>(resumePc),
+                            static_cast<unsigned long long>(
+                                palDiag::g_divertStackCyc[match]),
+                            static_cast<unsigned long long>(c.cpu->cycleCount),
+                            sdeDiv ? 1 : 0, sdeRei ? 1 : 0);
+                    }
                 }
-            }
-            if (bad == 0) {
-                // First 8 clean round trips loud, then muted -- the
-                // mismatches are the signal, the cleans are confidence.
-                static int s_clean = 0;
-                if (s_clean < 8) {
-                    ++s_clean;
-#if EMULATR_BRINGUP_PROBES
-                    std::fprintf(stderr,
-                        "DIVERT-REI CLEAN savedPc=0x%llx divertCyc=%llu "
-                        "reiCyc=%llu\n",
-                        static_cast<unsigned long long>(resumePc),
-                        static_cast<unsigned long long>(
-                            palDiag::g_divertPendingCyc[s]),
-                        static_cast<unsigned long long>(c.cpu->cycleCount));
-#endif
+                if (bad == 0) {
+                    static int s_clean = 0;
+                    if (s_clean < 8) {
+                        ++s_clean;
+                        std::fprintf(stderr,
+                            "DIVERT-REI-EXACT id=%llu CLEAN savedPc=0x%llx "
+                            "divCyc=%llu reiCyc=%llu sdeDiv=%d sdeRei=%d\n",
+                            static_cast<unsigned long long>(
+                                palDiag::g_divertStackId[match]),
+                            static_cast<unsigned long long>(resumePc),
+                            static_cast<unsigned long long>(
+                                palDiag::g_divertStackCyc[match]),
+                            static_cast<unsigned long long>(c.cpu->cycleCount),
+                            sdeDiv ? 1 : 0, sdeRei ? 1 : 0);
+                    }
                 }
+                // Remove the matched entry; compact entries above it down.
+                for (int k = match; k < palDiag::g_divertStackTop - 1; ++k) {
+                    palDiag::g_divertStackPc[k]   = palDiag::g_divertStackPc[k + 1];
+                    palDiag::g_divertStackCyc[k]  = palDiag::g_divertStackCyc[k + 1];
+                    palDiag::g_divertStackId[k]   = palDiag::g_divertStackId[k + 1];
+                    palDiag::g_divertStackIctl[k] = palDiag::g_divertStackIctl[k + 1];
+                    for (int i = 0; i < 32; ++i)
+                        palDiag::g_divertStackReg[k][i] =
+                            palDiag::g_divertStackReg[k + 1][i];
+                }
+                --palDiag::g_divertStackTop;
+                std::fflush(stderr);
             }
-            std::fflush(stderr);
         }
     }
-    // ---- END TEMP DIVERT-REI ledger compare ----
+    // ---- END DIVERT-REI EXACT compare ----
 
     return r;
 }

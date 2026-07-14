@@ -56,10 +56,16 @@
 // have internal linkage.
 // ----------------------------------------------------------------------------
 namespace palBox { namespace palDiag {
-extern uint64_t g_divertPendingPc[2];
-extern uint64_t g_divertPendingCyc[2];
-extern uint64_t g_divertPendingReg[2][10];
-extern bool     g_divertPendingLive[2];
+// EDIT 4 (spec 20260713): exact divert->REI LIFO stack (storage in
+// PalEntries.cpp).  Bound 8 duplicated here (namespace-scope constexpr has
+// internal linkage, so the definition's kDivertStackDepth is not visible).
+extern uint64_t g_divertStackPc[8];
+extern uint64_t g_divertStackCyc[8];
+extern uint64_t g_divertStackReg[8][32];
+extern uint64_t g_divertStackIctl[8];
+extern uint64_t g_divertStackId[8];
+extern int      g_divertStackTop;
+extern uint64_t g_divertIdCounter;
 // TEMP (SDE shadow-swap ledger) -- arm side; storage/body in PalEntries.cpp.
 extern bool     g_sdeTraceArmed;
 extern int      g_sdeTraceWindows;
@@ -1450,6 +1456,26 @@ bool Machine::systemTick(uint64_t i) noexcept
             }
         }
 
+#if EMULATR_BRINGUP_PROBES
+        // ---- ES40 TIG module-reset (prototype, 2026-07-13) ----------------------
+        // TsunamiTig::write raised the request on the co-gated reset triad (behind
+        // EMULATR_TIG_RESET).  Applied HERE -- a clean per-tick boundary, deferred
+        // from the store's writeback -- so the state discontinuity is deterministic
+        // (web-variant cond #4).  Module reset per HRM 12.1.1 (b_modrst_l via the
+        // RMC): re-init the chipset CSRs to their Chapter-10 reset values, then
+        // re-enter the firmware from the loaded SROM/decompressor entry.  DIAGNOSTIC
+        // first: does the reboot reach P00, or re-enter the auto-LFU (CONFIRM-3
+        // hazard 2)?  ES40-scoped by absence (DS10/DS20 issue zero of the triad).
+        if (m_chipset.tigResetRequested()) {
+            SPDLOG_INFO("Machine::run: TIG module-reset -- reboot at cycle {}",
+                        static_cast<unsigned long long>(m_cpu.cycleCount));
+            m_chipset.clearTigResetRequest();
+            m_chipset.reset();       // CSR re-init (HRM Chapter-10 reset values)
+            resetToLoadedEntry();    // CPU re-enter the SROM/decompressor entry
+            return true;             // continue the run loop from the fresh state
+        }
+#endif
+
         // ---- Option-A console-triggered snapshot --------------------------------
         // Off unless EMULATR_CONSOLE_SNAPSHOT is set; fires when the operator types
         // the marker line (default "set oem_string snapshot") at >>>.  Reuse the same
@@ -1658,6 +1684,27 @@ bool Machine::systemTick(uint64_t i) noexcept
                 m_systemClock     = (c0 | Tsunami21272::Spec::kCchipTimerMask) + 1;
                 m_cpu.warpCycles += (m_systemClock - c0);   // WARP accounting: idle skip (2026-06-30)
                 m_cpu.cycleCount  = m_systemClock;
+                // CHANGE 2026-07-13 (RSCC/warp instrumentation, spec
+                // journals/20260713_es40_lfu_rscc_warp_instrumentation_spec.md
+                // EDIT 1): emit an un-throttled warp-ledger row (from/to/delta +
+                // running warpTot) so a warp-on vs warp-off A/B shows every
+                // cycle-count jump baked into the guest-visible RSCC.  Gated at
+                // runtime on EMULATR_RSCC_DIAG -> inert unless armed.
+                {
+                    static bool const s_rsccDiag =
+                        std::getenv("EMULATR_RSCC_DIAG") != nullptr;
+                    if (s_rsccDiag) {
+                        std::fprintf(stderr,
+                            "WARPLEDGER site=idle from=%llu to=%llu delta=%llu "
+                            "warpTot=%llu pc=0x%llx\n",
+                            static_cast<unsigned long long>(c0),
+                            static_cast<unsigned long long>(m_cpu.cycleCount),
+                            static_cast<unsigned long long>(m_cpu.cycleCount - c0),
+                            static_cast<unsigned long long>(m_cpu.warpCycles),
+                            static_cast<unsigned long long>(idlePc));
+                        std::fflush(stderr);
+                    }
+                }
                 // process-global static; revisit under the threaded driver.
                 static uint64_t s_warpLog = 0;
                 if ((s_warpLog++ & 0x3FFull) == 0) {     // throttle 1/1024
@@ -1749,25 +1796,32 @@ bool Machine::systemTick(uint64_t i) noexcept
             }
 #endif
 
-            // TEMP DIAGNOSTIC (DIVERT-REI register ledger, fill) -- REMOVE
-            // AFTER the fclose(&spl_kernel) corruption is root-caused.
-            // Record the native conserved registers (R2-R7, R20-R23) the
-            // interrupted context holds RIGHT NOW; execHwRei compares them
-            // when the PAL returns to this savedPc.  Diverts fire only
-            // outside PAL mode (canAcceptInterrupt), so pc bit 0 is clear
-            // and the regfile view here is the native bank.
+            // DIAGNOSTIC (DIVERT-REI register ledger, fill) -- REMOVE AFTER
+            // the fclose(&spl_kernel) corruption is root-caused.
+            // Record the FULL native register file (R0-R31) the interrupted
+            // context holds RIGHT NOW; execHwRei diffs it when the PAL returns
+            // to this savedPc.  Diverts fire only outside PAL mode
+            // (canAcceptInterrupt), so pc bit 0 is clear and the regfile view
+            // here is the native bank.
             {
-                constexpr int kRegMap[10] = { 2, 3, 4, 5, 6, 7,
-                                              20, 21, 22, 23 };
                 namespace pd = ::palBox::palDiag;
-                int const slot = pd::g_divertPendingLive[0] ? 1 : 0;
-                pd::g_divertPendingPc[slot]  = m_cpu.pc & ~uint64_t{3};
-                pd::g_divertPendingCyc[slot] = m_cpu.cycleCount;
-                for (int i = 0; i < 10; ++i) {
-                    pd::g_divertPendingReg[slot][i] =
-                        m_cpu.intReg[kRegMap[i]];
+                // EDIT 4 (spec 20260713): push a full-context divert record onto
+                // the LIFO stack (native bank -- divert fires outside PAL, so pc
+                // bit 0 is clear).  Gated on EMULATR_RSCC_DIAG so there is no
+                // 32-reg copy per divert unless armed; drops the record if the
+                // stack is full (>8 nested un-returned diverts -- not expected).
+                static bool const s_rsccDiag =
+                    std::getenv("EMULATR_RSCC_DIAG") != nullptr;
+                if (s_rsccDiag && pd::g_divertStackTop < 8) {
+                    int const s = pd::g_divertStackTop++;
+                    pd::g_divertStackPc[s]   = m_cpu.pc & ~uint64_t{3};
+                    pd::g_divertStackCyc[s]  = m_cpu.cycleCount;
+                    pd::g_divertStackId[s]   = ++pd::g_divertIdCounter;
+                    pd::g_divertStackIctl[s] = m_cpu.i_ctl;
+                    for (int i = 0; i < 32; ++i) {
+                        pd::g_divertStackReg[s][i] = m_cpu.intReg[i];
+                    }
                 }
-                pd::g_divertPendingLive[slot] = true;
             }
             // ---- END TEMP DIVERT-REI ledger fill ----
 
