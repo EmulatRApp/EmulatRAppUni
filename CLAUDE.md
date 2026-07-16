@@ -10,14 +10,15 @@ the project.
 
 | Version | Path | Access | Notes |
 |---------|------|--------|-------|
-| **V4 (current)** | `D:\EmulatR\EmulatRAppUniV4` | read/write | Active development target |
+| **V5 (current)** | `D:\EmulatR\EmulatRAppUniV5` | read/write | Active development target |
+| **V4 **       | `D:\EmulatR\EmulatRAppUniV4` | read-only | Frozen development target |
 | V0 (sources)  | `D:\EmulatR\EmulatRAppUniV3` | read-only  | Untouched sources merged into V1 |
 | V1            | `D:\EmulatR\EmulatRAppUni`   | read-only  | |
 | V2 (POC)      | `D:\EmulatR\EmulatrPOC`      | read-only  | |
 | Reference     | `D:\EmulatR\Processor Support` | read-only | Alpha CPU/chipset/PALcode/SRM docs and sources |
 
-When the user says "the project" without qualification, assume V4
-(`EmulatRAppUniV4`).
+When the user says "the project" without qualification, assume V5
+(`EmulatRAppUniV5`).
 
 **Canonical folder: `D:\EmulatR` (PC).** Do NOT work against `D:\EmulatR (1)`
 or any other " (N)" copy -- that is a stray duplicate, not the git-tracked tree.
@@ -51,11 +52,15 @@ behavior, so future sessions inherit it.
 
 ## House conventions
 
-- Treat anything under V0/V1/V2 and `Processor Support` as read-only —
-  do not edit, even to "fix" formatting.
-- Prefer surgical `Edit` over rewriting whole files in V4.
-- For any non-trivial change in V4, summarize the intended diff before
-  applying it.
+- Treat anything under V0/V1/V2, **V4 (FROZEN)**, and `Processor Support` as
+  read-only — do not edit, even to "fix" formatting. All work lands in V5.
+- Prefer surgical `Edit` over rewriting whole files.
+- For any non-trivial change, summarize the intended diff (file paths + line
+  numbers + edit shape) before applying it; wait for approval.
+- **EmulatR is the PRIMARY Oracle.** AXPBox, SimH, and other emulators are
+  SECONDARY/supportive only — corroborate, or use when EmulatR is not yet
+  authoritative — never the primary authority over EmulatR. Any decision that
+  would treat a non-EmulatR emulator as ground truth is DISCUSS-FIRST.
 
 ### Build & run conventions
 
@@ -85,12 +90,11 @@ Project-level notes about work intentionally postponed until a
 prerequisite is met. Future sessions should consult these before
 starting net-new architectural work in the same area.
 
-- **Snapshots (save/restore machine state)** — deferred until SRM
-  Console reaches the `>>>` prompt. Rationale: snapshots are an
-  optimization investment that pays back per restore, and they're only
-  valuable once we know what end state to capture. Design notes and
-  implementation plan are in
-  `EmulatRAppUniV4\Emulatr\journals\Snapshots_Design_Notes.md`.
+- **Snapshots (save/restore machine state)** — DONE. SRM reaches `>>>`
+  on DS10/DS20/ES40; Level 1 snapshot landed and the entry snapshot
+  (EMULATR_FAST_DECOMPRESS=snapshot -> `firmware/<stem>.snap`, renamed
+  from `.axpsnap` in V5) is built. Design notes:
+  `journals/Snapshots_Design_Notes.md`.
 - **EV5 (21164) emulator profile** — eventual; would need a parallel
   `coreLib/Ev5EntryVectors.h` mirroring the EV6 one. EV5 vector layout
   is documented in `Processor Support\Palcode\palcode\milo-sources-2.0.35-0.2\milo-2.0.35-0.2\palcode\lx164\dc21164.h`
@@ -104,7 +108,7 @@ starting net-new architectural work in the same area.
   self-decompresses on the emulated CPU every cold boot (~4M cycles, the
   0x60111c spin). We now have a native, source-built oracle of the exact
   DEC decompressor (Mark Adler inflate c10p1 + DEC wrapper) in
-  `EmulatRAppUniV4\Emulatr\tools\host_decompressor\` (see its README). It
+  `tools\host_decompressor\` (see its README). It
   produces a byte-identical image to EmulatR's CPU, so today it is a
   trusted reference / regression guard and a clean `decompressed.rom`
   generator (strictly better than AXPBox, which runs the guest
@@ -128,7 +132,7 @@ starting net-new architectural work in the same area.
   360M+ cyc and, during `from_init`, emits repeated `TsunamiPchip:
   UNHANDLED OUTER WRITE offset=0x0000ffff0001` (index/data byte pairs,
   values 0x80/0xc0/0x5b/0x15/0xa3...). ROOT: the firmware reads a PCI BAR
-  for an on-board device V4 does NOT enumerate, gets all-ones, masks it to
+  for an on-board device V5 does NOT enumerate, gets all-ones, masks it to
   base 0xFFFF0000, and pokes that device's index/data register pair into
   the void (PA 0x800_FFFF_0000), which falls through TsunamiPchip::write
   to UNHANDLED. STRONG CANDIDATE = the DS10 on-board DEC 21143 / DE500
@@ -142,7 +146,7 @@ starting net-new architectural work in the same area.
   short-term; a full tulip model is the larger lift. To pin the exact
   device, a one-shot STORE-WATCH on PA 0x800_FFFF_00xx gives the storing
   PC. LOWER PRIORITY than the path to `>>>` (this does not block boot).
-- **`Ev6Translator` harvest (reference -> V4)** -- an emailed reference
+- **`Ev6Translator` harvest (reference -> V5)** -- an emailed reference
   translator (`journals/ref_ev6Translation_struct_20260702.h`) supplies pieces
   the in-tree `mmuLib/Ev6Translator.h` lacks: a 3-level HW page-table walk, DTB/
   ITB PTE register-format converters (for `HW_MTPR/MFPR ITB_PTE/DTB_PTE`),
@@ -159,7 +163,7 @@ starting net-new architectural work in the same area.
 ## CANONICAL LOCATION / SINGLE SOURCE OF TRUTH (2026-06-24)
 
 This `CLAUDE.md` and `memory.md` now live in the **git repo root**
-(`EmulatRAppUniV4/Emulatr/`) and are version-controlled so every machine (PC, Mac)
+(`EmulatRAppUniV5/`) and are version-controlled so every machine (PC, Mac)
 shares them via `git pull`. The old copies at `D:\EmulatR\` (outside git) are
 SUPERSEDED -- ignore/delete them. The absolute `D:\...` paths in the table above are
 the PC environment; on the Mac the repo is at a different path -- interpret the
@@ -167,16 +171,17 @@ conventions relatively.
 
 `memory.md` is the live, append-only context log -- READ IT FIRST each session.
 
-## ACTIVE WORK (as of 2026-06-24)
+## ACTIVE WORK (as of 2026-07-15)
 
-Building a **spec-validated map of the HWRPB region** (the firmware->OS hand-off
-contract: HWRPB / per-CPU slots / CTB / CRB / MEMDSC / DSRDB / GCT-FRU @ 0x3ff32000).
-The DS20 "AlphaPC 264DP" mis-badge is the first detected divergence in that contract,
-not a cosmetic item. Full methodology, runtime instrument designs, and the step-by-step
-resume plan are in:
-  `journals/HWRPB_Region_Fidelity_and_Resume_20260624.md`
-Supporting design doc (platform identity 3-channel model + P0-P6):
-  `journals/Platform_Interface_Contract_and_Latch_Plan_20260624.md`
+**V5 Translation Buffer (TB) fork.** SRM `>>>` is reached on DS10/DS20/ES40,
+which closed the V4 objective and gated the TB work. V5 = V4 (frozen Oracle) + a
+decode-amortizing TB tier, POC-first. Authoritative plan (lever hierarchy
+snapshot/warp/TB; three-routes/two-passes; register-state + cycle-cost
+invariants; Route-2-residue-empty; split-key dispatch; shared invalidation
+substrate; the ES40 silicon LFU spin as the first WARP-recognition target):
+  `journals/20260715_v5_tb_implementation_brief.md`
+Read `memory.md` first each session (durable EV6/PAL/chipset substrate + ruled-
+out lists), then the brief.
 
 ## SANDBOX CAVEAT
 
