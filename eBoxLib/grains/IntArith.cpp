@@ -1535,6 +1535,9 @@ auto execRpcc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
     // File:    EMULATR_RPCC_LOG_FILE=<path>          (default below, in V4 tree)
     // Bound:   EMULATR_RPCC_LOG_MAX=<lines>          (default 200000)
     // REVERT this whole block + the two TEMP includes after the gating run.
+    // 2026-07-14: gated under EMULATR_BRINGUP_PROBES -- keeps a release build
+    // quiet and stops the unconditional fopen of the hardcoded rpcc_probe.txt.
+#if EMULATR_BRINGUP_PROBES
     static const uint64_t s_rpccLogAfter = []() -> uint64_t {
         const char* e = std::getenv("EMULATR_RPCC_LOG_AFTER");
         return e ? std::strtoull(e, nullptr, 0) : 185000000ull;
@@ -1566,6 +1569,7 @@ auto execRpcc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
             std::fflush(s_rpccLogFp);  // survive an abrupt exit / halt
         }
     }
+#endif // EMULATR_BRINGUP_PROBES
     // ---- END TEMP RPCC PROBE 2026-06-01 ----
 
     return r;

@@ -19,8 +19,12 @@ RUN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"   # run-dir root (next to Emulatr.exe)
 EXE="Emulatr.exe"
 FIRMWARE="firmware/ds10_v7_3.exe"
 STAMP="$(date +%Y%m%d_%H%M%S)"
-CONSOLE_LOG="trace_halt_${STAMP}.console.log"
-export EMULATR_TRACE_DIR="${EMULATR_TRACE_DIR:-/d/EmulatR/traces}"; mkdir -p "$EMULATR_TRACE_DIR"
+# 2026-07-14: log -> run-dir ./logs, trace -> run-dir ./traces per the
+# emulatr-log-trace-output skill. Was loose in run-dir root and the repo-root
+# /d/EmulatR/traces; both now anchor under the resolved run dir.
+mkdir -p "$RUN_DIR/logs"
+CONSOLE_LOG="logs/trace_halt_${STAMP}.console.log"
+export EMULATR_TRACE_DIR="${EMULATR_TRACE_DIR:-$RUN_DIR/traces}"; mkdir -p "$EMULATR_TRACE_DIR"
 export EMULATR_TRACE_WINDOW=1                          # window-only sink (no GB cold-boot stream)
 export EMULATR_TIG_TRACE="${EMULATR_TIG_TRACE:-1}"     # canary: unmodeled TIG access
 cd "$RUN_DIR"
@@ -41,3 +45,4 @@ SRM="$(ls -t "$EMULATR_TRACE_DIR"/*_srm.trc 2>/dev/null | head -1 || true)"
 echo "[triage] newest _srm.trc: ${SRM:-none}"
 [[ -n "${SRM:-}" && -f "$SRM" ]] && { echo "--- _srm.trc tail ---"; tail -80 "$SRM"; }
 echo "[done] console: $RUN_DIR/$CONSOLE_LOG"
+

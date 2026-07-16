@@ -1,0 +1,156 @@
+
+ Initializing....
+Testing the System
+Testing the Memory
+memtest: No such command
+System Temperature is 0 degrees C
+
+AlphaServer DS20   5 MHz Console V7.3-2, Feb 27 2007 13:07:36
+P00>>>show dev
+dqa0.0.0.105.0             DQA0           EMULATR VIRTUAL DISK  1.0
+dqa1.1.0.105.0             DQA1          EMULATR VIRTUAL CDROM
+dva0.0.0.0.0               DVA0
+P00>>>show config
+                        AlphaServer DS20   5 MHz
+
+SRM Console:    V7.3-2
+PALcode:        OpenVMS PALcode V1.98-79, Tru64 UNIX PALcode V1.92-74
+
+Processors
+CPU 0           Alpha EV6 pass 1   5 MHz        SROM Revision: ▒.▒?▒.▒?▒▒▒▒
+                Bcache is disabled
+
+Core Logic
+Cchip           DECchip 21272-CA Rev 2.1
+Dchip           DECchip 21272-DA Rev 2.0
+Pchip 0         DECchip 21272-EA Rev 1
+Pchip 1         DECchip 21272-EA Rev 4.2
+
+TIG             Rev 0.0
+Arbiter         Rev 0.0 (0x0)
+
+MEMORY
+
+Array #       Size     Base Addr
+-------    ----------  ---------
+   0         1024 MB    000000000
+   1         1024 MB    040000000
+   2         1024 MB    080000000
+   3         1024 MB    0C0000000
+
+Total Bad Pages = 0
+Total Good Memory = 4096 MBytes
+
+
+PCI Hose 00
+     Bus 00  Slot 05/0: Cypress 82C693
+                                                         Bridge to Bus 1, ISA
+     Bus 00  Slot 05/1: Cypress 82C693 IDE
+                                   dqa.0.0.105.0
+                                   dqa0.0.0.105.0         EMULATR VIRTUAL DISK
+                                   dqa1.1.0.105.0         EMULATR VIRTUAL CDRO
+
+PCI Hose 01
+
+
+ISA
+Slot    Device  Name            Type         Enabled  BaseAddr  IRQ     DMA
+0
+        0       MOUSE           Embedded        Yes     60      12
+
+        1       KBD             Embedded        Yes     60      1
+
+        2       COM1            Embedded        Yes     3f8     4
+
+        3       COM2            Embedded        Yes     2f8     3
+
+        4       LPT1            Embedded        Yes     3bc     7
+
+        5       FLOPPY          Embedded        Yes     3f0     6       2
+
+
+P00>>>
+
+
+starting console on CPU 0
+initialized idle PCB
+initializing semaphores
+initializing heap
+initial heap 240c0
+memory low limit = 60e000 heap = 240c0, 17fc0
+initializing driver structures
+initializing idle process PID
+initializing file system
+initializing hardware
+initializing timer data structures
+lowering IPL
+create dead_eater
+create poll
+create timer
+create powerup
+access NVRAM
+Memory size 4096 MB
+testing memory
+...
+probe I/O subsystem
+probing hose 1, PCI
+probing hose 0, PCI
+probing PCI-to-ISA bridge, bus 1
+bus 0, slot 5 -- dqa -- Cypress 82C693 IDE
+starting drivers
+entering idle loop
+*** system serial number not set. use set sys_serial_num command.
+Partition 0, Memory base: 000000000, size: 100000000
+initializing GCT/FRU at 3fc30000
+Memory Testing and Configuration Status
+  Array       Size       Base Address    Intlv Mode
+---------  ----------  ----------------  ----------
+    0       1024Mb     0000000000000000    4-Way
+    1       1024Mb     0000000040000000    4-Way
+    2       1024Mb     0000000080000000    4-Way
+    3       1024Mb     00000000c0000000    4-Way
+
+     4096 MB of System Memory
+Testing the System
+AlphaServer ES40 Console V7.3-2, built on Feb 27 2007 at 13:07:26 (Silicon Mode)
+P00>>>show dev
+dva0.0.0.1000.0            DVA0
+P00>>>sh config
+                           hp AlphaServer ES40
+
+Firmware
+SRM Console:    V7.3-2
+ARC Console:    ▒l
+PALcode:        OpenVMS PALcode V1.98-4, Tru64 UNIX PALcode V1.92-5
+Serial ROM:     V2.22G
+RMC ROM:        V1.0
+RMC Flash ROM:  V1.0
+
+Processors
+CPU 0           Alpha EV6 pass 1   5 MHz  8MB Bcache
+
+Core Logic
+Cchip           DECchip 21272-CA Rev 9(C4)
+Dchip           DECchip 21272-DA Rev 2
+Pchip 0         DECchip 21272-EA Rev 1
+Pchip 1         DECchip 21272-EA Rev 4
+TIG             Rev 00
+
+Memory
+  Array       Size       Base Address    Intlv Mode
+---------  ----------  ----------------  ----------
+    0       1024Mb     0000000000000000    4-Way
+    1       1024Mb     0000000040000000    4-Way
+    2       1024Mb     0000000080000000    4-Way
+    3       1024Mb     00000000c0000000    4-Way
+
+     4096 MB of System Memory
+
+ Slot   Option                  Hose 0, Bus 0, PCI
+   5/0  Acer Labs M1543C                                Bridge to Bus 1, ISA
+   5/1  Cypress 82C693 IDE      dqa0.0.0.105.0
+
+        Option                  Hose 0, Bus 1, ISA
+        Floppy                  dva0.0.0.1000.0
+P00>>>
+

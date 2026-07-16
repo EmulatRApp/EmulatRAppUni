@@ -256,6 +256,7 @@ int main(int argc, char* argv[])
 
     bool loadOk = false;
     bool isDecompressedRom = false;
+    bool restoredFromEntrySnapshot = false;   // EMULATR_FAST_DECOMPRESS=snapshot reuse
     if (opts.firmwareFormat == systemLib::FirmwareFormat::Auto && looksLikeRom) {
         // Pre-decompressed AXPBox console image: load to PA 0, PC/PAL_BASE
         // from the 16-byte header.  Skips the decompressor entirely.
@@ -265,7 +266,48 @@ int main(int argc, char* argv[])
         // SRM uses the V1 default load PA (0x900000) unless overridden.
         uint64_t const srmLoadPa =
             (opts.loadPa != 0) ? opts.loadPa : systemLib::kDefaultLoadPa;
+
+        // EMULATR_FAST_DECOMPRESS lever (2026-07-14, snapshot reuse model).
+        // UNSET / "faithful" (default) = the Oracle: the guest SROM decompressor
+        // runs on every init / re-init.  "snapshot" (or "1") = use a complete-
+        // state snapshot taken at the firmware's own init->console handoff
+        // (pc == entryPa) to SKIP the multi-billion-cycle decompression:
+        //   - if firmware/<stem>.axpsnap exists and VALIDATES (checksum +
+        //     kCpuStateVersion/kChipsetVersion + chipset variant), REUSE it
+        //     (restore-except-flash) -> skip the decompressor at load;
+        //   - else decompress faithfully and MINT it at entryPa (overwriting any
+        //     stale/invalid file).
+        // Keyed to THIS firmware (stem) + model (variant) + build (version), so it
+        // is reused across runs until a rebuild or firmware/model change
+        // invalidates it -- determinism enforced by the load validator, not by
+        // deleting every run.  Survives exit/abort as a diagnostic.  Model-
+        // agnostic: DS10/DS20/ES40 each key their own file and the variant gate
+        // blocks cross-model reuse.  See Machine::tryRestoreEntrySnapshot and
+        // journals/20260714_es40_fast_decompress_lever_briefing.md.
         loadOk = mach.loadSrmFirmware(opts.firmwarePath, srmLoadPa);
+        if (loadOk) {
+            char const* const fastEnv = std::getenv("EMULATR_FAST_DECOMPRESS");
+            std::string_view const fastMode =
+                fastEnv ? std::string_view{fastEnv} : std::string_view{"faithful"};
+            if (fastMode == "snapshot" || fastMode == "1") {
+                std::filesystem::path const snap =
+                    opts.firmwarePath.parent_path() /
+                    (opts.firmwarePath.stem().string() + ".axpsnap");
+                mach.enableEntrySnapshot(snap);   // arm mint + reset re-restore path
+                if (mach.tryRestoreEntrySnapshot(snap)) {
+                    restoredFromEntrySnapshot = true;   // suppress autoload clobber
+                    std::fprintf(stderr,
+                        "EMULATR_FAST_DECOMPRESS=snapshot: reused '%s' -- skipped "
+                        "the decompressor (restore-except-flash)\n",
+                        snap.string().c_str());
+                } else {
+                    std::fprintf(stderr,
+                        "EMULATR_FAST_DECOMPRESS=snapshot: no valid snapshot for "
+                        "'%s' -- faithful decompress, mint at entryPa\n",
+                        snap.string().c_str());
+                }
+            }
+        }
     } else {
         loadOk = mach.loadFirmware(opts.firmwarePath, opts.loadPa, opts.startPa);
     }
@@ -482,6 +524,7 @@ int main(int argc, char* argv[])
         std::fprintf(stderr, "EMULATR_GATE: gate overridden from env\n");
     }
 
+#if EMULATR_BRINGUP_PROBES  // 2026-07-14: gated so a release build is quiet
     std::fprintf(stderr,
                  "BreakpointSink: armed open=0x%016llx close=0x%016llx "
                  "revolutions=%d (override via EMULATR_GATE or s_gateOpenPc / "
@@ -491,6 +534,7 @@ int main(int argc, char* argv[])
                  static_cast<unsigned long long>(
                      traceLib::BreakpointSink::s_gateClosePc.load(std::memory_order_relaxed)),
                  traceLib::BreakpointSink::s_revolutionsRemaining.load(std::memory_order_relaxed));
+#endif // EMULATR_BRINGUP_PROBES
     std::fflush(stderr);
 
     // ------------------------------------------------------------------
@@ -581,8 +625,12 @@ int main(int argc, char* argv[])
     // cold boot by skipping the autoload-newest step -- required for the
     // cold-origin mint run (yyreset hit count must be from cold, not a
     // restore).  See Spec_overnight_coldboot_mint_run.
+    // restoredFromEntrySnapshot: FAST_DECOMPRESS=snapshot already restored the
+    // entry snapshot above; suppress autoloadLatest so a newer periodic/halt save
+    // in snapshots/ does not clobber the restored (restore-except-flash) state.
     bool const noAutoload =
-        opts.noAutoload || (std::getenv("EMULATR_NO_AUTOLOAD") != nullptr);
+        opts.noAutoload || (std::getenv("EMULATR_NO_AUTOLOAD") != nullptr)
+        || restoredFromEntrySnapshot;
     if (noAutoload) {
         std::fprintf(stderr, "DEBUG: autoload suppressed (--no-autoload) "
                              "-- genuine cold boot\n");
@@ -665,6 +713,7 @@ int main(int argc, char* argv[])
     // embedded constant, the value the firmware will MTPR to during
     // decompression).  Their split was introduced 2026-05-19 from
     // AXPBox study; see SrmDescriptor in systemLib/SrmLoader.h.
+#if EMULATR_BRINGUP_PROBES  // 2026-07-14: gated so a release build is quiet
     std::fprintf(stderr,
                  "DEBUG: pre-run palBase=0x%016llx  pc=0x%016llx  palMode=%d  "
                  "srmValid=%d  initialPalBase=0x%016llx  targetPalBase=0x%016llx\n",
@@ -674,6 +723,7 @@ int main(int argc, char* argv[])
                  static_cast<int>(mach.srmDescriptor().valid),
                  static_cast<unsigned long long>(mach.srmDescriptor().initialPalBase),
                  static_cast<unsigned long long>(mach.srmDescriptor().targetPalBase));
+#endif // EMULATR_BRINGUP_PROBES
 
     // ------------------------------------------------------------------
     // Run.  CHANGE 2026-06-08 (TEP / Claude, task #10): wall-clock the run

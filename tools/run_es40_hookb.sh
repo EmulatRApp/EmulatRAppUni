@@ -26,7 +26,9 @@ if [ ! -e firmware/es40_v7_3.exe ]; then
     exit 1
 fi
 
-LOG="es40_hookb.log"
+# Output-file convention (emulatr-log-trace-placement skill): logs -> ./logs.
+mkdir -p logs traces
+LOG="logs/es40_hookb.log"
 echo "run: launching ES40 to max-cycles (this takes a while)..."
 EMULATR_VPTB_DIAG=1 ./Emulatr.exe --firmware firmware/es40_v7_3.exe --mem 4294967296 \
     --no-autoload --max-cycles 0x50000000  2> "$LOG"

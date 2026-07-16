@@ -10,7 +10,7 @@
 #
 # >>> SOURCE IT, do not execute <<<   (it must mutate the CURRENT shell)
 #       source tools/vsenv.sh
-#       ./tools/build_test_run.sh
+#       ./tools/build_emulatr.sh
 #
 #   Running it as ./vsenv.sh starts a subshell and the environment is lost
 #   the moment it exits -- you'll see the toolchain "not ready" afterward.

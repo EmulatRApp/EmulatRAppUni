@@ -68,44 +68,19 @@ if [ "$REBUILD" = "1" ]; then
     echo "=== rebuild done; continuing to launch ==="
 fi
 
-# ---- host + binary + run-dir resolution ------------------------------------
-case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) HOST=win; BIN=Emulatr.exe ;;
-    Darwin)               HOST=mac; BIN=Emulatr ;;
-    *)                    HOST=nix; BIN=Emulatr ;;
-esac
-if [ "$HOST" = "win" ]; then
-    case "$CONFIG" in
-        relwithdebinfo) VSCFG=RelWithDebInfo ;;
-        debug) VSCFG=Debug ;;
-        release) VSCFG=Release ;;
-    esac
-    CANDS=( "$PROJ_ROOT/$VSCFG" "$PROJ_ROOT/out/build/$CONFIG" )
-else
-    case "$CONFIG" in
-        relwithdebinfo) SUB=mac-debug ;;
-        release) SUB=mac-release ;;
-        debug) SUB=mac-debug-g ;;
-    esac
-    CANDS=( "$PROJ_ROOT/out/build/$SUB" )
-fi
-RESOLVED=""
-if [ -n "${RUN_DIR:-}" ]; then
-    RESOLVED="$RUN_DIR"
-else
-    for c in "${CANDS[@]}"; do
-        if [ -x "$c/$BIN" ]; then RESOLVED="$c"; break; fi
-    done
-fi
-[[ -n "$RESOLVED" ]] || { echo "FATAL: no $BIN found for config '$CONFIG' (looked: ${CANDS[*]}). Build first (add 'rebuild') or set RUN_DIR."; exit 1; }
-RUN_DIR="$(cd "$RESOLVED" && pwd)"
-cd "$RUN_DIR"
-[[ -x "./$BIN" ]] || { echo "FATAL: ./$BIN not in $RUN_DIR"; exit 1; }
+# ---- self-located run dir (shared helper) ----------------------------------
+# 2026-07-14: replaced source-tree run-dir probing with _emulatr_runenv.sh.
+# The helper finds the run dir from ITS OWN path (the binary sits beside tools/,
+# one level up), cd's there, and creates logs/ traces/ snapshots/.  This is what
+# makes a distributed, unzipped run-dir self-contained -- no source-tree or
+# absolute path is assumed.  CONFIG steers only the dev out/build/<cfg> fallback
+# when run from a checkout.  Sets RUN_DIR, BIN, HOST, EMU_SRC_ROOT.
+source "$SELF_DIR/_emulatr_runenv.sh"
 
 # ---- paths + run params ----------------------------------------------------
-SRC_FW="$PROJ_ROOT/firmware/${NAME}_v7_3.exe"
-DST_FW="firmware/${NAME}_v7_3.exe"
-SRC_MANIFEST="$PROJ_ROOT/${NAME}_v7_3_platform.json"
+SRC_FW="$EMU_SRC_ROOT/firmware/${NAME}_v7_3.exe"   # dev source; skipped in a shipped run-dir
+DST_FW="firmware/${NAME}_v7_3.exe"                 # run-dir-relative (already shipped in dist)
+SRC_MANIFEST="$EMU_SRC_ROOT/${NAME}_v7_3_platform.json"
 INI="config/EmulatrV4.ini"
 MEM="${MEM:-4294967296}"                   # 4 GiB default; override e.g. MEM=34359738368 (32 GiB)
 PORT="${PORT:-$((10023 + POFF))}"          # per-model default so models can run concurrently
@@ -125,16 +100,20 @@ MACHINE_LOG="${TRACE_DIR}/${TS}_${NAME}_machine.log"
 CONSOLE_LOG="${TRACE_DIR}/${TS}_${NAME}_console.out"
 DIAG_FLASH="$RUN_DIR/${NAME}_diag_flash.rom"
 
-# ---- preflight -------------------------------------------------------------
-[[ -f "$SRC_FW" ]] || { echo "FATAL: firmware not found: $SRC_FW (no image for $MODEL yet?)"; exit 1; }
-[[ -f "$INI" ]]    || { echo "FATAL: ini not found: $RUN_DIR/$INI"; exit 1; }
+# ---- preflight (run-dir-relative; source refresh is best-effort/dev-only) ---
+# 2026-07-14: emu_refresh_asset copies from the dev source tree ONLY when it
+# exists and differs; in a distributed run-dir SRC==DST so it is a no-op and the
+# shipped firmware/manifest are used as-is.  Preflight requires the RUN-DIR copy,
+# not a source tree, so an unzipped run-dir passes with no <project>/ present.
 mkdir -p firmware "$TRACE_DIR"
-cp -f "$SRC_FW" "$DST_FW"
-if [ -f "$SRC_MANIFEST" ]; then
-    cp -f "$SRC_MANIFEST" "./${NAME}_v7_3_platform.json"
-    echo "manifest : refreshed ./${NAME}_v7_3_platform.json from source"
+emu_refresh_asset "$SRC_FW" "$DST_FW"
+emu_refresh_asset "$SRC_MANIFEST" "./${NAME}_v7_3_platform.json"
+[[ -f "$DST_FW" ]] || { echo "FATAL: firmware missing in run dir: $RUN_DIR/$DST_FW (no image for $MODEL?)"; exit 1; }
+[[ -f "$INI" ]]    || { echo "FATAL: ini not found: $RUN_DIR/$INI"; exit 1; }
+if [ -f "./${NAME}_v7_3_platform.json" ]; then
+    echo "manifest : ./${NAME}_v7_3_platform.json (in run dir)"
 else
-    echo "manifest : WARNING source $SRC_MANIFEST missing -- may fall back to DS10 bus"
+    echo "manifest : WARNING none in run dir -- may fall back to DS10 bus"
 fi
 
 # ---- set model in ini for this run; restore on exit ------------------------
@@ -261,3 +240,4 @@ echo "Send back for analysis:"
 echo "  1) $RUN_DIR/$CONSOLE_LOG"
 echo "  2) $RUN_DIR/$MACHINE_LOG"
 echo "  3) ${NEWEST_TRC:-<newest traces/*.trc>}"
+

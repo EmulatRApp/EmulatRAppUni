@@ -45,7 +45,11 @@ export EMULATR_RSCC_DIAG="1"
 "$SHOWDEV" || true
 
 # ---- post-process: extract the A/B summary from the newest showdev log ------
-LOG="$(ls -t "$PROJ"/*/run_es40_showdev_*.log \
+# logs now live in the run dir's logs/ (emulatr-log-trace-placement); glob there
+# first, fall back to the old run-dir-root location for pre-convention logs.
+LOG="$(ls -t "$PROJ"/*/logs/run_es40_showdev_*.log \
+             "$PROJ"/out/build/*/logs/run_es40_showdev_*.log \
+             "$PROJ"/*/run_es40_showdev_*.log \
              "$PROJ"/out/build/*/run_es40_showdev_*.log 2>/dev/null | head -1 || true)"
 if [[ -z "$LOG" || ! -f "$LOG" ]]; then
     echo "NOTE: no run_es40_showdev_*.log found to summarize."

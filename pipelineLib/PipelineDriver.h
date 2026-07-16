@@ -272,6 +272,7 @@ struct PipelineDriver
             // (EMULATR_IDLEWARP), which advances cycleCount one tick at a time and
             // lets the real ISR increment 0x3c970 -- no out-of-band rewrite.
             static const bool s_tickWarp = (std::getenv("EMULATR_RSCCWARP") != nullptr);
+#if EMULATR_BRINGUP_PROBES  // 2026-07-14: gated so a release build is quiet
             // One-shot diagnostics: prove (a) the env is seen and (b) the gate PC is hit.
             static bool s_warpArmAnnounced = false;
             if (!s_warpArmAnnounced) {
@@ -281,6 +282,7 @@ struct PipelineDriver
                              s_tickWarp ? "seen" : "NOT set -- use export in bash");
                 std::fflush(stderr);
             }
+#endif // EMULATR_BRINGUP_PROBES
             constexpr uint64_t kTickInterval  = (1ull << 20);   // cycles per tick (2^20)
             constexpr uint64_t kWarpThreshold = 8;              // skip only waits > 8 ticks
             if (cpu.pcAddr() == 0x000000000007c314ull) {

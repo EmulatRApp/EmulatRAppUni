@@ -38,8 +38,10 @@ REPO="$(cd "$PROJ/../.." && pwd)"
 # Auto-pick the newest run dir that has the exe + DS20 firmware + DS20 manifest.
 RUN_DIR=""
 NEWEST=0
-for cand in "RelWithDebInfo" "out/build/relwithdebinfo" "Release" \
-            "out/build/release" "out/build/cli" "Debug"; do
+# 2026-07-14: build-of-record dirs only (out/build/*). Legacy top-level
+# RelWithDebInfo/Release/Debug dropped so a stale top-level build can never
+# win the newest-exe pick and route logs/traces outside out/build.
+for cand in "out/build/relwithdebinfo" "out/build/release" "out/build/cli"; do
     d="$PROJ/$cand"
     [[ -x "$d/Emulatr.exe" ]]                 || continue
     [[ -f "$d/firmware/ds20_v7_3.exe" ]]      || continue
@@ -66,7 +68,10 @@ MANIFEST="ds20_v7_3_platform.json"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
 MAXCYC="${MAXCYC:-2000000000}"
 ATTACH_DISK="${ATTACH_DISK:-1}"
-LOG="run_ds20_showdev_$(date +%Y%m%d_%H%M%S).log"
+# 2026-07-14: log -> run-dir ./logs per emulatr-log-trace-output skill (was
+# loose in run-dir root). Mirrors run_es40_showdev.sh.
+mkdir -p logs traces
+LOG="logs/run_ds20_showdev_$(date +%Y%m%d_%H%M%S).log"
 
 # ---- soft stale-binary notice (informational; not a build gate) ------------
 for src in "$PROJ/deviceLib/Tsunami/Cy82C693Ide.h" \
@@ -166,3 +171,4 @@ fi
 echo "-----------------------------------------------------------------------"
 echo "done.  dqa / IDE lines in the log:"
 grep -iE "dqa|IDE-TRACE C|cfg reg|82C693|show dev" "$LOG" | tail -40 || true
+

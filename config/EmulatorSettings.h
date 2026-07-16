@@ -73,8 +73,10 @@ struct TraceSettings {
     static constexpr uint32_t EVENT    = 0x10;
 
     uint32_t    traceMask    = 0;       // 0 disables all tracing
-    std::string traceFile    = "trace/cpu_trace.log";
-    std::string traceLstFile = "trace/cpu_trace.lst";
+    // 2026-07-14 (emulatr-log-trace-placement convention): traces live in the
+    // run dir's traces/ (plural), replacing the legacy singular trace/.
+    std::string traceFile    = "traces/cpu_trace.log";
+    std::string traceLstFile = "traces/cpu_trace.lst";
 
     bool enabled() const noexcept { return traceMask != 0; }
 };

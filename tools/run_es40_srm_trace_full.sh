@@ -70,8 +70,11 @@ if [ "${1:-}" = "rebuild" ] || [ "${1:-}" = "--rebuild" ] || [ "${1:-}" = "-r" ]
 fi
 _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "$REBUILD" = "1" ]; then
-    echo "=== REBUILD requested -> $_SELF_DIR/build_es40_relwithdebinfo.sh ==="
-    "$_SELF_DIR/build_es40_relwithdebinfo.sh" || { echo "FATAL: rebuild failed; not launching."; exit 1; }
+    # 2026-07-14: build_es40_relwithdebinfo.sh retired (redundant duplicate with
+    # no out/build mirror).  Use the general builder -- one model-agnostic binary,
+    # selected by CONFIG only; the model is a RUN-time choice, not a build one.
+    echo "=== REBUILD requested -> $_SELF_DIR/build_emulatr.sh relwithdebinfo ==="
+    "$_SELF_DIR/build_emulatr.sh" relwithdebinfo || { echo "FATAL: rebuild failed; not launching."; exit 1; }
     echo "=== rebuild done; continuing to launch ======================="
 fi
 

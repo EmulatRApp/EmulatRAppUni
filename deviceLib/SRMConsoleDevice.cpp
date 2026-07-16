@@ -19,6 +19,7 @@
 #include <QProcess>
 #include <QtNetwork/QHostAddress>
 #include <algorithm>
+#include <filesystem>   // std::filesystem::create_directories for the logs/ sessionlog dir (2026-07-14)
 
 #define COMPONENT_NAME "SRMConsole"
 
@@ -654,13 +655,19 @@ void SRMConsoleDevice::launchPutty()
     // each list element verbatim); a trailing space made PuTTY reject
     // "-sessionlog " as an unknown option.
     // Per-instance, run-dir-relative sessionlog.  Concurrent Machines (DS10 /
-    // DS20 / ES40 side by side) must NOT share or clobber one logfile, and the
-    // old absolute "d:/emulatr/traces/" is frequently absent on the build tree.
-    // The console port disambiguates instances; the file lands in the run dir's
-    // traces/ (PuTTY, started detached, inherits the emulator's CWD).  PuTTY
-    // still expands the &Y&M&D&T date/time tokens itself.
+    // DS20 / ES40 side by side) must NOT share or clobber one logfile; the
+    // console port disambiguates instances.
+    // 2026-07-14 (emulatr-log-trace-placement convention): the console capture
+    // is a LOG, so it lands in the run dir's logs/ (was the run-dir root; the
+    // old comment's traces/ claim never matched the actual root-relative path).
+    // PuTTY, started detached, inherits the emulator's CWD and still expands the
+    // &Y&M&D&T date/time tokens.  PuTTY -sessionlog does NOT create parent dirs,
+    // and a direct Emulatr.exe run (no wrapper script) may not have made logs/,
+    // so ensure it exists first (std, per the Qt-minimal rule).
+    std::error_code logDirEc;
+    std::filesystem::create_directories("logs", logDirEc);   // best-effort; PuTTY errors visibly if absent
     args << "-sessionlog"
-         << QString("putty_console_p%1_&Y&M&D&T.log").arg(m_config.port);
+         << QString("logs/putty_console_p%1_&Y&M&D&T.log").arg(m_config.port);
     args << "localhost";
 
     SPDLOG_INFO("SRM Console: Launching PuTTY: {} {}",

@@ -36,8 +36,10 @@ REPO="$(cd "$PROJ/../.." && pwd)"
 # Auto-pick the newest run dir that has the exe + ES40 firmware + ES40 manifest.
 RUN_DIR=""
 NEWEST=0
-for cand in "RelWithDebInfo" "out/build/relwithdebinfo" "Release" \
-            "out/build/release" "out/build/cli" "Debug"; do
+# 2026-07-14: build-of-record dirs only (out/build/*). Legacy top-level
+# RelWithDebInfo/Release/Debug dropped so a stale top-level build can never
+# win the newest-exe pick and route logs/traces outside out/build.
+for cand in "out/build/relwithdebinfo" "out/build/release" "out/build/cli"; do
     d="$PROJ/$cand"
     [[ -x "$d/Emulatr.exe" ]]                 || continue
     [[ -f "$d/firmware/es40_v7_3.exe" ]]      || continue
@@ -62,9 +64,12 @@ FW="firmware/es40_v7_3.exe"
 INI="config/EmulatrV4.ini"
 MANIFEST="es40_v7_3_platform.json"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
-MAXCYC="${MAXCYC:-2000000000}"
+MAXCYC="${MAXCYC:-120000000000}"   # 2026-07-12: 120B test cap for the silicon-mode run (real-HW init is cycle-hungry; give it plenty of room to settle at P00)
 ATTACH_DISK="${ATTACH_DISK:-1}"
-LOG="run_es40_showdev_$(date +%Y%m%d_%H%M%S).log"
+# Output-file convention (emulatr-log-trace-placement skill): run/console logs
+# in ./logs, traces in ./traces, named <purpose>_<YYYYMMDD>_<HHMMSS>.<ext>.
+mkdir -p logs traces
+LOG="logs/run_es40_showdev_$(date +%Y%m%d_%H%M%S).log"
 
 # ---- soft stale-binary notice (informational; not a build gate) ------------
 for src in "$PROJ/deviceLib/Tsunami/Cy82C693Ide.h" \
@@ -128,6 +133,16 @@ export EMULATR_CONSOLE_MIRROR=1       # banner + console -> stderr/log
 export EMULATR_IDE_TRACE=1            # IDE config-space + I/O probe trace (the point)
 export EMULATR_CONSOLE_PORT="$PORT"
 
+# Platform-mode lever (2026-07-12): DEFAULT is ISP (0xBFFC->0xCAFEBEEF ->
+# firmware platform()==ISP_MODEL) which SKIPS the real-hardware probe/timing/IDE
+# steps and reaches P00 but never discovers the IDE.  PLATFORM=silicon drops the
+# intercept -> REAL_HW -> real device discovery (dq_init_ide -> ALi prog-IF 0x00
+# -> csr 0x1F0 -> IDENTIFY -> dqa0).  Silicon runs the real-HW looping counters,
+# so WARP=1 (EMULATR_IDLEWARP) bypasses them.  Usage:
+#   PLATFORM=silicon WARP=1 ./tools/run_es40_showdev.sh
+export EMULATR_PLATFORM="${PLATFORM:-${EMULATR_PLATFORM:-isp}}"
+if [[ "${WARP:-0}" == "1" ]]; then export EMULATR_IDLEWARP=1; fi
+
 if ! command -v PuTTY.exe >/dev/null 2>&1 && ! command -v putty.exe >/dev/null 2>&1; then
     echo "WARN: PuTTY.exe not on PATH -- attach manually:  putty -telnet localhost $PORT"
 fi
@@ -143,10 +158,11 @@ echo "-----------------------------------------------------------------------"
   echo "exe     = $EXE  (built $(stat -c '%y' "$EXE" 2>/dev/null | cut -d. -f1))"
   echo "exe sha = $(sha256sum "$EXE" 2>/dev/null | cut -c1-16)"
   echo "fw      = $FW   (ES40 platform)"
+  echo "platform= ${EMULATR_PLATFORM}   warp=${WARP:-0} (EMULATR_IDLEWARP=${EMULATR_IDLEWARP:-unset})"
   echo "console = PuTTY auto-launch on localhost:$PORT"
   echo "log     = $RUN_DIR/$LOG"
   echo "======================================================================="
-  echo "At  P00>>>  type:   show dev     (dqa0 EXPECTED ABSENT until Phase 2)"
+  echo "At  P00>>>  type:   show dev   (silicon mode -> dqa0/dqb0 should enumerate)"
   echo "The IDE-TRACE C lines in the log are the diagnostic payload."
   echo "======================================================================="
 } | tee "$LOG"
@@ -164,3 +180,4 @@ echo "done.  IDE config-space reads the ES40 console issued (cfg probe):"
 grep -iE "IDE-TRACE C|cfg reg" "$LOG" | tail -60 || true
 echo "--- dqa / show dev lines (if any) ---"
 grep -iE "dqa|82C693|show dev" "$LOG" | tail -20 || true
+

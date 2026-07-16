@@ -23,16 +23,17 @@
 # enables the per-commit retire callback so the windowed .trc actually emits.
 #
 # USAGE
-#   ./tools/build_emulatr.sh                 # relwithdebinfo
+#   ./tools/build_emulatr.sh                 # relwithdebinfo; builds Emulatr + Emulatr_tests (release = app only)
 #   ./tools/build_emulatr.sh debug
 #   ./tools/build_emulatr.sh release
-#   TARGET=Emulatr_tests ./tools/build_emulatr.sh
+#   TARGET=Emulatr ./tools/build_emulatr.sh        # app only (skip tests; fast iteration)
+#   TARGET=Emulatr_tests ./tools/build_emulatr.sh  # tests only
 # ============================================================================
 set -euo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$(cd "$SELF_DIR/.." && pwd)"          # project root (has CMakeLists.txt)
-TARGET="${TARGET:-Emulatr}"
+TARGET="${TARGET:-}"        # empty => build the default ALL target (Emulatr + Emulatr_tests as one unit)
 
 # ---- config arg -> canonical config + CMake build-type string --------------
 CFG_IN="${1:-relwithdebinfo}"
@@ -69,8 +70,24 @@ if [ "$HOST" = "win" ]; then
     cd "$SRC"
     echo "--- reconfigure (reuses VS 17 2022 cache; EMULATR_TRACE_HOOKS=$HOOKS) ---"
     cmake -DEMULATR_TRACE_HOOKS="$HOOKS" .
-    echo "--- build $TARGET ($BUILD_TYPE) ---"
-    cmake --build . --config "$BUILD_TYPE" --target "$TARGET"
+    if [ -n "$TARGET" ]; then
+        echo "--- build $TARGET ($BUILD_TYPE) ---"
+        cmake --build . --config "$BUILD_TYPE" --target "$TARGET"
+    else
+        # App is required and must mirror.  Tests build as the SAME unit for dev
+        # configs, but BEST-EFFORT: a test-build failure must never abort the
+        # mirror below.  2026-07-14: building the ALL target made a release
+        # Emulatr_tests failure (diag/trace symbols are compiled out in Release)
+        # kill the build before out/build/release was ever created.  Release
+        # therefore builds app-only -- the shipped artifact carries no tests.
+        echo "--- build Emulatr ($BUILD_TYPE) ---"
+        cmake --build . --config "$BUILD_TYPE" --target Emulatr
+        if [ "$CONFIG" != "release" ]; then
+            echo "--- build Emulatr_tests ($BUILD_TYPE, best-effort) ---"
+            cmake --build . --config "$BUILD_TYPE" --target Emulatr_tests \
+                || echo "WARN: Emulatr_tests did not build ($BUILD_TYPE) -- continuing to mirror the app."
+        fi
+    fi
     # Conform to the run convention WITHOUT disturbing the in-source VS cache/
     # IDE workflow: the in-source <root>/<Config>/ is a COMPLETE runnable dir --
     # Emulatr.exe PLUS its Qt6*.dll / runtime deps and the firmware/ tree that
@@ -89,7 +106,7 @@ if [ "$HOST" = "win" ]; then
             *) cp -rf "$item" "$OUT/" ;;
         esac
     done
-    EXE="$OUT/$TARGET.exe"
+    EXE="$OUT/${TARGET:-Emulatr}.exe"; TESTEXE="$OUT/Emulatr_tests.exe"
 else
     # ---- macOS / Linux clang, out-of-source Ninja (mirrors build_mac.sh) ---
     # Root the build at the project run convention: out/build/<config>,
@@ -112,9 +129,19 @@ else
         -DEMULATR_TRACE_HOOKS="$HOOKS" \
         "${QT_ARG[@]}"
     JOBS="$( (command -v sysctl >/dev/null 2>&1 && sysctl -n hw.ncpu) || nproc 2>/dev/null || echo 4)"
-    echo "--- build $TARGET ($BUILD_TYPE, -j$JOBS) ---"
-    cmake --build "$BUILD" --target "$TARGET" -j"$JOBS"
-    EXE="$BUILD/$TARGET"
+    if [ -n "$TARGET" ]; then
+        echo "--- build $TARGET ($BUILD_TYPE, -j$JOBS) ---"
+        cmake --build "$BUILD" --target "$TARGET" -j"$JOBS"
+    else
+        echo "--- build Emulatr ($BUILD_TYPE, -j$JOBS) ---"
+        cmake --build "$BUILD" --target Emulatr -j"$JOBS"
+        if [ "$CONFIG" != "release" ]; then
+            echo "--- build Emulatr_tests ($BUILD_TYPE, -j$JOBS, best-effort) ---"
+            cmake --build "$BUILD" --target Emulatr_tests -j"$JOBS" \
+                || echo "WARN: Emulatr_tests did not build ($BUILD_TYPE) -- continuing."
+        fi
+    fi
+    EXE="$BUILD/${TARGET:-Emulatr}"; TESTEXE="$BUILD/Emulatr_tests"
 fi
 
 echo "=== done ==="
@@ -122,4 +149,7 @@ if [ -f "$EXE" ]; then
     echo "built: $EXE  ($(date -r "$EXE" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' "$EXE" 2>/dev/null | cut -d. -f1))"
 else
     echo "NOTE: expected exe not found at $EXE -- check the build output above."
+fi
+if [ -z "$TARGET" ] && [ -f "${TESTEXE:-}" ]; then
+    echo "built: $TESTEXE  (tests, same unit)"
 fi

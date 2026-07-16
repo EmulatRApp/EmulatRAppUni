@@ -175,6 +175,18 @@ public:
     // = 0, palMode = false.
     void resetToLoadedEntry() noexcept;
 
+    // Re-seed the firmware image into guest memory for a module reset.
+    // A real b_modrst_l reset re-runs the SROM, which re-lays the firmware
+    // image into memory; without this the reboot decompresses/runs on the
+    // previous boot's DIRTIED memory and faults early (observed: clean
+    // kFaultHalt at PC 0x5c0).  Re-runs whichever loader the initial boot
+    // used -- faithful compressed (guest decompressor re-runs) or accelerated
+    // host-decompressed -- so both modes reboot on a clean image.  Returns
+    // true if a re-seed was performed, false if the load mode has no re-seed
+    // path (raw / no prior load).  ES40 module-reset only; DS10/DS20 never
+    // raise the reset triad so this is never reached on those platforms.
+    bool reseedFirmwareForReset() noexcept;
+
     // One pipeline tick.  Returns true if the CPU is still running
     // afterwards (halted = false), false if it halted on this tick.
     bool step() noexcept;
@@ -357,6 +369,37 @@ public:
     // run.  Cleared by armSnapshotOnPc.  Used by tests / post-run diags.
     bool armSnapshotFired() const noexcept { return m_anySnapFired; }
 
+    // EMULATR_FAST_DECOMPRESS=snapshot (2026-07-14, within-run reset accel).
+    // Enable minting a COMPLETE-state snapshot at the firmware's init->console
+    // handoff (pc == descriptor.entryPa()) to a FIXED, firmware-bound path
+    // (firmware/<stem>.axpsnap).  The mint (systemTick) is delete-then-save so
+    // it always reflects THIS run's entryPa state and cannot merge with a stale
+    // file; the snapshot then backs a within-run module-reset re-entry instead
+    // of re-decompressing.  It is NOT consumed by any later run -- it survives
+    // exit/abort as a diagnostic and is regenerated (delete-then-save) only when
+    // the next run reaches entryPa.  Faithful load (loadSrmFirmware) still runs
+    // first; this only arms the mint.  entryPa is read live from the descriptor
+    // at mint time, so call after loadSrmFirmware.
+    void enableEntrySnapshot(std::filesystem::path path)
+    {
+        m_entrySnapshotMode   = true;
+        m_entrySnapshotPath   = std::move(path);
+        m_entrySnapshotMinted = false;
+    }
+    bool entrySnapshotMinted() const noexcept { return m_entrySnapshotMinted; }
+    std::filesystem::path const& entrySnapshotPath() const noexcept
+    {
+        return m_entrySnapshotPath;
+    }
+
+    // Reuse a valid firmware/<stem>.axpsnap (restore-except-flash) to skip the
+    // decompressor at load or re-enter at a within-run module reset.  Validates
+    // checksum + version + chipset variant via systemLib::load; returns false on
+    // any mismatch or absence so the caller can decompress faithfully.  On
+    // success re-points flash to the CURRENT backing (bindFlash) so live env is
+    // honored, and sets m_entrySnapshotMinted so the mint does not re-fire.
+    [[nodiscard]] bool tryRestoreEntrySnapshot(std::filesystem::path const& path) noexcept;
+
     // ------------------------------------------------------------------
     // One-shot synthetic INTERRUPT-class trap injection.
     // ------------------------------------------------------------------
@@ -538,6 +581,13 @@ private:
     std::vector<uint8_t>     m_srmPayload;
     uint64_t                 m_srmLoadPa = 0;   // PA the stub was loaded at; tryFetch's range base
 
+    // Load-source memory for reseedFirmwareForReset().  Captured by whichever
+    // loader ran at boot so a module reset can re-seed the SAME image via the
+    // SAME loader (the SROM's job on real hardware).
+    enum class LoadMode : uint8_t { None, Raw, Srm, Decompressed };
+    LoadMode                 m_loadMode = LoadMode::None;
+    std::filesystem::path    m_firmwareSrcPath;  // <stem>.exe (Srm) or firmware/<stem>.bin (Decompressed)
+
     // Step D one-shot gate.  Set by onBeforeFetch the first time the
     // CPU reaches descriptor.entryPa(), after the relocation copy has
     // run.  Steady-state hot-path cost after the trigger is a single
@@ -572,6 +622,14 @@ private:
     std::filesystem::path    m_snapshotDir       = "snapshots";
     uint64_t                 m_nextAutoSaveCycle = 0;
     bool                     m_autoSnapshotEnabled = false;
+
+    // Entry-snapshot (EMULATR_FAST_DECOMPRESS=snapshot) within-run reset accel.
+    // m_entrySnapshotMode armed by enableEntrySnapshot(); mint fires once in
+    // systemTick when pc == descriptor.entryPa() (delete-then-save to the fixed
+    // firmware/<stem>.axpsnap path); m_entrySnapshotMinted gates re-firing.
+    bool                     m_entrySnapshotMode   = false;
+    bool                     m_entrySnapshotMinted = false;
+    std::filesystem::path    m_entrySnapshotPath;   // firmware/<stem>.axpsnap
 
     // ------------------------------------------------------------------
     // Pre-diagnostic snapshot trigger state.

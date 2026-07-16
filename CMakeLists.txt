@@ -172,6 +172,10 @@ set(EMULATR_SOURCES
     systemLib/FirmwareLoader.cpp
     systemLib/SrmLoader.h
     systemLib/SrmLoader.cpp
+    firmwareLib/decompressFirmware.h
+    firmwareLib/decompressFirmware.c
+    firmwareLib/decomp.h
+    firmwareLib/inflate.c
     systemLib/CpuStateDump.h
     systemLib/CpuStateDump.cpp
     systemLib/Machine.h

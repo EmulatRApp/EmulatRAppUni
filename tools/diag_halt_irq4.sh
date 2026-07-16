@@ -11,10 +11,14 @@ RUN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 EXE="Emulatr.exe"
 FIRMWARE="firmware/ds10_v7_3.exe"
 STAMP="$(date +%Y%m%d_%H%M%S)"
-LOG="diag_halt_${STAMP}.log"
+# 2026-07-14: log -> run-dir ./logs, trace -> run-dir ./traces per the
+# emulatr-log-trace-output skill. Was loose in run-dir root and the repo-root
+# /d/EmulatR/traces; both now anchor under the resolved run dir.
+mkdir -p "$RUN_DIR/logs"
+LOG="logs/diag_halt_${STAMP}.log"
 
 # --- environment ------------------------------------------------------------
-export EMULATR_TRACE_DIR="${EMULATR_TRACE_DIR:-/d/EmulatR/traces}"; mkdir -p "$EMULATR_TRACE_DIR"
+export EMULATR_TRACE_DIR="${EMULATR_TRACE_DIR:-$RUN_DIR/traces}"; mkdir -p "$EMULATR_TRACE_DIR"
 export EMULATR_TRACE_WINDOW=1        # REQUIRED: builds the window-only retire sink (arming no-ops without it)
 export EMULATR_TIG_TRACE=1           # canary: logs any UNMODELED TIG-window access (pa+dir)
 
@@ -61,3 +65,4 @@ if [[ -n "${SRM:-}" && -f "$SRM" ]]; then
   grep -E "^RET " "$SRM" | tail -40 || echo "  (no RET lines -- window did not arm: confirm step 2 returned 7FFF...)"
 fi
 echo "[done] full log: $RUN_DIR/$LOG"
+

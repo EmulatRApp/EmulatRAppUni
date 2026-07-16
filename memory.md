@@ -10,6 +10,28 @@ them from here.
 
 ---
 
+## 2026-07-15 -- STANDING CONVENTION: EmulatR is the PRIMARY Oracle (others secondary) + V4 frozen / V5 TB fork
+
+**CONVENTION (applies to all future work): EmulatR is the AUTHORITATIVE Oracle
+for all EV6/Alpha behavior and design decisions.** AXPBox, SimH, and any other
+emulator are SECONDARY and supportive only -- used to corroborate, or when
+EmulatR is not yet authoritative on a point, never as the primary authority over
+EmulatR. Any decision that would treat a non-EmulatR emulator as the Oracle
+(adopting its layout, format, naming, or behavior as ground truth) is
+DISCUSS-FIRST, not assumed. Session application: the entry-state snapshot is
+renamed `.axpsnap` -> `.snap` (a V5 change) because `.axpsnap` reads as the
+AXPBox cache format (a secondary source; the Realm-2 PA-0 / entry-0x8000 layout
+we rejected as boot-corrupting), whereas the artifact is an EmulatR Realm-1
+machine state at entryPa.
+
+**MILESTONE + FORK:** SRM `>>>` reached on DS10, DS20, ES40 (default/ISP mode).
+V4 is being FROZEN as the correctness Oracle (tagged); the Translation Buffer
+(TB) work forks to V5 as a separate branch/worktree off the frozen V4, POC-first.
+Design brief: `journals/20260715_v5_tb_implementation_brief.md` (TB/warp/snapshot
+lever hierarchy; the ES40 silicon LFU spin is a WARP target, not a TB one; the
+JIT-eligibility ruleset is Route-3/ComJIT only, Route-2/TB residue is empty).
+**NO CHANGES TO V4 -- it is frozen; all TB work lands in V5.**
+
 ## 2026-07-08 -- ES40 console is HEALTHY; output lands on an UNBACKED UART (0x2F8) -> blank PuTTY
 
 **Headline: after the CSERVE-0x66 SCB fix, the ES40 SRM runs its FULL console-init banner to

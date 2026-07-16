@@ -861,6 +861,34 @@ void Machine::onBeforeFetch(uint64_t pa) noexcept
 
     m_palImageRelocated = true;
 
+    // Entry-snapshot mint (EMULATR_FAST_DECOMPRESS=snapshot, 2026-07-14).  THIS
+    // is the correct capture point: pa == entryPa is the firmware's init->console
+    // handoff, detected via the TRANSLATED physical address -- immune to the PAL
+    // bit / virtual pc that breaks a raw pc==entryPa compare (in PAL mode
+    // m_cpu.pc carries bit 0, entryPa is even, so they never match).  One-shot
+    // (m_palImageRelocated is now true so onBeforeFetch early-returns hereafter),
+    // pre-execution and quiescent (previous step retired; entryPa not yet
+    // fetched).  The snapshot therefore carries m_palImageRelocated=true, so a
+    // reuse/reset restore re-enters cleanly at entryPa with no re-trigger.
+    // Regenerate (overwrite): only reached on the faithful path -- a valid
+    // snapshot is reused at load (tryRestoreEntrySnapshot sets minted), so this
+    // never double-mints.
+    if (m_entrySnapshotMode && !m_entrySnapshotMinted) {
+        std::error_code ssec;
+        std::filesystem::create_directories(m_entrySnapshotPath.parent_path(), ssec);
+        SnapshotResult const sr =
+            systemLib::save(*this, m_entrySnapshotPath, "entry");
+        m_entrySnapshotMinted = true;
+        std::fprintf(stderr,
+            "Machine: entry snapshot minted at entryPa=0x%016llx cyc=%llu -> "
+            "'%s' (success=%d bytes=%llu)\n",
+            static_cast<unsigned long long>(m_srmDescriptor.entryPa()),
+            static_cast<unsigned long long>(m_cpu.cycleCount),
+            sr.path.c_str(), sr.success ? 1 : 0,
+            static_cast<unsigned long long>(sr.bytesWritten));
+        std::fflush(stderr);
+    }
+
     // Phase C+: PAL is now resident at palBase; the trace stream becomes
     // meaningful.  Flip the sink's emit-gate true so per-commit listing
     // I/O and the retire-compact stream begin emitting from this cycle
@@ -982,6 +1010,12 @@ bool Machine::loadSrmFirmware(std::filesystem::path const& path,
     m_loadedPalMode = r.palMode;
     m_loadedPalBase = r.descriptor.initialPalBase;
     m_cpu.palBase   = r.descriptor.initialPalBase;
+
+    // Capture the load source so a module reset re-seeds via the SAME loader
+    // (faithful compressed path -- guest decompressor re-runs).  2026-07-14.
+    m_loadMode        = LoadMode::Srm;
+    m_firmwareSrcPath = path;
+
     m_lastLoadError.clear();
     return true;
 }
@@ -1013,6 +1047,12 @@ bool Machine::loadDecompressedRom(std::filesystem::path const& path)
     m_loadedPalMode = r.palMode;                   // PAL bit from the image header
     m_loadedPalBase = r.descriptor.targetPalBase;  // PAL_BASE from header (e.g. 0x600000)
     m_cpu.palBase   = m_loadedPalBase;
+
+    // Capture the load source so a module reset re-seeds via the SAME loader
+    // (accelerated path -- host-decompressed image re-copied to PA 0).  2026-07-14.
+    m_loadMode        = LoadMode::Decompressed;
+    m_firmwareSrcPath = path;
+
     m_lastLoadError.clear();
     return true;
 }
@@ -1067,6 +1107,104 @@ void Machine::resetToLoadedEntry() noexcept
     // P2-T3a: reset() re-default-constructed m_cpu (cycleCount = 0); resync the
     // decoupled system clock so systemNow() == m_cpu.cycleCount post-reset.
     m_systemClock = m_cpu.cycleCount;
+}
+
+
+// ============================================================================
+// reseedFirmwareForReset -- re-lay the firmware image into guest memory for a
+// module reset (the SROM's job on a real b_modrst_l reset).  Called by
+// systemTick BEFORE resetToLoadedEntry so the reboot decompresses/runs on a
+// CLEAN image, not the previous boot's dirtied memory.  Re-runs whichever
+// FREE loader the boot used; the returned descriptor/payload are unchanged
+// from the initial load, so we discard them and keep the captured members.
+// ES40 module-reset only (DS10/DS20 never raise the reset triad).  2026-07-14.
+//
+// RE-SEED CONTRACT (web-variant ruling, 2026-07-14): reproduce the
+// architectural state a FRESH SROM lay-down produces, and nothing else.  A
+// member is re-armed here iff a fresh lay-down would have it in its
+// post-load state.  Audited against Machine::loadSrmFirmware (the member
+// loader) vs systemLib::loadSrmFirmware (the free loader the re-seed calls):
+//   - guest memory        : YES -- the free loader re-lays it (SROM's job).
+//   - m_palImageRelocated  : YES -- MUST re-arm.  The member loader sets it
+//     false (Step D pending); the free loader does not touch it, so after the
+//     first boot's Step D set it true it would suppress relocation on the
+//     reboot -- a latent 0x5c0-family bug.  Set per-mode below.
+//   - flash (bindFlash/seedFrom) : NO -- real flash is nonvolatile; a module
+//     reset does not re-flash the part.  Leaving it is MORE faithful.
+//   - m_srmDescriptor/Payload/LoadPa, m_loaded*, m_loadMode, m_firmwareSrcPath
+//     : unchanged across the reset (same image) -- no re-arm needed.
+//   - diagnostic one-shots (m_snapTriggers*, m_injectInterruptFired,
+//     m_nextAutoSaveCycle) : NOT architectural -- deliberately left as-is.
+// ============================================================================
+bool Machine::reseedFirmwareForReset() noexcept
+{
+    switch (m_loadMode) {
+    case LoadMode::Srm: {
+        // Faithful path: re-lay the compressed image at m_srmLoadPa; the
+        // reboot re-enters the guest decompressor at m_loadedStartPc.
+        SrmLoadResult const r = systemLib::loadSrmFirmware(
+            m_chipset.guestMemory(), m_firmwareSrcPath, m_srmLoadPa);
+        // Contract: fresh lay-down is PRE-relocation.  Match the member
+        // loader (loadSrmFirmware sets false); Step D re-arms on the reboot's
+        // first entryPa fetch.  Without this the reboot skips PAL relocation.
+        m_palImageRelocated = false;
+        return r.ok;
+    }
+    case LoadMode::Decompressed: {
+        // Accelerated path: re-copy the host-decompressed console to PA 0;
+        // the reboot re-enters the console at m_loadedStartPc directly.
+        SrmLoadResult const r = systemLib::loadDecompressedRom(
+            m_chipset.guestMemory(), m_firmwareSrcPath);
+        // Contract: the decompressed console is already at its final state
+        // (no Step D).  Match the member loader (loadDecompressedRom sets
+        // true) so canAcceptInterrupt's post-relocation gate stays satisfied.
+        m_palImageRelocated = true;
+        return r.ok;
+    }
+    case LoadMode::Raw:
+    case LoadMode::None:
+    default:
+        // No re-seed path for raw / no prior load; reset falls back to a
+        // CPU-only re-entry (resetToLoadedEntry still runs).
+        return false;
+    }
+}
+
+
+// ============================================================================
+// tryRestoreEntrySnapshot -- restore-except-flash reuse of firmware/<stem>.axpsnap
+// ============================================================================
+// EMULATR_FAST_DECOMPRESS=snapshot reuse path (Tim, 2026-07-14).  systemLib::load
+// VALIDATES the snapshot before applying it: checksum footer + kCpuStateVersion +
+// kChipsetVersion + chipset VARIANT.  Any mismatch (a rebuild bumped a version, a
+// different model's snapshot, a truncated/corrupt file) fails cleanly and we
+// return false, leaving the faithful loadSrmFirmware state the caller already
+// established -- so a stale-code snapshot can never be silently consumed
+// (determinism), and a wrong-model snapshot (ES40 vs DS10/DS20) cannot cross over.
+//
+// On success the snapshot's memory + CpuState + chipset CSRs are restored, BUT
+// the snapshot also carries the 2 MB TIG flash/NVRAM image (kChipsetVersion 3).
+// We re-point the flash to the CURRENT backing (bindFlash) so live `set`/`update
+// srm` env -- persisted to <stem>.rom / ds10_flash.rom -- is honored, not reverted
+// to the snapshot's capture-time env.  This is the same leave-flash contract as
+// the faithful module reset (reseedFirmwareForReset).  bindFlash must have run
+// first (loadSrmFirmware did), so m_firmwareSrcPath is populated.
+// Model-agnostic: keyed on m_firmwareSrcPath's stem + the variant gate above.
+bool Machine::tryRestoreEntrySnapshot(std::filesystem::path const& path) noexcept
+{
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec) || ec) {
+        return false;   // absent -> caller decompresses faithfully and mints
+    }
+    SnapshotResult const r = systemLib::load(*this, path);
+    if (!r.success) {
+        return false;   // version/variant/checksum mismatch -> regenerate
+    }
+    if (!m_firmwareSrcPath.empty()) {
+        bindFlash(m_firmwareSrcPath);   // restore-EXCEPT-flash: current NVRAM wins
+    }
+    m_entrySnapshotMinted = true;       // valid snapshot in hand; do not re-mint
+    return true;
 }
 
 
@@ -1470,9 +1608,13 @@ bool Machine::systemTick(uint64_t i) noexcept
             SPDLOG_INFO("Machine::run: TIG module-reset -- reboot at cycle {}",
                         static_cast<unsigned long long>(m_cpu.cycleCount));
             m_chipset.clearTigResetRequest();
-            m_chipset.reset();       // CSR re-init (HRM Chapter-10 reset values)
-            resetToLoadedEntry();    // CPU re-enter the SROM/decompressor entry
-            return true;             // continue the run loop from the fresh state
+            m_chipset.reset();          // CSR re-init (HRM Chapter-10 reset values)
+            reseedFirmwareForReset();   // re-lay a CLEAN firmware image (SROM's job);
+                                        // fixes the reboot fault at PC 0x5c0 that came
+                                        // from decompressing on the prior boot's dirtied
+                                        // memory.  2026-07-14.
+            resetToLoadedEntry();       // CPU re-enter the SROM/decompressor entry
+            return true;                // continue the run loop from the fresh state
         }
 #endif
 
@@ -1504,6 +1646,11 @@ bool Machine::systemTick(uint64_t i) noexcept
             systemLib::pruneOldSnapshots(m_snapshotDir, kAutoSaveKeepCount);
             m_nextAutoSaveCycle = systemNow() + kAutoSavePeriodCycles;
         }
+
+        // NOTE: the entry-snapshot mint (EMULATR_FAST_DECOMPRESS=snapshot) is NOT
+        // here.  It lives in onBeforeFetch, gated on the TRANSLATED-PA
+        // entryPa detection -- a systemTick m_cpu.pc==entryPa compare fails in PAL
+        // mode (pc carries bit 0, entryPa is even) and would never fire.
 
         // ------------------------------------------------------------------
         // Pre-diagnostic snapshot trigger.  One-shot.
