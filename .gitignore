@@ -118,8 +118,14 @@ Desktop.ini
 .vscode/
 .idea/
 *.tmp
-core
-core.*
+# Unix core dumps -- anchored + file-only so a source directory named core/
+# (e.g. tools/Editors/PlatformEditor/core/) is NOT silently swallowed.
+/core
+core.[0-9]*
+
+# macOS AppleDouble resource forks / Finder metadata
+._*
+.DS_Store
 
 # host_decompressor: compiled oracle + generated decompressed images (regenerable)
 tools/host_decompressor/oracle

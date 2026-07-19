@@ -15,7 +15,7 @@
 # What it does (faithful, self-contained):
 #   1. Resolves the firmware basename to <name>_v7_3.exe in the SOURCE
 #      firmware dir and copies it into the build-dir firmware/ (cwd-relative).
-#   2. Sets [System] model in config/EmulatrV4.ini to the matching variant for
+#   2. Sets [System] model in config/Emulatr.ini to the matching variant for
 #      this run, backing up + restoring the ini on exit (trap).
 #   3. Launches ./Emulatr.exe --firmware firmware/<name>_v7_3.exe --mem 4 GiB
 #      with cwd = build dir, teeing console+stderr to fw_<name>_<ts>.out.
@@ -47,7 +47,7 @@ cd "$BUILD_DIR"
 
 SRC_FW="$BUILD_DIR/../../../firmware/${NAME}_v7_3.exe"   # source firmware tree
 DST_FW="firmware/${NAME}_v7_3.exe"                       # cwd-relative target
-INI="config/EmulatrV4.ini"
+INI="config/Emulatr.ini"
 MEM=4294967296                                           # 4 GiB in bytes
 TS="$(date +%Y%m%d-%H%M%S)"
 LOG="fw_${NAME}_${TS}.out"

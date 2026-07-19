@@ -22,7 +22,7 @@ cd "$RUN_DIR"
 
 EXE="./Emulatr.exe"
 FW="firmware/ds20_v7_3.exe"
-INI="config/EmulatrV4.ini"
+INI="config/Emulatr.ini"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
 MAXCYC="${MAXCYC:-2000000000}"
 LOG="run_ds20_$(date +%Y%m%d_%H%M%S).log"

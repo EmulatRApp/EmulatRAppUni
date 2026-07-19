@@ -15,7 +15,7 @@
 # What it does (faithful, self-contained):
 #   1. Resolves the firmware basename to <name>_v7_3.exe in the SOURCE
 #      firmware dir and copies it into the build-dir firmware/ (cwd-relative).
-#   2. Sets [System] model in config/EmulatrV4.ini to the matching variant for
+#   2. Sets [System] model in config/Emulatr.ini to the matching variant for
 #      this run, backing up + restoring the ini on exit (trap).
 #   3. Launches ./Emulatr.exe --firmware firmware/<name>_v7_3.exe --mem 4 GiB
 #      with cwd = build dir, teeing console+stderr to fw_<name>_<ts>.out.
@@ -54,16 +54,21 @@ else echo "FATAL: neither ./Emulatr.exe nor ./Emulatr found in $BUILD_DIR"; exit
 
 SRC_FW="$BUILD_DIR/../../../firmware/${NAME}_v7_3.exe"   # source firmware tree
 DST_FW="firmware/${NAME}_v7_3.exe"                       # cwd-relative target
-INI="config/EmulatrV4.ini"
+INI="config/Emulatr.ini"
 MEM=4294967296                                           # 4 GiB in bytes
 TS="$(date +%Y%m%d-%H%M%S)"
 LOG="fw_${NAME}_${TS}.out"
 
 # ---- preflight -------------------------------------------------------------
-[[ -f "$SRC_FW" ]]       || { echo "FATAL: firmware not found: $SRC_FW"; exit 1; }
-[[ -f "$INI" ]]          || { echo "FATAL: ini not found: $INI"; exit 1; }
+# 2026-07-15: a distributed/unzipped run-dir has no source tree above it -- the
+# firmware ships in ./firmware (the beta zip is "run-dir minus firmware"; the
+# tester supplies their own image there).  Require the run-dir firmware (DST_FW);
+# refresh from the dev source tree only when SRC_FW exists and is a different
+# file (never fatal on a missing source, never a copy-onto-itself).
 mkdir -p firmware
-cp -f "$SRC_FW" "$DST_FW"
+if [ -f "$SRC_FW" ] && ! [ "$SRC_FW" -ef "$DST_FW" ]; then cp -f "$SRC_FW" "$DST_FW"; fi
+[[ -f "$DST_FW" ]]       || { echo "FATAL: firmware not found in run dir: $DST_FW (place your ${NAME}_v7_3.exe in ./firmware/)"; exit 1; }
+[[ -f "$INI" ]]          || { echo "FATAL: ini not found: $INI"; exit 1; }
 
 # Manifest safety-net (2026-06-24): CMake POST_BUILD copies <name>_v7_3_platform.json
 # next to the exe, but that custom command only re-runs when Emulatr.exe relinks --
@@ -107,13 +112,4 @@ fi
 
 echo "=== EmulatR run [$MODE] ====================================="
 echo "  firmware : $DST_FW"
-echo "  model    : $MODEL   (ini-driven; no --model flag exists)"
-echo "  memory   : $MEM bytes (4 GiB)"
-echo "  console  : TCP 10023  (Windows: PuTTY/plink raw; macOS/Linux: nc localhost 10023)"
-echo "  binary   : ./$BIN"
-echo "  log      : $BUILD_DIR/$LOG"
-echo "  extra    : $*"
-echo "============================================================="
-
-# Run. 2>&1 | tee captures StopReason / fault / exit cycle into the log.
-"./$BIN" --firmware "$DST_FW" --mem "$MEM" $COLD_FLAG "$@" 2>&1 | tee "$LOG"
+ec

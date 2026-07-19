@@ -59,7 +59,7 @@ cd "$RUN_DIR"
 
 EXE="./Emulatr.exe"
 FW="firmware/es40_v7_3.exe"
-INI="config/EmulatrV4.ini"
+INI="config/Emulatr.ini"
 MANIFEST="es40_v7_3_platform.json"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
 MAXCYC="${MAXCYC:-2000000000}"

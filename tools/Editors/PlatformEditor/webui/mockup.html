@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+     PlatformEditor -- web UI MOCKUP / prototype (front-end only, no backend)
+     SPEC-PLATED-001 Section 8, web frontend variant. Real ds20 data.
+     Now semi-functional: every node populates the property pane, and the CRUD
+     toolbar mutates the in-page tree. Delete is refused on REQUIRED interfaces
+     (the emulator's presence-checked set: DS10 0x70/0x72/0xA2; DS20 OCP 0x40/
+     0x42 and the 0x9e get_sysvar discriminator). Widgets/validation are visual;
+     a live build wires them to the Qt-free core over a local HTTP server.
+     ========================================================================== -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EmulatR Platform Editor - ds20_v7_3_platform.json</title>
+<style>
+  :root {
+    --bg:#0f1419; --panel:#161b22; --panel2:#1c232c; --edge:#2b3441;
+    --ink:#d6dde6; --muted:#8b98a8; --accent:#4a9eff; --accent2:#2b6cb0;
+    --ok:#3fb950; --warn:#d29922; --err:#f85149; --info:#58a6ff;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink);
+         height:100vh; display:flex; flex-direction:column; font-size:13px; }
+
+  .menubar { display:flex; align-items:center; gap:2px; background:var(--panel);
+             border-bottom:1px solid var(--edge); padding:6px 10px; }
+  .menubar .title { font-weight:600; margin-right:16px; }
+  .menubar .title .file { color:var(--muted); font-family:var(--mono); font-weight:400; }
+  .menubar .dirty { color:var(--warn); margin-left:6px; }
+  .menubar button { background:none; border:1px solid transparent; color:var(--ink);
+    padding:4px 10px; border-radius:5px; cursor:pointer; font-size:13px; }
+  .menubar button:hover { background:var(--panel2); border-color:var(--edge); }
+  .menubar .spacer { flex:1; }
+  .menubar .save { background:var(--accent2); border-color:var(--accent2); color:#fff; }
+  .menubar .brand { font-weight:800; font-size:15px; letter-spacing:.3px; }
+  .menubar .brand b { color:var(--accent); }
+  .menubar .tag { color:var(--muted); font-size:12px; border-left:1px solid var(--edge); padding-left:10px; margin:0 10px 0 8px; }
+  .msep { height:1px; background:var(--edge); margin:4px 6px; }
+  .devitem .mk { color:var(--muted); font-size:10px; align-self:center; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:30; }
+  .modal.show { display:flex; }
+  .mbox { background:var(--panel); border:1px solid var(--edge); border-radius:10px; padding:20px 24px; max-width:460px; box-shadow:0 12px 40px rgba(0,0,0,.5); }
+  .mbox h3 { margin:0 0 10px; } .mbox p,.mbox li { font-size:13px; line-height:1.6; }
+  .mbox .k { font-family:var(--mono); background:var(--panel2); border:1px solid var(--edge); border-radius:4px; padding:0 5px; }
+  .mbox .brand { font-weight:800; } .mbox .brand b { color:var(--accent); }
+
+  .toolbar { display:flex; align-items:center; gap:6px; background:var(--panel2);
+             border-bottom:1px solid var(--edge); padding:6px 10px; }
+  .toolbar .grp { color:var(--muted); font-size:11px; text-transform:uppercase;
+                  letter-spacing:.06em; margin-right:4px; }
+  .tbtn { background:var(--panel); border:1px solid var(--edge); color:var(--ink);
+          padding:4px 10px; border-radius:5px; cursor:pointer; font-size:12.5px; font-family:var(--mono); }
+  .tbtn:hover:not(:disabled) { border-color:var(--accent); }
+  .tbtn:disabled { opacity:.4; cursor:not-allowed; }
+  .tbtn.del:not(:disabled) { border-color:#5a2424; color:#ff9b95; }
+  .toolbar .sep { width:1px; height:20px; background:var(--edge); margin:0 4px; }
+  .devmenu { position:fixed; display:none; background:var(--panel2); border:1px solid var(--edge);
+             border-radius:6px; padding:4px; z-index:20; min-width:200px; box-shadow:0 8px 24px rgba(0,0,0,.45); }
+  .devitem { padding:6px 10px; border-radius:4px; cursor:pointer; font-family:var(--mono); font-size:12.5px;
+             display:flex; justify-content:space-between; gap:10px; }
+  .devitem:hover { background:#243447; }
+  .devitem .pv { color:var(--warn); font-size:9px; align-self:center; }
+
+  .work { flex:1; display:grid; grid-template-columns:360px 1fr; grid-template-rows:1fr 168px;
+          grid-template-areas:"tree props" "issues issues"; min-height:0; }
+  .tree   { grid-area:tree;   background:var(--panel);  border-right:1px solid var(--edge); overflow:auto; }
+  .props  { grid-area:props;  background:var(--bg);     overflow:auto; }
+  .issues { grid-area:issues; background:var(--panel);  border-top:1px solid var(--edge); overflow:auto; }
+
+  .pane-head { padding:8px 12px; color:var(--muted); font-size:11px; letter-spacing:.08em;
+               text-transform:uppercase; border-bottom:1px solid var(--edge); position:sticky; top:0;
+               background:var(--panel); z-index:1; }
+  .row { display:flex; align-items:center; gap:6px; padding:3px 10px; cursor:pointer;
+         white-space:nowrap; font-family:var(--mono); font-size:12.5px; }
+  .row:hover { background:var(--panel2); }
+  .row.sel { background:#243447; box-shadow:inset 3px 0 0 var(--accent); }
+  .row .caret { width:12px; color:var(--muted); text-align:center; }
+  .row .lbl .nm { color:var(--ink); }
+  .row .lbl .meta { color:var(--muted); }
+  .row .count { color:var(--accent); }
+  .row .flag { font-size:11px; }
+  .row .flag.err { color:var(--err); }
+  .row .flag.info { color:var(--info); }
+  .row .lock { color:var(--muted); font-size:11px; padding:0 6px; border:1px solid var(--edge); border-radius:8px; }
+  .row .rt { margin-left:auto; display:inline-flex; gap:8px; align-items:center; padding-left:8px; }
+
+  .props-head { padding:12px 18px 8px; border-bottom:1px solid var(--edge); }
+  .props-head h2 { margin:0; font-size:16px; font-family:var(--mono); }
+  .props-head .sub { color:var(--muted); font-size:12px; margin-top:3px; }
+  .props-head .req { color:var(--warn); }
+  .form { padding:10px 18px 24px; max-width:640px; }
+  .field { display:grid; grid-template-columns:130px 1fr; align-items:center; gap:10px; margin:8px 0; }
+  .field label { color:var(--muted); font-family:var(--mono); font-size:12.5px; }
+  .field .ctl { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  input,select,textarea { background:var(--panel2); color:var(--ink); border:1px solid var(--edge);
+    border-radius:5px; padding:5px 8px; font-family:var(--mono); font-size:12.5px; min-width:150px; }
+  input:focus,select:focus,textarea:focus { outline:none; border-color:var(--accent); }
+  input[readonly] { color:var(--muted); background:#141a21; }
+  textarea { width:100%; min-height:52px; resize:vertical; }
+  .empty { color:var(--muted); padding:24px 18px; font-style:italic; }
+  .tier { color:var(--muted); font-size:11px; font-family:var(--mono); }
+  .badge { font-size:10.5px; padding:1px 6px; border-radius:9px; font-family:var(--mono); }
+  .badge.cat  { color:var(--ok);   border:1px solid #24512f; background:#132218; }
+  .badge.div  { color:var(--warn); border:1px solid #4d3c12; background:#241d0e; }
+  .badge.ro   { color:var(--muted);border:1px solid var(--edge); }
+  .browse { cursor:pointer; min-width:auto; }
+
+  .issue { display:flex; align-items:center; gap:10px; padding:6px 14px; cursor:pointer;
+           font-family:var(--mono); font-size:12.5px; border-bottom:1px solid #10161d; }
+  .issue:hover { background:var(--panel2); }
+  .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .dot.err {background:var(--err);} .dot.warn {background:var(--warn);} .dot.info {background:var(--info);}
+  .issue .id { color:var(--muted); width:44px; }
+  .issue .src { font-size:10px; padding:0 5px; border:1px solid var(--edge); border-radius:4px; color:var(--muted); }
+  .issue .msg .node { color:var(--accent); }
+  .note { color:var(--muted); font-size:11px; padding:6px 14px; font-style:italic; }
+
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    background:#2a1416; border:1px solid #5a2424; color:#ffb4ae; padding:9px 16px;
+    border-radius:7px; font-size:12.5px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+  <div class="menubar">
+    <span class="brand">Emulat<b>R</b></span><span class="tag">Platform Editor</span>
+    <span class="file">ds20_v7_3_platform.json</span><span class="dirty" id="dirty" style="display:none">*</span>
+    <span style="width:16px"></span>
+    <button onclick="fileMenu(event)">File &#9662;</button>
+    <button onclick="runValidate()">Validate</button>
+    <button onclick="helpMenu(event)">Help &#9662;</button>
+    <span class="spacer"></span>
+    <button class="save" onclick="save()">Save</button>
+  </div>
+
+  <div class="toolbar">
+    <span class="grp">Device</span>
+    <button class="tbtn" id="addIic"  onclick="addIic()">+ IIC</button>
+    <button class="tbtn" id="addPci"  onclick="addPci()">+ PCI</button>
+    <button class="tbtn" id="addBar"  onclick="addBar()">+ BAR</button>
+    <button class="tbtn" id="addDev"  onclick="toggleDevMenu(event)">+ Device &#9662;</button>
+    <span class="sep"></span>
+    <button class="tbtn" id="dup" onclick="duplicate()">Duplicate</button>
+    <button class="tbtn del" id="del" onclick="del()">Delete</button>
+    <span class="spacer" style="flex:1"></span>
+    <span class="grp" id="selinfo"></span>
+  </div>
+
+  <div class="work">
+    <div class="tree"><div class="pane-head">Structure</div><div id="tree"></div></div>
+    <div class="props">
+      <div class="props-head"><h2 id="pTitle"></h2><div class="sub" id="pSub"></div></div>
+      <div class="form" id="form"></div>
+    </div>
+    <div class="issues">
+      <div class="pane-head" id="issHead">Issues</div>
+      <div id="issues"></div>
+      <div class="note">Computed live from the model &mdash; edits and CRUD update it (try Duplicate a disk, or + PCI, then Validate). V-24 is illustrative: the ini is not loaded in this mockup.</div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <div class="devmenu" id="devmenu"></div>
+  <div class="devmenu" id="topmenu"></div>
+  <div class="modal" id="modal" onclick="if(event.target.id==='modal')this.classList.remove('show')"><div class="mbox" id="mbox"></div></div>
+
+<script>
+// ---------- required-interface registry (emulator presence checks) ----------
+const REQ_IIC = {
+  '0x70':'iic_system0 -- build_power_hw', '0x72':'iic_system1 -- build_power_hw',
+  '0xA2':'iic_smb0 -- FRU descriptor',    '0x40':'iic_ocp0 -- DS20 badge (get_sysvar)',
+  '0x42':'iic_ocp1 -- sable_ocp_init',    '0x9e':'iic_rcm_temp -- DS20 discriminator'
+};
+
+// ---------- data model ----------
+let uid = 1;
+const nid = () => 'n' + (uid++);
+function node(kind, fields, extra) {
+  return Object.assign({ id:nid(), kind, fields:fields||{}, kids:[], open:true }, extra||{});
+}
+function iic(name,address,cls,rest) {
+  const f = Object.assign({ name, address, 'class':cls }, rest||{});
+  return node('iic', f, { required: !!REQ_IIC[address] });
+}
+function arr(key, kids){ const a = node('array', {}, { arrayKey:key }); a.kids = kids; return a; }
+
+const iicArray = arr('iic_devices', [
+  iic('iic_system0','0x70','status',{byte:'0x00'}),
+  iic('iic_system1','0x72','status',{byte:'0x00'}),
+  iic('iic_smb0','0xA2','fru_eeprom',{manufacturer:'DEC',model:'DS20',part_class:'54-',serial:''}),
+  iic('iic_cpu0','0xA4','fru_eeprom',{manufacturer:'DEC',model:'EV6',part_class:'54-',serial:''}),
+  iic('iic_rcm_nvram0','0xC0','nvram',{size:256}),
+  iic('iic_ocp0','0x40','status',{byte:'0x00',comment:'OCP LED control'}),
+  iic('iic_ocp1','0x42','status',{byte:'0x00',comment:'OCP data'}),
+  iic('iic_rcm_temp','0x9e','status',{byte:'0x19',comment:'DS20 discriminator @ 0x9e'})
+]);
+
+function storageT(channel,unit,type,model,media,kind){
+  return node('storage',{channel,unit,lun:0,type,model,media,media_kind:kind});
+}
+function bar(index,kind,size){ return node('bar',{index,kind,size,prefetch:false}); }
+
+const cypIde = node('pci',
+  {name:'cypress_ide',model:'cypress_ide',hose:0,bus:0,slot:5,func:1,vendor:'0x1080',device:'0xc693',
+   class_code:'0x010100',option_rom:false,interrupt_pin:0,comment:'Cypress 82C693 IDE func1.'},
+  {baseline:true});
+cypIde.kids = [ arr('storage', [
+  storageT(0,0,'ata_disk','EMULATR VIRTUAL DISK','Alpha/dka0.vdisk','image'),
+  storageT(0,1,'atapi_cdrom','EMULATR VIRTUAL CDROM','Alpha/OpenVMS_v82.iso','iso') ]) ];
+
+const de500 = node('pci',
+  {name:'de500_tulip',model:'generic',hose:0,bus:0,slot:7,func:0,vendor:'0x1011',device:'0x0019',
+   class_code:'0x020000',option_rom:false,interrupt_pin:1,comment:'On-board DE500-AA (21143 tulip). slot _PROVISIONAL.'},
+  {flag:'info',baseline:true});
+de500.kids = [ arr('bars', [ bar(0,'io','0x80'), bar(1,'mem','0x80') ]) ];
+
+// user-added SCSI HBA -- demonstrates the SPEC-SCSIH-001 Option C shape:
+// channels[] sidecar (bus facts) + flat storage[] leaf (unit = SCSI target id)
+const scsiHba = node('pci',
+  {name:'isp1040_0',model:'qlogic_isp1040',hose:0,bus:0,slot:8,func:0,vendor:'0x1077',device:'0x1020',
+   class_code:'0x010000',option_rom:false,interrupt_pin:1,comment:'_PROVISIONAL QLogic ISP1040 SCSI HBA (SPEC-SCSIH-001).'},
+  {flag:'info'});
+scsiHba.kids = [
+  arr('channels', [ node('channel',{index:0,initiator_id:7,width:'wide',comment:'Single SCSI bus; targets 0-6, 8-15 free.'}) ]),
+  arr('bars', [ bar(0,'io','0x100'), bar(1,'mem','0x1000') ]),
+  arr('storage', [
+    node('storage',{channel:0,unit:0,lun:0,type:'scsi_disk',label:'vms_system',model:'EMULATR VIRTUAL DISK',media:'Alpha/dka0.vdisk',media_kind:'image'}),
+    node('storage',{channel:0,unit:3,lun:0,type:'scsi_cdrom',model:'EMULATR VIRTUAL CDROM',media:'Alpha/ds20_fw.iso',media_kind:'iso'}) ]) ];
+
+const pciArray = arr('pci_devices', [
+  node('pci',{name:'cypress_isa',model:'cypress_isa',hose:0,bus:0,slot:5,func:0,vendor:'0x1080',
+        device:'0xc693',class_code:'0x060100',option_rom:false,interrupt_pin:0}, {baseline:true}),
+  cypIde, de500, scsiHba ]);
+
+const root = node('root', {manifest_version:1, platform:'DS20',
+  comment:'EmulatR DS20 / PC264 platform device manifest ...'});
+root.kids = [ iicArray, pciArray ];
+
+// ---------- policy (tiers) + catalog (defaults) ----------
+const TIERS = {
+  root:{manifest_version:'int',platform:'openEnum',comment:'multiline'},
+  iic:{name:'openEnum',address:'hex','class':'enum',byte:'hex',size:'int',manufacturer:'openEnum',
+       model:'openEnum',part_class:'free',serial:'free',revision_ro:'hex',revision_rw:'hex',comment:'multiline'},
+  pci:{name:'openEnum',model:'openEnum',hose:'int',bus:'int',slot:'int',func:'int',vendor:'hex',device:'hex',
+       class_code:'hex',revision:'hex',subsys_vendor:'hex',subsys_id:'hex',option_rom:'bool',
+       interrupt_pin:'int',comment:'multiline'},
+  storage:{channel:'int',unit:'int',lun:'int',type:'enum',model:'openEnum',media:'path',
+           media_kind:'enum',enabled:'bool',create_if_missing:'bool',size:'size',comment:'multiline'},
+  bar:{index:'int',kind:'enum',size:'hex',prefetch:'bool'},
+  channel:{index:'int',initiator_id:'int',width:'enum',comment:'multiline'}
+};
+const ENUM = { 'class':['status','fru_eeprom','nvram','led'],
+  type:['ata_disk','atapi_cdrom','scsi_disk','scsi_cdrom','scsi_tape'],
+  media_kind:['image','iso','host'], kind:['io','mem'], width:['narrow','wide'],
+  platform:['DS10','DS20','DS25','ES40','ES45'] };
+const OPEN = { model_pci:['generic','passive','cypress_isa','cypress_ide','qlogic_isp1040','symbios_53c810'] };
+const CATALOG = { cypress_isa:{vendor:'0x1080',device:'0xc693',class_code:'0x060100',controller:null},
+                  cypress_ide:{vendor:'0x1080',device:'0xc693',class_code:'0x010100',controller:'ide'},
+                  qlogic_isp1040:{vendor:'0x1077',device:'0x1020',class_code:'0x010000',controller:'scsi',channels:1},
+                  symbios_53c810:{vendor:'0x1000',device:'0x0001',class_code:'0x010000',controller:'scsi',channels:1} };
+const controllerOf = model => (CATALOG[model]||{}).controller || null;
+
+const tierOf = (kind,key) => (TIERS[kind]&&TIERS[kind][key]) || 'passthrough';
+function optsOf(kind,key){
+  if (ENUM[key]) return ENUM[key];
+  if (key==='model' && kind==='pci') return OPEN.model_pci;
+  if (key==='manufacturer') return ['DEC'];
+  return [];
+}
+const hexEq=(a,b)=>{ const p=s=>parseInt(String(s),/^0x/i.test(s)?16:10);
+  const x=p(a),y=p(b); return (!isNaN(x)&&!isNaN(y))? x===y : String(a)===String(b); };
+
+// ---------- state ----------
+let sel = cypIde.id;
+let dirty = false;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+
+// ---------- labels ----------
+function label(n){
+  if (n.kind==='root') return `<span class="nm">${esc(n.fields.platform)}</span>`;
+  if (n.kind==='array') return `<span class="nm">${n.arrayKey}</span> <span class="count">[${n.kids.length}]</span>`;
+  const f=n.fields;
+  if (n.kind==='iic') return dev(f.name, f.address, f['class']);
+  if (n.kind==='pci') return dev(f.name, `${f.hose}:${f.bus}:${f.slot}.${f.func}`, `${f.vendor}:${f.device}`);
+  if (n.kind==='storage'){ const m=moniker(n);
+    const addr = /^scsi/.test(f.type) ? `tgt${f.unit} lun${f.lun}` : `ch${f.channel} unit${f.unit}`;
+    return `<span class="nm">${esc(m||addr)}</span>  <span class="meta">${esc(m?addr+'  '+f.type:f.type)}</span>`; }
+  if (n.kind==='bar') return dev(`BAR${f.index}`, f.kind, f.size);
+  if (n.kind==='channel') return dev(`ch${f.index}`, `init=${f.initiator_id}`, f.width);
+}
+const dev=(n,a,c)=>`<span class="nm">${esc(n)}</span>  <span class="meta">${esc(a)}  ${esc(c)}</span>`;
+// SPEC-SCSIH-001 Sec 7: guest computes its device name from (channel,unit,lun).
+function guestName(n){ const f=n.fields; const L=String.fromCharCode(97+(+f.channel||0));
+  return /^scsi/.test(f.type) ? 'dk'+L+((+f.unit||0)*100+(+f.lun||0)) : 'dq'+L+(+f.unit||0); }
+// device moniker: explicit label override, else media filename minus extension
+function fileLabel(media){ return media ? media.split('/').pop().replace(/\.[^.]+$/,'') : ''; }
+function moniker(n){ const f=n.fields; return f.label || fileLabel(f.media) || ''; }
+
+// ---------- tree helpers ----------
+function parentOf(id, cur=root, par=null){
+  if (cur.id===id) return par;
+  for (const k of cur.kids){ const r=parentOf(id,k,cur); if (r!==undefined) return r; }
+  return undefined;
+}
+function findById(id, cur=root){
+  if (cur.id===id) return cur;
+  for (const k of cur.kids){ const r=findById(id,k); if (r) return r; }
+  return null;
+}
+function ancestorPci(id){
+  let n=findById(id);
+  while (n){ if (n.kind==='pci') return n; n=parentOf(n.id); }
+  return null;
+}
+function childArray(pci, key){
+  let a=pci.kids.find(k=>k.kind==='array'&&k.arrayKey===key);
+  if (!a){ a=arr(key,[]); pci.kids.push(a); }
+  return a;
+}
+
+// ---------- render ----------
+function render(){ computeVal(); renderTree(); renderForm(); renderToolbar(); renderIssues(); }
+function renderTree(){
+  const host=document.getElementById('tree'); host.innerHTML='';
+  const walk=(n,depth)=>{
+    const row=document.createElement('div');
+    const kids=n.kids.length;
+    row.className='row'+(n.id===sel?' sel':'');
+    row.style.paddingLeft=(10+depth*16)+'px';
+    const caret=kids?(n.open?'–':'+'):'';
+    let tail='';
+    if (n.required) tail+=`<span class="lock">● req</span>`;
+    else if (n.baseline) tail+=`<span class="lock">std</span>`;
+    const fl=nodeFlags[n.id];
+    if (fl) tail+=`<span class="flag ${fl}">${fl==='err'?'!':'P'}</span>`;
+    row.innerHTML=`<span class="caret">${caret}</span><span class="lbl">${label(n)}</span><span class="rt">${tail}</span>`;
+    row.onclick=(e)=>{ if(kids) n.open=!n.open; sel=n.id; render(); e.stopPropagation(); };
+    host.appendChild(row);
+    if (kids && n.open) n.kids.forEach(k=>walk(k,depth+1));
+  };
+  walk(root,0);
+}
+function widget(tier,val,opts){
+  const v=esc(val);
+  switch(tier){
+    case 'int': case 'size': return `<input type="number" value="${v}" style="min-width:90px">`;
+    case 'bool': { const b=String(val)==='true'||val===true;
+      return `<select style="min-width:90px"><option${b?' selected':''}>true</option><option${!b?' selected':''}>false</option></select>`; }
+    case 'enum': return `<select>${opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
+    case 'openEnum': { const list='dl'+Math.random().toString(36).slice(2);
+      return `<input value="${v}" list="${list}"><datalist id="${list}">${opts.map(o=>`<option>${o}</option>`).join('')}</datalist>`; }
+    case 'multiline': return `<textarea>${v}</textarea>`;
+    case 'path': return `<input value="${v}"><button class="browse tbtn">Browse...</button>`;
+    default: return `<input value="${v}">`;   // hex, free, passthrough
+  }
+}
+function catBadge(n,key){
+  if (n.kind!=='pci') return '';
+  const c=CATALOG[n.fields.model]; if(!c||c[key]===undefined) return '';
+  return hexEq(n.fields[key],c[key]) ? '<span class="badge cat">= catalog</span>'
+                                     : '<span class="badge div">diverged</span>';
+}
+function renderForm(){
+  const n=findById(sel);
+  const title=document.getElementById('pTitle'), sub=document.getElementById('pSub'), form=document.getElementById('form');
+  if (!n){ title.textContent=''; sub.textContent=''; form.innerHTML=''; return; }
+  if (n.kind==='array'){
+    title.textContent=n.arrayKey; sub.textContent=`array of ${n.kids.length} -- select an item, or use the toolbar to add`;
+    form.innerHTML=`<div class="empty">No fields on an array node. Its ${n.kids.length} entries are in the tree.</div>`;
+    return;
+  }
+  title.innerHTML=esc(n.fields.name || n.fields.platform || n.kind);
+  let s = n.kind + (n.kind!=='root'?'':'  (platform root)');
+  if (n.required) s += ` &mdash; <span class="req">required interface: ${esc(REQ_IIC[n.fields.address])}</span>`;
+  else if (n.baseline) s += ` &mdash; <span style="color:var(--muted)">baseline controller &mdash; editing not recommended</span>`;
+  if (n.kind==='storage') s += `  &mdash; guest device: <span style="color:var(--accent)">${guestName(n)}</span>`;
+  sub.innerHTML=s;
+  let extra='';
+  if (n.kind==='storage'){
+    const def=fileLabel(n.fields.media), cur=n.fields.label||'';
+    extra=`<div class="field"><label>label</label><div class="ctl">`
+        + `<input value="${esc(cur)}" placeholder="${esc(def||'(set media first)')}">`
+        + `<span class="tier">free</span> <span class="badge ${cur?'div':'cat'}">${cur?'override':'= filename'}</span>`
+        + `</div></div>`;
+  }
+  form.innerHTML=extra + Object.keys(n.fields).filter(k=>k!=='label').map(key=>{
+    const tier=tierOf(n.kind,key), val=n.fields[key];
+    if (n.kind==='storage' && key==='media'){ const host=n.fields.media_kind==='host';
+      return `<div class="field"><label>media</label><div class="ctl">`
+        + `<input value="${esc(val)}" placeholder="${host?'host drive, e.g. /dev/sr0':'filename (resolved vs diskDir)'}">`
+        + `<button class="browse tbtn">${host?'Pick drive...':'Browse...'}</button>`
+        + `<span class="tier">path</span>${host?' <span class="badge div">host</span>':''}</div></div>`; }
+    const ro=(n.kind==='root'&&key==='manifest_version');
+    const w = ro ? `<input value="${esc(val)}" readonly style="min-width:80px">` : widget(tier,val,optsOf(n.kind,key));
+    const badge = ro ? '<span class="badge ro">read-only</span>' : catBadge(n,key);
+    return `<div class="field"><label>${key}</label><div class="ctl">${w}<span class="tier">${tier}</span> ${badge}</div></div>`;
+  }).join('');
+}
+function renderToolbar(){
+  const n=findById(sel);
+  const pci=ancestorPci(sel);
+  const isItem = n && ['iic','pci','storage','bar'].includes(n.kind);
+  document.getElementById('addBar').disabled  = !pci;
+  document.getElementById('addDev').disabled  = !(pci && controllerOf(pci.fields.model));
+  document.getElementById('dup').disabled     = !isItem;
+  const delBtn=document.getElementById('del');
+  delBtn.disabled = !isItem || (n && n.required);
+  delBtn.title = (n && n.required) ? ('required interface: '+REQ_IIC[n.fields.address]) : 'Delete selected';
+  document.getElementById('selinfo').textContent = n ? ('selected: '+(n.fields.name||n.arrayKey||n.kind)+(n.required?'  (required)':'')) : '';
+}
+
+// ---------- CRUD ----------
+function markDirty(){ dirty=true; document.getElementById('dirty').style.display='inline'; }
+function addIic(){ const x=iic('new_iic','0x00','status',{byte:'0x00'}); iicArray.kids.push(x); sel=x.id; markDirty(); render(); }
+function addPci(){ const x=node('pci',{name:'new_pci',model:'generic',hose:0,bus:0,slot:0,func:0,
+  vendor:'0x0000',device:'0x0000',class_code:'0x000000',option_rom:false,interrupt_pin:0});
+  pciArray.kids.push(x); sel=x.id; markDirty(); render(); }
+function addBar(){ const pci=ancestorPci(sel); if(!pci) return; const a=childArray(pci,'bars');
+  const x=bar(a.kids.length,'mem','0x0'); a.kids.push(x); sel=x.id; markDirty(); render(); }
+// device-kind picker: each kind maps to (type x media_kind) per bus (SPEC-SCSIH-001 Sec 8)
+const KINDS = [
+  { label:'Virtual Disk',    ide:'ata_disk',    scsi:'scsi_disk',  media_kind:'image' },
+  { label:'Virtual CD-ROM',  ide:'atapi_cdrom', scsi:'scsi_cdrom', media_kind:'iso'   },
+  { label:'Virtual Tape',    ide:null,          scsi:'scsi_tape',  media_kind:'image' },
+  { label:'Physical CD-ROM', ide:'atapi_cdrom', scsi:'scsi_cdrom', media_kind:'host'  }
+];
+function initiatorId(pci){ const c=pci.kids.find(k=>k.kind==='array'&&k.arrayKey==='channels');
+  return (c&&c.kids[0]) ? (+c.kids[0].fields.initiator_id||7) : 7; }
+function nextAddress(pci, a, bus){
+  const used=new Set(a.kids.map(s=>`${s.fields.channel}/${s.fields.unit}`));
+  if(bus==='scsi'){ const init=initiatorId(pci);
+    for(let u=0;u<16;u++){ if(u===init) continue; if(!used.has('0/'+u)) return {channel:0,unit:u,lun:0}; } }
+  else { for(const cu of [[0,0],[0,1],[1,0],[1,1]]) if(!used.has(cu[0]+'/'+cu[1])) return {channel:cu[0],unit:cu[1],lun:0}; }
+  return {channel:0,unit:0,lun:0};
+}
+function toggleDevMenu(e){
+  const menu=document.getElementById('devmenu');
+  if(menu.style.display==='block'){ menu.style.display='none'; return; }
+  const pci=ancestorPci(sel); const bus=pci?controllerOf(pci.fields.model):null;
+  if(!bus){ toast('Select an IDE or SCSI storage controller first'); return; }
+  menu.innerHTML = KINDS.map((k,i)=>({k,i})).filter(o=>bus==='scsi'?o.k.scsi:o.k.ide).map(o=>{
+    const type = bus==='scsi'?o.k.scsi:o.k.ide;
+    const prov = bus==='scsi' || o.k.media_kind==='host';
+    return `<div class="devitem" data-k="${o.i}">${o.k.label}${prov?'<span class="pv">_PROVISIONAL</span>':''}</div>`;
+  }).join('');
+  menu.querySelectorAll('.devitem').forEach(el=>el.onclick=()=>{ addDevice(KINDS[+el.dataset.k]); menu.style.display='none'; });
+  const r=e.target.getBoundingClientRect();
+  menu.style.left=r.left+'px'; menu.style.top=(r.bottom+3)+'px'; menu.style.display='block';
+}
+function addDevice(kind){
+  const pci=ancestorPci(sel); if(!pci) return;
+  const bus=controllerOf(pci.fields.model);
+  const type = bus==='scsi' ? kind.scsi : kind.ide;
+  if(!type){ toast(kind.label+' is not available on an '+bus.toUpperCase()+' controller'); return; }
+  const a=childArray(pci,'storage');
+  const x=node('storage', Object.assign(nextAddress(pci,a,bus),
+              {type, model:'', media:'', media_kind:kind.media_kind}));
+  a.kids.push(x); sel=x.id; markDirty(); render();
+}
+function duplicate(){ const n=findById(sel); const par=parentOf(sel);
+  if(!n||!par||!['iic','pci','storage','bar'].includes(n.kind)) return;
+  const clone=JSON.parse(JSON.stringify(n)); reid(clone);
+  if(clone.fields.name) clone.fields.name+='_copy';
+  const i=par.kids.indexOf(n); par.kids.splice(i+1,0,clone); sel=clone.id; markDirty(); render(); }
+function reid(n){ n.id=nid(); (n.kids||[]).forEach(reid); }
+function del(){ const n=findById(sel); if(!n) return;
+  if(n.required){ toast('Cannot delete a required interface: '+REQ_IIC[n.fields.address]); return; }
+  const par=parentOf(sel); if(!par||!['iic','pci','storage','bar'].includes(n.kind)) return;
+  if(n.baseline && !confirm('"'+(n.fields.name||n.kind)+'" is a platform baseline controller.\nChanging it is not recommended. Delete anyway?')) return;
+  const i=par.kids.indexOf(n); par.kids.splice(i,1); sel=par.id; markDirty(); render(); }
+function save(){ document.getElementById('dirty').style.display='none'; dirty=false;
+  toastOk('Saved (mockup) -- a live build writes via the format-preserving core, .bak on overwrite'); }
+
+let toastTimer;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className='toast',2600); }
+function toastOk(msg){ const t=document.getElementById('toast'); t.textContent=msg;
+  t.style.background='#132218'; t.style.borderColor='#24512f'; t.style.color='#8ce69b'; t.className='toast show';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{t.className='toast'; t.style=''; },2600); }
+
+// ---------- top menus ----------
+function openMenu(anchor, items){
+  const m=document.getElementById('topmenu');
+  if(m.style.display==='block' && m.dataset.for===anchor.textContent){ m.style.display='none'; return; }
+  m.dataset.for=anchor.textContent;
+  m.innerHTML=items.map((it,i)=> it.sep ? '<div class="msep"></div>'
+    : `<div class="devitem" data-i="${i}">${it.label}${it.key?`<span class="mk">${it.key}</span>`:''}</div>`).join('');
+  m.querySelectorAll('.devitem').forEach(el=>el.onclick=()=>{ m.style.display='none'; const f=items[+el.dataset.i].fn; if(f) f(); });
+  const r=anchor.getBoundingClientRect(); m.style.left=r.left+'px'; m.style.top=(r.bottom+3)+'px'; m.style.display='block';
+}
+function fileMenu(e){ openMenu(e.target, [
+  {label:'New from template…', fn:()=>toast('mockup: New would clone the platform baseline (File>New, Q-5)')},
+  {label:'Open…',              fn:()=>toast('mockup: open a <model>_platform.json')},
+  {sep:true},
+  {label:'Save', key:'Ctrl+S',     fn:save},
+  {label:'Save As…',           fn:()=>toast('mockup: Save As… (.bak on overwrite)')},
+  {label:'Reload',                 fn:()=>toast('mockup: reload from disk (discard edits)')}
+]); }
+function helpMenu(e){ openMenu(e.target, [
+  {label:'Keyboard Shortcuts', fn:()=>showHelp('shortcuts')},
+  {label:'About',              fn:()=>showHelp('about')}
+]); }
+function runValidate(){ render();
+  const e=issues.filter(x=>x.sev==='err').length, w=issues.filter(x=>x.sev==='warn').length, i=issues.filter(x=>x.sev==='info').length;
+  toastOk(`Validation: ${issues.length} issue(s) — ${e} error, ${w} warn, ${i} info`); }
+function closeModal(){ document.getElementById('modal').classList.remove('show'); }
+function showHelp(which){
+  const mbox=document.getElementById('mbox');
+  if(which==='about'){
+    mbox.innerHTML=`<h3><span class="brand">Emulat<b>R</b></span> Platform Editor</h3>
+      <p>Authoring &amp; validation for EmulatR platform device manifests (<code>&lt;model&gt;_platform.json</code>).</p>
+      <p>Data-driven policy + device catalog, format-preserving save. SPEC-PLATED-001 / SPEC-SCSIH-001.</p>
+      <p style="border-top:1px solid var(--edge);padding-top:12px;color:var(--muted);font-size:12px;line-height:1.7">
+        <b style="color:var(--ink)">ASA-EmulatR</b> &mdash; Alpha AXP / EV6 Architecture Emulator<br>
+        Copyright &copy; 2025&ndash;2026 Timothy Peer (eNVy Systems, Inc.)<br>
+        Licensed under the <b style="color:var(--ink)">GNU General Public License v3.0</b>; a separate commercial license is available.<br>
+        peert@envysys.com &nbsp;&middot;&nbsp; https://envysys.com</p>
+      <button class="tbtn" onclick="closeModal()">Close</button>`;
+  } else {
+    mbox.innerHTML=`<h3>Keyboard Shortcuts</h3>
+      <ul><li><span class="k">Ctrl+S</span> save</li>
+      <li><span class="k">Del</span> delete selected (guarded: required blocked, baseline warns)</li>
+      <li><span class="k">↑</span>/<span class="k">↓</span> move · <span class="k">Enter</span> expand / edit</li></ul>
+      <button class="tbtn" onclick="closeModal()">Close</button>`;
+  }
+  document.getElementById('modal').classList.add('show');
+}
+
+// ---------- validation (computed live from the model) ----------
+let issues=[]; let nodeFlags={};
+const hx = s => parseInt(String(s).replace(/^0x/i,''),16);
+const isHex = s => /^0x[0-9a-fA-F]+$/.test(String(s));
+function validate(){
+  const out=[]; const A=(sev,id,src,node,msg)=>out.push({sev,id,src,node,msg});
+  // IIC
+  const addr={}, inm={};
+  iicArray.kids.forEach(n=>{ const f=n.fields;
+    if(!isHex(f.address)) A('warn','V-05','T',n,`${f.name}: address '${f.address}' is not valid hex`);
+    else { const v=hx(f.address);
+      if(v&1) A('err','V-06','E',n,`${f.name}: address ${f.address} is odd (emulator rejects manifest)`);
+      if(addr[v]) A('err','V-02','E',n,`duplicate IIC address ${f.address}`); addr[v]=1; }
+    if(inm[f.name]) A('warn','V-03','T',n,`duplicate name '${f.name}' in iic_devices`); inm[f.name]=1;
+    if((f.comment||'').includes('_PROVISIONAL')) A('info','V-11','T',n,`${f.name}: comment contains _PROVISIONAL`);
+  });
+  // PCI
+  const bdf={}, pnm={};
+  pciArray.kids.forEach(p=>{ const f=p.fields;
+    const k=`${f.hose}/${f.bus}/${f.slot}/${f.func}`;
+    if(bdf[k]) A('err','V-01','E',p,`${f.name}: duplicate BDF ${f.hose}:${f.bus}:${f.slot}.${f.func}`); bdf[k]=1;
+    if(pnm[f.name]) A('warn','V-03','T',p,`duplicate name '${f.name}' in pci_devices`); pnm[f.name]=1;
+    if(!isHex(f.vendor)||hx(f.vendor)===0||hx(f.vendor)===0xffff) A('err','V-15','E',p,`${f.name}: invalid vendor ${f.vendor}`);
+    if((f.comment||'').includes('_PROVISIONAL')) A('info','V-11','T',p,`${f.name}: comment contains _PROVISIONAL`);
+    const chArr=p.kids.find(a=>a.arrayKey==='channels'); const chIdx={};
+    if(chArr) chArr.kids.forEach(c=>{ if(chIdx[c.fields.index]!==undefined) A('err','V-28','E',c,`duplicate channel index ${c.fields.index}`); chIdx[c.fields.index]=c.fields; });
+    const stArr=p.kids.find(a=>a.arrayKey==='storage'); const cu={};
+    if(stArr) stArr.kids.forEach(s=>{ const sf=s.fields;
+      const ck=`${sf.channel}/${sf.unit}`;
+      if(cu[ck]) A('err','V-04','E',s,`${f.name}: duplicate (channel ${sf.channel}, unit ${sf.unit})`); cu[ck]=1;
+      if(/^scsi/.test(sf.type)){ const ch=chIdx[sf.channel];
+        if(!ch) A('err','V-26','E',s,`storage channel ${sf.channel} has no channels[] entry (dangling FK)`);
+        else { if(+sf.unit===+ch.initiator_id) A('err','V-25','E',s,`target ${sf.unit} == initiator_id (the HBA's own id)`);
+               if(ch.width==='narrow'&&+sf.unit>7) A('err','V-27','E',s,`narrow bus: target ${sf.unit} > 7`); } }
+    });
+  });
+  A('warn','V-24','E',null,`ini [System] model=ES40 != manifest platform=${root.fields.platform} (illustrative -- ini not loaded)`);
+  return out;
+}
+function computeVal(){ issues=validate(); nodeFlags={};
+  issues.forEach(x=>{ if(!x.node) return; const id=x.node.id;
+    if(x.sev==='err') nodeFlags[id]='err'; else if(x.sev==='info'&&nodeFlags[id]!=='err') nodeFlags[id]='info'; }); }
+function renderIssues(){
+  const e=issues.filter(x=>x.sev==='err').length, w=issues.filter(x=>x.sev==='warn').length;
+  document.getElementById('issHead').textContent=`Issues (${issues.length})  ·  ${e} error, ${w} warn`;
+  document.getElementById('issues').innerHTML=issues.map((x,i)=>
+    `<div class="issue" data-i="${i}"><span class="dot ${x.sev}"></span><span class="id">${x.id}</span>`
+    +`<span class="src">${x.src}</span><span class="msg">${x.msg}</span></div>`).join('');
+  document.querySelectorAll('.issue').forEach(el=>el.onclick=()=>{ const x=issues[+el.dataset.i]; if(x.node) sel=x.node.id; render(); });
+}
+
+render();
+</script>
+</body>
+</html>

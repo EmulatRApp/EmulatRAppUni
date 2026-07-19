@@ -12,7 +12,9 @@
 # the bulk of cycles late in the run -- the candidate "wedge" pattern.
 #
 # Line format expected:
-#   RET [cpu=<n> ]rpcc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
+#   RET [cpu=<n> ]rpcc=<n> pc=0x<hex> <mnem> pal=<0|1> exc=0x<hex>[ R<dd>=0x<hex>]*
+#   (2026-07-15: hex fields now 0x-prefixed + leading zeros stripped; the legacy
+#    fixed-width <hex16> form is still parsed via an optional 0x in the regex.)
 #   (cpu= is the optional SMP slot tag; rpcc= was formerly cyc=, renamed
 #    2026-06-20 -- it is the per-CPU PCC.  Both forms are accepted.)
 #
@@ -57,7 +59,7 @@ from pathlib import Path
 # `cyc=`->`rpcc=` rename (2026-06-20) are both tolerated; `cyc=` is still
 # accepted so pre-rename trace files keep parsing.
 RET_LINE = re.compile(
-    r"RET\s+(?:ord=\d+\s+)?(?:cpu=\d+\s+)?(?:rpcc|cyc)=(\d+)\s+pc=([0-9a-fA-F]+)\s+(\S+)"
+    r"RET\s+(?:ord=\d+\s+)?(?:cpu=\d+\s+)?(?:rpcc|cyc)=(\d+)\s+pc=(?:0x)?([0-9a-fA-F]+)\s+(\S+)"
 )
 
 

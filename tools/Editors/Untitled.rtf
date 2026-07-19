@@ -1,0 +1,501 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2709
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 EmulatR Platform Manifest Editor -- Design Brief and Implementation Spec\
+Doc id\'a0\'a0\'a0\'a0\'a0 : SPEC-PLATED-001\
+Status\'a0\'a0\'a0\'a0\'a0 : DRAFT -- partial sign-off 2026-07-17 (see Section 14, Decision Log)\
+\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 Q-2 and Q-4 CLOSED. Q-1, Q-3, Q-5, Q-6, Q-7 remain open.\
+Date\'a0\'a0\'a0\'a0\'a0\'a0\'a0 : 2026-07-17\
+Author\'a0\'a0\'a0\'a0\'a0 : Tim (design) / drafted for Cowork (implementation)\
+Subject\'a0\'a0\'a0\'a0 : GUI editor for EmulatR platform device manifests (platform.json)\
+Reference\'a0\'a0 : ds20_v7_3_platform.json (manifest_version 1, 2026-06-16)\
+Encoding\'a0\'a0 \'a0: ASCII-128 throughout. Hex radix for addresses and IDs.\
+\
+0. Sign-off gate\
+No source lands until Section 13 (Open Questions) is resolved. Sections 3, 6, and 7 carry architectural decisions that deviate from or reinterpret the field classification in the originating request; those deviations are called out explicitly and marked [DEVIATION].\
+\
+1. Problem statement\
+The platform manifest (<platform>_platform.json) is the declarative device description consumed at EmulatR bring-up: IIC bus population, PCI hose/bus/slot/ func topology, BAR layout, storage attachment, and per-device provisional notes. It is currently hand-authored. Hand-authoring is failing in three specific ways:\
+\'a0\'a0\'a0\'a01\'a0\'a0\'a0\'a0Silent topology errors. A duplicated (hose,bus,slot,func) tuple or a mistyped IIC address (0x9e vs 0x9E vs 0x09e) produces a manifest that parses cleanly and enumerates wrongly. The failure surfaces hours later as a missing device in an SRM retire-trace.\
+\'a0\'a0\'a0\'a02\'a0\'a0\'a0\'a0Identity drift. vendor / device / class_code are properties of the modelled silicon, not of the platform. A hand-edited manifest can claim model: cypress_ide with an ALi vendor ID and nothing objects.\
+\'a0\'a0\'a0\'a03\'a0\'a0\'a0\'a0Cross-platform divergence. DS10, DS20, and ES40 manifests share most of their structure. There is no tooling that makes the deltas legible.\
+The tool is an authoring and validation aid. It is not part of the emulator runtime and links no EmulatR core code -- the Qt-free core mandate is unaffected.\
+\
+2. Non-goals\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Not a schema authority. The manifest schema is explicitly not final. The tool must not become the thing that blocks schema evolution (see Section 4).\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Not a device-model editor. It edits manifests, not the C++ device classes.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Not a live/attached editor. No connection to a running EmulatR instance.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0No manifest migration engine in v1. manifest_version is displayed, not rewritten.\
+\
+3. Frontend decision\
+Recommendation: Qt 6 Widgets, C++20, CMake, MSVC. Not QML. Not web.\
+Rationale:\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Qt Widgets is the correct tool for dense, form-heavy, tree-structured data editors. QTreeView + QAbstractItemModel + QStyledItemDelegate maps almost one-to-one onto the "nested hive -> expansion point" model described in the request. QML would require re-implementing that machinery.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Toolchain already exists on the Z6 (Qt6 + CMake + VS2022). Zero new dependencies.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0A web front end (React + a JSON-schema form library) is the standard answer for this problem class and is genuinely good at it, but it drags in either a local HTTP server or an Electron shell, neither of which earns its cost for a single-user desktop authoring tool that lives next to the emulator binary.\
+[DEVIATION] The request describes some fields as opening into "a window, dialog, or frame on the page." The spec proposes a single master-detail layout (tree + property pane) rather than nested modal dialogs. Nested dialogs for nested JSON would require the user to open three dialogs deep to edit a BAR size. Sign-off requested on Section 8.\
+\
+4. Governing principle: the schema is not final\
+This is the design constraint that dominates every other decision. A GUI whose field set is hardcoded in C++ dies on the first schema change. Therefore:\
+P-1. Data-driven. Widget selection, enumerations, and read/write policy live in an external policy file (platform_schema.json), not in C++. Adding a field to the manifest means editing the policy file, not recompiling.\
+P-2. Preserve-unknown. Any key present in the manifest but absent from the policy file is displayed with a generic editor, is fully editable, and is written back byte-for-byte on save. The tool never drops what it does not understand. This is what allows the manifest to evolve without the tool becoming a bottleneck.\
+P-3. Non-destructive. The tool warns; it does not correct. _PROVISIONAL values, catalog conflicts, and validation failures are surfaced in a warnings dock and never silently rewritten.\
+\
+5. Architecture\
+5.1 Layers\
++--------------------------------------------------+\
+| Presentation\'a0\'a0 MainWindow, TreeView, PropertyPane |\
++--------------------------------------------------+\
+| Policy\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 SchemaPolicy, PathMatcher,\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
+|\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 WidgetFactory, DeviceCatalog\'a0\'a0\'a0\'a0\'a0\'a0 |\
++--------------------------------------------------+\
+| Model\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 ManifestModel (QAbstractItemModel) |\
++--------------------------------------------------+\
+| DOM\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 Node tree, ordered, typed\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
++--------------------------------------------------+\
+| I/O\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 OrderedJsonReader / Writer\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
++--------------------------------------------------+\
+Downward dependency only. DOM and I/O are Qt-Core-only (no Widgets) so they are unit-testable headless and reusable by a CLI validate mode (T-11).\
+5.2 DOM node\
+Do not build the item model directly over QJsonDocument. QJsonValue is a value type; QAbstractItemModel requires stable parent pointers and stable child indices. Parse once into an owned tree:\
+struct Node \{\
+\'a0\'a0\'a0 NodeKind\'a0\'a0\'a0\'a0\'a0 kind;\'a0\'a0\'a0\'a0\'a0 // Object, Array, String, Number, Bool, Null\
+\'a0\'a0\'a0 std::string\'a0\'a0 key;\'a0\'a0\'a0\'a0\'a0\'a0 // "" for array elements\
+\'a0\'a0\'a0 std::string\'a0\'a0 raw;\'a0\'a0\'a0\'a0\'a0\'a0 // original scalar text, verbatim\
+\'a0\'a0\'a0 QVariant\'a0\'a0\'a0\'a0\'a0 value;\'a0\'a0\'a0\'a0 // typed scalar\
+\'a0\'a0\'a0 Node*\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 parent;\
+\'a0\'a0\'a0 std::vector<std::unique_ptr<Node>> children;\'a0\'a0 // AUTHORED ORDER\
+\'a0\'a0\'a0 int\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 \'a0\'a0originIndex;\'a0\'a0 // ordinal in source, for stable re-emit\
+\'a0\'a0\'a0 bool\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 dirty;\
+\};\
+Each node exposes a canonical path (Section 6.1) computed from its ancestry.\
+5.3 Key-order preservation -- MANDATORY\
+QJsonObject stores keys sorted lexicographically. A naive QJsonDocument::fromJson() -> edit -> toJson() round trip will reorder every object in the manifest. Applied to ds20_v7_3_platform.json, comment migrates above manifest_version, bars above class_code, and every review diff becomes unreadable noise.\
+Requirements:\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0OrderedJsonReader is a hand-rolled recursive-descent parser producing the Node tree in authored order. It does not route through QJsonObject.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0OrderedJsonWriter emits authored order, 2-space indent, \\n line endings, strict JSON (no //, no /* */ -- the manifest convention of comment string fields is preserved as ordinary data).\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Scalars that were not edited re-emit from Node::raw verbatim. This preserves "0x9e" as-authored rather than normalizing it to "0x9E", and preserves hex-vs-decimal choices exactly.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Source file uses mixed tab/space indentation (see iic_ocp0 entry). The writer normalizes indentation to 2 spaces. This is the one intentional normalization; it must be applied in a single dedicated commit so the diff is reviewable.\
+Round-trip contract: load any of the three manifests, make zero edits, save. Output must be semantically identical and diff-clean modulo the indentation normalization above. This is the T-01 acceptance test and it is a hard gate.\
+5.4 Tree model\
+ManifestModel : QAbstractItemModel exposes containers only -- objects and arrays. Scalars are not tree rows; they are fields in the property pane of their parent container. Rationale: a scalar-bearing tree produces 40-row single-column chains and buries bars[0].size three expansions deep. Tree for structure, property pane for values.\
+Tree shape for the DS20 reference manifest:\
+DS20\'a0 (platform root)\
++-- iic_devices\'a0 [8]\
+|\'a0\'a0 +-- iic_system0\'a0\'a0\'a0\'a0\'a0 0x70\'a0\'a0 status\
+|\'a0\'a0 +-- iic_system1\'a0\'a0\'a0\'a0\'a0 0x72\'a0\'a0 status\
+|\'a0\'a0 +-- iic_smb0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 0xA2\'a0\'a0 fru_eeprom\
+|\'a0\'a0 +-- iic_cpu0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 0xA4\'a0\'a0 fru_eeprom\
+|\'a0\'a0 +-- iic_rcm_nvram0\'a0\'a0 0xC0\'a0\'a0 nvram\
+|\'a0\'a0 +-- iic_ocp0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 0x40\'a0\'a0 status\
+|\'a0\'a0 +-- iic_ocp1\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 0x42\'a0\'a0 status\
+|\'a0\'a0 +-- iic_rcm_temp\'a0\'a0\'a0\'a0 0x9e\'a0\'a0 status\
++-- pci_devices\'a0 [3]\
+\'a0\'a0\'a0 +-- cypress_isa\'a0\'a0\'a0\'a0\'a0 0:0:5.0\'a0\'a0 0x1080:0xc693\
+\'a0\'a0\'a0 +-- cypress_ide\'a0\'a0\'a0\'a0\'a0 0:0:5.1\'a0\'a0 0x1080:0xc693\
+\'a0\'a0\'a0 |\'a0\'a0 +-- storage\'a0 [2]\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0 +-- ch0 unit0\'a0 ata_disk\'a0\'a0\'a0\'a0 dqa0\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0 +-- ch0 unit1\'a0 atapi_cdrom\'a0 dqa1\
+\'a0\'a0\'a0 +-- de500_tulip\'a0\'a0\'a0\'a0\'a0 0:0:7.0\'a0\'a0 0x1011:0x0019\
+\'a0\'a0\'a0\'a0\'a0\'a0\'a0 +-- bars\'a0 [2]\
+\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 +-- BAR0\'a0 io\'a0\'a0 0x80\
+\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 +-- BAR1\'a0 mem\'a0 0x80\
+Row label is synthesized from a policy-declared labelFormat per container type, so it survives schema drift. Nodes carrying validation warnings get a decorated icon; nodes whose comment contains _PROVISIONAL get a distinct decoration.\
+\
+6. Field policy\
+6.1 The governing test: does the platform builder read this key?\
+Signed off 2026-07-17. Tier assignment is not a matter of taste. One question decides it:\
+A field is editable if changing it changes what the emulator does. A field is derived if it does not.\
+The corollary matters more than the rule. CypressIde almost certainly hardcodes its own PCI config header -- 0x1080:0xc693 lives in the C++ class, because config space is part of the device model. If the manifest parser never reads pci_devices[*].vendor, then that key is not configuration at all. It is an echo: documentation of what the class already does, written into the file for human legibility.\
+Making an echo field editable is strictly worse than making it readonly. The user types a value, nothing happens, and the manifest now lies. That is the identity drift of Section 1 with a text box attached.\
+T-00 (Section 10) is the evidence gate for this section. No policy table lands until a pass over the manifest parser establishes which keys it actually consumes. The table in 6.4 is a prediction pending that pass, and every row is subject to it.\
+Predicted partition:\
+Class\
+Keys\
+Read -> editable\
+hose, bus, slot, func, interrupt_pin, option_rom, address, byte, size (nvram), media, media_kind, storage.*, name\
+Echo -> derived\
+vendor, device, class_code, bars[*]\
+Two consequences already accepted:\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0interrupt_pin moves to editable. If IRQ routing reads it, it is board wiring (a platform property), not silicon identity (a device property). This reverses the initial classification -- see Q-2, closed.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0bars[*] stays derived. BAR size is decided by the silicon; the device decodes what it decodes. freeform: true remains the escape hatch for generic -- see Q-4, closed.\
+On keeping the echo fields at all. If model: cypress_ide is sufficient to reconstruct vendor / device / class_code, those keys are pure redundancy and therefore a drift source. They are kept because they buy manifest legibility -- the topology is readable without cross-referencing the catalog -- and V-07 makes the redundancy safe rather than dangerous. This is a deliberate trade, not an oversight. Every echoed field is a field that can disagree with the truth, and the validator is the only thing standing between those two states.\
+6.2 The collision problem, and why policy is path-keyed\
+The originating classification lists type under both readonly and selectable, kind under both readonly and selectable, and both device-name (readonly) and Name (selectable). These are not contradictions in the request -- they are evidence that the same leaf name means different things at different depths:\
+pci_devices[*].bars[*].kind\'a0\'a0\'a0\'a0\'a0\'a0\'a0 io | mem\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 -> catalog-derived\
+pci_devices[*].storage[*].type\'a0\'a0\'a0\'a0 ata_disk | atapi_cdrom -> user choice\
+iic_devices[*].class\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 status | fru_eeprom | nvram\
+iic_devices[*].size\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 nvram byte count\'a0\'a0\'a0 -> user-editable\
+pci_devices[*].bars[*].size\'a0\'a0\'a0\'a0\'a0\'a0\'a0 BAR aperture\'a0\'a0\'a0\'a0\'a0\'a0\'a0 -> catalog-derived\
+iic_devices[*].size and pci_devices[*].bars[*].size are the clearest case: same leaf name, opposite policy.Therefore policy is keyed by path, never by leaf name. Path grammar:\
+$.platform\
+$.iic_devices[*].address\
+$.pci_devices[*].bars[*].kind\
+$.pci_devices[*].storage[*].media\
+* matches any array index. Longest-literal-prefix wins on conflict. Unmatched paths fall through to P-2 passthrough.\
+6.3 Reframing the three tiers [DEVIATION]\
+The request's "readonly" and "selectable" tiers overlap because both express the same intent: the user must not free-type this. The distinction that actually matters mechanically is where the value comes from:\
+Tier\
+Meaning\
+Widget\
+derived\
+Value is a property of the selected model; populated from the catalog, never typed\
+Greyed QLabel, monospace\
+enum\
+Closed set, fully known\
+QComboBox (locked)\
+openEnum\
+Known set exists but authoring new values is legitimate\
+QComboBox (editable)\
+free\
+Genuinely free text\
+QLineEdit\
+multiline\
+Prose\
+QPlainTextEdit\
+int\
+Bounded integer\
+QSpinBox\
+hex\
+Hex scalar, validated\
+QLineEdit + validator\
+path\
+Filesystem reference\
+QLineEdit + browse\
+passthrough\
+Unknown to policy (P-2)\
+Type-inferred, editable\
+derived fields additionally carry a per-field overridden state -- see Section 7.1. Overridden is a state, not a tier: the field's tier stays derived, and the catalog value it departed from is retained for display and for V-07.\
+This preserves the request's intent exactly -- vendor is still uneditable, media_kind is still a dropdown -- while making the reason machine-checkable.\
+6.4 Policy table\
+Resolved by path. Every row is _PROVISIONAL pending T-00 (Section 6.1): the read-vs-echo pass over the manifest parser is the evidence, and this table is the hypothesis. [?] marks entries requiring sign-off (see Section 13).\
+Path\
+Tier\
+Values / notes\
+$.manifest_version\
+derived\
+display only; migration is out of scope\
+$.platform\
+enum\
+DS10, DS20, ES40 (from catalog)\
+$.comment\
+multiline\
+\
+$.iic_devices[*].name\
+openEnum\
+known roles; unique within array [?]\
+$.iic_devices[*].address\
+hex\
+0x00..0xFE, even (7-bit addr << 1)\
+$.iic_devices[*].class\
+enum\
+status, fru_eeprom, nvram\
+$.iic_devices[*].byte\
+hex\
+0x00..0xFF\
+$.iic_devices[*].size\
+int\
+nvram only; 1..65536\
+$.iic_devices[*].manufacturer\
+openEnum\
+DEC, ...\
+$.iic_devices[*].model\
+openEnum\
+per request: selectable\
+$.iic_devices[*].part_class\
+free\
+\
+$.iic_devices[*].serial\
+free\
+\
+$.iic_devices[*].comment\
+multiline\
+\
+$.pci_devices[*].name\
+openEnum\
+unique within array [?]\
+$.pci_devices[*].model\
+enum\
+catalog key; drives all derived below\
+$.pci_devices[*].hose\
+int\
+0..1 [?]\
+$.pci_devices[*].bus\
+int\
+0..255\
+$.pci_devices[*].slot\
+int\
+0..31\
+$.pci_devices[*].func\
+int\
+0..7\
+$.pci_devices[*].vendor\
+derived\
+from catalog[model]\
+$.pci_devices[*].device\
+derived\
+from catalog[model]\
+$.pci_devices[*].class_code\
+derived\
+from catalog[model]\
+$.pci_devices[*].option_rom\
+enum\
+true, false (per request: dropdown)\
+$.pci_devices[*].interrupt_pin\
+int\
+0..4 (0=none, A..D). Q-2 CLOSED: board wiring, read by IRQ routing -> editable\
+$.pci_devices[*].comment\
+multiline\
+\
+$.pci_devices[*].bars[*].index\
+derived\
+Q-4 CLOSED. freeform demotes to int\
+$.pci_devices[*].bars[*].kind\
+derived\
+io, mem. freeform demotes to enum\
+$.pci_devices[*].bars[*].size\
+derived\
+silicon decodes what it decodes. freeform demotes to hex\
+$.pci_devices[*].storage[*].channel\
+int\
+0..1\
+$.pci_devices[*].storage[*].unit\
+int\
+0..1\
+$.pci_devices[*].storage[*].lun\
+int\
+0..7\
+$.pci_devices[*].storage[*].type\
+enum\
+ata_disk, atapi_cdrom\
+$.pci_devices[*].storage[*].model\
+openEnum\
+\
+$.pci_devices[*].storage[*].media\
+path\
+resolved vs [Storage] diskDir\
+$.pci_devices[*].storage[*].media_kind\
+enum\
+image, iso\
+$.pci_devices[*].storage[*].comment\
+multiline\
+\
+[DEVIATION] The request specifies hose / bus / slot / func as text edit. Spec proposes QSpinBox with the ranges above. These are small bounded integers where a validated spinner strictly dominates free text and eliminates an entire class of topology typo. Sign-off requested.\
+[DEVIATION] The request does not classify address, byte, class, manufacturer, part_class, serial, channel, unit, or lun. Proposals above are inferred from the reference manifest. address is the highest-value entry here -- the iic_rcm_temp @ 0x9e root-cause makes clear that a mistyped IIC address is a genuinely expensive error, so it gets a real validator, not a text box.\
+6.5 Policy file sketch\
+\{\
+\'a0 "policy_version": 1,\
+\'a0 "rules": [\
+\'a0\'a0\'a0 \{ "path": "$.pci_devices[*].bars[*].kind",\
+\'a0\'a0\'a0\'a0\'a0 "tier": "derived", "values": ["io", "mem"] \},\
+\'a0\'a0\'a0 \{ "path": "$.pci_devices[*].storage[*].media_kind",\
+\'a0\'a0\'a0\'a0\'a0 "tier": "enum", "values": ["image", "iso"] \},\
+\'a0\'a0\'a0 \{ "path": "$.pci_devices[*].vendor",\
+\'a0\'a0\'a0\'a0\'a0 "tier": "derived", "source": "catalog:$.pci_devices[*].model#vendor" \},\
+\'a0\'a0\'a0 \{ "path": "$.pci_devices[*].slot",\
+\'a0\'a0\'a0\'a0\'a0 "tier": "int", "min": 0, "max": 31 \}\
+\'a0 ],\
+\'a0 "containers": [\
+\'a0\'a0\'a0 \{ "path": "$.pci_devices[*]",\
+\'a0\'a0\'a0\'a0\'a0 "labelFormat": "\{name\}\'a0 \{hose\}:\{bus\}:\{slot\}.\{func\}\'a0 \{vendor\}:\{device\}" \},\
+\'a0\'a0\'a0 \{ "path": "$.iic_devices[*]",\
+\'a0\'a0\'a0\'a0\'a0 "labelFormat": "\{name\}\'a0 \{address\}\'a0 \{class\}" \}\
+\'a0 ]\
+\}\
+\
+7. Device catalog\
+device_catalog.json is the reason the derived tier exists and is the heart of the tool. It declares each modelled device once:\
+\{\
+\'a0 "catalog_version": 1,\
+\'a0 "pci_models": [\
+\'a0\'a0\'a0 \{ "model": "cypress_ide", "vendor": "0x1080", "device": "0xc693",\
+\'a0\'a0\'a0\'a0\'a0 "class_code": "0x010100", "interrupt_pin": 0, "bars": [],\
+\'a0\'a0\'a0\'a0\'a0 "supports": ["storage"],\
+\'a0\'a0\'a0\'a0\'a0 "comment": "Cypress 82C693 IDE func1. Fixed legacy ports; no relocatable BARs." \},\
+\'a0\'a0\'a0 \{ "model": "generic", "vendor": null, "device": null, "class_code": null,\
+\'a0\'a0\'a0\'a0\'a0 "freeform": true,\
+\'a0\'a0\'a0\'a0\'a0 "comment": "Escape hatch. All identity fields become user-authored." \}\
+\'a0 ],\
+\'a0 "platforms": ["DS10", "DS20", "ES40"]\
+\}\
+Behaviour:\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Selecting model in the property pane populates every derived field from the catalog entry, marks them greyed, and shows the catalog comment as field-level help.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Conflict policy (P-3). If the loaded manifest's value for a derived field disagrees with the catalog, the tool does not overwrite. It renders the field with a conflict decoration, shows both values, and offers an explicit Adopt catalog value action. Nothing changes without a click.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0freeform: true models (generic, and today's de500_tulip entry uses it) demote all derived fields to their natural editable tier. This is how hand-authored BARs remain authorable -- see Section 13 Q-4.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Unknown model in manifest: warn, treat as freeform, preserve everything.\
+The catalog is hand-maintained in v1 and is the single point of truth for silicon identity. Future: generate it from the EmulatR device registry at build time so the manifest editor and the emulator cannot disagree. Out of scope for v1.\
+7.1 Per-field override -- the bring-up escape hatch\
+Signed off 2026-07-17. There is a real and recurring bring-up case that a strict derived policy would block: deliberately lying to the firmware to observe whether SRM enumerates differently. Presenting a wrong vendor ID on purpose is a legitimate diagnostic, and the iic_rcm_temp @ 0x9e root-cause is precedent for exactly that class of probe.\
+The answer is not a general unlock. It is a per-field override:\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Context menu on any derived field: Override catalog value.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0The field demotes to its natural editable tier for that node only. The catalog value is retained alongside the override, not discarded.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0The field renders in a visually distinctoverridden state -- not the greyed (catalog) treatment, and not an ordinary editable field either. It must be impossible to mistake a probe for a real value at a glance.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0V-07 fires and stays in the warnings dock for as long as the override lives.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Revert to catalog value restores the derived state.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0The override is persisted in the manifest as an ordinary value. The manifest format gains nothing; the tool remembers that the value disagrees with the catalog, because the catalog is right there to compare against.\
+Rationale: a throwaway probe should not require polluting the catalog, but it also must not look identical to an authored value. The default stays coherent, and the experiment is loud instead of silent.\
+\
+8. UI layout\
+\'a0\'a0\'a0 +-------------------------------------------------------------------+\
+\'a0\'a0\'a0 | File\'a0 Edit\'a0 Device\'a0 Validate\'a0 Help\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 +---------------------------+---------------------------------------+\
+\'a0\'a0\'a0 |\'a0 DS20\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\'a0 cypress_ide\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0 +-- iic_devices [8]\'a0\'a0\'a0\'a0\'a0 |\'a0 --------------------------------\'a0\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0 |\'a0\'a0 +-- iic_system0\'a0\'a0\'a0\'a0\'a0 |\'a0 name\'a0\'a0\'a0\'a0\'a0\'a0\'a0 [cypress_ide\'a0\'a0\'a0\'a0\'a0\'a0 v]\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0 |\'a0\'a0 +-- ...\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\'a0 model\'a0\'a0\'a0\'a0\'a0\'a0 [cypress_ide\'a0\'a0\'a0\'a0\'a0\'a0 v]\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0 |\'a0\'a0 +-- iic_rcm_temp\'a0 !\'a0 |\'a0 hose\'a0\'a0\'a0\'a0\'a0\'a0\'a0 [0]\'a0 bus\'a0 [0]\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0 +-- pci_devices [3]\'a0\'a0\'a0\'a0\'a0 |\'a0 slot\'a0\'a0\'a0\'a0\'a0\'a0\'a0 [5]\'a0 func [1]\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0 +-- cypress_isa\'a0\'a0\'a0\'a0\'a0 |\'a0 vendor\'a0\'a0\'a0\'a0\'a0\'a0 0x1080\'a0\'a0\'a0\'a0\'a0 (catalog)\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0 +-- cypress_ide\'a0\'a0 <\'a0 |\'a0 device\'a0\'a0\'a0\'a0\'a0\'a0 0xc693\'a0\'a0\'a0\'a0\'a0 (catalog)\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0 |\'a0\'a0 +-- storage [2]\'a0 |\'a0 class_code\'a0\'a0 0x010100\'a0\'a0\'a0 (catalog)\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0 +-- de500_tulip\'a0\'a0 P\'a0 |\'a0 option_rom\'a0 [false\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 v]\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\'a0 interrupt_pin 0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 (catalog)\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\'a0 comment\'a0\'a0\'a0\'a0 +-------------------+\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 | Cypress 82C693... |\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 +-------------------+\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 +---------------------------+---------------------------------------+\
+\'a0\'a0\'a0 |\'a0 Warnings (2)\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0 ! iic_rcm_temp\'a0\'a0 address 0x9e is odd; IIC addresses are even\'a0\'a0\'a0\'a0 |\
+\'a0\'a0\'a0 |\'a0 P de500_tulip\'a0\'a0\'a0 comment contains _PROVISIONAL (slot unverified) |\
+\'a0\'a0\'a0 +-------------------------------------------------------------------+\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Left: structure tree. Right: property pane for the selected node. Bottom: warnings dock (dockable, hideable).\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0derived fields render as greyed monospace with a (catalog) suffix, not as disabled line edits -- a disabled line edit reads as "broken", a label reads as "not yours to set".\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Clicking a warning selects the offending node and focuses the field.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Label copy follows the manifest's own vocabulary. The pane says hose, func, class_code -- not Bus Number or Device Class. The user speaks manifest.\
+\
+9. Validation\
+All validation is non-blocking (P-3). Save is never prevented; warnings persist in the dock. Rules, all _PROVISIONAL pending sign-off:\
+Id\
+Severity\
+Rule\
+V-01\
+error\
+duplicate (hose,bus,slot,func) tuple in pci_devices\
+V-02\
+error\
+duplicate address in iic_devices\
+V-03\
+error\
+duplicate name within an array\
+V-04\
+error\
+duplicate (channel,unit,lun) within one controller's storage\
+V-05\
+error\
+hex field fails ^0x[0-9a-fA-F]+$\
+V-06\
+warn\
+IIC address is odd (7-bit address left-shifted expects even)\
+V-07\
+warn\
+derived field disagrees with catalog. Fires for both unexplained drift and deliberate override (7.1); an override does not silence it, that is the point\
+V-08\
+warn\
+model not present in catalog\
+V-09\
+warn\
+bars[*].size not a power of two\
+V-10\
+warn\
+media non-empty and unresolvable under [Storage] diskDir\
+V-11\
+info\
+comment contains _PROVISIONAL\
+V-12\
+info\
+key present in manifest, absent from policy (P-2 passthrough)\
+V-13\
+error\
+any non-ASCII-128 codepoint in any string\
+V-13 enforces house style at the tool boundary. V-11 is deliberately info, not warn: _PROVISIONAL is a valid authoring state, not a defect.\
+\
+10. Ticket plan\
+Id\
+Ticket\
+Gate\
+T-00\
+Evidence pass. Grep the manifest parser for every key it consumes. Produce a read-vs-echo table (Section 6.1) as an artifact. No opinions, no code -- just what the parser reads\
+Blocks T-02 and T-03.Section 6.4 is rewritten from this result, not defended against it\
+T-01\
+Node DOM + OrderedJsonReader / OrderedJsonWriter\
+round-trip test on all three manifests, diff-clean\
+T-02\
+PathMatcher + SchemaPolicy loader\
+unit tests incl. the size collision case\
+T-03\
+DeviceCatalog loader + conflict detector\
+unit tests\
+T-04\
+ManifestModel : QAbstractItemModel (containers only)\
+tree renders DS20 per Section 5.4\
+T-05\
+WidgetFactory -- tier -> widget, driven by policy\
+all nine tiers instantiate\
+T-06\
+PropertyPane + two-way binding + dirty tracking\
+edit -> DOM -> save round trip\
+T-07\
+Catalog-derived population + Adopt catalog value + per-field override (7.1)\
+no silent overwrite; overridden state visually distinct from both derived and editable\
+T-08\
+Structural edit: add / remove / duplicate device [?] Q-3\
+blocked on sign-off\
+T-09\
+Validator + warnings dock + click-to-navigate\
+V-01..V-13\
+T-10\
+File open / save / save-as, .bak on overwrite, dirty prompt\
+\
+T-11\
+Headless CLI mode: PlatformEditor --validate <file>, exit code\
+usable from a build step\
+T-12\
+Packaging, windeployqt, ASCII-128 enforcement on save\
+\
+Exit criterion (litmus). Load DS10, DS20, and ES40 manifests. For each: zero edits, save, semantic diff empty. Then: change de500_tulip slot 7 -> 9 via the GUI, save, diff shows exactly one changed line. Until both hold, the tool is not trustworthy for authoring and no manifest is edited with it.\
+\
+11. Build and placement\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Standalone CMake target PlatformEditor, find_package(Qt6 COMPONENTS Widgets).\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0C++20, MSVC, warnings-as-errors consistent with the main tree.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Links no EmulatR core. Enforced by the target's link list, reviewed at T-12.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0Proposed location: D:\\EmulatR\\EmulatRAppUniV4\\PlatformEditor\\ _PROVISIONAL -- see Q-6.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0platform_schema.json and device_catalog.json ship beside the binary and are also checked into the tree as the authored source.\
+\
+12. Risks\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0R-1. Catalog and emulator device registry drift apart; the editor asserts an identity the emulator does not implement. Mitigated in v1 by V-08 warning only; properly fixed by build-time catalog generation (out of scope).\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0R-2. Policy file becomes a second, competing schema definition. Mitigated by P-2: policy is advisory presentation metadata, never a gate on what the manifest may contain.\
+\'a0\'a0\'a0\'a0\'95\'a0\'a0\'a0\'a0R-3. Scope creep into a general JSON editor. The catalog and the validation table are what make this an EmulatR tool rather than a worse version of a text editor. If those are thin, the tool has no reason to exist.\
+\
+13. Open questions -- sign-off required\
+Q-1. name semantics. The request lists device-name as readonly and Name as selectable. Spec reads name as the instance label (iic_cpu0, cypress_ide) and proposes openEnum + uniqueness check: pick a known role, or type a new one. Correct? Or is name intended to be catalog-derived from model, making it truly readonly?\
+Q-2. interrupt_pin. CLOSED 2026-07-17 -> editable (int). The pin is board wiring, not silicon identity. If IRQ routing reads it, changing it changes what the emulator does, and the read-vs-echo test (6.1) puts it in the editable column. This reverses the spec's initial classification. Confirmation still contingent on T-00.\
+Q-3. Structural editing (T-08). The field classification covers editing existing devices only. Must the GUI add and remove devices -- a new PCI card, a fourth IIC node -- or is v1 a value editor over an existing skeleton? This is the single largest scope fork in the spec.\
+Q-4. bars and the generic model. CLOSED 2026-07-17 -> derived, with freeform: true as the escape hatch. BAR size is decided by the silicon -- the device decodes what it decodes -- so bars[*] is derived for catalogued models. de500_tulip's hand-authored BARs remain authorable because model: generic carries freeform: true, which demotes every derived field to its natural editable tier.\
+Q-5. New manifest from scratch. Does the tool need File > New (template from catalog platforms), or does it only ever open an existing manifest?\
+Q-6. Placement. PlatformEditor\\ as a sibling of Emulatr\\? The existing tools convention (Emulatr\\tools\\) is scoped to shell scripts, so a CMake subproject there seems wrong. Your call.\
+Q-7. manifest_version. Display-only in v1. When the schema does move, does the tool refuse to open a newer manifest_version, or open it in passthrough-everything mode with a banner? Spec assumes the latter.\
+\
+14. Decision log\
+Date\
+Id\
+Decision\
+2026-07-17\
+D-001\
+Qt 6 Widgets. Not QML, not web. Existing toolchain, and Widgets is the correct tool for tree-structured data editors\
+2026-07-17\
+D-002\
+Policy is path-keyed, never leaf-name-keyed. Evidence: iic_devices[*].size and pci_devices[*].bars[*].size are the same leaf with opposite policy\
+2026-07-17\
+D-003\
+Hand-rolled ordered JSON reader/writer. QJsonObject sorts keys lexicographically and would reorder every object in the manifest\
+2026-07-17\
+D-004\
+P-2 preserve-unknown. The schema is not final; the tool must not become the thing that blocks it evolving\
+2026-07-17\
+D-005\
+The read-vs-echo test governs tier assignment. A field is editable iff changing it changes what the emulator does. Echo fields made editable are worse than readonly: the user types, nothing happens, the manifest lies\
+2026-07-17}

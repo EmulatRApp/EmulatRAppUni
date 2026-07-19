@@ -1,0 +1,68 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2709
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 Here are the corrected drafts. Both are text you can drop into the RTF (RTF string-editing tends to split runs across control words, so I'm giving you clean paste-in blocks rather than editing the binary in place \'97 say the word if you'd rather I write them to a .txt in the folder).\
+\
+Corrected \'a78 mockup\
+\
+Two fixes: interrupt_pin becomes an editable int (per Q-2 CLOSED), and the bogus odd-0x9e warning is replaced with an honest one \'97 an illustrative mistyped value (0x9e \uc0\u8594  0x9f), which is exactly the \'a71 motivating failure and is genuinely odd.\
+\
++-------------------------------------------------------------------+\
+| File  Edit  Device  Validate  Help                                |\
++---------------------------+---------------------------------------+\
+|  DS20                     |  cypress_ide                          |\
+|  +-- iic_devices [8]      |  --------------------------------     |\
+|  |   +-- iic_system0      |  name        [cypress_ide       v]    |\
+|  |   +-- ...              |  model       [cypress_ide       v]    |\
+|  |   +-- iic_rcm_temp  !  |  hose        [0]  bus  [0]            |\
+|  +-- pci_devices [3]      |  slot        [5]  func [1]            |\
+|      +-- cypress_isa      |  vendor       0x1080      (catalog)   |\
+|      +-- cypress_ide   <  |  device       0xc693      (catalog)   |\
+|      |   +-- storage [2]  |  class_code   0x010100    (catalog)   |\
+|      +-- de500_tulip   P  |  option_rom  [false             v]    |\
+|                           |  interrupt_pin [0]                    |\
+|                           |  comment     +-------------------+    |\
+|                           |              | Cypress 82C693... |    |\
+|                           |              +-------------------+    |\
++---------------------------+---------------------------------------+\
+|  Warnings (2)                                                     |\
+|  ! iic_rcm_temp   address 0x9f is odd; IIC addresses are even     |\
+|  P de500_tulip    comment contains _PROVISIONAL (slot unverified) |\
++-------------------------------------------------------------------+\
+\
+Note: the ! row illustrates V-06 after a fat-finger edit of iic_rcm_temp\
+0x9e -> 0x9f (the Section 1 motivating failure). On the as-authored\
+manifest every IIC address is even, so V-06 does NOT fire; the tree\
+decoration and this row appear only once the value is mistyped.\
+interrupt_pin renders as an editable int (Q-2 CLOSED), not (catalog).\
+\
+Patched \'a77 catalog sketch\
+\
+Adds cypress_isa so the reference manifest's first PCI device no longer trips V-08. Note it shares 0x1080:0xc693 with cypress_ide \'97 same multifunction chip, func 0 (ISA bridge) vs func 1 (IDE) \'97 which is correct, not a duplicate-identity error.\
+\
+\{\
+  "catalog_version": 1,\
+  "pci_models": [\
+    \{ "model": "cypress_isa", "vendor": "0x1080", "device": "0xc693",\
+      "class_code": "0x060100", "interrupt_pin": 0, "bars": [],\
+      "supports": [],\
+      "comment": "Cypress 82C693 ISA bridge, func0. Shares 0x1080:0xc693 with cypress_ide (same multifunction part, func0 vs func1). Fixed legacy south-bridge; no relocatable BARs." \},\
+    \{ "model": "cypress_ide", "vendor": "0x1080", "device": "0xc693",\
+      "class_code": "0x010100", "interrupt_pin": 0, "bars": [],\
+      "supports": ["storage"],\
+      "comment": "Cypress 82C693 IDE func1. Fixed legacy ports; no relocatable BARs." \},\
+    \{ "model": "generic", "vendor": null, "device": null, "class_code": null,\
+      "freeform": true,\
+      "comment": "Escape hatch. All identity fields become user-authored." \}\
+  ],\
+  "platforms": ["DS10", "DS20", "ES40"]\
+\}\
+\
+Two things worth threading back into prose while you're in there:\
+\
+- \'a76.5 labelFormat relies on \{vendor\}:\{device\} \'97 for a catalogued model those are derived, and a manifest may legitimately omit them (they're redundant per \'a76.1). State that the formatter resolves those tokens through the catalog, or the tree label goes blank for a minimal manifest.\
+- The shared 0x1080:0xc693 across two catalog entries means any V-07 "disagrees with catalog" check must key on (model \uc0\u8594  identity), not (identity \u8594  model). Non-blocking, but a one-liner in \'a77 prevents a future implementer from adding a "duplicate vendor/device" guard that would false-positive on every multifunction chip.}
