@@ -304,7 +304,7 @@ SRMConsoleDevice::Config Machine::makeCom1Cfg(
 {
     SRMConsoleDevice::Config cfg;
     // SSOT (Slice A): console config comes from the threaded EmulatorSettings,
-    // loaded once in main from EmulatrV4.ini.  Struct defaults live in
+    // loaded once in main from Emulatr.ini.  Struct defaults live in
     // SrmConsoleSettings (port 10023, never the privileged 23).
     cfg.port            = settings.srmConsole.port != 0
                               ? settings.srmConsole.port

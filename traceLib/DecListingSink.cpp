@@ -325,16 +325,17 @@ DecListingSink::DecListingSink(std::filesystem::path const& decLogPath,
             // Self-describing header: any consumer that opens the
             // file knows the format and elision rule without
             // needing external docs.
-            m_retireLog << "# EmulatR V4 retire trace -- compact format\n";
+            m_retireLog << "# EmulatR V5 retire trace -- compact format "
+                           "(hex fields 0x-prefixed, leading zeros stripped; zero = 0x0)\n";
             m_retireLog << "# run_started=" << stamp << "\n";
             m_retireLog << "# trace_mask=0x" << std::hex << std::setw(8)
                         << std::setfill('0') << traceMask
                         << std::dec << std::setfill(' ') << "\n";
-            m_retireLog << "# format: RET ord=<n> cpu=<n> rpcc=<n> pc=<hex16> <mnem> "
-                           "pal=<0|1> exc=<hex16>"
-                           " [=>R|F<dd>=<hex16>]"
-                           " [<ld|st><sz> va=<hex16> pa=<hex16> v=<hex16>]"
-                           " [sde=<n>] [H<dd>=<hex16>]*\n";
+            m_retireLog << "# format: RET ord=<n> cpu=<n> rpcc=<n> pc=0x<hex> <mnem> "
+                           "pal=<0|1> exc=0x<hex>"
+                           " [=>R|F<dd>=0x<hex>]"
+                           " [<ld|st><sz> va=0x<hex> pa=0x<hex> v=0x<hex>]"
+                           " [sde=<n>] [H<dd>=0x<hex>]*\n";
             m_retireLog << "# fields: =>Rdd/=>Fdd = destination reg write this "
                            "retire (omitted if none); ld/st = data access of "
                            "<sz> bytes; va = effective/virtual addr the leaf "
@@ -443,7 +444,10 @@ void DecListingSink::emitRetireCompact(uint64_t                   ordinal,
     // overlength tokens just push the remainder right rather than
     // crashing the format.
     char const* const mnem = record.mnemonic ? record.mnemonic : "?";
-    m_retireLog << vfmt("RET ord=%llu cpu=%u rpcc=%llu pc=%016llx %-8s pal=%d exc=%016llx",
+    // 2026-07-15: compact hex fields are now 0x-prefixed with leading zeros
+    // stripped (was fixed-width %016llx); a zero value prints as 0x0.  Parsers
+    // tolerate both forms (tools/analyze_retire_trace.py, diff_traces.py).
+    m_retireLog << vfmt("RET ord=%llu cpu=%u rpcc=%llu pc=0x%llx %-8s pal=%d exc=0x%llx",
                         static_cast<unsigned long long>(ordinal),
                         static_cast<unsigned>(postCommitCpu.cpuSlot),
                         static_cast<unsigned long long>(record.cycle),
@@ -468,15 +472,15 @@ void DecListingSink::emitRetireCompact(uint64_t                   ordinal,
     //   v=            : value loaded (into the dest reg) or stored
     if (coreLib::BoxResult const* const br = record.result) {
         if (br->regWriteIdx != coreLib::kNoRegWrite) {
-            m_retireLog << vfmt(br->regWriteIsFp ? " =>F%02d=%016llx"
-                                                 : " =>R%02d=%016llx",
+            m_retireLog << vfmt(br->regWriteIsFp ? " =>F%02d=0x%llx"
+                                                 : " =>R%02d=0x%llx",
                                 static_cast<int>(br->regWriteIdx),
                                 static_cast<unsigned long long>(br->regWriteValue));
         }
         if (br->memSize != coreLib::kNoMemEffect) {
             uint64_t const val = br->memIsStore ? br->memData
                                                 : br->regWriteValue;
-            m_retireLog << vfmt(" %s%u va=%016llx pa=%016llx v=%016llx",
+            m_retireLog << vfmt(" %s%u va=0x%llx pa=0x%llx v=0x%llx",
                                 br->memIsStore ? "st" : "ld",
                                 static_cast<unsigned>(br->memSize),
                                 static_cast<unsigned long long>(br->memAddr),
@@ -506,14 +510,14 @@ void DecListingSink::emitRetireCompact(uint64_t                   ordinal,
         for (int i = 0; i < 4; ++i) {            // intShadow[0..3] shadow R4..R7
             uint64_t const v = postCommitCpu.intShadow[i];
             if (v == 0) continue;
-            m_retireLog << vfmt(" H%02d=%016llx",
+            m_retireLog << vfmt(" H%02d=0x%llx",
                                 4 + i,
                                 static_cast<unsigned long long>(v));
         }
         for (int i = 0; i < 4; ++i) {            // intShadow[4..7] shadow R20..R23
             uint64_t const v = postCommitCpu.intShadow[4 + i];
             if (v == 0) continue;
-            m_retireLog << vfmt(" H%02d=%016llx",
+            m_retireLog << vfmt(" H%02d=0x%llx",
                                 20 + i,
                                 static_cast<unsigned long long>(v));
         }

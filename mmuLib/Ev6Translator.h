@@ -64,6 +64,25 @@
 //   and is consumed by the MEM-stage drainer.
 //
 // ============================================================================
+//
+// CHANGE HISTORY
+//   FILE 1: mmuLib/Ev6Translator.h
+//   FUNCTION: translateInstruction (ITB lookup hit/miss return)
+//   CHANGE 2026-07-18 (JRN-VMB-003, ITBPROBE): restored this file from the
+//     intact 564-line good copy -- the active-hive copy had been truncated at
+//     the translateInstruction declaration (body absent, no include-guard
+//     #endif) and would not compile -- then added the Step 1b hit-path and
+//     miss-path ITBPROBE at the ITB lookup return.  The probe is
+//     EMULATR_BRINGUP_PROBES-gated, keyed to EMULATR_ITBPROBE_VA (default
+//     0x20000000, the VMB system-software entry, PC<0>-masked), capped at 16,
+//     and emits the JRN-VMB-003 Sec 6 discriminator fields
+//     (pte/valid/pfn/foe/res/pa/ZEROPFN) plus a one-shot ARMED line.  It is
+//     observe-only and zero-cost when the flag is off.  Bug addressed: the VA
+//     0x20000000 boot fetch resolves as an ITB HIT with PFN 0 and NO miss
+//     fires; this probe splits H-A (a stale / invalid entry being HIT) from a
+//     wrongly-filled PFN-0 entry, per the Sec 6 decision table.
+//
+// ============================================================================
 
 #ifndef MMULIB_EV6TRANSLATOR_H
 #define MMULIB_EV6TRANSLATOR_H
@@ -549,10 +568,81 @@ struct Ev6Translator
         // vector refills (HW_MTPR ITB_TAG/PTE) and retries the fetch.
         pteLib::LookupResult const r =
             cpu.itbMgr.lookup(pteLib::TlbRealm::Itb, va, cpu.asn);
+#if defined(EMULATR_BRINGUP_PROBES)
+        // ITBPROBE key (2026-07-18, JRN-VMB-003): computed once.  Default
+        // 0x20000000 (the VMB system-software entry, Sec 3); override with
+        // EMULATR_ITBPROBE_VA to key a different fetch site.  Bit 0 (PALmode
+        // PC<0>) is masked so the key compares against the address, not mode.
+        static uint64_t const s_itbProbeKey = []() noexcept -> uint64_t {
+            char const* e = std::getenv("EMULATR_ITBPROBE_VA");
+            uint64_t v = (e != nullptr && *e != '\0')
+                       ? std::strtoull(e, nullptr, 0)
+                       : 0x20000000ULL;
+            return v & ~uint64_t{1};
+        }();
+        bool const s_itbProbeKeyed = ((va & ~uint64_t{1}) == s_itbProbeKey);
+#endif
         if (r.isHit()) {
-            return applyTlbHit(r.pte, va, coreLib::AccessKind::Execute,
-                               cpu.mode, pa_out);
+            TranslationResult const hit =
+                applyTlbHit(r.pte, va, coreLib::AccessKind::Execute,
+                            cpu.mode, pa_out);   // ITBPROBE: pa_out set here
+#if defined(EMULATR_BRINGUP_PROBES)
+            // ITBPROBE hit-path (JRN-VMB-003 Sec 6): dump the resident ITB PTE
+            // + composed PA for the keyed VA.  ZEROPFN flags the PFN-0 case
+            // that the observed 0x20000000 halt exhibits; valid/pfn/foe split
+            // H-A (stale/invalid entry HIT) from a wrongly-filled PFN-0 entry.
+            if (s_itbProbeKeyed) {
+                static unsigned s_itbHit = 0;
+                if (s_itbHit < 16) {
+                    if (s_itbHit == 0) {
+                        std::fprintf(stderr,
+                            "ITBPROBE ARMED va=%016llx cap=16\n",
+                            static_cast<unsigned long long>(s_itbProbeKey));
+                    }
+                    ++s_itbHit;
+                    unsigned const zeropfn = (r.pte.pfn() == 0) ? 1u : 0u;
+                    std::fprintf(stderr,
+                        "ITBPROBE HIT n=%u cyc=%llu pal=%d va=%016llx mode=%d "
+                        "pte=%016llx valid=%d pfn=%llx foe=%d res=%d "
+                        "pa=%016llx ZEROPFN=%u\n",
+                        s_itbHit,
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<int>(cpu.inPalMode()),
+                        static_cast<unsigned long long>(va),
+                        static_cast<int>(cpu.mode),
+                        static_cast<unsigned long long>(r.pte.raw),
+                        static_cast<int>(r.pte.isValid()),
+                        static_cast<unsigned long long>(r.pte.pfn()),
+                        static_cast<int>(r.pte.faultOnExecute()),
+                        static_cast<int>(hit),
+                        static_cast<unsigned long long>(pa_out),
+                        zeropfn);
+                    std::fflush(stderr);
+                }
+            }
+#endif
+            return hit;   // ITBPROBE hit-path wraps this return
         }
+#if defined(EMULATR_BRINGUP_PROBES)
+        // ITBPROBE miss-path (JRN-VMB-003 Sec 4): a ZERO count of this line
+        // across a boot is the no-miss proof.  Keyed + capped identically.
+        if (s_itbProbeKeyed) {
+            static unsigned s_itbMiss = 0;
+            if (s_itbMiss < 16) {
+                ++s_itbMiss;
+                std::fprintf(stderr,
+                    "ITBPROBE MISS n=%u cyc=%llu pal=%d va=%016llx mode=%d "
+                    "asn=%u\n",
+                    s_itbMiss,
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<int>(cpu.inPalMode()),
+                    static_cast<unsigned long long>(va),
+                    static_cast<int>(cpu.mode),
+                    static_cast<unsigned>(cpu.asn));
+                std::fflush(stderr);
+            }
+        }
+#endif
         return TranslationResult::ItbMiss;
     }
 };

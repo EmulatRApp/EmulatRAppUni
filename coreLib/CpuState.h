@@ -381,14 +381,22 @@ struct CpuState
     //
     // The TBs are per-CPU and accessed single-threaded by this CPU's
     // pipeline, so the managers carry no synchronisation (see
-    // pteLib/TlbEpoch.h).  Each is a 16-shard x 8-way SPAM cache (128
-    // slots), matching the architectural per-realm TB size (HRM 4.2).
+    // pteLib/TlbEpoch.h).  Each is a 2-shard x 64-way SPAM cache (128
+    // slots).  The EV6 per-realm TB is 128-entry FULLY associative
+    // (21264/EV67 HRM Sec 2.5 / 4.2); <2,64> matches the 128-slot SIZE
+    // with 64-way/shard associativity -- enough that the VMB console-phase
+    // working set (~78 pages, ~39/shard) does not conflict-evict.  The
+    // former <16,8> matched SIZE but was only 8-way, so live identity-
+    // mapped console pages were CONFLICT-evicted and re-missed forever
+    // (JRN-VMB-012 root cause).  Exact 1x128 (one fully-assoc set) needs
+    // SPAMBucket occupancy widened past its Ways<=64 cap (SPAMBucket.h) --
+    // deferred; <2,64> is sufficient for the VMB working set.
     //
     // Lookup is driven by Ev6Translator; insert / invalidate are driven
     // by the HW_MTPR ITB_* / DTB_* PAL handlers, which reach these via
     // ExecCtx::cpu.
-    pteLib::SPAMShardManager<16, 8> itbMgr;
-    pteLib::SPAMShardManager<16, 8> dtbMgr;
+    pteLib::SPAMShardManager<2, 64> itbMgr;   // JRN-VMB-012: was <16,8> (8-way conflict-evicted)
+    pteLib::SPAMShardManager<2, 64> dtbMgr;   // JRN-VMB-012: 128 slots, 64-way/shard
 
     // TB IPR staging registers (HRM 5.2.1 / 5.3.x).  ITB_TAG / DTB_TAG
     // are write-only staging registers; a write to ITB_PTE / DTB_PTE

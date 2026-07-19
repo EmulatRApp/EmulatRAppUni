@@ -1,5 +1,5 @@
 // ============================================================================
-// IniLoader.h -- Load EmulatorSettings from EmulatrV4.ini
+// IniLoader.h -- Load EmulatorSettings from Emulatr.ini
 // ============================================================================
 // Project:           EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C):     2025, 2026 eNVy Systems, Inc.  All rights reserved.
@@ -8,7 +8,7 @@
 // AI Collaboration:  Claude (Anthropic)
 // ============================================================================
 //
-// Loads EmulatrV4.ini into an EmulatorSettings struct.  Uses QSettings
+// Loads Emulatr.ini into an EmulatorSettings struct.  Uses QSettings
 // internally for INI parsing -- this is startup-time periphery, the
 // V4-spec-permitted "Qt for utilities" case.  EmulatorSettings itself
 // stays Qt-free so that core code can read it without pulling in Qt.
@@ -16,10 +16,10 @@
 // Discovery:
 //   load(path) loads from an explicit path (typically passed via CLI).
 //   loadDefault() searches well-known locations:
-//     1. ./EmulatrV4.ini             (current working directory)
-//     2. ./config/EmulatrV4.ini      (config subdir next to executable)
-//     3. <exe-dir>/EmulatrV4.ini
-//     4. <exe-dir>/config/EmulatrV4.ini
+//     1. ./Emulatr.ini             (current working directory)
+//     2. ./config/Emulatr.ini      (config subdir next to executable)
+//     3. <exe-dir>/Emulatr.ini
+//     4. <exe-dir>/config/Emulatr.ini
 //   First hit wins.  If none found, returns defaults with a warning.
 //
 // Error handling:

@@ -1,5 +1,5 @@
 // ============================================================================
-// IniLoader.cpp -- Load EmulatorSettings from EmulatrV4.ini
+// IniLoader.cpp -- Load EmulatorSettings from Emulatr.ini
 // ============================================================================
 // Project:           EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C):     2025, 2026 eNVy Systems, Inc.  All rights reserved.
@@ -220,16 +220,16 @@ std::vector<std::filesystem::path> IniLoader::defaultSearchPaths() {
 
     namespace fs = std::filesystem;
     fs::path cwd = fs::current_path();
-    paths.push_back(cwd / "EmulatrV4.ini");
-    paths.push_back(cwd / "config" / "EmulatrV4.ini");
+    paths.push_back(cwd / "Emulatr.ini");
+    paths.push_back(cwd / "config" / "Emulatr.ini");
 
     // Executable directory (only meaningful if QCoreApplication is initialized)
     if (QCoreApplication::instance() != nullptr) {
         QString exeDir = QCoreApplication::applicationDirPath();
         if (!exeDir.isEmpty()) {
             fs::path exe = fs::path(exeDir.toStdString());
-            paths.push_back(exe / "EmulatrV4.ini");
-            paths.push_back(exe / "config" / "EmulatrV4.ini");
+            paths.push_back(exe / "Emulatr.ini");
+            paths.push_back(exe / "config" / "Emulatr.ini");
         }
     }
 
@@ -246,7 +246,7 @@ IniLoader::LoadResult IniLoader::loadDefault() {
     // Nothing found -- return defaults with a clear warning listing where we looked.
     LoadResult result;
     result.foundFile = false;
-    std::string msg = "EmulatrV4.ini not found in any of:";
+    std::string msg = "Emulatr.ini not found in any of:";
     for (const auto& p : defaultSearchPaths()) {
         msg += "\n  " + p.string();
     }
