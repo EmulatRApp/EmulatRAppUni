@@ -9,6 +9,21 @@
 // AI Code Generation: Claude (Anthropic)
 // ============================================================================
 //
+// CHANGE HISTORY
+//   FILE 1: deviceLib/Tsunami/Uart16550.h
+//   FUNCTION: badgeEmitByte / bootstrapTraceWatch (new)
+//   CHANGE 2026-07-18 (JRN-VMB-004 followup, bootstrap trace-arm): added a
+//     TX-side line watch on the console output.  When the firmware emits the
+//     line "jumping to bootstrap code" (the VMB->bootstrap handoff), the watch
+//     latches once and calls traceLib::BreakpointSink::forceOpenNow(), which
+//     force-opens the full-retire trace window and holds it until clean
+//     shutdown -- so the boot transfer and the halt are captured without
+//     knowing the transfer PC.  Mirrors the existing snapshotWatch (RX) and
+//     the IicPcf8584 -> DecListingSink device-arms-trace precedent.
+//     EMULATR_BRINGUP_PROBES-gated; observe-only; zero-cost when the flag off.
+//
+// ============================================================================
+//
 // PURPOSE:
 //   Emulates a 16550-compatible UART at the register level. The SRM
 //   firmware discovers this UART through I/O port probing and uses it
@@ -142,6 +157,10 @@
 #include "chipsetLib/IDeviceHandlers.h"         // IIoPortHandler
 #include "deviceLib/IConsoleDevice.h"           // IConsoleDevice backend
 #include "deviceLib/BadgeMhzGauge.h"            // 2026-07-01: live effMhz for badge rewrite
+#if EMULATR_BRINGUP_PROBES
+#include <cstring>                              // 2026-07-18: strlen for bootstrap marker
+#include "traceLib/BreakpointSink.h"            // 2026-07-18: forceOpenNow() trace-arm
+#endif
 
 class Uart16550 : public IIoPortHandler
 {
@@ -616,6 +635,13 @@ private:
     std::chrono::steady_clock::time_point m_mirrorLast{};
     bool                                  m_mirrorFirst = true;
 
+#if EMULATR_BRINGUP_PROBES
+    // 2026-07-18 bootstrap trace-arm: transient TX line accumulator + one-shot
+    // latch.  NOT serialized (empty at every line boundary, like m_mirrorLine).
+    std::string                           m_btLine;
+    bool                                  m_btArmed = false;
+#endif
+
     // 2026-07-01: cosmetic "<n> MHz" badge-rewrite TX state (see badgeTxEmit).
     // Transient, NOT serialized -- empty at every line boundary.
     enum class BadgeState { Normal, Digits, Suffix };
@@ -759,6 +785,9 @@ private:
     void badgeEmitByte(uint8_t b) noexcept
     {
         consoleMirror(b);           // gated stderr mirror sees the rewritten bytes
+#if EMULATR_BRINGUP_PROBES
+        bootstrapTraceWatch(b);     // 2026-07-18: arm full trace at VMB handoff
+#endif
         if (m_backend) {
             m_backend->putChar(b);
         }
@@ -891,6 +920,69 @@ private:
         std::fflush(stderr);
         m_mirrorLine.clear();
     }
+
+#if EMULATR_BRINGUP_PROBES
+    // ------------------------------------------------------------------------
+    // Bootstrap trace-arm watch (2026-07-18, JRN-VMB-004 followup).
+    // ------------------------------------------------------------------------
+    // Accumulates the console TX stream a line at a time and, on the first line
+    // containing "jumping to bootstrap code" (the VMB->bootstrap handoff),
+    // force-opens the BreakpointSink full-retire window so the boot transfer
+    // and the halt are captured through clean shutdown.  Latched one-shot;
+    // observe-only; independent of the EMULATR_CONSOLE_MIRROR gate.
+    void bootstrapTraceWatch(uint8_t byte) noexcept
+    {
+        if (m_btArmed) return;                          // one-shot
+        char const c = static_cast<char>(byte);
+        if (c == '\n' || c == '\r') {
+            if (!m_btLine.empty() && lineHasMarker(m_btLine)) {
+                m_btArmed = true;
+                // 2026-07-18: force-open is OPT-IN.  It firehoses a full-retire
+                // record per instruction until shutdown -- from this marker to
+                // the transfer is ~250M cycles, which both throttles the run and
+                // produced a 143 GB trace.  The default diagnostic is now
+                // EMULATR_CHECKPOINTS (near-zero cost).  Set
+                // EMULATR_TRACE_ON_BOOTSTRAP=1 to re-enable the full-retire arm.
+                static bool const s_forceArm =
+                    (std::getenv("EMULATR_TRACE_ON_BOOTSTRAP") != nullptr);
+                if (s_forceArm) {
+                    traceLib::BreakpointSink::forceOpenNow();
+                    std::fprintf(stderr,
+                        "BRKSINK: bootstrap marker seen on %s -- full trace "
+                        "ARMED until shutdown (EMULATR_TRACE_ON_BOOTSTRAP)\n",
+                        m_name.c_str());
+                } else {
+                    std::fprintf(stderr,
+                        "BRKSINK: bootstrap marker seen on %s (force-open OFF; "
+                        "set EMULATR_TRACE_ON_BOOTSTRAP=1 to enable)\n",
+                        m_name.c_str());
+                }
+                std::fflush(stderr);
+            }
+            m_btLine.clear();
+            return;
+        }
+        if (m_btLine.size() < 256u) m_btLine.push_back(c);
+    }
+
+    // Case-insensitive ASCII substring test for the fixed bootstrap marker.
+    static bool lineHasMarker(std::string const& line) noexcept
+    {
+        static constexpr char kMarker[] = "jumping to bootstrap code";
+        std::size_t const mlen = std::strlen(kMarker);
+        if (line.size() < mlen) return false;
+        for (std::size_t i = 0; i + mlen <= line.size(); ++i) {
+            std::size_t j = 0;
+            for (; j < mlen; ++j) {
+                char a = line[i + j];
+                if (a >= 'A' && a <= 'Z') a = static_cast<char>(a - 'A' + 'a');
+                if (a != kMarker[j]) break;
+            }
+            if (j == mlen) return true;
+        }
+        return false;
+    }
+#endif
 
     /**
      * @brief Read Line Status Register

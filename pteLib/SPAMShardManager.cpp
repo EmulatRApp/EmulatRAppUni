@@ -218,7 +218,8 @@ std::size_t SPAMShardManager<Shards, Ways>::occupancy() const noexcept
 // Explicit template instantiations.  See the comment in SPAMBucket.cpp
 // for the rationale and the procedure for adding more shapes.
 // ===========================================================================
-template class SPAMShardManager<16, 8>;   // CpuState-resident ITB/DTB (128 slots)
+template class SPAMShardManager<2, 64>;   // CpuState-resident ITB/DTB (128 slots, 64-way) -- JRN-VMB-012
+template class SPAMShardManager<16, 8>;   // former CpuState shape (now unused; harmless)
 template class SPAMShardManager<32, 8>;   // original default
 template class SPAMShardManager<8,  4>;   // tests prefer the smaller shape
 

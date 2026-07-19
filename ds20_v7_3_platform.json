@@ -28,10 +28,10 @@
       "option_rom": false, "interrupt_pin": 0,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "ata_disk",
-          "model": "EMULATR VIRTUAL DISK", "media": "",
+          "model": "EMULATR VIRTUAL DISK", "media": "Alpha/dka0.vdisk", "media_kind": "image",
           "comment": "primary master = dqa0. media = bare image FILENAME resolved against [Storage] diskDir; empty = no disk." },
         { "channel": 0, "unit": 1, "lun": 0, "type": "atapi_cdrom",
-          "model": "EMULATR VIRTUAL CDROM", "media": "",
+          "model": "EMULATR VIRTUAL CDROM", "media": "Alpha/OpenVMS_v82.iso", "media_kind": "iso",
           "comment": "primary slave = dqa1, ATAPI CD. media empty = no disc loaded." }
       ] },
     { "name": "de500_tulip", "model": "generic", "hose": 0, "bus": 0, "slot": 7, "func": 0,

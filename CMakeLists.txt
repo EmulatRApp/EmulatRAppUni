@@ -128,7 +128,7 @@ endif()
 # EMULATR_SOURCES.
 set(EMULATR_SOURCES
     main.cpp
-    # config / settings: EmulatrV4.ini -> EmulatorSettings (wired 2026-06-08;
+    # config / settings: Emulatr.ini -> EmulatorSettings (wired 2026-06-08;
     # previously orphan TUs, never compiled).  IniLoader feeds the console port.
     config/EmulatorSettings.cpp
     config/IniLoader.cpp
@@ -790,7 +790,7 @@ set(EMULATR_FIRMWARE_FILES
     # generalization + firmware test matrix.  ES40/DS20 are Tsunami (runnable
     # now); DS25/ES45 are Titan (boot pending the TitanChipset path -- see
     # journals/20260616_titan_21274_interface.md).  2026-06-17: es40_v7_3.exe
-    # copied into firmware/ and set as firmwareImage in EmulatrV4.ini; the
+    # copied into firmware/ and set as firmwareImage in Emulatr.ini; the
     # es40cv_v7_3.exe "cv" variant is also present (add a row to deploy it).
     "firmware/es40_v7_3.exe"
     "firmware/ds20_v7_3.exe"
@@ -813,7 +813,7 @@ endforeach()
 # Configuration file(s) consumed at runtime
 # ----------------------------------------------------------------------------
 set(EMULATR_CONFIG_FILES
-    "config/EmulatrV4.ini"
+    "config/Emulatr.ini"
     # 2026-06-12: storage reference data consumed by tools (and, later, the
     # drive_model resolver in the C++ IDENTIFY path).
     "config/disk_types.json"
@@ -923,6 +923,70 @@ add_custom_command(TARGET Emulatr POST_BUILD
 )
 
 # ----------------------------------------------------------------------------
+# Auxiliary authoring tools -- PlatformEditor (manifest editor)  (2026-07-18)
+# ----------------------------------------------------------------------------
+# SSOT for tool development is the SOURCE dir tools/Editors/PlatformEditor,
+# where Editors/ is a source-side GROUPING level and PlatformEditor is the
+# tool.  The run-directory copy is a staged, disposable mirror on the same
+# footing as config/, firmware/, and the manifests -- never authored by hand.
+# The group level is COLLAPSED in the run layout: the tool stages to
+# <run-dir>/tools/PlatformEditor/ (not tools/Editors/PlatformEditor/), so the
+# runtime tree carries no source-organization artifact.
+#
+# (1) webui staging is UNCONDITIONAL.  The mockup is static data that must sit
+#     under <run-dir>/tools/PlatformEditor/webui at run time, mirroring the
+#     firmware/config/manifest staging above.  copy_directory creates the
+#     intermediate tools/PlatformEditor/ levels and the destination tree; it
+#     re-copies every build (cheap for a small mockup -- cmake_minimum_required
+#     is 3.16, so copy_directory_if_different (3.26+) is not available here).
+#
+# (2) Building the C++ editor itself is OPT-IN via EMULATR_BUILD_EDITORS
+#     (default OFF): it is not part of the emulator and stays out of do-no-harm
+#     builds.  Enable with -DEMULATR_BUILD_EDITORS=ON.
+#
+# NOTE: copy_directory carries whatever the source webui/ dir holds, including
+#       any macOS AppleDouble (._*) sidecars -- strip those from source before
+#       a release so they do not ride into the run layout.
+# ----------------------------------------------------------------------------
+add_custom_command(TARGET Emulatr POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/Editors/PlatformEditor/webui"
+            "$<TARGET_FILE_DIR:Emulatr>/tools/PlatformEditor/webui"
+    COMMENT "[Emulatr] stage PlatformEditor webui -> tools/PlatformEditor/webui"
+    VERBATIM
+)
+
+option(EMULATR_BUILD_EDITORS
+       "Build the PlatformEditor manifest authoring/validation tool (auxiliary)"
+       OFF)
+
+if(EMULATR_BUILD_EDITORS)
+    # PlatformEditor ships its own self-contained CMakeLists (Qt-free core +
+    # doctest gates + TUI/Qt) at tools/Editors/PlatformEditor/CMakeLists.txt.
+    # That sub-file is SSOT-side development and is edited THERE, not here.
+    # Before enabling this it still needs, on the source side: (a) an MSVC guard
+    # around its -Wall -Wextra flags, (b) namespaced test-target names
+    # (roundtrip_test -> platedit_roundtrip_test, etc.) to avoid collisions, and
+    # (c) its PLATEDIT_MANIFEST_DIR pointed at the real manifest corpus.
+    add_subdirectory(tools/Editors/PlatformEditor)
+
+    # TODO(platedit-stage): stage the built Qt editor binary into
+    #   <run-dir>/tools/PlatformEditor/ (collapsed path), mirroring the webui
+    #   copy above, plus the Qt runtime deploy on Windows.  Deferred: the Qt GUI
+    #   target does not exist yet, so $<TARGET_FILE:...> has nothing to point at.
+    #   Lands WITH the first Qt-target ticket (spec T-14).  Shape once the
+    #   target (e.g. platedit_gui) exists:
+    #
+    #   add_custom_command(TARGET platedit_gui POST_BUILD
+    #       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    #               $<TARGET_FILE:platedit_gui>
+    #               "$<TARGET_FILE_DIR:Emulatr>/tools/PlatformEditor/$<TARGET_FILE_NAME:platedit_gui>"
+    #       COMMENT "[Emulatr] stage PlatformEditor binary -> tools/PlatformEditor/"
+    #       VERBATIM)
+endif()
+
+
+# ----------------------------------------------------------------------------
 # windeployqt -- copy Qt runtime DLLs alongside the executable
 # ----------------------------------------------------------------------------
 # After Emulatr.exe builds, run windeployqt to populate the output
@@ -992,9 +1056,9 @@ install(TARGETS Emulatr
 # ---- (1) staged runtime layout --------------------------------------------
 # Ship the curated DS10 deploy default (NOT the in-tree ES40 dev ini), renamed
 # to the name the app searches for next to the executable.
-install(FILES   "${CMAKE_SOURCE_DIR}/config/EmulatrV4.ini.default"
+install(FILES   "${CMAKE_SOURCE_DIR}/config/Emulatr.ini.default"
         DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        RENAME EmulatrV4.ini)
+        RENAME Emulatr.ini)
 
 # License at the package root (text + html form).
 install(FILES   "${CMAKE_SOURCE_DIR}/LICENSE.md"        DESTINATION .)

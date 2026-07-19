@@ -1,11 +1,17 @@
 // ============================================================================
-// memoryLib/GuestMemory.cpp -- sparse paged backing implementation
+// memoryLib/GuestMemory.cpp -- contiguous backing implementation
 // ============================================================================
 // DESIGN:
-//   This class now acts strictly as a "Dumb Byte Store". It assumes the 
-//   calling TsunamiChipset (or Arbiter) has performed all range checking 
-//   and MMIO/PAL dispatch logic. PAL scratchpad and MMIO hook logic have 
-//   been removed to fulfill the strict architectural layering.
+//   This class acts strictly as a "Dumb Byte Store" over ONE contiguous,
+//   eagerly-reserved host region (VirtualAlloc / mmap / calloc).  The calling
+//   TsunamiChipset (or Arbiter) performs MMIO/PAL dispatch and DRAM routing;
+//   this layer only reads/writes bytes and enforces the sizeBytes() bound.
+//
+//   2026-07-19 (T. Peer decision; Claude / Cowork): the sparse, lazily-
+//   allocated 64 KiB page table was ripped out in favour of a single
+//   contiguous region.  See GuestMemory.h header block for the full rationale.
+//   Out-of-range reads now fault (MemStatus::OutOfRange) instead of returning a
+//   silent zero, and the 64 KiB "seam" byte-wise special-casing is gone.
 // ============================================================================
 
 #include "memoryLib/GuestMemory.h"
@@ -32,31 +38,37 @@ namespace memoryLib {
 
     namespace {
 
-        uint8_t* allocPage() noexcept {
+        // allocRegion / freeRegion -- one contiguous, zero-filled host region
+        // of `bytes`.  VirtualAlloc(MEM_RESERVE|MEM_COMMIT) and mmap
+        // (MAP_ANONYMOUS) both guarantee zero pages that the OS lazily backs
+        // physically on first touch; the calloc fallback zeroes eagerly.
+        uint8_t* allocRegion(uint64_t bytes) noexcept {
 #if defined(EMULATR_USE_OS_PAGES)
 #  if defined(_WIN32)
             return static_cast<uint8_t*>(
-                VirtualAlloc(nullptr, static_cast<SIZE_T>(GuestMemory::kPageSize),
+                VirtualAlloc(nullptr, static_cast<SIZE_T>(bytes),
                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
 #  else
-            void* p = mmap(nullptr, static_cast<size_t>(GuestMemory::kPageSize),
+            void* p = mmap(nullptr, static_cast<size_t>(bytes),
                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
             return (p == MAP_FAILED) ? nullptr : static_cast<uint8_t*>(p);
 #  endif
 #else
-            return static_cast<uint8_t*>(std::calloc(1, static_cast<size_t>(GuestMemory::kPageSize)));
+            return static_cast<uint8_t*>(std::calloc(1, static_cast<size_t>(bytes)));
 #endif
         }
 
-        void freePage(uint8_t* p) noexcept {
+        void freeRegion(uint8_t* p, uint64_t bytes) noexcept {
             if (!p) return;
 #if defined(EMULATR_USE_OS_PAGES)
 #  if defined(_WIN32)
+            (void)bytes;                    // MEM_RELEASE requires size 0
             VirtualFree(p, 0, MEM_RELEASE);
 #  else
-            munmap(p, static_cast<size_t>(GuestMemory::kPageSize));
+            munmap(p, static_cast<size_t>(bytes));
 #  endif
 #else
+            (void)bytes;
             std::free(p);
 #endif
         }
@@ -67,53 +79,34 @@ namespace memoryLib {
         if (m_size == 0) return;
 
         m_pageCount = static_cast<uint32_t>((m_size + kPageMask) / kPageSize);
-        m_pages = static_cast<uint8_t**>(std::calloc(m_pageCount, sizeof(uint8_t*)));
-
-        if (!m_pages) throw std::bad_alloc{};
-
-        m_zeroSentinel = allocPage();
-        if (!m_zeroSentinel) {
-            std::free(m_pages);
-            throw std::bad_alloc{};
-        }
+        // Reserve+commit ONE contiguous region, rounded up to a whole 64 KiB
+        // page so forEachPage/ensurePage chunk pointers are always valid.  The
+        // OS zero-fills and lazily backs untouched pages, so this is not a 4 GiB
+        // eager physical allocation -- only the touched pages consume RAM.
+        m_allocBytes = static_cast<uint64_t>(m_pageCount) * kPageSize;
+        m_base = allocRegion(m_allocBytes);
+        if (!m_base) throw std::bad_alloc{};
 
         m_dirtyWordCount = (m_pageCount + kPagesPerDirty - 1) / kPagesPerDirty;
         m_dirtyBitmap = static_cast<uint64_t*>(std::calloc(m_dirtyWordCount, sizeof(uint64_t)));
         if (!m_dirtyBitmap) {
-            freePage(m_zeroSentinel);
-            std::free(m_pages);
+            freeRegion(m_base, m_allocBytes);
+            m_base = nullptr;
             throw std::bad_alloc{};
         }
     }
 
     GuestMemory::~GuestMemory() noexcept {
-        if (m_pages) {
-            for (uint32_t i = 0; i < m_pageCount; ++i) {
-                if (m_pages[i] && m_pages[i] != m_zeroSentinel) freePage(m_pages[i]);
-            }
-            std::free(m_pages);
-        }
-        if (m_zeroSentinel) freePage(m_zeroSentinel);
+        if (m_base) freeRegion(m_base, m_allocBytes);
         if (m_dirtyBitmap) std::free(m_dirtyBitmap);
     }
 
-    // ensurePage implementation remains mostly unchanged, but note that 
-    // it no longer needs to worry about PAL or MMIO regions.
+    // ensurePage -- compatibility shim over the contiguous region.  Every page
+    // in [0, m_pageCount) is backed; return its chunk pointer, or nullptr past
+    // the end.  No allocation happens here anymore (the region is eager).
     uint8_t* GuestMemory::ensurePage(uint32_t pidx) noexcept {
-        if (pidx >= m_pageCount) return nullptr;
-        if (uint8_t* existing = m_pages[pidx]) return existing;
-
-        uint8_t* newPage = allocPage();
-        if (!newPage) return nullptr;
-
-        auto* slot = reinterpret_cast<std::atomic<uint8_t*>*>(&m_pages[pidx]);
-        uint8_t* expected = nullptr;
-        if (slot->compare_exchange_strong(expected, newPage, std::memory_order_release, std::memory_order_acquire)) {
-            m_allocatedPages.fetch_add(1, std::memory_order_relaxed);
-            return newPage;
-        }
-        freePage(newPage);
-        return m_pages[pidx];
+        if (pidx >= m_pageCount || !m_base) return nullptr;
+        return m_base + (static_cast<uint64_t>(pidx) << kPageShift);
     }
 
     // Bulk memory operations now trust that the caller is operating within 
@@ -234,124 +227,68 @@ namespace memoryLib {
     }
 #endif
 
+    // Bulk helpers over the contiguous region.  writeBlock enforces the size
+    // bound; readBlock zero-fills any portion at/after m_size so the snapshot
+    // save (which walks the full logical span) never faults on the rounded tail.
     bool GuestMemory::writeBlock(uint64_t pa, void const* src, uint64_t len) noexcept {
-        uint8_t const* sp = static_cast<uint8_t const*>(src);
-        uint64_t remaining = len;
-        uint64_t addr = pa;
-
-        while (remaining > 0) {
-            uint32_t const pidx = static_cast<uint32_t>(addr >> kPageShift);
-            uint64_t const offset = addr & kPageMask;
-            uint64_t const avail = kPageSize - offset;
-            uint64_t const chunk = (remaining < avail) ? remaining : avail;
-
-            uint8_t* page = ensurePage(pidx);
-            if (!page) return false;
-            std::memcpy(page + offset, sp, chunk);
-            markDirty(pidx);
+        if (len == 0) return true;
+        if (!m_base || pa >= m_size || len > m_size - pa) return false;
+        std::memcpy(m_base + pa, src, static_cast<size_t>(len));
+        uint32_t const first = static_cast<uint32_t>(pa >> kPageShift);
+        uint32_t const last  = static_cast<uint32_t>((pa + len - 1) >> kPageShift);
+        for (uint32_t p = first; p <= last; ++p) markDirty(p);
 #if defined(EMULATR_DIAGNOSTIC_LOGGING)
-            gmemDiagOnStore(addr, 0ULL, static_cast<unsigned>(chunk));
+        gmemDiagOnStore(pa, 0ULL, static_cast<unsigned>(len < 8 ? len : 8));
 #endif
-
-            sp += chunk; addr += chunk; remaining -= chunk;
-        }
         return true;
     }
 
     bool GuestMemory::readBlock(uint64_t pa, void* dst, uint64_t len) const noexcept {
+        if (len == 0) return true;
         uint8_t* dp = static_cast<uint8_t*>(dst);
-        uint64_t remaining = len;
-        uint64_t addr = pa;
-
-        while (remaining > 0) {
-            uint32_t const pidx = static_cast<uint32_t>(addr >> kPageShift);
-            uint64_t const offset = addr & kPageMask;
-            uint64_t const avail = kPageSize - offset;
-            uint64_t const chunk = (remaining < avail) ? remaining : avail;
-
-            uint8_t const* page = m_pages[pidx];
-            if (page) std::memcpy(dp, page + offset, chunk);
-            else std::memset(dp, 0, chunk);
-
-            dp += chunk; addr += chunk; remaining -= chunk;
-        }
+        uint64_t const inRange =
+            (!m_base || pa >= m_size) ? 0ULL
+                                      : ((len < m_size - pa) ? len : m_size - pa);
+        if (inRange) std::memcpy(dp, m_base + pa, static_cast<size_t>(inRange));
+        if (inRange < len)
+            std::memset(dp + inRange, 0, static_cast<size_t>(len - inRange));
         return true;
     }
 
-    // --- Reads ---
+    // --- Reads (contiguous backing; PA at/beyond m_size faults OutOfRange) ---
+    // A multi-byte access no longer needs the 64 KiB "seam" byte-wise fallback:
+    // the region is contiguous, so a single memcpy spans any in-range offset.
 
     MemStatus GuestMemory::read1(coreLib::PAType pa, uint8_t& out) const noexcept {
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint32_t offset = static_cast<uint32_t>(pa & kPageMask);
-
-        if (pidx >= m_pageCount || !m_pages[pidx]) { out = 0; return MemStatus::Ok; }
-        out = m_pages[pidx][offset];
+        if (pa >= m_size) { out = 0; return MemStatus::OutOfRange; }
+        out = m_base[pa];
         return MemStatus::Ok;
     }
 
     MemStatus GuestMemory::read2(coreLib::PAType pa, uint16_t& out) const noexcept {
-        if ((pa & kPageMask) > kPageMask - 1u) {   // crosses a 64KB page boundary
-            uint16_t v = 0;
-            for (unsigned i = 0; i < 2u; ++i) {
-                uint8_t b = 0; (void)read1(pa + i, b);
-                v |= static_cast<uint16_t>(static_cast<uint16_t>(b) << (8u * i));
-            }
-            out = v;
-            return MemStatus::Ok;
-        }
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint32_t offset = static_cast<uint32_t>(pa & kPageMask);
-
-        if (pidx >= m_pageCount || !m_pages[pidx]) { out = 0; return MemStatus::Ok; }
-        std::memcpy(&out, &m_pages[pidx][offset], 2);
+        if (pa >= m_size || 2u > m_size - pa) { out = 0; return MemStatus::OutOfRange; }
+        std::memcpy(&out, m_base + pa, 2);
         return MemStatus::Ok;
     }
 
     MemStatus GuestMemory::read4(coreLib::PAType pa, uint32_t& out) const noexcept {
-        if ((pa & kPageMask) > kPageMask - 3u) {   // crosses a 64KB page boundary
-            uint32_t v = 0;
-            for (unsigned i = 0; i < 4u; ++i) {
-                uint8_t b = 0; (void)read1(pa + i, b);
-                v |= static_cast<uint32_t>(b) << (8u * i);
-            }
-            out = v;
-            return MemStatus::Ok;
-        }
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint32_t offset = static_cast<uint32_t>(pa & kPageMask);
-
-        if (pidx >= m_pageCount || !m_pages[pidx]) { out = 0; return MemStatus::Ok; }
-        std::memcpy(&out, &m_pages[pidx][offset], 4);
+        if (pa >= m_size || 4u > m_size - pa) { out = 0; return MemStatus::OutOfRange; }
+        std::memcpy(&out, m_base + pa, 4);
         return MemStatus::Ok;
     }
 
     MemStatus GuestMemory::read8(coreLib::PAType pa, uint64_t& out) const noexcept {
-        if ((pa & kPageMask) > kPageMask - 7u) {   // crosses a 64KB page boundary
-            uint64_t v = 0;
-            for (unsigned i = 0; i < 8u; ++i) {
-                uint8_t b = 0; (void)read1(pa + i, b);
-                v |= static_cast<uint64_t>(b) << (8u * i);
-            }
-            out = v;
-            return MemStatus::Ok;
-        }
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint32_t offset = static_cast<uint32_t>(pa & kPageMask);
-
-        if (pidx >= m_pageCount || !m_pages[pidx]) { out = 0; return MemStatus::Ok; }
-        std::memcpy(&out, &m_pages[pidx][offset], 8);
+        if (pa >= m_size || 8u > m_size - pa) { out = 0; return MemStatus::OutOfRange; }
+        std::memcpy(&out, m_base + pa, 8);
         return MemStatus::Ok;
     }
 
-    // --- Writes ---
+    // --- Writes (contiguous backing; PA at/beyond m_size faults OutOfRange) ---
 
     MemStatus GuestMemory::write1(coreLib::PAType pa, uint8_t value) noexcept {
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint8_t* page = ensurePage(pidx);
-        if (!page) return MemStatus::OutOfRange;
-
-        page[pa & kPageMask] = value;
-        markDirty(pidx);
+        if (pa >= m_size) return MemStatus::OutOfRange;
+        m_base[pa] = value;
+        markDirty(static_cast<uint32_t>(pa >> kPageShift));
 #if defined(EMULATR_DIAGNOSTIC_LOGGING)
         gmemDiagOnStore(pa, value, 1u);
 #endif
@@ -359,17 +296,10 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::write2(coreLib::PAType pa, uint16_t value) noexcept {
-        if ((pa & kPageMask) > kPageMask - 1u) {   // crosses a 64KB page boundary
-            for (unsigned i = 0; i < 2u; ++i)
-                (void)write1(pa + i, static_cast<uint8_t>(value >> (8u * i)));
-            return MemStatus::Ok;
-        }
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint8_t* page = ensurePage(pidx);
-        if (!page) return MemStatus::OutOfRange;
-
-        std::memcpy(&page[pa & kPageMask], &value, 2);
-        markDirty(pidx);
+        if (pa >= m_size || 2u > m_size - pa) return MemStatus::OutOfRange;
+        std::memcpy(m_base + pa, &value, 2);
+        markDirty(static_cast<uint32_t>(pa >> kPageShift));
+        markDirty(static_cast<uint32_t>((pa + 1) >> kPageShift));
 #if defined(EMULATR_DIAGNOSTIC_LOGGING)
         gmemDiagOnStore(pa, value, 2u);
 #endif
@@ -377,17 +307,10 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::write4(coreLib::PAType pa, uint32_t value) noexcept {
-        if ((pa & kPageMask) > kPageMask - 3u) {   // crosses a 64KB page boundary
-            for (unsigned i = 0; i < 4u; ++i)
-                (void)write1(pa + i, static_cast<uint8_t>(value >> (8u * i)));
-            return MemStatus::Ok;
-        }
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint8_t* page = ensurePage(pidx);
-        if (!page) return MemStatus::OutOfRange;
-
-        std::memcpy(&page[pa & kPageMask], &value, 4);
-        markDirty(pidx);
+        if (pa >= m_size || 4u > m_size - pa) return MemStatus::OutOfRange;
+        std::memcpy(m_base + pa, &value, 4);
+        markDirty(static_cast<uint32_t>(pa >> kPageShift));
+        markDirty(static_cast<uint32_t>((pa + 3) >> kPageShift));
 #if defined(EMULATR_DIAGNOSTIC_LOGGING)
         gmemDiagOnStore(pa, value, 4u);
 #endif
@@ -395,17 +318,10 @@ namespace memoryLib {
     }
 
     MemStatus GuestMemory::write8(coreLib::PAType pa, uint64_t value) noexcept {
-        if ((pa & kPageMask) > kPageMask - 7u) {   // crosses a 64KB page boundary
-            for (unsigned i = 0; i < 8u; ++i)
-                (void)write1(pa + i, static_cast<uint8_t>(value >> (8u * i)));
-            return MemStatus::Ok;
-        }
-        uint32_t pidx = static_cast<uint32_t>(pa >> kPageShift);
-        uint8_t* page = ensurePage(pidx);
-        if (!page) return MemStatus::OutOfRange;
-
-        std::memcpy(&page[pa & kPageMask], &value, 8);
-        markDirty(pidx);
+        if (pa >= m_size || 8u > m_size - pa) return MemStatus::OutOfRange;
+        std::memcpy(m_base + pa, &value, 8);
+        markDirty(static_cast<uint32_t>(pa >> kPageShift));
+        markDirty(static_cast<uint32_t>((pa + 7) >> kPageShift));
 #if defined(EMULATR_DIAGNOSTIC_LOGGING)
         gmemDiagOnStore(pa, value, 8u);
 #endif

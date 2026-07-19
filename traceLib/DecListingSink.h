@@ -48,9 +48,9 @@
 //   captured at sink-open time so concurrent or repeat runs do not
 //   collide.
 //
-//   Line format:
-//     RET ord=<n> cpu=<n> rpcc=<n> pc=<hex16> <mnem> pal=<0|1> exc=<hex16>[ R<dd>=<hex16>]*
-//          [ sde=<1-3>][ H<dd>=<hex16>]*
+//   Line format (2026-07-15: hex fields 0x-prefixed, leading zeros stripped; zero = 0x0):
+//     RET ord=<n> cpu=<n> rpcc=<n> pc=0x<hex> <mnem> pal=<0|1> exc=0x<hex>[ R<dd>=0x<hex>]*
+//          [ sde=<1-3>][ H<dd>=0x<hex>]*
 //
 //   <mnem> is the codegen-emitted instruction mnemonic literal,
 //   left-padded to 8 characters for column alignment.  "?" if the

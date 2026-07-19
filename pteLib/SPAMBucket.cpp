@@ -168,7 +168,8 @@ bool SPAMBucket<Ways>::any() const noexcept
 // Add a new line for any additional shape exercised by tests or by a
 // CpuState-resident manager.
 // ===========================================================================
-template class SPAMBucket<8>;     // production default (manager Ways=8)
+template class SPAMBucket<64>;    // CpuState ITB/DTB Ways=64 -- JRN-VMB-012
+template class SPAMBucket<8>;     // former production default (manager Ways=8)
 template class SPAMBucket<4>;     // tests prefer the smaller shape
 
 

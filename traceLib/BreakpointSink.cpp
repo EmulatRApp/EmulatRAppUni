@@ -48,6 +48,7 @@ std::atomic<int32_t>  BreakpointSink::s_revolutionsRemaining {
     static_cast<int32_t>(BP_DEFAULT_REVOLUTIONS) };
 std::atomic<uint32_t> BreakpointSink::s_revolutionsCaptured { 0 };
 std::atomic<bool>     BreakpointSink::s_gateOpen { false };
+std::atomic<bool>     BreakpointSink::s_forceOpen { false };   // 2026-07-18 bootstrap trace-arm
 std::atomic<bool>     BreakpointSink::s_breakOnGateOpen { false };
 std::atomic<bool>     BreakpointSink::s_breakOnGateClose { false };
 
@@ -191,6 +192,8 @@ bool isMtpr(char const* m) noexcept
 
 bool BreakpointSink::armed() noexcept
 {
+    // 2026-07-18: force-open arms the sink independent of the paired-PC gate.
+    if (s_forceOpen.load(std::memory_order_relaxed)) return true;
     uint64_t const openPc  = s_gateOpenPc.load(std::memory_order_relaxed);
     uint64_t const closePc = s_gateClosePc.load(std::memory_order_relaxed);
     int32_t  const rem     = s_revolutionsRemaining.load(std::memory_order_relaxed);
@@ -705,14 +708,33 @@ void BreakpointSink::emitCheckpointSummary(coreLib::CpuState const& finalCpu)
 bool BreakpointSink::processCommit(CommitRecord const&        record,
                                    coreLib::CpuState const&   postCommitCpu)
 {
+    bool    const forceOpen = s_forceOpen.load(std::memory_order_relaxed);   // 2026-07-18
     int32_t const revsRem = s_revolutionsRemaining.load(std::memory_order_relaxed);
-    if (revsRem <= 0) {
+    if (revsRem <= 0 && !forceOpen) {
         return false;   // budget exhausted; sink quiet for the rest of run
     }
 
     uint64_t const openPc  = s_gateOpenPc.load(std::memory_order_relaxed);
     uint64_t const closePc = s_gateClosePc.load(std::memory_order_relaxed);
     bool     const isOpen  = s_gateOpen.load(std::memory_order_relaxed);
+
+    // Force-open transition (2026-07-18, bootstrap trace-arm): an external arm
+    // (forceOpenNow) opens the window on the next commit regardless of PC and
+    // holds it open until onRunEnd -- no close-PC test, no revolution decrement.
+    // Emits a BP_OPEN snapshot (kind "open") so the window has a proper header.
+    if (forceOpen && !isOpen) {
+        ensureBreakOpen();
+        uint32_t const rev = s_revolutionsCaptured.load(std::memory_order_relaxed);
+        emitGateSnapshot(record.cycle, record.pc, rev, "open", postCommitCpu);
+        s_gateOpen.store(true, std::memory_order_release);
+        std::fprintf(stderr,
+                     "BRKSINK: FORCE-OPEN at cyc=%llu pc=%016llx -- full trace "
+                     "until shutdown\n",
+                     static_cast<unsigned long long>(record.cycle),
+                     static_cast<unsigned long long>(record.pc));
+        std::fflush(stderr);
+        return false;   // boundary retire captured in the snapshot
+    }
 
     // Gate-open transition.
     if (!isOpen && openPc != 0 && record.pc == openPc) {
@@ -743,8 +765,9 @@ bool BreakpointSink::processCommit(CommitRecord const&        record,
         return false;
     }
 
-    // Gate-close transition.
-    if (isOpen && closePc != 0 && record.pc == closePc) {
+    // Gate-close transition.  Skipped while force-open holds the window open
+    // until shutdown (2026-07-18): the close-PC must not end a forced capture.
+    if (!forceOpen && isOpen && closePc != 0 && record.pc == closePc) {
         uint32_t const rev =
             s_revolutionsCaptured.fetch_add(1, std::memory_order_acq_rel);
         emitGateSnapshot(record.cycle, record.pc, rev + 1, "close", postCommitCpu);

@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
 #endif
 
     // ------------------------------------------------------------------
-    // SSOT: load EmulatorSettings ONCE from EmulatrV4.ini -- the single source
+    // SSOT: load EmulatorSettings ONCE from Emulatr.ini -- the single source
     // of truth for tunables.  Precedence: struct defaults < ini < CLI.  Loaded
     // BEFORE firmware resolution so the firmware path can fall back to the ini.
     // ------------------------------------------------------------------
@@ -168,7 +168,7 @@ int main(int argc, char* argv[])
     {
         auto const cfgLoad = emulatr::config::IniLoader::loadDefault();
         if (!cfgLoad.foundFile) {
-            std::fprintf(stderr, "config: no EmulatrV4.ini found; using built-in defaults\n");
+            std::fprintf(stderr, "config: no Emulatr.ini found; using built-in defaults\n");
         }
         for (std::string const& w : cfgLoad.warnings) {
             std::fprintf(stderr, "config: %s\n", w.c_str());
@@ -189,7 +189,7 @@ int main(int argc, char* argv[])
     if (opts.firmwarePath.empty()) {
         std::fprintf(stderr,
                      "error: no firmware -- pass --firmware <path> or set "
-                     "[ROM] firmwareImage in EmulatrV4.ini\n");
+                     "[ROM] firmwareImage in Emulatr.ini\n");
         return 2;
     }
 
@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
             : opts.firmwareFormat;
 
     // SSOT (2026-06-12): guest memory size precedence CLI > ini.  If --mem was
-    // NOT given on the CLI, fall back to [System] memorySize from EmulatrV4.ini
+    // NOT given on the CLI, fall back to [System] memorySize from Emulatr.ini
     // (parsed into settings).  Without this the 64 MiB AppOptions default always
     // won, so show config / the SRM memory sizing reported 64 MB regardless of
     // the ini's 1 GiB.  The value flows memSize -> Machine -> TsunamiChipset ->

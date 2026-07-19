@@ -13,6 +13,20 @@
 // Documentation:  https://timothypeer.github.io/ASA-EMulatR-Project/
 // ============================================================================
 //
+// CHANGE HISTORY
+//   FILE 1: traceLib/BreakpointSink.h / .cpp
+//   FUNCTION: forceOpenNow (new) / armed / processCommit
+//   CHANGE 2026-07-18 (JRN-VMB-004 followup, bootstrap trace-arm): added the
+//     s_forceOpen atomic + forceOpenNow() setter.  When forceOpenNow() is
+//     called (by the UART bootstrap-marker watch at the VMB->bootstrap
+//     handoff), the capture window opens on the next commit regardless of PC
+//     and stays open until onRunEnd -- it ignores s_gateClosePc and the
+//     revolution budget.  Purpose: capture the boot transfer + the halt in
+//     full without knowing the transfer PC.  Zero behavior change when
+//     forceOpenNow() is never called.
+//
+// ============================================================================
+//
 // BreakpointSink is a TraceSink that captures one (or N) full revolutions
 // of a target PALcode region at maximum fidelity, bracketed by a pair of
 // debugger-pokeable PC gates.  Built to answer "what happens inside one
@@ -263,6 +277,14 @@ public:
     static std::atomic<uint32_t> s_revolutionsCaptured;
     static std::atomic<bool>     s_gateOpen;
 
+    // s_forceOpen (2026-07-18, bootstrap trace-arm): when true, the capture
+    // window opens on the next commit regardless of PC and stays open until
+    // onRunEnd -- it ignores s_gateClosePc and the revolution budget.  Armed
+    // by an external event (the UART bootstrap-marker watch calls
+    // forceOpenNow()) to capture the VMB->bootstrap handoff through clean
+    // shutdown.  Default false; leaves the paired-PC gate untouched when unset.
+    static std::atomic<bool>     s_forceOpen;
+
     // ------------------------------------------------------------------
     // Optional debugger-break triggers at gate transitions.
     // ------------------------------------------------------------------
@@ -299,6 +321,14 @@ public:
     static void setGateClosePc(uint64_t pc) noexcept
     {
         s_gateClosePc.store(pc, std::memory_order_release);
+    }
+    // forceOpenNow (2026-07-18, bootstrap trace-arm): latch the force-open
+    // window; opens on the next commit and holds until onRunEnd.  See
+    // s_forceOpen.  One-way arm (no disarm setter -- the run is expected to
+    // end in a clean shutdown right after the captured window).
+    static void forceOpenNow() noexcept
+    {
+        s_forceOpen.store(true, std::memory_order_release);
     }
     static void setRevolutionsRemaining(int32_t n) noexcept
     {

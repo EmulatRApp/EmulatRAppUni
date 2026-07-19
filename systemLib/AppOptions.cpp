@@ -281,7 +281,7 @@ AppOptions AppOptions::parse(int argc, char* argv[])
     }
 
     // 2026-06-08 (SSOT Slice B): --firmware is no longer required on the CLI.
-    // main falls back to [ROM] firmwareImage from EmulatrV4.ini and enforces
+    // main falls back to [ROM] firmwareImage from Emulatr.ini and enforces
     // "firmware from CLI or ini" after the settings load.
     return opts;
 }

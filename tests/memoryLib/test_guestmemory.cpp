@@ -87,26 +87,36 @@ TEST_CASE("GuestMemory -- quadword round-trip")
 }
 
 
-TEST_CASE("GuestMemory is a dumb byte-store -- no byte-precise bound (the bus enforces DRAM range)")
+TEST_CASE("GuestMemory -- enforces the configured byte size (out-of-range faults)")
 {
-    // Post-amputation, GuestMemory does NOT enforce the logical byte size; the
-    // arbiter (TsunamiChipset::isDramAddress / sizeBytes) gates the address
-    // before ever calling here -- see tests/chipsetLib/test_systembus_arbiter.cpp.
-    // The only structural limit left is the page-array bound.
-    GuestMemory mem(4096);   // rounds up to one 64 KiB backing page
+    // Post-2026-07-19 rip-out of the sparse backing, GuestMemory is a single
+    // contiguous region bounded by sizeBytes(): an access at or beyond the
+    // logical size FAULTS with OutOfRange instead of silently reading zero (the
+    // old sparse backing allowed accesses up to the rounded 64 KiB backing
+    // page).  The arbiter (TsunamiChipset::isDramAddress) still gates upstream;
+    // this bound is the load-bearing safety net that surfaces a walk or pointer
+    // that runs off the end.
+    GuestMemory mem(4096);
 
-    // Past the logical 4096-byte size but inside the backing page: just works.
-    CHECK(mem.write1(4096, 0xFF) == MemStatus::Ok);
+    // In range: round-trips at the top valid byte.
+    CHECK(mem.write1(4095, 0xFF) == MemStatus::Ok);
     uint8_t v = 0;
-    CHECK(mem.read1(4096, v) == MemStatus::Ok);
+    CHECK(mem.read1(4095, v) == MemStatus::Ok);
     CHECK(v == 0xFF);
 
-    // Beyond the page array (pidx >= pageCount): reads zero-fill (Ok), writes
-    // cannot allocate (OutOfRange).
-    uint8_t v2 = 0;
-    CHECK(mem.read1(0x10000, v2) == MemStatus::Ok);
+    // At/beyond the configured size: reads fault (out zeroed), writes fault.
+    uint8_t v2 = 0xAB;
+    CHECK(mem.read1(4096, v2) == MemStatus::OutOfRange);
     CHECK(v2 == 0);
+    CHECK(mem.write1(4096, 0xAB) == MemStatus::OutOfRange);
+    CHECK(mem.read1(0x10000, v2) == MemStatus::OutOfRange);
     CHECK(mem.write1(0x10000, 0xAB) == MemStatus::OutOfRange);
+
+    // A multi-byte access that would straddle the top edge also faults.
+    uint64_t q = 0xDEAD;
+    CHECK(mem.read8(4090, q) == MemStatus::OutOfRange);   // 4090 + 8 > 4096
+    CHECK(q == 0);
+    CHECK(mem.write8(4090, 0x1ull) == MemStatus::OutOfRange);
 }
 
 

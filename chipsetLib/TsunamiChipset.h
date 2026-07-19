@@ -29,6 +29,7 @@
 #include "deviceLib/Tsunami/Cy82C693Ide.h" // CY82C693 IDE func1 + ATAPI CD (2026-06-08)
 #include "deviceLib/Tsunami/AliM5229Ide.h" // ALi M5229 IDE func1 (ES40/ES45/DS25, Phase 2B)
 #include "deviceLib/Tsunami/Smc37c669SuperIo.h" // FDC37C669 SuperIO: config port + FDC (#22)
+#include "deviceLib/Tsunami/VgaTextConsole.h"    // VGA text-console interface (JRN-VMB-006, 2026-07-18)
 #include "deviceLib/scsi/VirtualIsoDevice.h"
 
 
@@ -351,6 +352,7 @@ public:
         m_pic.setIrqInput(4, m_com1.intPending());   // COM1 = ISA IRQ4
         m_pic.setIrqInput(3, m_com2.intPending());   // COM2 = ISA IRQ3
         m_pic.setIrqInput(6, m_superio.fdcInterruptPending()); // FDC = ISA IRQ6 (F5)
+        m_pic.setIrqInput(1, m_kbd8042.irq1Pending()); // 8042 KBD = ISA IRQ1 (JRN-VMB-006)
 
         bool const level = m_pic.outputAsserted();
         if (level != m_lastPicLevel) {
@@ -704,6 +706,20 @@ private:
         // polled-recalibrate timeout on dva0.  2026-06-11.
         m_pchip.registerIoPortRange(0x536, 0x537, &m_superio); // floppy IRQ6 poll (0x536)
 
+        // VGA text-console interface (JRN-VMB-006, 2026-07-18): the SRM
+        // firmware drives a PC/VGA color-text console -- it paints cells into
+        // the legacy framebuffer at 0xB8000 and touches the VGA register file
+        // at 0x3B0-0x3DF.  V5 modeled no VGA, so every 0xB8000 write fell
+        // through as UNHANDLED OUTER WRITE (lost).  m_vga CLAIMS both apertures
+        // so those accesses land: the mem handler stores the text buffer (the
+        // 32 KiB 0xB8000-0xC0000 window fits the registerPciMemRange 64 KiB
+        // cap), the I/O handler answers the VGA registers benignly (toggling
+        // Input-Status-1 so retrace polls terminate).  Minimal-unblock: retain
+        // + optional EMULATR_VGA_DUMP snapshot, no rendering.  Shared across
+        // all five platforms (single wireDevices()).
+        m_pchip.registerIoPortRange(0x3B0, 0x3E0, m_vga.ioHandler());   // VGA CRTC/attr/seq/gfx/DAC/status
+        m_pchip.registerPciMemRange(0xB8000, 0xC0000, m_vga.memHandler()); // color text buffer (32 KiB)
+
         // 3. PCI dense-memory claimants (G3-lite seam, 2026-06-03).
         // PCF8584 IIC controller -- FIXED platform mapping ("low BIOS region
         // of ROM space", pc264_init.c:43), so the base is PER-MODEL, NOT a PCI
@@ -940,6 +956,14 @@ private:
     // the 2000 ms lost-arbitration retry (the powerup stall).  Spec:
     // journals/IIC_Stub_Specification.txt.
     IicPcf8584    m_iic;
+
+    // JRN-VMB-006 (2026-07-18): VGA text-console interface.  Declared after
+    // m_pchip (the Pchip registries hold raw pointers into this member; it
+    // constructs after the Pchip and outlives the registry entries).  Claims
+    // the 0xB8000 text framebuffer + 0x3B0-0x3DF VGA register I/O in
+    // wireDevices() so the firmware's graphics-console writes land instead of
+    // faulting to UNHANDLED OUTER WRITE.  Absorb + optional snapshot only.
+    VgaTextConsole    m_vga;
 
     // TIG-bus flash / NVRAM (AMD Am29F016, 2 MB).  Self-contained; decoded
     // directly in read()/write() via the kTigFlash* window helpers above.

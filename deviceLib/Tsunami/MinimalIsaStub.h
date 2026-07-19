@@ -109,6 +109,17 @@
 // not yet acted on -- they leave OBF clear, which is the safe default
 // (SRM treats "no response" as either success or skipped depending on
 // the command class).
+//
+// CHANGE 2026-07-18 (JRN-VMB-006 keyboard/VGA interface): the 8042 now
+// exposes irq1Pending() -- a LEVEL accessor -- so
+// TsunamiChipset::evalDeviceIrqs() can feed ISA IRQ1 to the shared 8259
+// (mirroring COM1 IRQ4 / FDC IRQ6).  With no keyboard attached there is no
+// keyboard-sourced output byte, so IRQ1 stays deasserted for the whole boot
+// and can never storm; command-byte bit0 (EKI) is tracked for correctness.
+// Controller-command responses (e.g. 0xAA -> 0x55) set OBF but are NOT
+// keyboard-sourced and MUST NOT assert IRQ1 -- the firmware polls them.
+// FILE 2 / FUNCTION: Kbd8042Stub::ioWrite + irq1Pending() / CHANGE: add EKI +
+// keyboard-data-pending state and the level accessor.
 // ============================================================================
 class Kbd8042Stub : public IIoPortHandler
 {
@@ -173,6 +184,14 @@ public:
             // Data write: future cmd argument or KBD/AUX byte.  Record
             // for the planned command-response state machine.
             m_lastDataWrite.store(v, std::memory_order_relaxed);
+            // JRN-VMB-006: if the previous 0x64 command was 0x60 ("write
+            // command byte"), THIS data byte is the 8042 command byte;
+            // bit0 = EKI (enable keyboard IRQ1).  Track it so irq1Pending()
+            // reflects the firmware's interrupt-enable state.
+            if (m_expectCmdByte.exchange(0, std::memory_order_relaxed)) {
+                m_kbdIrqEnabled.store((v & 0x01u) ? 1u : 0u,
+                                      std::memory_order_relaxed);
+            }
             break;
         case 0x64:
             // Controller command.  Record for diagnostics, then check
@@ -191,6 +210,11 @@ public:
                 m_queuedData.store(0x55, std::memory_order_relaxed);
                 m_obfPending.store(1, std::memory_order_release);
             }
+            else if (v == 0x60) {
+                // JRN-VMB-006: "write command byte" -- the next 0x60 data
+                // write carries the command byte (EKI in bit0).
+                m_expectCmdByte.store(1, std::memory_order_relaxed);
+            }
             break;
         default:
             // 0x61-0x63 writes: silently ignored in stub
@@ -206,6 +230,17 @@ public:
         return m_lastCmdWrite.load(std::memory_order_relaxed);
     }
 
+    // JRN-VMB-006: level accessor for ISA IRQ1 (keyboard), fed to the shared
+    // 8259 by TsunamiChipset::evalDeviceIrqs().  With no keyboard attached
+    // (this controller has no host-input source) no keyboard-sourced output
+    // byte is ever produced, so m_kbdDataPending stays 0 and IRQ1 remains
+    // deasserted for the whole boot regardless of EKI -- the interface is
+    // present and defined, and it can never storm.
+    [[nodiscard]] bool irq1Pending() const noexcept {
+        return m_kbdIrqEnabled.load(std::memory_order_relaxed) != 0
+            && m_kbdDataPending.load(std::memory_order_relaxed) != 0;
+    }
+
 private:
     std::atomic<uint8_t> m_lastDataWrite{0x00};
     std::atomic<uint8_t> m_lastCmdWrite{0x00};
@@ -217,6 +252,16 @@ private:
     // Full command state machine is task #45.
     std::atomic<uint8_t> m_queuedData{0x00};
     std::atomic<uint8_t> m_obfPending{0x00};
+
+    // JRN-VMB-006: keyboard IRQ1 interface state.  m_kbdIrqEnabled mirrors
+    // command-byte bit0 (EKI).  m_kbdDataPending is the keyboard-sourced OBF
+    // flag; it stays 0 because no keyboard is attached.  m_expectCmdByte is
+    // set between a 0x64=0x60 ("write command byte") and the following 0x60
+    // data write.  irq1Pending() = EKI && data-pending -> always false at
+    // runtime, which defines the line and guarantees it cannot storm.
+    std::atomic<uint8_t> m_kbdIrqEnabled{0x00};
+    std::atomic<uint8_t> m_kbdDataPending{0x00};
+    std::atomic<uint8_t> m_expectCmdByte{0x00};
 };
 
 

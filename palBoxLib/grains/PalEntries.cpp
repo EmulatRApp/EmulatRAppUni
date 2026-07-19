@@ -400,6 +400,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             case 0x43: return "CALLBACK";
             case 0x44: return "MTPR_EXC_ADDR";
             case 0x45: return "JUMP_TO_ARC";
+            case 0x46: return "IIC_WRITE";
             case 0x65: return "MP_WORK_REQUEST";
             case 0x66: return "GET_PAL_BASE (masked)";
             default:   return "(reserved / no-op)";
@@ -513,6 +514,67 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     static_cast<uint8_t>(c.cpu->intReg[18] & 0xFFu));
             }
             return r;                // R0 untouched
+        }
+        case 0x46: {   // CSERVE$IIC_WRITE -- ev6_vms_pc264_pal.mar sys__iic_write (:5208)
+            // JRN-VMB-006.  The VMS PAL packs a PCF8584 I2C write into R17:
+            //   [7:0]  slave address   [15:8]  word address
+            //   [23:16] data byte      [31:24] data-present flag (!=0 -> data)
+            // sys__iic_write enable_superpage's then drives the controller at the
+            // pc264 IIC base 0xFFF80000 in Pchip0 PCI-mem space (registerPciMemRange
+            // in TsunamiChipset::wireDevices).  Superpage == rung-1 direct VA->PA, so
+            // the resolved PA is kBasePA(0x800.0000.0000)+0xFFF80000; S0 (data) at +0,
+            // S1 (control/status) at +1.  We replay START + slave (+word/+data) + STOP
+            // against the emulated IicPcf8584 via c.memory (same physical-bus idiom as
+            // the CSERVE primitives 0x10-0x13 above) and sample S1 for the ACK (LRB,
+            // 0x08).  V5's IIC is an EMPTY bus (no slaves) so the address phase NAKs ->
+            // R0 = -1, matching real HW with no device at slave 0x4E.
+            uint64_t const arg    = c.cpu->intReg[17];
+            uint8_t  const slave  = static_cast<uint8_t>( arg        & 0xFFu);
+            uint8_t  const word   = static_cast<uint8_t>((arg >> 8)  & 0xFFu);
+            uint8_t  const data   = static_cast<uint8_t>((arg >> 16) & 0xFFu);
+            bool     const hasDat = ((arg >> 24) & 0xFFu) != 0u;
+            int64_t        r0     = -1;   // empty-bus NAK default (no slave ACK)
+            uint8_t        s1     = 0x08u;
+            if (c.memory != nullptr) {
+                constexpr coreLib::PAType kIicS0 = 0x800FFF80000ULL; // pc264 IIC S0 (data)
+                constexpr coreLib::PAType kIicS1 = 0x800FFF80001ULL; // pc264 IIC S1 (ctl/stat)
+                (void)c.memory->write1(kIicS0, slave);   // load slave into S0
+                (void)c.memory->write1(kIicS1, 0xC5u);   // control: generate START
+                (void)c.memory->read1(kIicS1, s1);       // sample S1 status
+                if ((s1 & 0x08u) == 0u) {                // LRB=0 -> slave ACK'd
+                    (void)c.memory->write1(kIicS0, word);
+                    if (hasDat) (void)c.memory->write1(kIicS0, data);
+                    r0 = 0;
+                }
+                (void)c.memory->write1(kIicS1, 0xC3u);   // control: generate STOP
+            }
+            r.regWriteIdx   = 0;     // R0
+            r.regWriteIsFp  = false;
+            r.regWriteValue = static_cast<uint64_t>(r0);
+#if EMULATR_BRINGUP_PROBES
+            {
+                static bool const s_iicDiag =
+                    (std::getenv("EMULATR_IIC_DIAG") != nullptr);
+                if (s_iicDiag) {
+                    static unsigned long s_iicN = 0;
+                    if (s_iicN < 128) { ++s_iicN;
+                        std::fprintf(stderr,
+                            "IIC-DIAG[cserve46] cyc=%llu pc=0x%016llx arg=0x%016llx "
+                            "slave=0x%02x word=0x%02x data=0x%02x s1=0x%02x r0=%lld\n",
+                            static_cast<unsigned long long>(c.cpu->cycleCount),
+                            static_cast<unsigned long long>(g.pc),
+                            static_cast<unsigned long long>(arg),
+                            static_cast<unsigned>(slave),
+                            static_cast<unsigned>(word),
+                            static_cast<unsigned>(data),
+                            static_cast<unsigned>(s1),
+                            static_cast<long long>(r0));
+                        std::fflush(stderr);
+                    }
+                }
+            }
+#endif
+            return r;
         }
         case 0x44: {   // CSERVE$MTPR_EXC_ADDR -- console hand-off continuation
             // huf_decom switch: (ev6_huf_decom.m64 l.308-311)
@@ -1108,6 +1170,29 @@ auto execSwpctxVms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxR
     r.regWriteIdx   = 0;
     r.regWriteIsFp  = false;
     r.regWriteValue = oldPtbr;
+#if EMULATR_BRINGUP_PROBES
+    // JRN-VMB-006 PTBR-DIAG (env EMULATR_PTBR_DIAG).  SWPCTX is the ONLY writer
+    // of the cpu->ptbr abstraction (read by MFPR_PTBR).  Log each swap so we can
+    // see whether the console/OS ever installs a real (nonzero) PTBR from a
+    // valid HWPCB before the DTB-miss loop, and at what cycle.  Low volume.
+    {
+        static bool const s_diag = (std::getenv("EMULATR_PTBR_DIAG") != nullptr);
+        if (s_diag) {
+            static unsigned long s_n = 0;
+            if (s_n < 64) { ++s_n;
+                std::fprintf(stderr,
+                    "PTBR-DIAG[swpctx] cyc=%llu pc=0x%016llx oldPcbb=0x%016llx "
+                    "newPcbb=0x%016llx newPtbr=0x%016llx\n",
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<unsigned long long>(oldPcbb),
+                    static_cast<unsigned long long>(newPcbb),
+                    static_cast<unsigned long long>(newCtx.ptbr));
+                std::fflush(stderr);
+            }
+        }
+    }
+#endif
     return r;
 }
 
@@ -1639,9 +1724,72 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     // PAL_TEMP range first: range check is cheaper than case labels
     // and PT slots are written on every PAL entry.
     if (coreLib::isPalTemp(sel)) {
-        c.cpu->palTemp[coreLib::palTempIndex(sel)] = c.opB;
+        unsigned const ptIdx = coreLib::palTempIndex(sel);
+        c.cpu->palTemp[ptIdx] = c.opB;
+#if EMULATR_BRINGUP_PROBES
+        // JRN-VMB-006 PTBR-DIAG (env EMULATR_PTBR_DIAG).  The VMS PAL keeps the
+        // page-table walk base in PHYSICAL scratch at PT__PTBR(p_temp), where
+        // p_temp is a PAL_TEMP holding PAL__IMPURE_BASE (ev6_vms_pc264_pal.mar
+        // :3400 load / :4944 store).  Log page-aligned, nonzero PAL_TEMP writes:
+        // those are the candidate scratch/base pointers (p_temp is page-aligned),
+        // so we can see whether/when the PAL establishes its impure-scratch base
+        // before the DTB-miss loop.  Value-filtered + capped so the per-PAL-entry
+        // GPR-save writes do not flood.  Zero cost unless EMULATR_PTBR_DIAG set.
+        {
+            static bool const s_diag = (std::getenv("EMULATR_PTBR_DIAG") != nullptr);
+            if (s_diag && c.opB != 0 && (c.opB & 0x1FFFull) == 0) {
+                static unsigned long s_n = 0;
+                if (s_n < 128) { ++s_n;
+                    std::fprintf(stderr,
+                        "PTBR-DIAG[paltemp] cyc=%llu pc=0x%016llx PT[%u]=0x%016llx\n",
+                        static_cast<unsigned long long>(c.cpu->cycleCount),
+                        static_cast<unsigned long long>(g.pc),
+                        ptIdx,
+                        static_cast<unsigned long long>(c.opB));
+                    std::fflush(stderr);
+                }
+            }
+        }
+#endif
         return r;
     }
+
+#if EMULATR_BRINGUP_PROBES
+    // JRN-VMB-008 R1: dedicated VA_CTL / I_CTL write probe (env EMULATR_VACTL_DIAG).
+    // Its OWN cap so it is NOT starved by the DTB_TAG flood that fills the shared
+    // MMU-ctl probe below (which hit its 256 cap before any late VA_CTL write, so
+    // va_ctl=0x2 looked "never written").  Logs, in order, every write to the two
+    // VA_48 bits and to VPTB -- resolving the observed VA_CTL[VA_48]=1 /
+    // I_CTL[VA_48]=0 split (HRM: "should usually be equal") and whether any VPTB
+    // base is ever established (I_CTL[VA_48] also selects DTBM_DOUBLE_3 vs _4).
+    if (sel == coreLib::HW_VA_CTL || sel == coreLib::HW_I_CTL) {
+        static bool const s_vaDiag = (std::getenv("EMULATR_VACTL_DIAG") != nullptr);
+        if (s_vaDiag) {
+            static unsigned long s_vaN = 0;
+            if (s_vaN < 128) { ++s_vaN;
+                bool const isVaCtl = (sel == coreLib::HW_VA_CTL);
+                bool const va48    = isVaCtl ? coreLib::vaCtlIsVa48(c.opB)
+                                             : coreLib::iCtlIsVa48(c.opB);
+                bool const form32  = isVaCtl ? coreLib::vaCtlIsVaForm32(c.opB)
+                                             : coreLib::iCtlIsVaForm32(c.opB);
+                uint64_t const vptb = isVaCtl
+                                        ? (c.opB & 0xFFFFFFFFC0000000ULL) // VA_CTL[63:30]
+                                        : coreLib::iCtlVptb(c.opB);        // I_CTL[47:30] sext
+                std::fprintf(stderr,
+                    "VACTL-DIAG cyc=%llu pc=0x%016llx reg=%s value=0x%016llx "
+                    "va48=%d form32=%d vptb=0x%016llx\n",
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    isVaCtl ? "VA_CTL" : "I_CTL",
+                    static_cast<unsigned long long>(c.opB),
+                    static_cast<int>(va48),
+                    static_cast<int>(form32),
+                    static_cast<unsigned long long>(vptb));
+                std::fflush(stderr);
+            }
+        }
+    }
+#endif
 
 #if EMULATR_MEMDIAG || defined(EMULATR_BRINGUP_PROBES)
     // 2026-07-09: guard widened to EMULATR_BRINGUP_PROBES so this capped,

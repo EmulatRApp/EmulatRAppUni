@@ -9,7 +9,7 @@
 // ============================================================================
 //
 // Runtime configuration for the emulator, populated at startup from
-// EmulatrV4.ini by configLib::IniLoader.  This struct is Qt-free so that
+// Emulatr.ini by configLib::IniLoader.  This struct is Qt-free so that
 // any subsystem (including the Qt-free core: pipelineLib, cpuLib, etc.)
 // can include it without contaminating Qt-free code.
 //
