@@ -160,6 +160,15 @@ EMULATR_STOP
 .fuse_hidden*
 *.BAK
 
+# Guest media / virtual storage -- multi-GB disk images, never tracked
+vStorage/
+
+# Redundant archive of tools/Editors/ (the source tree itself IS tracked)
+tools/Editors.zip
+
+# Superseded journal drafts staged for removal
+journals/_to_delete/
+
 # RE / analysis workspaces
 ghidra/
 traces/
