@@ -75,6 +75,7 @@
 #include "coreLib/InstructionGrain.h"
 #include "coreLib/PipelineSlot.h"
 #include "coreLib/VA_types.h"
+#include "coreLib/IprFields.h"   // iCtlIsVa48 for DTBM_DOUBLE_4 vector select (JRN-VMB-008)
 #include "coreLib/axp_attributes_core.h"
 
 #include "grainFactoryLib/DispatchAccess.h"
@@ -92,6 +93,7 @@
 #include "traceLib/DecListingSink.h"   // 2026-06-01: setTraceWindowCountdown (window arm)
 #include "traceLib/RetireProfiler.h"   // 2026-06-05: always-on boot profiler
 #include "traceLib/TraceSink.h"
+#include "traceLib/BreakpointSink.h"   // 2026-07-19: BreakpointSink::s_forceOpen for BOOTTRACE (JRN-VMB-013)
 
 
 namespace pipelineLib {
@@ -1204,6 +1206,38 @@ private:
                     static_cast<unsigned long long>(r.regWriteValue));
                 std::fflush(stderr);
             }
+
+            // BOOTTRACE (JRN-VMB-013): once the UART bootstrap marker arms
+            // BreakpointSink (via EMULATR_TRACE_ON_BOOTSTRAP), log every retired
+            // instruction (pc/enc/pal/fault/memAddr + dest reg) so the console->
+            // bootstrap TRANSFER sequence at the 0x20000000 handoff is captured.
+            // Diagnoses why the transfer aborts before reaching HALT_PC=0x20000000
+            // (nothing executes at 0x20000000: ITBPROBE=0, boot0 unreached).
+            // Capped at EMULATR_DIAG_CAP; zero-cost when EMULATR_BOOTTRACE unset.
+            static bool const s_bootTrace =
+                (std::getenv("EMULATR_BOOTTRACE") != nullptr);
+            static int s_bootN = 0;
+            // Gate on s_forceOpen (set by the UART bootstrap-marker watch at the
+            // VMB->bootstrap handoff), NOT armed() -- armed() is true from cyc 0
+            // via the default paired-PC gate and would capture SROM init instead.
+            if (s_bootTrace
+                && traceLib::BreakpointSink::s_forceOpen.load(std::memory_order_relaxed)
+                && s_bootN < diagCap) {
+                ++s_bootN;
+                std::fprintf(stderr,
+                    "BOOTTRACE: cyc=%llu pc=0x%llx enc=0x%08x pal=%d fault=%d "
+                    "memAddr=0x%llx =>%c%d=0x%llx\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(diagApc),
+                    static_cast<unsigned>(slot.grain.encoded),
+                    cpu.inPalMode() ? 1 : 0,
+                    static_cast<int>(r.faultCode),
+                    static_cast<unsigned long long>(r.memAddr),
+                    r.regWriteIsFp ? 'F' : 'R',
+                    static_cast<int>(r.regWriteIdx),
+                    static_cast<unsigned long long>(r.regWriteValue));
+                std::fflush(stderr);
+            }
         }
 
         // HALT: graceful shutdown signal, not a trap.
@@ -1249,6 +1283,27 @@ private:
                                        slot.grain.encoded, r.faultCode,
                                        cpu.inPalMode(), cpu.va);
             }
+#if EMULATR_BRINGUP_PROBES
+            // JRN-VMB-006: first-level DTB-miss VA probe (env EMULATR_DTBMISS_DIAG).
+            // The DtbMissDouble loop reports the PAL PTE-lookup VA; this logs the
+            // ORIGINAL data VA of each single kFaultDtbMiss -- the page the console
+            // wanted but never hand-installed in the DTB.  Capped; zero-cost unset.
+            if (r.faultCode == coreLib::kFaultDtbMiss) {
+                static bool const s_dtbmDiag =
+                    (std::getenv("EMULATR_DTBMISS_DIAG") != nullptr);
+                if (s_dtbmDiag) {
+                    static unsigned long s_dtbmN = 0;
+                    if (s_dtbmN < 64) { ++s_dtbmN;
+                        std::fprintf(stderr,
+                            "DTBMISS-DIAG cyc=%llu pc=0x%016llx va=0x%016llx\n",
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(slot.grain.pc),
+                            static_cast<unsigned long long>(cpu.va));
+                        std::fflush(stderr);
+                    }
+                }
+            }
+#endif
 
             // 2026-07-08: arm a decoded retire window on the FIRST DTB double
             // miss (env EMULATR_TRACE_ARM_ON_DTBM=<instrs>, one-shot).  The
@@ -1285,8 +1340,19 @@ private:
             // the VPTE virtual address, causing an infinite ~28-cycle
             // self-re-entry loop at SROM PCs 0x8300 / 0xd1a1.
 
-            uint64_t const entryOffset =
+            uint64_t entryOffset =
                 coreLib::ev6::entryForFault(r.faultCode);
+            // JRN-VMB-008 / HRM Table 6-8 + sec 35373: the DTB double-miss page-
+            // walk level (3 vs 4) is selected by I_CTL[VA_48] -- NOT VA_CTL[VA_48]
+            // (HRM :17755).  entryForFault defaults to the three-level vector
+            // (DTBM_DOUBLE_3, 0x100); when the Ibox is in 48-bit mode
+            // (I_CTL[VA_48]=1) redirect to the four-level vector DTBM_DOUBLE_4
+            // (0x180).  This adds real DTBM_DOUBLE_4 support (previously the
+            // 0x180 vector was defined-but-dead; every double miss went to 0x100).
+            if (r.faultCode == coreLib::kFaultDtbMissDouble &&
+                coreLib::iCtlIsVa48(cpu.i_ctl)) {
+                entryOffset = coreLib::ev6::kEntry_DTBM_DOUBLE_4;
+            }
 
             if (cpu.palBase == 0 ||
                 entryOffset == coreLib::ev6::kEntry_None) {
