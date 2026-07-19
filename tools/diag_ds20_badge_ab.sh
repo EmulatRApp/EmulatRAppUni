@@ -66,7 +66,7 @@ RUN_DIR="$(cd "$RUN_DIR" 2>/dev/null && pwd || true)"
 cd "$RUN_DIR"
 
 FW="firmware/ds20_v7_3.exe"
-INI="config/EmulatrV4.ini"
+INI="config/Emulatr.ini"
 MEM=4294967296                 # 4 GiB in bytes
 MAXCYC=22250000000               # ~250M cycles: comfortably past the ~185M verify
 TS="$(date +%Y%m%d-%H%M%S)"

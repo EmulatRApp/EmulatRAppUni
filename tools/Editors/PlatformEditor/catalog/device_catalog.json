@@ -1,0 +1,25 @@
+{
+  "catalog_version": 1,
+  "comment": "Optional tool-side authoring aid (SPEC-PLATED-001 Section 7). Provides autofill defaults for known models and drift warnings (V-07). NOT a source of truth: the emulator reads identity from the manifest, not from this file. Keyed model -> identity; identity is NOT a key. cypress_isa and cypress_ide deliberately share 0x1080:0xc693 (one multifunction 82C693 part, func0 ISA bridge vs func1 IDE, distinguished by class_code) -- this is correct, not a duplicate-identity error, so there is no duplicate vendor/device guard.",
+  "pci_models": [
+    { "model": "cypress_isa", "vendor": "0x1080", "device": "0xc693",
+      "class_code": "0x060100", "interrupt_pin": 0, "bars": [], "supports": [],
+      "comment": "Cypress 82C693 ISA bridge, func0. Shares 0x1080:0xc693 with cypress_ide (same multifunction part, func0 vs func1). Fixed legacy south bridge; no relocatable BARs." },
+    { "model": "cypress_ide", "vendor": "0x1080", "device": "0xc693",
+      "class_code": "0x010100", "interrupt_pin": 0, "bars": [], "supports": ["storage"],
+      "controller": "ide",
+      "comment": "Cypress 82C693 IDE func1. Fixed legacy ports; no relocatable BARs." },
+    { "model": "qlogic_isp1040", "vendor": "0x1077", "device": "0x1020",
+      "class_code": "0x010000", "interrupt_pin": 1,
+      "bars": [ { "index": 0, "kind": "io", "size": "0x100" },
+                { "index": 1, "kind": "mem", "size": "0x1000" } ],
+      "supports": ["storage", "scsi"], "channels": 1,
+      "comment": "_PROVISIONAL SCSI (SPEC-SCSIH-001 Sec 10). QLogic ISP1040 SCSI HBA, KZPBA lineage -- the canonical Alpha HBA. Named storage controller: scsi_disk/scsi_cdrom/scsi_tape targets addressed by (channel,unit,lun) where unit=SCSI target id. Bus facts (initiator_id/width) live in channels[]; channels:1 bounds channels[].index. Identity + BARs estimated; verify vs HRM/REFERENCE_INDEX and v5 (emulator SCSI type + S2 BAR rebind still pending)." },
+    { "model": "symbios_53c810", "vendor": "0x1000", "device": "0x0001",
+      "class_code": "0x010000", "interrupt_pin": 1, "bars": [],
+      "supports": ["storage", "scsi"], "channels": 1,
+      "comment": "_PROVISIONAL SCSI (SPEC-SCSIH-001 Sec 10). Symbios/NCR 53C810, KZPAA lineage; narrow bus. Identity estimated; verify before landing." }
+  ],
+  "backing_models": ["generic", "passive"],
+  "platforms": ["DS10", "DS20", "DS25", "ES40", "ES45"]
+}

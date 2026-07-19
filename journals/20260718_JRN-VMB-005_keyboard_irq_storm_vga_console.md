@@ -1,0 +1,276 @@
+<!--
+EmulatR V4/V5 -- Session Journal JRN-VMB-005
+Project: EmulatR (Alpha 21264 / EV6 emulator), V5 active hive (emulatrappuniv5)
+Architect: Timothy Peer.  AI collaboration: Claude (Anthropic).
+Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
+Licensed under eNVy Systems Non-Commercial License v1.1.
+Per docs/notes/ADR-0001-source-file-headers.md (Markdown header as HTML comment).
+ASCII(128) only.  Hex radix.
+-->
+
+# Session Journal -- IRQ1 (keyboard) storm + VGA console writes: the graphics/keyboard console path (DEFERRED: kbd + gfx not implemented)
+
+    Doc id      : JRN-VMB-005
+    Status      : OPEN -- primary finding captured, work DEFERRED to next
+                  session by decision (keyboard + graphics NOT implemented).
+    Date        : 2026-07-18
+    Model       : claude-opus-4-8 (Cowork), device bridge to tim-hpz640,
+                  hive D:\EmulatR\emulatrappuniv5.
+    Relates to  : JRN-VMB-001..004 (ITB-miss frontier, boot environment,
+                  SRM boot-handoff reference, ITBPROBE landed). This journal
+                  supersedes the ITB-hit hypothesis as the leading boot
+                  blocker with a device-emulation finding.
+    Decision    : Keyboard (i8042) and graphics (VGA) are NOT to be
+                  implemented. The firmware must either be kept off that
+                  console path (serial only) OR the two devices must be
+                  stubbed so their probes quiesce (IRQ1 deassert, VGA writes
+                  absorbed) instead of storming/erroring.
+    Encoding    : ASCII-128.  Hex radix.
+
+---
+
+## 1. One-paragraph summary
+
+During a DS20 cold boot (b dqa0, then b dqa1) EmulatR takes a level IRQ1
+(keyboard / i8042) interrupt that never deasserts -- 32 identical diverts into
+the PALcode interrupt entry at 0x8680, each saving VMB PC 0x1ade64, still firing
+at cyc 1.58B. Separately, right after the dqa0 halt the firmware writes VGA text
+cells to PCI 0xB8000 that the Tsunami Pchip drops as UNHANDLED OUTER WRITE (no
+VGA device). Together these indicate the firmware is driving a graphics +
+keyboard console that EmulatR does not service. Neither device is to be
+implemented, so the task (deferred) is to keep the firmware on the serial
+console and/or make the keyboard/VGA probes quiesce. The earlier "0x20000000
+ITB stale-entry" line is downgraded: the translator gate is correct and
+AXPBox-equivalent (Sec 5), so the halt at 0x20000000 is a downstream symptom,
+not an ITB walker bug.
+
+## 2. Primary finding -- the IRQ1 (keyboard) storm
+
+Source of evidence: journals capture snap_vmb_dqa0_20260717_213638.log
+(537,049 bytes, 4891 lines) and the break trace
+D:\EmulatR\traces\20260717-213638_break.trc (~6.24 GB).
+
+Log (stderr) shows 32 identical diverts, ALL the same tuple:
+
+    Machine: b_irq<1> divert[0..31] (device)
+        cyc      = 246858889 .. 275741093   (divert[0] .. divert[31])
+        savedPc  = 0x00000000001ade64        (VMB, the PAL-handoff site)
+        target   = 0x0000000000008680        (PALcode interrupt entry)
+        picVector= 0x916f3858                 (FIXED; does not look like an
+                                               SCB vector -- 0x91.. is an
+                                               Alpha instruction word)
+
+The break trace confirms the handler is live inside the capture window
+(cyc ~1.407B): at pc 0x8681 (0x8680 | PAL-bit) the entry runs the PAL
+interrupt prologue --
+
+    pc=0x8681 encoded=66ff0600 HW_MFPR pal=1 exc=0x1ade64
+    pc=0x8685 encoded=649f0d00 HW_MFPR pal=1 exc=0x1ade64
+    pc=0x8689 encoded=47ff041f BIS     pal=1 exc=0x1ade64
+    ... (HW_MFPR / BIS sequence, exc always 0x1ade64)
+
+and PCSAMPLE at the tail (dqa1, cyc 1.55B-1.58B) still shows
+pc=0x8680 pal=1 recurring. So the interrupt is not a one-shot; the line
+stays asserted and re-enters 0x8680 with the same saved PC. IRQ line 1 on
+this platform is the 8042 keyboard controller. The signature (same savedPc,
+same target, same vector, unbounded) is the classic level-interrupt-never-
+deasserted storm: the emulated 8042 does not drop IRQ1 after the ISR reads
+its data/status port (or asserts spuriously), so the firmware re-enters the
+handler forever. The fixed non-vector-shaped picVector=0x916f3858 is a
+second red flag -- the SCB/PIC vector handed to the dispatch looks wrong.
+
+## 3. Secondary finding -- VGA console writes fall into a void
+
+Immediately after the dqa0 halt (log line 4790+), the firmware writes
+character cells to PCI 0xB8000 (the PC/VGA color text framebuffer):
+
+    TsunamiPchip: UNHANDLED OUTER WRITE offset=0x0b8000 value=0x20 width=1
+    TsunamiPchip: UNHANDLED OUTER WRITE offset=0x0b8001 value=0x4f width=1
+    ... offset 0x0b8000 .. 0x0b801f, value alternating 0x20 / 0x4f, width=1
+
+0x20 is the space glyph; 0x4f is a text attribute (white-on-red). The pattern
+is a screen-clear/fill with a RED attribute -- the firmware painting a text
+console. Every byte returns UNHANDLED because no VGA device is mapped at
+0xB8000 in the Tsunami Pchip outer (PCI mem) space, so the writes are dropped.
+The firmware believes it has a graphics head and is drawing an
+(error-colored) banner nobody receives.
+
+## 4. Interpretation (the unifying picture)
+
+The DS20 SRM output we can see is the serial console (the [CON COM1 +..ms]
+lines). But the firmware is ALSO exercising a graphics + keyboard console:
+VGA text at 0xB8000 and the 8042 keyboard on IRQ1. Neither is serviced by
+EmulatR -- the VGA target does not exist (writes dropped) and the keyboard
+line never quiesces (IRQ1 storm). This is a more concrete hang mechanism than
+the PC-bit question and matches the observed "reading heavily / spins forever"
+symptom: the machine is not reading, it is re-servicing a keyboard interrupt
+that will not clear while writing to a VGA that is not there.
+
+## 5. Downgrade of the 0x20000000 / PALmode-PC<0> hypothesis (this session)
+
+Earlier this session we chased whether the 0x20000000 boot fetch is mis-served
+because PALmode is decoupled from PC<0>. Conclusion: the translator gate is
+CORRECT and equivalent to the AXPBox reference; the earlier "ITB HIT with PFN 0"
+was a deduction, not an observation, and both the hit-path and miss-path
+ITBPROBE fired ZERO times, so the halting fetch never reaches the ITB lookup.
+
+  - coreLib/CpuState.h:174  inPalMode() { return (pc & 1ull) != 0; }
+    (PALmode IS PC<0>, not a decoupled bool) and :175 pcAddr() = pc & ~1.
+  - pipelineLib/PipelineDriver.h:147  the I-fetch is
+    translateInstruction(cpu, cpu.pc, pa) -- va IS cpu.pc, so inPalMode()
+    tests exactly the fetched address's bit, identical to AXPBox.
+  - AXPBox reference (D:\EmulatR\axpbox\src): get_icache (AlphaCPU.hpp)
+    gates physical-vs-translated fetch on (address & 1); virt2phys
+    (AlphaCPU.cpp:1390) tries superpage only if (spe && !cm) for the three
+    high-VA SPE windows (SPE_2 VA[47:46]=2, SPE_1 VA[47:41]=7E, SPE_0
+    VA[47:30]=3FFFE) -- 0x20000000 matches none -- then falls to FindTBEntry
+    -> ITB miss -> set_pc(pal_base + ITB_MISS + 1) -> VMS PAL fills. AXPBox
+    has NO decoupled palMode bool, so it cannot drift.
+
+Open (also deferred, subordinate to the storm): confirm via checkpoints
+whether the CPU ever fetches 0x20000000 and with bit 0 set/clear. See Sec 8.
+
+## 6. DMA support check (this session) -- V5 has none, boot is PIO
+
+Prompted by the V1 device-support files (mmio_DeviceCatalog.cpp,
+mmio_DMACoherencyManager.h, mmio_Manager.cpp, ScsiControllerKzpba.h): V5 has
+NO DMACoherencyManager, NO isRAM DMA-target validation, and the Tsunami/Titan
+Pchip stores the DMA-window CSRs (WSBA/WSM/TBA) but has NO translate function
+that consumes them. No V5 device writes guest memory with a device-supplied PA.
+
+  - deviceLib/Tsunami/Cy82C693Ide.h -- port-I/O (ioRead/ioWrite on 0x1F0/0x170),
+    delegates to AtaTaskfileEngine.
+  - deviceLib/Tsunami/AtaTaskfileEngine.h -- PIO only (kCMD_READ_SECTORS 0x20,
+    16-bit data-register insw/outsw into an internal pio[] buffer).
+  - chipsetLib/TitanPchip.h + Titan21274_CsrSpec.h -- WSBA/WSM/TBA stored,
+    no dmaTranslate.
+
+Consequence: the dqa boot is PURE PIO -- the CPU reads the IDE data register and
+stores to memory itself through the normal MMU, so the boot-image PA is NOT
+subject to a DMA-invalid-PA bug. Missing DMA is "absent", not "returns garbage",
+for the current path. A future bus-master device (KZPBA/ISP1020, bus-master IDE)
+WOULD yield invalid PAs without a Pchip window translate + isRAM guard. Not the
+current blocker.
+
+## 7. Tooling landed this session (source changes)
+
+All EMULATR_BRINGUP_PROBES-gated, ASCII-128, CRLF, committed to the active hive.
+
+  FILE: mmuLib/Ev6Translator.h  (JRN-VMB-004)
+    Restored the intact 564-line good copy over the truncated active-hive
+    copy (which lacked the translateInstruction body and the include-guard
+    #endif -- would not compile), then added the hit-path AND miss-path
+    ITBPROBE at the ITB lookup return, keyed to EMULATR_ITBPROBE_VA
+    (default 0x20000000, PC<0>-masked), cap 16. Both fired ZERO at the halt.
+
+  FILE: traceLib/BreakpointSink.h / .cpp
+    Added s_forceOpen + forceOpenNow(): opens the full-retire window on the
+    next commit regardless of PC and holds it until onRunEnd (ignores
+    s_gateClosePc and the revolution budget). Folded into armed() and
+    processCommit; close transition guarded by !forceOpen.
+
+  FILE: deviceLib/Tsunami/Uart16550.h
+    bootstrapTraceWatch(): TX-side line watch in badgeEmitByte (line ~759)
+    matching "jumping to bootstrap code" and calling forceOpenNow(). NOW
+    OPT-IN behind env EMULATR_TRACE_ON_BOOTSTRAP -- default just logs
+    "marker seen (force-open OFF)". Reason: the marker fires ~250M cycles
+    before the actual transfer; the full-retire firehose throttled the
+    emulator to a crawl and produced a 143 GB trace. Default diagnostic is
+    now EMULATR_CHECKPOINTS.
+
+## 8. Deferred task list (for the next session)
+
+  T-1 (PRIMARY) -- keyboard IRQ1 storm. Find the device that owns b_irq<1>
+      (the i8042 / keyboard controller) in the V5 tree and determine why it
+      holds IRQ1 asserted: does the data/status-port read deassert the line,
+      or is the assertion spurious? Since keyboard is NOT to be implemented,
+      the correct fix is a QUIESCENT stub: never assert IRQ1 (or deassert on
+      any port access), so the firmware's keyboard probe finds nothing and
+      moves on. Also investigate why picVector=0x916f3858 (a bad SCB/PIC
+      vector) is delivered -- the interrupt-controller / SCB dispatch path.
+
+  T-2 (PRIMARY) -- VGA console at 0xB8000. Since graphics is NOT to be
+      implemented, decide between (a) steering the firmware to a SERIAL-ONLY
+      console (SRM console environment variable = serial, so it never touches
+      VGA/keyboard), and (b) absorbing writes to the 0xB8000 outer region in
+      the Tsunami Pchip as a silent no-op sink so they stop logging UNHANDLED
+      and do not perturb the boot. Prefer (a) if the console env is the lever;
+      (b) is the safety net.
+
+  T-3 (subordinate) -- 0x20000000 checkpoint confirmation. With the opt-in
+      gate built (Sec 7), run at FULL SPEED with:
+        EMULATR_CHECKPOINTS="boot0:0x20000000,bootpal:0x20000001,handoff:0x1ade60"
+      do NOT set EMULATR_TRACE_ON_BOOTSTRAP, and TEE stderr to logs/. The
+      CKPT_SUMMARY at onRunEnd (main.cpp parse at :357; report at
+      BreakpointSink.cpp emitCheckpointSummary, called from onRunEnd) says
+      whether the CPU ever fetches 0x20000000, with bit 0 set/clear, and at
+      what cycle -- with a full GPR snapshot -- at near-zero cost.
+
+## 9. How to reproduce / observe (env knobs)
+
+  - EMULATR_CHECKPOINTS="label:0xPC,..."  (main.cpp:357)  -- up to 8 tripwire
+    PCs; first-hit cycle + GPR snapshot; CKPT_SUMMARY (decisive) to stderr at
+    run end. Near-zero cost. THE default boot-frontier diagnostic.
+  - EMULATR_TRACE_ON_BOOTSTRAP=1  (Uart16550.h)  -- OPT-IN full-retire capture
+    from the "jumping to bootstrap code" marker until shutdown. WARNING:
+    firehose (~740 bytes/retire); throttles the run; 143 GB was produced once.
+  - EMULATR_ITBPROBE_VA=0x...  (Ev6Translator.h)  -- re-key the ITB hit/miss
+    probe (default 0x20000000).
+  - Trace/log placement: logs in <run>/logs, retire traces in <repo>/traces
+    (the BreakpointSink writes D:\EmulatR\traces\<ts>_break.trc). Multi-GB:
+    bounded tails / gated windows ONLY -- never whole-file grep or wc, and the
+    device-bridge mount can serve a STALE early slice (use device_list_dir for
+    the authoritative size).
+
+## 10. Artifacts referenced
+
+  - D:\EmulatR\emulatrappuniv5\out\build\relwithdebinfo\logs\
+      snap_vmb_dqa0_20260717_213638.log   (537 KB) -- the IRQ1 storm + VGA
+      UNHANDLED writes + dqa0 halt + dqa1 start. PRIMARY evidence for this
+      journal.
+  - D:\EmulatR\traces\20260717-213638_break.trc   (~6.24 GB) -- full-retire
+      window (cyc ~1.407B onward) confirming the 0x8680 handler is live.
+  - D:\EmulatR\traces\20260717-200443_SRM-Jumping To BootStrap.trc
+      (~148.7 GB) -- kept on purpose; the earlier 143 GB firehose capture
+      (JRN artifacts index: claude/vmb_diagnostic_artifacts.md).
+
+## 11. Source citations (V5 hive, D:\EmulatR\emulatrappuniv5)
+
+    coreLib/CpuState.h:174-175        inPalMode()=(pc&1) / pcAddr()
+    pipelineLib/PipelineDriver.h:147  translateInstruction(cpu, cpu.pc, pa)
+    mmuLib/Ev6Translator.h            translateInstruction ITB path + ITBPROBE
+    traceLib/BreakpointSink.h/.cpp    s_forceOpen/forceOpenNow, checkpoints,
+                                      emitCheckpointSummary (onRunEnd)
+    main.cpp:344-391                  EMULATR_CHECKPOINTS parse + arming
+    deviceLib/Tsunami/Uart16550.h     bootstrapTraceWatch, badgeEmitByte:~759,
+                                      EMULATR_TRACE_ON_BOOTSTRAP gate
+    deviceLib/Tsunami/Cy82C693Ide.h   IDE port-I/O (dqa)
+    deviceLib/Tsunami/AtaTaskfileEngine.h  PIO transfer model
+    chipsetLib/TitanPchip.h           WSBA/WSM/TBA (no DMA translate)
+    chipsetLib/Titan21274_CsrSpec.h:188-241  DMA-window CSR spec
+    (TO LOCATE next session) i8042 / keyboard controller + interrupt-router /
+      SCB dispatch that raises b_irq<1> and computes picVector; and the
+      TsunamiPchip outer-write handler that logs UNHANDLED at 0xB8000.
+
+## 12. Reference citations (read-only; Processor Support / AXPBox)
+
+    D:\EmulatR\axpbox\src\AlphaCPU.hpp    get_icache -- (address & 1) physical
+                                          fetch gate (Route-B reference)
+    D:\EmulatR\axpbox\src\AlphaCPU.cpp:1390  virt2phys -- superpage(spe&&!cm)
+                                          -> FindTBEntry -> ITB_MISS vector
+    D:\EmulatR\Processor Support\Palcode\palcode\apisrm\apisrm\ref\boot.c
+                                          SRM console boot (JRN-VMB-003 Sec 2-3)
+    Alpha 21264/EV6 HRM 5.3.9 (superpage), 5.2.2 (ITB / no FOE)
+    Tsunami 21272 HRM 11.x (WSBA/WSM/TBA PCI DMA windows)
+
+## 13. Prohibitions still in force (JRN-VMB-001..004)
+
+  - P-1. No page-table walker in the translator or in C++. TB-fill fixes live
+    in the PALcode fill / swap path.
+  - Multi-GB traces: bounded tails / gated windows only; never whole-file grep
+    or wc (times out / wedges the sandbox / hammers the user disk over the
+    bridge). Prefer device_list_dir for authoritative size (mount cache serves
+    stale content).
+  - ASCII-128 only; include guards not #pragma once; hex dispatch labels;
+    doctest CHECK only; surgical Edit over whole-file rewrites; treat
+    V0/V1/V2, Processor Support, and axpbox as read-only.

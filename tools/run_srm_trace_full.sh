@@ -80,14 +80,17 @@ if [ "$HOST" = "win" ]; then
         debug) VSCFG=Debug ;;
         release) VSCFG=Release ;;
     esac
-    CANDS=( "$PROJ_ROOT/$VSCFG" "$PROJ_ROOT/out/build/$CONFIG" )
+    # 2026-07-15: include $PROJ_ROOT itself.  When this script runs from the
+    # deployed <config>/tools/ copy, PROJ_ROOT resolves to the run dir where
+    # Emulatr.exe sits directly -- without this the config-dir invocation FATALs.
+    CANDS=( "$PROJ_ROOT" "$PROJ_ROOT/$VSCFG" "$PROJ_ROOT/out/build/$CONFIG" )
 else
     case "$CONFIG" in
         relwithdebinfo) SUB=mac-debug ;;
         release) SUB=mac-release ;;
         debug) SUB=mac-debug-g ;;
     esac
-    CANDS=( "$PROJ_ROOT/out/build/$SUB" )
+    CANDS=( "$PROJ_ROOT" "$PROJ_ROOT/out/build/$SUB" )
 fi
 RESOLVED=""
 if [ -n "${RUN_DIR:-}" ]; then
@@ -106,7 +109,7 @@ cd "$RUN_DIR"
 SRC_FW="$PROJ_ROOT/firmware/${NAME}_v7_3.exe"
 DST_FW="firmware/${NAME}_v7_3.exe"
 SRC_MANIFEST="$PROJ_ROOT/${NAME}_v7_3_platform.json"
-INI="config/EmulatrV4.ini"
+INI="config/Emulatr.ini"
 MEM="${MEM:-4294967296}"                   # 4 GiB default; override e.g. MEM=34359738368 (32 GiB)
 PORT="${PORT:-$((10023 + POFF))}"          # per-model default so models can run concurrently
 MAXCYC="${MAXCYC:-3000000000}"
@@ -129,9 +132,11 @@ DIAG_FLASH="$RUN_DIR/${NAME}_diag_flash.rom"
 [[ -f "$SRC_FW" ]] || { echo "FATAL: firmware not found: $SRC_FW (no image for $MODEL yet?)"; exit 1; }
 [[ -f "$INI" ]]    || { echo "FATAL: ini not found: $RUN_DIR/$INI"; exit 1; }
 mkdir -p firmware "$TRACE_DIR"
-cp -f "$SRC_FW" "$DST_FW"
+# 2026-07-15: skip when source and dest are the same file (config-dir launch,
+# where PROJ_ROOT resolves to the run dir -- cp would error "same file").
+[ "$SRC_FW" -ef "$DST_FW" ] || cp -f "$SRC_FW" "$DST_FW"
 if [ -f "$SRC_MANIFEST" ]; then
-    cp -f "$SRC_MANIFEST" "./${NAME}_v7_3_platform.json"
+    [ "$SRC_MANIFEST" -ef "./${NAME}_v7_3_platform.json" ] || cp -f "$SRC_MANIFEST" "./${NAME}_v7_3_platform.json"
     echo "manifest : refreshed ./${NAME}_v7_3_platform.json from source"
 else
     echo "manifest : WARNING source $SRC_MANIFEST missing -- may fall back to DS10 bus"
@@ -253,11 +258,4 @@ grep -aiE "Console V|Compaq AlphaServer|AlphaServer|AlphaPC|P00>>>|UPD>|LFU|init
 echo "  SYSVAR / SYSTYPE / member (badge decision):"
 grep -inE "SYSVAR|SYSTYPE|GMEM-WATCH|member" "$CONSOLE_LOG" 2>/dev/null | tail -8 | sed 's/^/    /' || true
 echo "  stall / halt / machine-check:"
-grep -inE "HALTPROBE|MCHK|machine check|cbox|smir|StopReason|MaxCycles|fault|PANIC|deadlock" "$CONSOLE_LOG" 2>/dev/null | tail -10 | sed 's/^/    /' || true
-echo "  IIC-TXN total / node-0x40   : $(cnt 'IIC-TXN') / $(cnt 'IIC-TXN addr=0x40')"
-echo "  retire trace (.trc)         : ${NEWEST_TRC:-<none written>}"
-echo "--------------------------------------------------------------"
-echo "Send back for analysis:"
-echo "  1) $RUN_DIR/$CONSOLE_LOG"
-echo "  2) $RUN_DIR/$MACHINE_LOG"
-echo "  3) ${NEWEST_TRC:-<newest traces/*.trc>}"
+grep -inE "HALTPROBE|MCHK|mac
