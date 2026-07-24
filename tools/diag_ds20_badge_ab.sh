@@ -71,7 +71,7 @@ MEM=4294967296                 # 4 GiB in bytes
 MAXCYC=22250000000               # ~250M cycles: comfortably past the ~185M verify
 TS="$(date +%Y%m%d-%H%M%S)"
 LOG="fw_ds20_iicpoll_${TS}.out"
-DIAG_FLASH="$RUN_DIR/ds20_diag_flash.rom"   # dedicated, wiped each run
+DIAG_FLASH="$RUN_DIR/firmware/ds20_diag_flash.rom"   # dedicated, wiped each run
 
 # ---- preflight -------------------------------------------------------------
 [[ -x "./Emulatr.exe" ]] || { echo "FATAL: ./Emulatr.exe not found in $RUN_DIR"; exit 1; }

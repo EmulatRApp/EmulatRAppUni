@@ -28,6 +28,7 @@
 #include "deviceLib/Tsunami/IicPcf8584.h"  // PCF8584 IIC controller model (2026-06-03)
 #include "deviceLib/Tsunami/Cy82C693Ide.h" // CY82C693 IDE func1 + ATAPI CD (2026-06-08)
 #include "deviceLib/Tsunami/AliM5229Ide.h" // ALi M5229 IDE func1 (ES40/ES45/DS25, Phase 2B)
+#include "deviceLib/Tsunami/Dec21143Tulip.h" // DE500-AA 21143 NIC (ewa) -- Phase 1 enumerate+init
 #include "deviceLib/Tsunami/Smc37c669SuperIo.h" // FDC37C669 SuperIO: config port + FDC (#22)
 #include "deviceLib/Tsunami/VgaTextConsole.h"    // VGA text-console interface (JRN-VMB-006, 2026-07-18)
 #include "deviceLib/scsi/VirtualIsoDevice.h"
@@ -540,6 +541,22 @@ public:
     ToyRtc& rtc()     noexcept { return m_rtc; }   // 2026-06-03
     IicPcf8584& iic()     noexcept { return m_iic; }   // 2026-06-03
 
+    // Manifest-driven PCI enumeration (D-PCIMODEL): resolve a PciModel::Named
+    // manifest modelName to the chipset's behavioral PCI config handler, so
+    // Machine::run can register it at the manifest-declared (slot,func).  The
+    // active IDE (m_activeIde) is chosen by wireDevices() per south bridge, so
+    // both "ali_m5229" and "cypress_ide" resolve to whichever is active.
+    // Returns nullptr for an unknown name -> caller presents a config stub.
+    IPciDeviceHandler* pciHandlerForModel(const std::string& modelName) noexcept {
+        if (modelName == "ali_m1543c")  return &m_ali;
+        if (modelName == "cypress_isa") return &m_cypress;
+        if (modelName == "ali_m5229" || modelName == "cypress_ide")
+            return m_activeIde;
+        if (modelName == "de500" || modelName == "dec21143")
+            return &m_tulip;
+        return nullptr;
+    }
+
     // TIG-bus flash / NVRAM (AMD Am29F016).  Machine binds its backing file
     // via flash().loadRaw(path) after construction and calls forceFlush() on
     // clean shutdown; steady-state persistence is the debounce poll in step().
@@ -646,11 +663,17 @@ private:
         // 1. Register the south bridge (func0) in the PCI device map, and wire
         //    it as the I/O-port fallback handler.  ALi for ES40/ES45/DS25, else
         //    Cypress (DS10/DS20).
+        // PCI CONFIG-SPACE registration for the south bridge + IDE is now
+        // DRIVEN BY THE MANIFEST (Machine::run -> registerManifestPci(), which
+        // resolves each PciModel::Named entry via pciHandlerForModel() and
+        // registers it at the manifest-declared (slot,func)).  This makes the
+        // BDF topology data, not code -- one binary serves DS10/DS20/DS25/
+        // ES40/ES45, each placing its south bridge/IDE where its SRM expects
+        // (e.g. Cypress at dev 5 on DS10/DS20, ALi M1543C at dev 15 on ES40).
+        // Here we wire ONLY the legacy I/O-port fallback (not BDF-dependent).
         if (m_southBridge == SouthBridge::AliM1543C) {
-            m_pchip.registerPciDevice(0, 5, 0, &m_ali);     // ALi M1543C ISA bridge (0x10B9/0x1533)
             m_pchip.setIoPortHandler(&m_ali);
         } else {
-            m_pchip.registerPciDevice(0, 5, 0, &m_cypress); // CY82C693 ISA bridge (0x1080/0xC693)
             m_pchip.setIoPortHandler(&m_cypress);
         }
 
@@ -688,7 +711,41 @@ private:
                     ? static_cast<ITsunamiIde*>(&m_aliIde)
                     : static_cast<ITsunamiIde*>(&m_ide);
         m_activeIde->attachDevice(0, 1, &m_cdrom);              // primary slave = ATAPI CD (dqa1)
-        m_pchip.registerPciDevice(0, 5, 1, m_activeIde);        // func 1 config space
+        // func-1 config space is registered from the manifest (Machine::run ->
+        // pciHandlerForModel("ali_m5229"/"cypress_ide") -> m_activeIde).
+
+        // DE500 21143 (ewa): its CSR window is relocatable via BAR0(I/O)/BAR1(mem).
+        // When the SRM programs a BAR, the model calls back to register its
+        // 0x80-byte CSR window at the assigned base so CSR accesses route here.
+        // (Pchip mem/IO registries are offset-from-kMMIO_Start / port space; a
+        // BAR base is exactly that offset.)  Removal API is a TODO -- BARs are
+        // programmed once during enumeration and don't move.
+        m_tulip.setRangeCallbacks(
+            [this](uint64_t base, uint32_t len, bool isMem, IIoPortHandler* self) {
+                if (isMem) m_pchip.registerPciMemRange(base, base + len, self);
+                else       m_pchip.registerIoPortRange(
+                               static_cast<uint16_t>(base),
+                               static_cast<uint16_t>(base + len), self);
+            },
+            [](uint64_t, uint32_t, bool, IIoPortHandler*) { /* no removal API yet */ });
+        // DMA access for TX/RX descriptor completion.  Descriptor addresses in
+        // CSR3/4 are PCI-DMA addresses; wired direct-to-guest-PA for now (the
+        // tulip's TULIP-TX trace verifies whether a Pchip DMA-window translation
+        // is needed).  read4/write4 bounds-check against DRAM.
+        m_tulip.setDmaAccess(
+            [this](uint64_t dma) -> uint32_t {
+                uint32_t v = 0; m_guestMemory.read4(m_pchip.translateDmaToPa(dma), v); return v;
+            },
+            [this](uint64_t dma, uint32_t v) {
+                m_guestMemory.write4(m_pchip.translateDmaToPa(dma), v);
+            });
+        // Interrupt: DE500 (hose 0 / Pchip0, INTA) -> Cchip DRIR[32].  On an
+        // enabled TX/RX interrupt the tulip asserts INTA so the SRM's ew ISR
+        // runs, signals tu_out's semaphore, and ewa init completes.
+        m_tulip.setIntrCallback([this](bool level) {
+            if (level) raisePciInterrupt(/*pchip*/0, /*INTA*/0);
+            else       lowerPciInterrupt(0, 0);
+        });
         m_pchip.registerIoPortRange(0x1F0, 0x1F8, m_activeIde); // primary command block
         m_pchip.registerIoPortRange(0x170, 0x178, m_activeIde); // secondary command block
         m_pchip.registerIoPortRange(0x3F6, 0x3F7, m_activeIde); // primary alt-status/control
@@ -922,6 +979,7 @@ private:
     scsi::VirtualIsoDevice m_cdrom;          // no-media ATAPI CD
     Cy82C693Ide            m_ide;            // CY82C693 IDE controller (func 1; DS10/DS20)
     AliM5229Ide            m_aliIde;         // ALi M5229 IDE controller (func 1; ES40/ES45/DS25)
+    deviceLib::Dec21143Tulip m_tulip;        // DE500-AA 21143 NIC (ewa); wired via the manifest (slot 7)
     ITsunamiIde*           m_activeIde = nullptr;  // -> m_ide or m_aliIde; set in wireDevices()
     Smc37c669SuperIo       m_superio;       // FDC37C669 SuperIO: config port + FDC LDN (#22)
 

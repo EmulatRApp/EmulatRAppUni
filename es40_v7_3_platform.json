@@ -25,23 +25,23 @@
       "comment": "PC264/Clipper IIC set per srmconsole/IIC_DRIVER.C + galaxy_pc264.c. SOURCED FROM THE CONSUMER: build_power_hw reads ONLY iic_system0@0x70 (->fail_register) and iic_system1@0x72 (->func_register), 1 byte each, then `if(!status) return` -- so its reachability/pass gate is the IIC CONTROLLER BASE (kIicBaseByModel[ES40], so the PCF8584 fread completes) + the fail_register BIT VALUES (ps_present clear = power supplies present), NOT any OCP node. The OCP LEDs (0x40/0x42/0x4E) + iic_cont@0xB6 are read by the SEPARATE build_led_hw path and are NOT needed for build_power_hw -- do NOT add them to force a SYSVAR badge. ES40 = CLASS_CLIPPER var=5 (galaxy_pc264.c:366/714/1356), NOT DS20(6)/DS20E(8): the SYSVAR>>10 gate is binary (member 1=264DP skips build_power_hw, !=1 runs it), not an OCP selector, and the member is not OCP-keyed. FRU roots iic_smb0@0xA2 + iic_cpu0@0xA4 + iic_cpu1@0xAC + KCRCM iic_rcm_*@0x9E/0xC0-0xCE feed build_fru_root (SMB-rooted hierarchy, BUILD_FRU.C, a deeper IIC-model feature)." }
   ],
   "pci_devices": [
-    { "name": "ali_isa", "model": "ali_m1543c", "hose": 0, "bus": 0, "slot": 5, "func": 0,
+    { "name": "ali_isa", "model": "ali_m1543c", "hose": 0, "bus": 0, "slot": 15, "func": 0,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x060100",
       "comment": "STAND-IN: real ES40 south bridge is ALi M1543C (vendor 0x10b9, device 0x1533 bridge / 0x1533+0x1543 funcs). EmulatR has no ALi model yet; the Cypress stand-in carries the ISA/UART/PIC console path at standard ports.",
       "option_rom": false, "interrupt_pin": 0 },
-    { "name": "ali_ide", "model": "ali_m5229", "hose": 0, "bus": 0, "slot": 5, "func": 1,
+    { "name": "ali_ide", "model": "ali_m5229", "hose": 0, "bus": 0, "slot": 15, "func": 1,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x010100",
       "comment": "STAND-IN IDE/ATAPI (DS10-style). ES40 boots on-board SCSI; this carries dqa0/dqa1 for parity with the DS10 harness.",
       "option_rom": false, "interrupt_pin": 0,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "ata_disk",
-          "model": "EMULATR VIRTUAL DISK", "media": "",
-          "comment": "primary master = dqa0. media = bare image FILENAME resolved against [Storage] diskDir; empty = no disk." },
+          "model": "EMULATR VIRTUAL DISK", "media": "Alpha/dka0.vdisk",
+          "comment": "primary master = dqa0 (bootable OpenVMS system disk). media = bare image FILENAME resolved against [Storage] diskDir; empty = no disk." },
         { "channel": 0, "unit": 1, "lun": 0, "type": "atapi_cdrom",
-          "model": "EMULATR VIRTUAL CDROM", "media": "",
-          "comment": "primary slave = dqa1, ATAPI CD. media empty = no disc loaded." }
+          "model": "EMULATR VIRTUAL CDROM", "media": "Alpha/OpenVMS_v82.iso",
+          "comment": "primary slave = dqa1, ATAPI CD (OpenVMS install media)." }
       ] },
-    { "name": "de500_tulip", "model": "generic", "hose": 0, "bus": 0, "slot": 7, "func": 0,
+    { "name": "de500_tulip", "model": "de500", "hose": 0, "bus": 0, "slot": 7, "func": 0,
       "vendor": "0x1011", "device": "0x0019", "class_code": "0x020000",
       "comment": "On-board DE500-AA (DECchip 21143 tulip). Slot _PROVISIONAL (DS10-derived).",
       "bars": [ { "index": 0, "kind": "io", "size": "0x80" },

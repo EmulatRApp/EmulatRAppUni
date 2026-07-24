@@ -34,7 +34,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ="$(cd "$SCRIPT_DIR/.." && pwd)"
 SHOWDEV="$SCRIPT_DIR/run_es40_showdev.sh"
-[[ -x "$SHOWDEV" ]] || { echo "FATAL: $SHOWDEV not found/executable"; exit 1; }
+# Test for existence with -f (NOT -x) and run via `bash` below: an NTFS/Windows
+# checkout frequently drops the executable bit, so -x would false-FATAL here.
+[[ -f "$SHOWDEV" ]] || { echo "FATAL: sibling not found: $SHOWDEV" >&2; exit 1; }
 
 echo "=== ES40 RSCC A/B -- CASE B: WARP OFF (faithful timing) ==="
 echo "    platform=silicon  rscc_diag=1  idlewarp=OFF"
@@ -49,7 +51,7 @@ unset  EMULATR_IDLEWARP || true
 # Raise the cycle cap since nothing is skipped (override with MAXCYC=...).
 export MAXCYC="${MAXCYC:-400000000000}"   # 400B: give the un-warped grind room
 
-"$SHOWDEV" || true
+bash "$SHOWDEV" || true
 
 # ---- post-process: extract the A/B summary from the newest showdev log ------
 LOG="$(ls -t "$PROJ"/*/run_es40_showdev_*.log \

@@ -498,6 +498,50 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
         }
         m_chipset.iic().configureDevices(devs);
 
+        // ----------------------------------------------------------------
+        // Manifest-driven PCI enumeration (D-PCIMODEL, 2026-07-20).
+        // The manifest DECLARES every PCI device the guest firmware expects to
+        // enumerate; register each at its declared (bus,slot,func).  This is the
+        // previously-MISSING consumer of mr.manifest.pci: the IIC list was
+        // wired above, but the PCI list went nowhere -- so declared devices
+        // (e.g. the DE500 tulip @ slot 7, and on ES40 the M1543C @ its real
+        // slot) never enumerated and the SRM read all-ones.  Binding:
+        //   PciModel::Named   -> the chipset's behavioral handler
+        //                        (south bridge / IDE) via pciHandlerForModel();
+        //   Generic/Passive   -> a synthesized config-only ManifestPciDevice so
+        //                        PCI sizing sees vendor/device/class + sane BAR
+        //                        sizes instead of the all-ones "no device" float.
+        // BDF is DATA, not code -> one binary serves DS10/DS20/DS25/ES40/ES45.
+        // (The .storage sub-lists are consumed separately, below.)
+        // ----------------------------------------------------------------
+        {
+            int wiredNamed = 0, wiredStub = 0;
+            for (PciDeviceEntry const& e : mr.manifest.pci) {
+                IPciDeviceHandler* h = nullptr;
+                if (e.model == PciModel::Named) {
+                    h = m_chipset.pciHandlerForModel(e.modelName);
+                    if (h) {
+                        ++wiredNamed;
+                    } else {
+                        spdlog::warn("PCI manifest: '{}' at {:02d}.{} declares model "
+                                     "'{}' with no behavioral handler -- presenting a "
+                                     "config-only stub", e.name, int(e.slot),
+                                     int(e.func), e.modelName);
+                    }
+                }
+                if (h == nullptr) {          // Generic / Passive / unresolved Named
+                    m_manifestPci.push_back(std::make_unique<ManifestPciDevice>(
+                        synthesizePciConfig(e), e.name));
+                    h = m_manifestPci.back().get();
+                    ++wiredStub;
+                }
+                m_chipset.pchip().registerPciDevice(e.bus, e.slot, e.func, h);
+            }
+            spdlog::info("PCI manifest enumerated: {} device(s) wired "
+                         "({} behavioral, {} config-stub) from '{}'",
+                         mr.manifest.pci.size(), wiredNamed, wiredStub, manifestPath);
+        }
+
         if (mr.usedDefault) {
             spdlog::warn("PlatformConfig: manifest '{}' unusable ({}); "
                          "using built-in default DS10 bus",
@@ -1719,6 +1763,61 @@ bool Machine::systemTick(uint64_t i) noexcept
         }
         // ---- END EMULATR_IDLEWARP idle fast-forward ----------------------------
 
+        // ---- EMULATR_UDELAYWARP: COHERENT RSCC micro-delay warp at 0x6a514 -----
+        // (2026-07-21) The ES40 silicon krn$_micro_delay busy-wait (0x6a4f8-
+        // 0x6a520) spins reading RSCC (== cycleCount) until it reaches a deadline
+        // r3 = start_RSCC + N (the calibrated LFU/"Initializing...." delay,
+        // ~10^10 cycles for krn$_sleep(2000ms)).  Collapse it COHERENTLY: advance
+        // the clock only to min(deadline, next-timer-edge) so the interval timer
+        // NEVER skips a boundary.  The old cycleCount-only warp (PipelineDriver.h,
+        // now disabled) jumped straight to the deadline, skipping timer ticks ->
+        // the 0x3c970 tick counter fell behind -> broke timing-dependent code
+        // (the memory test stuck at 0x8bdb0).  Here, each time we land on a timer
+        // edge the FIRE below runs the tick ISR (0x3c970 stays exact); the delay
+        // loop re-enters and warps again until the deadline.  Clock-only -- no
+        // guest-memory rewrite (that out-of-band 0x3c970 write is what
+        // quarantined the old RSCCWARP family).  memory.md 1.3;
+        // journals/20260715_es40_silicon_lfu_initialize_hang_HANDOFF.md.
+        // GENERIC recognizer keyed on the RSCC PAL handler entry (0xb740, the
+        // CALL_PAL 0x9d read) -- the physical anchor common to ALL the ES40
+        // silicon calibrated-delay loops (0x6a4f8, 0x60092c, ...), NOT
+        // PC-hardcoded to one native loop (the TB brief's "anchor + block shape"
+        // shape).  When the RSCC read repeats in a tight loop (re-read within a
+        // couple of timer periods, > threshold consecutive), it is a pure
+        // busy-wait (no other architectural side effect): advance cycleCount to
+        // the NEXT TIMER EDGE (one tick).  The FIRE below latches the tick; it
+        // delivers on the PAL->native HW_REI return, so 0x3c970 stays exact.
+        // The delay loop re-reads RSCC and exits O(duration_ticks) reads later.
+        {
+            static bool const s_uDelayWarp =
+                std::getenv("EMULATR_UDELAYWARP") != nullptr;
+            if (s_uDelayWarp && m_cpu.pcAddr() == 0x000000000000b740ull) {
+                static uint64_t s_lastCyc = 0;
+                static uint64_t s_spinCnt = 0;
+                uint64_t const cyc  = systemNow();
+                uint64_t const period = Tsunami21272::Spec::kCchipTimerMask + 1;
+                if (cyc - s_lastCyc < (period << 1)) ++s_spinCnt;  // tight re-read -> spin
+                else                                 s_spinCnt = 0; // real progress -> reset
+                s_lastCyc = cyc;
+                if (s_spinCnt > 64) {                              // confirmed RSCC busy-wait
+                    uint64_t const nextEdge =
+                        (cyc | Tsunami21272::Spec::kCchipTimerMask) + 1;
+                    m_cpu.warpCycles += (nextEdge - cyc);
+                    m_systemClock     = nextEdge;
+                    m_cpu.cycleCount  = nextEdge;   // exactly one tick edge -> FIRE catches it
+                    static uint64_t s_uwLog = 0;
+                    if ((s_uwLog++ & 0xFFFull) == 0) {            // throttle 1/4096
+                        std::fprintf(stderr,
+                            "UDELAYWARP2 cyc=%llu->%llu (RSCC-spin, coherent 1 tick)\n",
+                            static_cast<unsigned long long>(cyc),
+                            static_cast<unsigned long long>(nextEdge));
+                        std::fflush(stderr);
+                    }
+                }
+            }
+        }
+        // ---- END coherent micro-delay warp ------------------------------------
+
         // FIRE: latch unconditionally on the cycle edge.
         if (chipsetLib::intervalTimerShouldFire(systemNow())) {
             m_chipset.cchip().fireIntervalTimer();
@@ -1973,8 +2072,14 @@ bool Machine::systemTick(uint64_t i) noexcept
                 uint64_t const savedPc = m_cpu.pc;
                 uint64_t const target =
                     m_cpu.palBase + coreLib::ev6::kEntry_INTERRUPT;
+                // NOTE: no picVector printed here -- the vec computation was
+                // removed by the "NO INTA AT DIVERT" fix, so acking to obtain a
+                // real 8259 vector at divert time is incorrect (it zeroes the
+                // Cchip DIR0 triage read).  The former "picVector=0x%02x" had no
+                // matching argument (printed uninitialized stack garbage, e.g.
+                // 0xc40eb970) and lacked a newline (lines concatenated).  Fixed.
                 std::fprintf(stderr,
-                             "Machine: b_irq<1> divert[%llu] (device) at cyc=%llu savedPc=0x%016llx target=0x%016llx picVector=0x%02x",
+                             "Machine: b_irq<1> divert[%llu] (device) at cyc=%llu savedPc=0x%016llx target=0x%016llx\n",
                              static_cast<unsigned long long>(n),
                              static_cast<unsigned long long>(m_cpu.cycleCount),
                              static_cast<unsigned long long>(savedPc),
@@ -1983,7 +2088,7 @@ bool Machine::systemTick(uint64_t i) noexcept
                 std::fflush(stderr);
             } else if ((n & 0xFFFFu) == 0) {
                 std::fprintf(stderr,
-                             "Machine: %llu b_irq<1> diverts (loud-stderr muted past 32)", static_cast<unsigned long long>(n + 1));
+                             "Machine: %llu b_irq<1> diverts (loud-stderr muted past 32)\n", static_cast<unsigned long long>(n + 1));
                 std::fflush(stderr);
             }
 #endif

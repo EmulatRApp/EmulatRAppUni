@@ -12,17 +12,33 @@
 #             EMULATR_CONSOLE_PORT  console TCP port (default 10023)
 #             NO_TRACE=1            drop EMULATR_IDE_TRACE (plain boot, no trace)
 # ASCII(128) only.
+#
+# Host    : Windows / Git Bash (PC) is the supported path; a macOS/Linux branch
+#           is stubbed via the platform guard below for the cross-platform owner.
 # ============================================================================
 set -euo pipefail
 
+# ---- platform guard: PC (Windows/Git Bash) authoritative --------------------
+# One script set serves Windows and (owned elsewhere) macOS/Linux.  uname picks
+# the host so the binary name and console tooling resolve per platform.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) EMU_HOST=win ;;   # Git Bash / MSYS2 on Windows (PC)
+    Darwin)               EMU_HOST=mac ;;   # macOS  (cross-platform owner)
+    *)                    EMU_HOST=nix ;;   # Linux / other POSIX
+esac
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# run dir = script dir if it holds the exe, else its parent (script in tools/)
-if   [[ -x "$SCRIPT_DIR/Emulatr.exe"    ]]; then RUN_DIR="$SCRIPT_DIR"
-elif [[ -x "$SCRIPT_DIR/../Emulatr.exe" ]]; then RUN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-else echo "FATAL: Emulatr.exe not found next to this script or one level up"; exit 1; fi
+# run dir = script dir if it holds the exe, else its parent (script in tools/).
+# Accept Emulatr.exe (Windows) or a bare Emulatr (macOS/Linux build).
+if   [[ -x "$SCRIPT_DIR/Emulatr.exe"    || -x "$SCRIPT_DIR/Emulatr"    ]]; then RUN_DIR="$SCRIPT_DIR"
+elif [[ -x "$SCRIPT_DIR/../Emulatr.exe" || -x "$SCRIPT_DIR/../Emulatr" ]]; then RUN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+else echo "FATAL: Emulatr(.exe) not found next to this script or one level up"; exit 1; fi
 cd "$RUN_DIR"
 
-EXE="./Emulatr.exe"
+# binary: prefer .exe (Windows) then bare (mac/Linux).
+if   [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
+elif [ -x "./Emulatr"     ]; then EXE="./Emulatr"
+else echo "FATAL: no Emulatr(.exe) in $RUN_DIR"; exit 1; fi
 FW="firmware/ds20_v7_3.exe"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
 MAXCYC="${MAXCYC:-22000000000}"

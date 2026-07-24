@@ -337,6 +337,31 @@ struct Ev6Translator
         // (HW_MTPR DTB_TAG0/PTE0, wired in C2b) then retries the access.
         pteLib::LookupResult const r =
             cpu.dtbMgr.lookup(pteLib::TlbRealm::Dtb, va, cpu.asn);
+#if defined(EMULATR_BRINGUP_PROBES)
+        // VPTEPROBE (2026-07-22, JRN-VMB-004 downstream): the OS-boot TB-miss
+        // walk mis-resolves the self-map VPTE addr 0x200080000.  Log the DTB
+        // resolution of that VA (and the OS entry 0x20000000) to split a SPAM
+        // lookup fault from a bad refill.  Keyed + capped; zero-cost when off.
+        if (((va >= 0x200000000ULL && va < 0x201000000ULL)  // VPTB self-map region
+          || (va & ~0x1FFFULL) == 0x20000000ULL)            // the OS entry
+         && cpu.cycleCount > 870000000ULL) {                // handoff window only
+            static unsigned long s_vpteN = 0;
+            if (s_vpteN < 48) { ++s_vpteN;
+                std::fprintf(stderr,
+                    "VPTEPROBE va=0x%016llx hit=%d pfn=0x%llx pte=0x%016llx "
+                    "pa=0x%llx asn=%u cyc=%llu\n",
+                    static_cast<unsigned long long>(va),
+                    static_cast<int>(r.isHit()),
+                    static_cast<unsigned long long>(r.isHit() ? r.pte.pfn() : 0ULL),
+                    static_cast<unsigned long long>(r.isHit() ? r.pte.raw : 0ULL),
+                    static_cast<unsigned long long>(
+                        r.isHit() ? ((r.pte.pfn() << 13) | (va & 0x1FFFULL)) : 0ULL),
+                    static_cast<unsigned>(cpu.asn),
+                    static_cast<unsigned long long>(cpu.cycleCount));
+                std::fflush(stderr);
+            }
+        }
+#endif
         if (r.isHit()) {
             TranslationResult const hit =
                 applyTlbHit(r.pte, va, access, cpu.mode, pa_out);

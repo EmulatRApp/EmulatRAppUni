@@ -262,6 +262,15 @@ struct MemDrainer
 
 
 private:
+#if EMULATR_BRINGUP_PROBES
+    // DTBM-DOUBLE probe arm-countdown (2026-07-19, A-vs-B fork).  Set at the
+    // OS-PAL double-miss reclassification; decremented as the handler's next
+    // PAL-mode memory ops are logged (its §17.6.1 physical PTE fetches).
+    // Runtime-gated via EMULATR_DTBM_PROBE; zero cost when the env is unset
+    // (the arm site never fires, so this stays 0 and every log guard is false).
+    static inline int s_dtbmArmed = 0;
+#endif
+
     // -------------------------------------------------------------
     // applyMemEffect
     //
@@ -341,6 +350,120 @@ private:
                 && slot.grain.primaryOp == 0x1Bu
                 && ((slot.grain.encoded >> 13) & 0x7u) == 0x2u) {
                 r.faultCode = coreLib::kFaultDtbMissDouble;
+            }
+#if EMULATR_BRINGUP_PROBES
+            // ---- DTBM-DOUBLE probe (A-vs-B fork, 2026-07-19) --------------------
+            // Answers whether the OS-PAL §17.6.1 physical fallback walk can even
+            // begin: does PTBR hold a real page-table base, and do the handler's
+            // L1/L2/L3 PTE fetches get the S_PhysAddr physical bypass?  Runtime-
+            // gated on EMULATR_DTBM_PROBE (silent + free when unset).
+            {
+                static bool const s_on =
+                    (std::getenv("EMULATR_DTBM_PROBE") != nullptr);
+                if (s_on) {
+                    // (1) An ALREADY-armed access that FAULTED.  A handler PTE read
+                    //     reaching this fault path means it was NOT S_PhysAddr-
+                    //     bypassed (physAddr is always false here) and DTB-missed --
+                    //     the case-B signature (physical read mis-classified virtual).
+                    if (s_dtbmArmed > 0) {
+                        --s_dtbmArmed;
+                        std::fprintf(stderr,
+                            "DTBM-DBL   FAULT cyc=%llu pc=0x%016llx enc=0x%08x "
+                            "op=0x%02x phys=%d ea=0x%016llx fault=%u ptbr=0x%016llx\n",
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(slot.grain.pc),
+                            static_cast<unsigned>(slot.grain.encoded),
+                            static_cast<unsigned>(slot.grain.primaryOp),
+                            static_cast<int>(physAddr),
+                            static_cast<unsigned long long>(r.memAddr),
+                            static_cast<unsigned>(r.faultCode),
+                            static_cast<unsigned long long>(cpu.ptbr));
+                    }
+                    // (2) If THIS fault IS the double-miss, (re)arm and dump the base
+                    //     state that governs §17.6.1: PTBR (IPR side), the faulting
+                    //     VA, VA_CTL[VPTB], VPTB, MM_STAT.  The next armed LOAD lines
+                    //     expose impure PT__PTBR + the level1/2/3 PTE values.
+                    if (r.faultCode == coreLib::kFaultDtbMissDouble
+                        && cpu.ptbr != 0ULL) {   // handoff window: real PTBR installed (JRN-VMB-004)
+                        static unsigned long s_cap = 0;
+                        if (s_cap < 64) {
+                            ++s_cap;
+                            s_dtbmArmed = 24;
+                            std::fprintf(stderr,
+                                "DTBM-DBL#%lu TRIGGER cyc=%llu pc=0x%016llx va=0x%016llx "
+                                "ptbr=0x%016llx va_ctl=0x%016llx vptb=0x%016llx "
+                                "mm_stat=0x%016llx palBase=0x%016llx pt2=0x%016llx\n",
+                                s_cap,
+                                static_cast<unsigned long long>(cpu.cycleCount),
+                                static_cast<unsigned long long>(slot.grain.pc),
+                                static_cast<unsigned long long>(r.memAddr),
+                                static_cast<unsigned long long>(cpu.ptbr),
+                                static_cast<unsigned long long>(cpu.va_ctl),
+                                static_cast<unsigned long long>(cpu.vptb),
+                                static_cast<unsigned long long>(cpu.mm_stat),
+                                static_cast<unsigned long long>(cpu.palBase),
+                                static_cast<unsigned long long>(cpu.palTemp[2]));
+                        }
+                    }
+                    std::fflush(stderr);
+                }
+            }
+#endif
+            // ---- PTEMP probe (JRN-VMB-014, 2026-07-22) --------------------------
+            // Capture r21 (p_temp, the PALtemp/impure memory base) during a NORMAL
+            // early-boot PAL trap, where the guest PAL maintains it correctly (the
+            // SRM reaches >>>, so r21 IS the real base here).  This gives the value
+            // we must restore at the CSERVE-START restart, where recon showed r21=0.
+            // Double-miss faults run in PAL mode (the single-miss handler's VPTE
+            // load), so intReg[21] is the PAL-bank r21 = p_temp.  Log both banks +
+            // PAL mode.  Runtime-gated on EMULATR_PTEMP_PROBE; capped; free when off.
+            {
+                static bool const s_ptOn =
+                    (std::getenv("EMULATR_PTEMP_PROBE") != nullptr);
+                if (s_ptOn && r.faultCode == coreLib::kFaultDtbMissDouble) {
+                    static unsigned long s_ptCap = 0;
+                    if (s_ptCap < 16) {
+                        ++s_ptCap;
+                        std::fprintf(stderr,
+                            "PTEMP#%lu cyc=%llu pc=0x%016llx palMode=%d "
+                            "R21=0x%016llx R21sh=0x%016llx va=0x%016llx ptbr=0x%016llx\n",
+                            s_ptCap,
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(slot.grain.pc),
+                            static_cast<int>((slot.grain.pc & 1ULL) != 0ULL),
+                            static_cast<unsigned long long>(cpu.intReg[21]),
+                            static_cast<unsigned long long>(cpu.intShadow[5]),
+                            static_cast<unsigned long long>(r.memAddr),
+                            static_cast<unsigned long long>(cpu.ptbr));
+                        std::fflush(stderr);
+                    }
+                    // One-shot: is the REAL PALtemp region populated?  The PAL
+                    // establishes p_temp = PAL__TEMPS_BASE = 0xF000 (primary) and
+                    // links the impure area at PT__IMPURE(p_temp)=0xF088 -> impure
+                    // base PAL__IMPURE_BASE=0x5000 (ev6_pc264_pal_impure.mar).  If
+                    // 0xF000 is populated, the init ran (r21 corrupted after); if
+                    // empty, EmulatR skipped the sys__reset_init p_temp init.
+                    static bool s_f000done = false;
+                    if (!s_f000done) {
+                        s_f000done = true;
+                        auto rp = [&](uint64_t pa) noexcept -> uint64_t {
+                            return bus.read(pa & ~uint64_t{7}, 8).data;
+                        };
+                        std::fprintf(stderr,
+                            "PTEMP-F000 @0xF000: WHAMI[0xF098]=0x%llx PT__IMPURE[0xF088]="
+                            "0x%llx [F000]=0x%llx [F010]=0x%llx [F238(PTBR)]=0x%llx | "
+                            "IMPURE@0x5000: [5000]=0x%llx [5010]=0x%llx cyc=%llu\n",
+                            static_cast<unsigned long long>(rp(0xF098)),
+                            static_cast<unsigned long long>(rp(0xF088)),
+                            static_cast<unsigned long long>(rp(0xF000)),
+                            static_cast<unsigned long long>(rp(0xF010)),
+                            static_cast<unsigned long long>(rp(0xF238)),
+                            static_cast<unsigned long long>(rp(0x5000)),
+                            static_cast<unsigned long long>(rp(0x5010)),
+                            static_cast<unsigned long long>(cpu.cycleCount));
+                        std::fflush(stderr);
+                    }
+                }
             }
             // EV6 MM_STAT is a STATUS word (HRM 5.x / ev6_defs.mar), NOT the
             // address:  bit0 WR (store), bit1 ACV (access violation), bit2 FOR
@@ -485,6 +608,32 @@ private:
                 br.data = 0xCAFEBEEFull;                // platform() => ISP_MODEL
             }
         }
+#if EMULATR_BRINGUP_PROBES
+        // ---- DTBM-DOUBLE probe: armed handler LOADs (A-vs-B fork, 2026-07-19) --
+        // While armed by the double-miss trigger, log each PAL-mode load the
+        // handler issues.  phys=1 + a low EA is the impure PT__PTBR / level1/2/3
+        // physical PTE fetch; its VALUE settles case A (PTBR/PTE read back 0 =>
+        // unseeded base).  phys=0 here would mean a PTE read escaped the physical
+        // bypass (case B) -- though such a read usually faults before reaching
+        // this point and is caught by the FAULT probe above.
+        if (s_dtbmArmed > 0 && cpu.inPalMode()) {
+            --s_dtbmArmed;
+            bool const wasPhys = grainFactory::has(
+                r.semFlags, grainFactory::GrainSem::S_PhysAddr);
+            std::fprintf(stderr,
+                "DTBM-DBL   LOAD  cyc=%llu pc=0x%016llx sz=%u phys=%d "
+                "ea=0x%016llx pa=0x%016llx val=0x%016llx ptbr=0x%016llx\n",
+                static_cast<unsigned long long>(cpu.cycleCount),
+                static_cast<unsigned long long>(cpu.pc),
+                static_cast<unsigned>(r.memSize),
+                static_cast<int>(wasPhys),
+                static_cast<unsigned long long>(r.memAddr),
+                static_cast<unsigned long long>(pa),
+                static_cast<unsigned long long>(br.data),
+                static_cast<unsigned long long>(cpu.ptbr));
+            std::fflush(stderr);
+        }
+#endif
         // ---- TEMP load-watch on 0x3c970 (find the tick-counter poll loop) 2026-06-02 ----
         // The tick-delay grinds without warping; log the PC that READS 0x3c970 (the poll
         // loop) plus the loaded value and R6 (the would-be target). Prints when the PC or
@@ -667,6 +816,99 @@ private:
             // overwritten with 1 after a successful store.
         }
 
+#if EMULATR_BRINGUP_PROBES
+        // ---- PA-WATCH (relocated 2026-07-19, JRN-VMB-014) --------------------
+        // MOVED here from inside the `#if EMULATR_MEMDIAG` region below (it sat
+        // at old line 843, i.e. dead code: MEMDIAG defaults to 0 and CMake keeps
+        // it off because that region fprintf()s per retired instruction).  The
+        // watch itself is already RUNTIME env-gated, so with EMULATR_PA_WATCH
+        // unset it costs one compare per store -- safe under the cheap probes
+        // gate.  Verified absent from the binary before this move:
+        //   grep -a -c EMULATR_PA_WATCH out/build/relwithdebinfo/Emulatr.exe -> 0
+        //
+        // RANGE EXTENSION: EMULATR_PA_WATCH=<base> now pairs with an optional
+        // EMULATR_PA_WATCH_LEN=<bytes> (default 8 = the original single-quadword
+        // behaviour, so existing recipes are unchanged).  A range lets one boot
+        // observe an ENTIRE structure being built rather than one field, and the
+        // logged off=+0x.. is the offset from base -- for the JRN-VMB-013 wall we
+        // watch the whole HWRPB per-CPU slot (base 0x2180, len 0x280) to see
+        // whether kSlotPalMemPa (+0x098) and halt_code (+0x118) are ever written.
+        {
+            static uint64_t const s_paWatch = []() -> uint64_t {
+                char const* e = std::getenv("EMULATR_PA_WATCH");
+                if (!e || !*e) return 0;
+                return std::strtoull(e, nullptr, 0);   // 0x.. hex or decimal
+            }();
+            static uint64_t const s_paWatchLen = []() -> uint64_t {
+                char const* e = std::getenv("EMULATR_PA_WATCH_LEN");
+                if (!e || !*e) return 8;
+                uint64_t const v = std::strtoull(e, nullptr, 0);
+                return v ? v : 8;                      // 0 would watch nothing
+            }();
+            if (s_paWatch != 0) {
+                uint64_t const wLo = s_paWatch;                             // watched range
+                uint64_t const wHi = s_paWatch + s_paWatchLen;
+                uint64_t const sLo = pa;
+                uint64_t const sHi = pa + (r.memSize ? r.memSize : 1);      // store byte range
+                if (sLo < wHi && sHi > wLo) {                               // overlaps the range
+                    std::fprintf(stderr,
+                        "PA-WATCH(0x%llx+0x%llx) STORE off=+0x%llx cyc=%llu "
+                        "pc=0x%016llx pa=0x%016llx va=0x%016llx sz=%u "
+                        "v=0x%016llx pal=%d ra=0x%016llx\n",
+                        static_cast<unsigned long long>(s_paWatch),
+                        static_cast<unsigned long long>(s_paWatchLen),
+                        static_cast<unsigned long long>(pa - s_paWatch),
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(cpu.pc),
+                        static_cast<unsigned long long>(pa),
+                        static_cast<unsigned long long>(r.memAddr),
+                        static_cast<unsigned>(r.memSize),
+                        static_cast<unsigned long long>(r.memData),
+                        cpu.inPalMode() ? 1 : 0,
+                        static_cast<unsigned long long>(cpu.intReg[26]));
+                    std::fflush(stderr);
+                }
+            }
+        }
+        // ---- END PA-WATCH ----
+        // ---- VAL-WATCH (JRN-VMB-015): catch a store of a distinctive VALUE
+        // regardless of PA -- e.g. the VPTB base 0x0000000200000000 that the SRM
+        // ipr_write driver writes to impure cns$vptb (ev6_ipr_driver.c:513).
+        // Logging its PA reveals the impure base AND confirms the memory seed
+        // actually executes during b dqa0.  EMULATR_VAL_WATCH=<value>; capped.
+        {
+            static uint64_t const s_valWatch = []() -> uint64_t {
+                char const* e = std::getenv("EMULATR_VAL_WATCH");
+                if (!e || !*e) return 0;
+                return std::strtoull(e, nullptr, 0);
+            }();
+            // Optional cycle floor: EMULATR_VAL_WATCH_CYCLO skips early cold-boot
+            // noise (the decompressor stores 0x2_0000_0000 as data ~cyc<100M).
+            static uint64_t const s_valWatchCycLo = []() -> uint64_t {
+                char const* e = std::getenv("EMULATR_VAL_WATCH_CYCLO");
+                return (e && *e) ? std::strtoull(e, nullptr, 0) : 0;
+            }();
+            if (s_valWatch != 0 && r.memData == s_valWatch
+                && cpu.cycleCount >= s_valWatchCycLo) {
+                static unsigned long s_valN = 0;
+                if (s_valN < 256) { ++s_valN;
+                    std::fprintf(stderr,
+                        "VAL-WATCH(0x%llx) STORE cyc=%llu pc=0x%016llx pa=0x%016llx "
+                        "va=0x%016llx sz=%u pal=%d\n",
+                        static_cast<unsigned long long>(s_valWatch),
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(cpu.pc),
+                        static_cast<unsigned long long>(pa),
+                        static_cast<unsigned long long>(r.memAddr),
+                        static_cast<unsigned>(r.memSize),
+                        cpu.inPalMode() ? 1 : 0);
+                    std::fflush(stderr);
+                }
+            }
+        }
+        // ---- END VAL-WATCH ----
+#endif // EMULATR_BRINGUP_PROBES
+
 #if EMULATR_MEMDIAG
         // TEMP STORE-WATCH 2026-05-30 -- REMOVE BEFORE COMMIT.  Catch any guest
         // store landing in the aligned quad (PA 0xd950-0xd957) that holds the
@@ -840,44 +1082,11 @@ private:
         }
         // ---- END SYSVAR/DSRDB store-watch ----
 
-        // ---- TEMP PA-WATCH 2026-06-25: catch the writer of HWRPB SYSVAR ----
-        // EMULATR_HWRPB_SCAN located the live HWRPB @ PA 0x2000; the "AlphaPC
-        // 264DP" badge is SYSVAR (HWRPB+0x58 = PA 0x2058, value 0x405 => member 1).
-        // Unlike the blind EMULATR_SYSVAR_WATCH above (which guessed the VALUE and
-        // never fired), this keys on the ADDRESS: it fires on ANY store touching
-        // the watched quadword, handing us the PC of get_sysvar/build_dsrdb -- the
-        // firmware decision we could not reach by static XREF.  ARM BEFORE A COLD
-        // BOOT (the write happens during cold init, long before >>>).  PA is
-        // parameterized via EMULATR_PA_WATCH=<hex|dec> (default 0x2058) so we can
-        // re-point if the HWRPB base ever moves.  REMOVE once the decision is mapped.
-        {
-            static uint64_t const s_paWatch = []() -> uint64_t {
-                char const* e = std::getenv("EMULATR_PA_WATCH");
-                if (!e || !*e) return 0;
-                return std::strtoull(e, nullptr, 0);   // 0x.. hex or decimal
-            }();
-            if (s_paWatch != 0) {
-                uint64_t const qw   = s_paWatch & ~7ULL;                    // watched quadword
-                uint64_t const sLo  = pa;
-                uint64_t const sHi  = pa + (r.memSize ? r.memSize : 1);     // store byte range
-                if (sLo < qw + 8 && sHi > qw) {                            // overlaps the qword
-                    std::fprintf(stderr,
-                        "PA-WATCH(0x%llx) STORE cyc=%llu pc=0x%016llx pa=0x%016llx "
-                        "va=0x%016llx sz=%u v=0x%016llx pal=%d ra=0x%016llx\n",
-                        static_cast<unsigned long long>(s_paWatch),
-                        static_cast<unsigned long long>(cpu.cycleCount),
-                        static_cast<unsigned long long>(cpu.pc),
-                        static_cast<unsigned long long>(pa),
-                        static_cast<unsigned long long>(r.memAddr),
-                        static_cast<unsigned>(r.memSize),
-                        static_cast<unsigned long long>(r.memData),
-                        cpu.inPalMode() ? 1 : 0,
-                        static_cast<unsigned long long>(cpu.intReg[26]));
-                    std::fflush(stderr);
-                }
-            }
-        }
-        // ---- END PA-WATCH ----
+        // ---- PA-WATCH: RELOCATED 2026-07-19 (JRN-VMB-014) -------------------
+        // The store-watch that lived here was dead code (this whole region is
+        // `#if EMULATR_MEMDIAG`, which defaults to 0).  It now lives above the
+        // MEMDIAG block under EMULATR_BRINGUP_PROBES, with an added
+        // EMULATR_PA_WATCH_LEN range option.  Nothing to do here.
 
         // ---- STORE-WATCH + conditional break: PA 0x10 bad-descriptor-ptr hunt
         //      2026-06-03 (cold-boot PC=0 halt root) -- REMOVE once found ----

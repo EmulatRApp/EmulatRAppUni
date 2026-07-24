@@ -37,7 +37,7 @@ export EMULATR_RETIRE_TRACE_DIR="$TRACEDIR"   # RetireProfiler histogram lands h
 # + FRU (wrong platform NVRAM, a suspect for the init wall). Point it at a DS20
 # file. For a genuine factory-fresh cold boot, remove it first so the device starts
 # at 0xFF and the DS20 SRM builds its own NVRAM defaults.
-export EMULATR_FLASH_ROM="ds20_flash.rom"
+export EMULATR_FLASH_ROM="firmware/ds20_flash.rom"
 rm -f "$BUILD/ds20_flash.rom"   # factory-fresh; comment out to persist DS20 NVRAM across runs
 
 echo "=== effective EMULATR_* env (expect ONLY RETIRE_TRACE_DIR; all warp OFF) ==="

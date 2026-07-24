@@ -71,6 +71,7 @@
 #include "schedLib/AlphaCpuAgent.h"   // Phase-2 T4: Machine owns agent0 (CpuState owner)
 #include "pipelineLib/IFetchOverride.h"
 #include "pipelineLib/MmioRegistry.h"
+#include "systemLib/ManifestPciDevice.h"
 #include "systemLib/SrmLoader.h"
 #include "systemLib/SpinSkip.h"
 #include "systemLib/PlatformCapabilities.h"
@@ -510,6 +511,12 @@ private:
         emulatr::config::EmulatorSettings const& settings) noexcept;
     SRMConsoleDevice::Config m_consoleCfg{makeCom1Cfg(m_settings)};
     SRMConsoleDevice         m_com1Backend;
+
+    // Config-only PCI responders synthesized from the platform manifest
+    // (PciModel::Generic/Passive).  Machine owns them and registers each with
+    // m_chipset's Pchip in Machine::run at its manifest-declared BDF.  Declared
+    // BEFORE m_chipset so they outlive the chipset that holds raw pointers here.
+    std::vector<std::unique_ptr<systemLib::ManifestPciDevice>> m_manifestPci;
 
     // Tsunami chipset (CSRs, PCI bridges, sparse mem/IO windows) and
     // the PA dispatch registry that the GuestMemory MMIO hooks consult

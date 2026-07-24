@@ -1,0 +1,507 @@
+<!--
+EmulatR V5 -- GSEA POC Tiered-Execution Audit and Architecture Reconstruction
+Project: EmulatR (Alpha 21264 / EV6 emulator), V5 active tree
+Architect: Timothy Peer.  AI collaboration: Claude / Anthropic.
+Status: FINDINGS (tree-grounded). Supersedes the PROVISIONAL claims in the
+        Tiered Execution / POC Injection Speculation Record where they conflict.
+Scope inspected: TASK-POC-1 (GSEA POC execution-architecture reconstruction),
+        the V5 execution seam (systemLib/Machine, coreLib/CpuState,
+        systemLib/StopReason, coreLib/ExecCtx), and a GATE-1 cross-compiler
+        disassembly probe (Section 11). NOT inspected: BranchPredictor
+        readiness (TASK-BP-1). See Section 7.
+Provenance: live read of D:/EmulatR/EmulatrPOC/gsea_poc and
+        D:/EmulatR/emulatrappuniv5 on 2026-07-22.
+        POC source last touched ~Apr-May 2026 (file mtimes + journals).
+Conventions: ASCII(128) only. All magnitudes are measured unless marked EST.
+-->
+
+# GSEA POC Tiered-Execution Audit and Architecture Reconstruction
+
+## 0. What this document is and how to task it later
+
+This is the tree-grounded audit of using the GSEA POC (Grain-Stalk Execution
+Architecture, D:/EmulatR/EmulatrPOC) as a second, fast execution tier inside
+EmulatR V5. It answers the load-bearing unknowns in the Tiered Execution /
+POC Injection Speculation Record by inspecting the actual POC source rather
+than reasoning from memory.
+
+Read the Speculation Record for the SHAPE of the plan and the gates. Read THIS
+document for what the code actually is. Where the two conflict, this document
+wins for facts; the Record still wins for strategy shape.
+
+To task a future session from here:
+- The confirmed / overturned ledger (Section 3) is the diff against the Record.
+- The reframed gates (Section 5) replace GATE-1 and add two gates.
+- The two-path execution design (Section 9) is the converged architecture; the
+  scaffold that embodies it is systemLib/MachinePoc.h (placed 2026-07-22).
+- The V5 seam facts (Section 10) are the verified CpuState / Machine anchors.
+- The GATE-1 empirical probe + residency rule + reference ASM is Section 11.
+- The deferred branches (Section 7) are the next inspection tasks.
+- Source anchors (Section 8) are file:line for every claim.
+
+## 1. One-paragraph verdict
+
+The tiered-injection strategy is structurally sound and the POC is a much
+stronger asset than the Record's cautious framing admits: a working Alpha
+semantic core that reached SRM boot Phase 6 at a MEASURED ~90 M inst/sec
+release (67-80 M sustained on real SRM execution), carrying its own
+same-process validation harness. BUT three of the Record's load-bearing
+technical premises are wrong -- the speed mechanism, the dispatch model, and
+the abandonment narrative -- and correcting them changes what the make-or-break
+gate should test. Proceed, but fix the model first.
+
+## 2. What the POC actually is (reconstruction)
+
+GSEA is a FLAT, FUNCTIONAL interpreter, not a staged pipeline. The journals
+call it a "6-stage sequential pipeline," but in pipeline.h the six "stages"
+are the six sequential STEPS of one loop iteration (fetch, encode, resolve,
+execute, advance, interrupt-check). There are NO latches, NO per-cycle
+occupancy / hazard state, NO BoxResult, and a 2-frame call stack (loop +
+handler).
+
+Execution model:
+- Pipeline A (run_pipeline_a, pipeline.h:238): the main flat interpreter loop.
+- Pipeline B (run_stalk, pipeline.h:468): a captured-loop replayer. A "stalk"
+  is a pre-encoded loop body (<=32 grains of PL0 word + Handler pointer) that
+  replays with no fetch/encode/resolve. This is the loop-acceleration lever
+  (relates to WARP), measured at 63.7 M/s in a debug bench (9.7x over
+  Pipeline A debug); the 300 M release figure is EST, not built.
+- Dispatch: resolve_handler (handler_table.h:40) is a SINGLE flat switch on
+  opcode that returns a Handler function pointer; the loop then does one
+  indirect call. Header comment states verbatim: "Single flat switch -- no
+  dispatcher functions, no two-level dispatch."
+- Handlers: mostly C++ TEMPLATE signatures (signatures.h) instantiated per
+  operation; comment claims "identical to hand-written at -O2, zero overhead,
+  verified by benchmark." Plus direct handlers for irregular ops.
+- State: a large ExecContext struct (exec_context.h:110) passed BY REFERENCE
+  to every handler. Registers accessed via ctx.rf.ird()/iwr() indexing
+  ctx.rf.ir[32] in memory. There is no locals-hoisting of guest state.
+- Exceptions: faultCore_inl.h. raise_*() set EXC_ADDR, nextPC = PAL vector | 1,
+  and exc_pending; the loop checks exc_pending after fetch and after execute
+  and skips the normal advance. No pipeline latches to unwind -> precise by
+  construction.
+- Harness: RVF (Region Validation Framework). RegionDispatcher
+  (region_dispatcher.h) wraps the production handler table and inserts
+  RegisterDelta.snapshot_before/after/commit, IPRMonitor, InstructionAudit,
+  and region-boundary snapshots. This is a same-process monitoring /
+  differential precursor already in the tree.
+
+Coverage that is real and debugged: full integer / logic / shift / byte / MVI /
+multiply; memory with DTB lookup + VPTB walk; PAL (call_pal, hw_ld/st/mfpr/
+mtpr/rei); FP IEEE and VAX. It reached SRM Phase 6, not a toy spike.
+
+## 3. Confirmed vs overturned ledger (the diff against the Record)
+
+CONFIRMED:
+- Flat / functional / WARP-tier: the moment a handler computes an architectural
+  result it leaves the cycle-accurate tier. Accurate (Record 1.3).
+- The ~120x is REAL, not stale. Measured: 90 M inst/sec release; 67-80 M
+  sustained on SRM execution. Against a slow tier of order ~0.75-1 M inst/sec
+  that is ~90-120x. Discount the 300 M "stalk" and 600 M "JIT" rows -- both are
+  EST in the Expected Platform Performance note; the JIT does not exist.
+- Tiered injection over revert, with same-process differential and runtime
+  fallback: sound design, and better supported than assumed (see RVF).
+
+OVERTURNED (these matter):
+
+O-1. Register-residency is NOT why it is fast, and GATE-1 tests the wrong thing.
+  State is by-reference in a large ExecContext; there is no "materialize to
+  locals across N instructions, sync at boundaries" -- not in Pipeline A, not
+  in run_stalk (still passes ctx by reference, pipeline.h:477). The Record's
+  mid-session "CORRECTION" (POC held context as locals, not by-ref) is itself
+  wrong; the code is the by-reference structure the Record talked itself out of.
+  What actually buys ~90x: absence of fidelity bookkeeping (no BoxResult
+  populate/apply/trace, no stage advance, no hazard/occupancy), inline template
+  handlers, batched IRQ checks (every 1024) and heartbeats (every 1M), inlined
+  RAM access, flat 2-frame stack. CONSEQUENCE: GATE-1 as written ("confirm
+  state stays register-resident") is the wrong probe -- the POC never did that
+  and still hit 90M. The true make-or-break is state-representation sharing
+  (see O-1 remedy in Section 5). EMPIRICALLY CONFIRMED in Section 11: with
+  function-pointer dispatch the register file is memory-resident, reloaded
+  every instruction across an indirect call.
+
+O-2. There are NO family dispatchers. Dispatch is one flat switch returning a
+  function pointer (handler_table.h:9,40). The Record's "per-family dispatchers
+  distribute indirect-branch pressure = threaded dispatch achieved
+  structurally" is not in the code. The POC has exactly the single shared
+  indirect site the Record named as the #1 host-mispredict suspect (Record 2.2)
+  and still hits 90M -- weak evidence AGAINST dispatch misprediction being the
+  dominant slow-tier cost. "Table-driven generator that regenerates against V5
+  conventions" is half-right: handlers are compile-time C++ templates (good,
+  nothing to maintain); the resolve switch is hand-written. A grain generator
+  lineage exists (the "620 grains" script; V5 genGrains.py) but it emits PL0
+  metadata, not the dispatcher. So "edit the generator to fix state access
+  across all handlers at once" does not apply as stated; edit the signature
+  templates + accessor inlines instead (similar propagation).
+  ADDENDUM (dispatch micro-opt): a precomputed function-pointer lookup table
+  does NOT fix dispatch misprediction -- the mispredicting branch is the
+  indirect CALL through the resolved pointer, identical whether resolve is a
+  switch-jump-table or an array load. Threaded dispatch (computed-goto /
+  musttail) reduces it, and that is clang/gcc-only, not MSVC. Real leverage:
+  per-PC decoded-handler caching (amortize resolve to zero, which stalks
+  already do) and, on the ARM64/clang Phase-5 target, tail-call threading.
+  Do NOT refactor dispatch before TASK-PERF-1 confirms it is the top bucket.
+
+O-3. The abandonment narrative is inaccurate on three counts.
+  (a) Timing: last touched ~Apr-May 2026 (~2.5-3.5 months before 2026-07-22),
+      not "6-8 months ago."
+  (b) Cause: not an undiagnosable "exceptions with side effects" wall. The
+      fault path is clean and functional; because there is no pipeline it is
+      precise by construction, and stores gate side effects correctly (every
+      store checks `if (pa == ~0ULL) return;` before writing, mem_ops.h). The
+      journals show a normal, well-instrumented frontier: Phases 1-3 COMPLETE,
+      Phase 5 console probe "UART poll breaks," Phase 6 reached, 9 TLB-insert
+      bugs freshly fixed awaiting a clean-build verify run, and an ordered
+      10-item next-session priority list. It was PAUSED (to concentrate on
+      V4/V5, which reached P00>>>), not blocked.
+  (c) "No Oracle then": partially true, but the POC already built RVF, the
+      same-process differential/monitoring pattern the Record's Sections 5-6
+      propose. It is a re-use, not a new build.
+
+## 4. Feasibility and cost-benefit
+
+Feasibility: YES, structurally, and the tiered design is the right shape. The
+genuine cost centers, corrected for what is in the tree:
+
+- State reconciliation (the real make-or-break). GSEA ExecContext (rf.ir/fr,
+  iprs, tlb, shared_mem, palShadow, pal_mode as a bool derived from pc&1 at
+  advance) vs V5 CpuState (separate palMode bool, BoxResult, pipeline latches).
+  Because GSEA state is already a plain struct, this is a STRUCT-MAPPING
+  problem, not a compiler-aliasing fight. More tractable than the Record
+  implies, but it is the true effort sink. RESOLVED further by the V5 seam
+  inspection (Section 10): the shared substrate is coreLib::CpuState itself,
+  so the fast tier binds references and there is no separate mirror to map.
+- FP is not bit-exact with the Oracle. GSEA FP uses host double/float and
+  std::fesetround (signatures.h fop_t/fop_s/fop_t_rounded), NOT Berkeley
+  SoftFloat, which V4 uses deliberately for bit-exactness (Record 1.1). The
+  Oracle differential WILL flag every FP-bearing path. Decide up front: swap
+  GSEA FP to SoftFloat, or class FP as a fidelity boundary that falls through
+  to the slow tier. NOTE: V5 carries BOTH berkeley-softfloat-3-master AND an
+  SSE-FP path (coreLib/alpha_SSE_fp_inl.h) -- the FP reconciliation may reduce
+  to reusing whichever the Oracle commits through.
+- Known fidelity holes (all match the provisional / C2-decode caution):
+  arithmetic /V traps are STUBBED (`// TODO: queue arithmetic trap`,
+  signatures.h -- overflow computed and result written, ARITH never raised);
+  I_CTL SDE bit positions unverified; VPTB walk "was it ever active?";
+  HW_LD/HW_ST DTB path unimplemented (journal priority list).
+
+Benefit: a measured ~90x fast tier (bankable; ignore JIT/stalk estimates), a
+working semantic core, and RVF (which discounts the harness cost budgeted in
+Record 5-6). For OS bring-up wall-clock this is transformative, and every WARP
+it lets you retire in favor of faithful execution is a fidelity GAIN (Record 7
+fidelity ledger).
+
+Cost / risk: a real multi-week subsystem port -- the handler regeneration
+against CpuState, the FP decision, closing the stubbed traps, and full
+re-verification against the V5 Oracle. The fast tier as-is is a functional
+(WARP-tier) executor: correct as a validated fast path gated by the Oracle,
+wrong if ever billed as the Oracle.
+
+## 5. Reframed gates (replace GATE-1, add two)
+
+GATE-1 (rewritten): STATE-SHARING DISASSEMBLY PROBE. Bind a couple of hot
+handlers against the shared coreLib::CpuState, read the release disassembly,
+and confirm the fast loop keeps the state pointer + RAM base hot and does NOT
+pull in V5 per-cycle bookkeeping (BoxResult populate/apply/trace). Still a
+cheap early go/no-go; just the correct question. (The old "is state
+register-resident" test is void: the POC never was, and hit 90M.) THIS GATE
+RUNS INSIDE systemLib/MachinePoc.h (the EMULATR_FAST_TIER block, TODO(state-
+probe)) -- it is the first thing to prove before any real wiring. EMPIRICAL
+PROBE + THE RESIDENCY RULE ARE IN SECTION 11: it is a COMPILER-listing question
+(never linker, never profiler), and the answer hinges on inlinable dispatch,
+not state layout.
+
+GATE-FP (new): decide SoftFloat swap vs FP-as-fidelity-boundary before any
+FP-bearing path is validated, because host-FP vs SoftFloat is a deterministic
+Oracle divergence. (MachinePoc.h TODO(fp-strategy).)
+
+ADR-STATE (RESOLVED by V5 inspection 2026-07-22): the shared substrate is
+coreLib::CpuState itself -- contiguous intReg[32]/fpReg[32]/fpcr/intShadow[8],
+architectural pc, flat IPR members, halted flag; direct member access is the
+contract (no accessor methods). The fast tier binds NON-OWNING references to
+the Oracle's CpuState + GuestMemory (as MachinePoc does). A separate flat-vector
+/ POD mirror was PROPOSED and REJECTED (see Section 9 rationale): it wins no
+addressing advantage over CpuState's already-contiguous regfile and only
+re-introduces reconciliation. ADR-STATE therefore reduces to: (a) regenerate
+the GSEA handler set against CpuState member access, and (b) adopt the
+pc<0>-canonical mode-bit representation rather than a duplicate palMode flag
+(ties into the PALmode PC<0> fidelity work).
+
+Retained from the Record unchanged: Section 8 sequencing (fix secondary boot
+first to extend the Oracle; run Oracle-independent early stages in parallel on
+the green SRM path). Unaffected and correct.
+
+## 6. Measured performance anchors (for level-checking later)
+
+Source: gsea_poc journals (04-04, 04-04 night, 04-05) and Expected Platform
+Performance note. Host: HP Z6 G4, 2x8 Xeon 3.6 GHz.
+- V1 (7-stage OOO, Qt): 14,200-15,200 inst/sec.
+- GSEA V2 debug (no trace): 16-19 M inst/sec.
+- GSEA V2 debug (with fprintf): 2-9 M inst/sec (diagnostics dominate; gate them).
+- GSEA V2 release: ~90 M inst/sec.
+- SRM execution release (outside IDE): 67-80 M inst/sec (the bankable number).
+- Pipeline B stalk bench (debug): 63.7 M/s, 9.7x over Pipeline A debug.
+- Pipeline B stalks release: 300 M EST (not built). JIT: 600 M EST (not built).
+
+## 7. Deferred branches (next inspection tasks)
+
+- TASK-BP-1 (not started): BranchPredictor.h readiness review in
+  emulatrappuniv5/cBoxLib. NOTE: only BranchPredictor.h is present at that
+  level (plus a .BAK the user confirms is a carryover, and a grains/ dir); no
+  BranchPredictor.cpp was found there. Answer Q-BP-1 (predictor-only vs
+  +speculative squash) and Q-BP-2 (does any target workload read mispredict
+  PMCs). Confirm dormant-behind-EMULATR_EV6_BPRED, compiled, uncalled.
+- V5 core seam blast-radius (PARTIALLY INSPECTED 2026-07-22): the executor
+  seam is mapped (Section 10) -- Machine::run/step/cpuKernel, CpuState shape,
+  StopReason, ExecCtx/BoxResult commit contract. REMAINING: read
+  pipelineLib/PipelineDriver (the cpuKernel body), BoxResult.h commit path,
+  and mmuLib/Ev6Translator to scope the exact handoff/fetch-override contract
+  MachinePoc must honor at region entry.
+- TASK-POC-2 (secondary): re-profile the POC on current Intel desktop (VTune)
+  to reconfirm the ~90 M ceiling. Correctness dominates; the fast part was
+  never the doubt. Same as TASK-PERF-1's gate on dispatch (Section 3, O-2).
+
+## 8. Source anchors (file : line, POC tree)
+
+- pipeline.h:238  run_pipeline_a -- flat loop, per-iteration step comment.
+- pipeline.h:468  run_stalk -- Pipeline B replayer; :477 ctx by reference.
+- pipeline.h:44   Stalk struct (kMaxStalkLen=32, PL0/Handler arrays).
+- exec_context.h:23  RegisterFile (ir[32], fr[32]); :110 ExecContext struct;
+  :146 palmode() derives from pal_mode bool set at advance.
+- handler_table.h:9,40  "single flat switch, no two-level dispatch";
+  resolve_handler returns Handler pointer.
+- signatures.h:78+  template signatures; :84,131 stubbed /V overflow trap;
+  fop_t/fop_s/fop_t_rounded use host double/float + fesetround (not SoftFloat).
+- mem_ops.h:47  mem_ea returns ~0ULL on DTB miss; stores check pa==~0ULL
+  before writing (side-effect gating correct).
+- faultCore_inl.h:120  raise_exception (EXC_ADDR, nextPC=PAL|1, exc_pending).
+- region_dispatcher.h:56  RegionDispatcher (RVF); snapshot_before/after/commit.
+- journals/session_journal_2026_04_05_night.txt:61-70  SRM boot phase status;
+  :623+ next-session priority list.
+- journals/Expected Platform Performance  perf table (mostly EST rows).
+
+## 9. Two-path execution design (converged 2026-07-22)
+
+Decision: two execution PATHS over ONE shared state, dispatched at a coarse
+boundary. Path 1 = V5 Classic (systemLib::Machine + PipelineDriver) -- the
+faithful, cycle-accurate Oracle. Path 2 = MachinePoc -- the flat GSEA fast
+tier. Both mutate the SAME coreLib::CpuState + memoryLib::GuestMemory, so a
+tier handoff is a return of control, not a state copy.
+
+Layered structure (three layers, not two headers):
+
+        +-----------------------------+
+        |   Orchestrator / tier gate  |  picks tier, owns --verify + region
+        |   (future; slots at         |  allowlist + runtime dispatch flag +
+        |    Machine::cpuKernel seam)  |  fallback to Classic on Defer/Fault
+        +-----------------------------+
+             |                    |
+   +------------------+   +------------------+
+   | ClassicTier      |   | MachinePoc       |   two executors, ONE state
+   | (V5 faithful =   |   | (flat: Pipe A +  |   IExecTier::run(cpu,mem,budget)
+   |  Oracle;         |   |  stalk Pipe B)   |   -> TierExit
+   |  PipelineDriver) |   |  EMULATR_FAST_   |
+   |                  |   |  TIER guarded    |
+   +------------------+   +------------------+
+             \                    /
+          +-----------------------------+
+          |  coreLib::CpuState (shared) |  intReg[32]/fpReg[32]/fpcr/
+          |  + memoryLib::GuestMemory   |  intShadow[8]/pc/IPRs/halted
+          +-----------------------------+
+
+Contracts:
+- ONE state, two executors. The shared substrate is CpuState itself (Section
+  10). No separate POD/flat-vector mirror (proposed and rejected: it wins no
+  addressing advantage over the already-contiguous regfile and re-introduces
+  reconciliation and strict-aliasing/alignment hazards).
+- COARSE boundary, never per-instruction virtual. IExecTier::run executes a
+  tight internal loop and returns a TierExit reason: Continued / RegionExit /
+  Defer / PalTransfer / Irq / Fault / Halted / MaxCycles. The IExecTier virtual
+  fires per run() slice, not per grain. Terminal reasons map onto StopReason
+  via toStopReason() for the post-mortem.
+- Seam location. The natural insertion point is Machine::cpuKernel(CpuState&)
+  (= PipelineDriver::step, the per-CPU action already factored out of the run
+  loop; systemTick stays system-owned). The orchestrator chooses, per region,
+  whether cpuKernel runs the Classic driver or MachinePoc.
+- Oracle stays authoritative; poc adapts to CpuState. The fast tier only runs
+  where the Oracle is GREEN -- enforced by MachinePoc::allowRegion(lo,hi), NOT
+  a global switch. Secondary boot is off-limits until the slow tier boots it.
+- --verify is the payoff. Same-state execution makes a divergence provably the
+  tier difference. First cut diffs the architectural projection (regs, pc,
+  IPRs, memory write-set) at the boot milestones Snapshot already captures
+  (coarse-to-fine), which sidesteps per-region rollback.
+- Guard discipline, twice. EMULATR_FAST_TIER (CMake compile guard, OFF by
+  default) gates real execution; a runtime dispatch flag on the orchestrator
+  gates which tier runs. MachinePoc.h compiles UNCONDITIONALLY (cannot
+  bit-rot) with the real loop stubbed to TierExit::Defer -- same posture as the
+  EMULATR_EV6_BPRED move.
+
+Scaffold placed 2026-07-22: emulatrappuniv5/systemLib/MachinePoc.h
+(namespace systemLib; include guard SYSTEMLIB_MACHINEPOC_H; PascalCase to match
+Machine.h). Defines TierExit + tierExitName + operator<< + toStopReason,
+RunBudget, IExecTier, and the MachinePoc skeleton (non-owning CpuState/
+GuestMemory refs, allowRegion, region-gated run() stub). Carries a header TODO
+table: state-probe (GATE-1), handlers, fp-strategy, stalk, verify, orchestrator.
+Nothing calls it; it is inert in the default build. NOTE ON NAMING: header
+mirrors the sibling "(V4)" label used across systemLib; bump if the header
+version convention has moved to V5. "Poc" may want to become "Fast" if this
+graduates from proof-of-concept to production.
+
+## 10. V5 execution-seam facts (verified 2026-07-22)
+
+coreLib::CpuState (coreLib/CpuState.h) -- the shared substrate:
+- uint64_t intReg[32], fpReg[32], fpcr, intShadow[8] (PAL shadow R4-7/R20-23).
+- uint64_t pc (architectural PC). IPRs are FLAT members (cpu.ptbr, cpu.palBase,
+  ...), canonical Alpha names, direct member access, NO accessor methods.
+- bool halted (set at WB on BoxResult::faultCode == kFaultHalt).
+- Contract: no leaf mutates CpuState directly; architectural writes go through
+  BoxResult::regWriteValue/regWriteIdx applied at MEM; IPR writes via the
+  CpuState* on ExecCtx are the documented exception. (This is the Classic path
+  contract; MachinePoc deliberately writes CpuState directly -- that is the
+  tier difference, and why it is not the Oracle.)
+
+systemLib::Machine (systemLib/Machine.h) -- the Oracle orchestrator:
+- run(maxCycles) -> systemLib::StopReason. step() -> bool (one PipelineDriver
+  tick). stepCycle(i) -> bool (full per-cycle body).
+- SPLIT: cpuKernel(CpuState&) = per-CPU action (PipelineDriver::step);
+  systemTick(i) = once-per-quantum system bookkeeping (sentinel, snapshots,
+  device-IRQ eval, IDLEWARP, interval-timer, b_irq diverts). This split is the
+  tier-seam insertion point.
+- Owns m_cpu (CpuState) + memory via m_chipset.guestMemory(); accessors cpu(),
+  memory(), chipset(), mmio(). Implements pipelineLib::IFetchOverride
+  (tryFetch/onBeforeFetch) for the SRM decompressor self-overwrite window --
+  MachinePoc's fetch must honor the same override.
+- applySpinSkip(SpinSkip::Plan) exists (systemLib/SpinSkip.h) -- the WARP/skip
+  lever is already in the Oracle; census loop lengths at fast-tier speed before
+  retiring any WARP (Record 7).
+
+systemLib::StopReason (systemLib/StopReason.h): HaltedClean, OpcDecFault,
+UnalignedFault, AcvFault, MemFault, MaxCyclesExceeded. Named stopReasonName()
+(not toString) to avoid the doctest ADL clash -- follow the same rule for
+tierExitName().
+
+FP substrate: berkeley-softfloat-3-master AND coreLib/alpha_SSE_fp_inl.h both
+present. GATE-FP reduces to reusing whichever the Oracle commits FP through.
+
+## 11. GATE-1 empirical probe -- inlinable dispatch is the residency lever
+
+Date: 2026-07-22. Status: INDICATIVE cross-compiler model, NOT the dispositive
+gate. MSVC on the real handlers is the system of record (recipe below).
+
+Method: compiled a CpuState-shaped POD + two GSEA-style handlers (h_addq,
+h_ldq) + two dispatch loops with g++ 13.3.0 and clang 18.1.3 at -O2 (System V
+ABI, Linux). Guest RAM marked __restrict (a distinct allocation from CpuState,
+the real design intent). This proves the PATTERN, not the real handlers.
+  - LoopA = opaque function-pointer dispatch (GSEA Pipeline A shape):
+    resolve(raw) -> Handler pointer; call it.
+  - LoopB = inlined direct dispatch (stalk / superinstruction shape): switch on
+    opcode calling known handlers the compiler can inline.
+
+Findings (g++ and clang agree):
+- The CpuState base pointer is register-resident in BOTH loops (rdi / r13 /
+  r15); fields are reached base+displacement: pc at [base+0x100], halted at
+  [base+0x188], intReg[i] at [base + i*8]. "State as base+displacement from a
+  hot pointer": CONFIRMED, and it is free (a struct member already is this).
+- LoopA: exactly ONE indirect `call` per instruction; pc and the register file
+  are round-tripped to MEMORY every instruction (reload `mov rax,[base+0x100]`;
+  the handler writes back inside the call). State is NOT register-resident
+  across instructions -- the opaque call forbids it; the hot base pointer is all
+  you get. This empirically confirms O-1: the 90M did not come from residency.
+- LoopB: ZERO calls; operands held in registers within the instruction; regfile
+  writes are direct indexed stores (`mov [base + rc*8], result`). This is where
+  residency appears. Hoisting pc into a loop-carried register (true stalk replay
+  with a known body length) removes even the per-iteration pc reload.
+
+RECOMMENDATION (the residency rule):
+  GATE-1 passes to the exact degree the fast tier's dispatch is INLINABLE /
+  visible to the loop. KEEP HANDLER BODIES VISIBLE -- stalks (Pipeline B),
+  superinstructions, or templated direct dispatch. ANY routing through an opaque
+  function pointer lands in LoopA: an indirect call per instruction with the
+  register file in memory, REGARDLESS of how state is laid out. Corollary (ties
+  to O-2): a precomputed function-pointer lookup table IS LoopA -- the wrong
+  lever for residency. Layout choices (flat vector, POD, enum-indexed IPRs) do
+  NOT change this; only dispatch visibility does. Design the fast tier so the
+  hot loop sees its handler bodies.
+
+What the model canNOT settle (needs the real build):
+- MSVC is dispositive. On the Z640: `cl /O2 /FAsc machine_poc_probe.cpp`
+  (interleaved source+asm) or `dumpbin /disasm MachinePoc.obj`, or a
+  release-build Disassembly window at a loop breakpoint. Two compilers already
+  agree, so MSVC agreeing is the strong prior. NOTE: this is a COMPILER listing;
+  the linker map only gives symbol layout/sizes (a useful secondary signal for
+  "did the handler inline away / did BoxResult symbols get pulled in").
+- The model has NO per-cycle bookkeeping by construction, so it cannot test the
+  OTHER half of GATE-1: that V5's BoxResult populate/apply/trace and pipeline
+  machinery do not leak into the fast loop. That check only means anything
+  against the real regenerated handlers bound to the real CpuState.
+
+Reference ASM (g++ 13.3.0, -O2, Intel syntax; jump targets abbreviated to
+<loopX+off>; `;` comments are annotations; CpuState offsets pc=+0x100,
+halted=+0x188, intReg[i]=+i*8):
+
+  --- LoopA: opaque function-pointer dispatch (Pipeline A shape) ---
+  loopA:
+    push  r15 ... push rbx            ; prologue
+    mov   rbx,rcx                     ; n
+    mov   r15,rdi                     ; r15 = CpuState* (HOT across loop)
+    mov   rbp,rdx                     ; code base
+    lea   r14,[rip+..]  # h_ldq       ; handler pointers precomputed
+    lea   r13,[rip+..]  # h_addq
+  .body:
+    mov   rax,[r15+0x100]             ; RELOAD pc from memory
+    mov   rdx,[rsp+0x8]               ; ram
+    mov   rsi,r15                     ; &cpu arg
+    and   eax,0x3fffc
+    mov   edi,[rax+rbp*1]             ; fetch code word
+    shr   eax,0x1a                    ; opcode
+    cmp   eax,0x29
+    mov   rax,r13
+    cmove rax,r14                     ; select handler
+    add   r12,0x1
+    call  rax                         ; <== INDIRECT DISPATCH, 1 per instruction
+    cmp   rbx,r12
+    je    <loopA+0x7e>
+    cmp   BYTE PTR [r15+0x188],0x0    ; RELOAD halted from memory
+    je    .body
+    ... epilogue ... ret
+  Note: pc + regfile live in MEMORY; only r15 (base ptr) stays in a register.
+
+  --- LoopB: inlined direct dispatch (stalk / superinstruction shape) ---
+  loopB:
+    mov   r9,rcx                      ; n
+    cmp   BYTE PTR [rdi+0x188],0x0    ; halted (rdi = CpuState*, HOT)
+    mov   r8,rdx                      ; code base
+  .iter:
+    mov   r10,[rdi+0x100]             ; pc into r10 for this iteration
+    mov   rax,r10
+    add   r10,0x4                     ; pc+4 held in register
+    and   eax,0x3fffc
+    mov   eax,[rax+r8*1]              ; fetch code word
+    mov   ebx,eax
+    shr   ebx,0x1a                    ; opcode
+    ... decode ra/rb ...
+    mov   r11,[rdi+rdx*8]             ; regfile read (rb) -> r11
+    cmp   ebx,0x10
+    jne   .ldq
+    add   r11,[rdi+rdx*8]             ; addq: + regfile read (ra)  [held in reg]
+    mov   [rdi+rax*8],r11             ; regfile WRITE, direct indexed store
+    mov   [rdi+0x100],r10             ; pc writeback
+    cmp   r9,rcx
+    jne   .iter
+    ... ret
+  .ldq:
+    movsx rax,ax                      ; disp
+    add   rax,r11
+    shr   rax,0x3
+    mov   rax,[rsi+rax*8]             ; ram load (rsi = ram, __restrict)
+    mov   [rdi+rdx*8],rax             ; regfile write, direct indexed
+    mov   [rdi+0x100],r10             ; pc writeback
+    ... loop
+  Note: NO call; operands in registers; regfile writes are [base + idx*8].
+
+clang 18.1.3 confirms the shape: LoopA = exactly 1 `call rax` per iteration with
+pc reloaded from [base+0x100]; LoopB = 0 calls, direct indexed regfile stores.
+Probe source retained locally as gate1_probe.cpp (reproduce from the two-loop
+model described above).
+
+<!-- END GSEA POC TIERED-EXECUTION AUDIT -->

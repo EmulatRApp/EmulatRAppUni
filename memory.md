@@ -25,6 +25,10 @@ drill into journals only as needed.
   naming, behavior) is DISCUSS-FIRST.
 - **MILESTONE (2026-07-15):** SRM `>>>` reached on DS10, DS20, ES40 (default/ISP
   mode). That closed the V4 objective and gated the V5 Translation Buffer fork.
+- **LIVE FRONTIER (2026-07-23):** DS20 OpenVMS boot-handoff. The SRM->OS transfer
+  at VA `0x20000000` is now driven by a FULLY FAITHFUL path (no C++ stub/replica);
+  standing wall is a guest-side RESET at boot0 entry (OS IPR context gap). See 1.0
+  + `journals/20260722_JRN-VMB-016_0x20000000_wall_end_to_end_rootcause.md`.
 - **SANDBOX MOUNT CAVEAT (load-bearing):** the Cowork Linux sandbox sees this
   repo over a FUSE mount that returns TRUNCATED reads and cannot unlink. The
   Read/Edit/Write file tools (host side) are GROUND TRUTH; bash `wc`/`grep` on
@@ -38,7 +42,81 @@ drill into journals only as needed.
 
 ---
 
-## 1. CURRENT FRONTIER -- V5 Translation Buffer (TB)
+## 1. CURRENT FRONTIERS (two, parallel)
+
+Two live frontiers run in parallel: **1.0 boot-correctness** (the DS20 OS handoff,
+where the last several sessions have been) and **1.1-1.4 the TB acceleration tier**
+(the strategic fork; brief is authoritative but not the recent-session focus).
+
+### 1.0 Boot-correctness -- the DS20 OS handoff at VA 0x20000000
+
+Authoritative journal (read it):
+`journals/20260722_JRN-VMB-016_0x20000000_wall_end_to_end_rootcause.md` (end-to-end
+root cause + fix stack + EOD resume). Also `20260722_JRN-VMB-004` (CSERVE START =
+the handoff), `20260720_architecture_development_status.md` (system snapshot).
+
+**GOVERNING PRINCIPLE (2026-07-23, durable, generalizes past this bug):** the goal
+is FAITHFUL INSTRUCTION EXECUTION -- EmulatR as an EV6 Oracle. Booting VMS is a SIDE
+EFFECT of running the real firmware faithfully. Therefore every C++ no-op/stub of a
+pure-PAL function is itself a FAITHFULNESS VIOLATION (EmulatR stops executing the
+machine and substitutes a guess), NOT a neutral placeholder. The "tolerated no-op on
+silicon" claim is the trap -- disproven by CSERVE 0x65, whose real side-effect the
+console needs. Per-unhandled-func discipline: (1) INSTRUMENT the missing contract
+(`EMULATR_CSERVE_AUDIT`); (2) CROSS-REF the guest `cfw_*` handler in apisrm source;
+(3) CLOSE by ROUTING to the guest PAL (mirror-AXPBox, no C++ effect replication);
+(4) VERIFY + record the contract. Generalizes to every intercepted CALL_PAL/IPR/
+device path: run the real machine; instrument+document any substitution.
+
+**The end-to-end chain (all root-caused):** decompressor -> POWERUP 0x8000 ->
+`sys__reset` @0x13540 -> at 0x13654 `HW_MTPR r?,<scbd 0x2d>` (unassigned IPR)
+faulted -> aborted `sys__reset` before `sys__reset_init` -> `p_temp`(r21) never
+built (stayed decompressor scratch 0xf01) -> OS restart derefs garbage -> RESET(0)
+at 0x20000000. Real silicon IGNORES unassigned-IPR writes; the fault was a KEPT
+SCAFFOLD that reached `>>>` precisely BY skipping the real-HW init that builds p_temp.
+
+**Fix stack (landed, all env-gated; tree uncommitted as of 2026-07-23):**
+- FIX 1 `EMULATR_2D_NOOP=1` -- 0x2d MTPR -> no-op; `sys__reset_init` runs,
+  `p_temp=0x7000` (NOT the PC264 def's 0xF000 -- trust runtime 0x7000). CONFIRMED.
+- FIX 2 `EMULATR_DELAYWARP=1` -- general SUBQ-Rn-countdown-to-zero warp
+  (PipelineDriver.h) collapses the 0x13e40/0x13e80/0x13ec0 Pchip1 settling delays
+  the older warps missed. Reaches `>>>`. CONFIRMED.
+- HANDOFF: CSERVE dispatch must RUN THE GUEST PAL, not C++-stub/replicate (proven
+  by AXPBox, which boots VMS). `EMULATR_CSERVE_ROUTE=1` routes stubbed CSERVE funcs
+  to guest `sys__cserve` (DS20 = 0x12d84, found by cmpeq-r16/bne signature scan);
+  Option A (0x42 START -> guest `exit_console`) is the mirror-AXPBox default.
+  Invariant per routed func: set p23(R23)=g.pc+4 in BOTH banks (intReg[23]+
+  intShadow[7]), divert to guest handler (PALmode), NO C++ replication. Option B
+  (C++ replicate restart, `EMULATR_CSERVE_START_MODE=cpp`) is a CONFIRMED DEAD END
+  (seed PT__VPTB clobbered by console re-entry -> halt 0xA) -- `#if 0`'d out.
+- SHADOW-BANK FIX (foundational) `EMULATR_DIVERT_PALSWAP=1` -- the C++ CSERVE
+  intercept fires BEFORE PAL entry (palMode still 0, shadow bank not swapped), so a
+  bare PC-divert let the guest handler read the ACTIVE p_misc (<63>=0 virtual)
+  instead of the PAL-bank shadow (<63>=1 physical 1-1) -> DTB double-miss cascade ->
+  PC=0. Fix: the WB no-fault divert path (PipelineDriver.h ~1610) now routes a
+  mode-changing divert through `palModeEnter`/`palModeLeave` (SDE-gated), symmetric
+  with the FAULT path + HW_REI. VERIFIED: eliminated BOTH the 0x65 cascade
+  (54000->2 calls) AND the exit_console 0xA. EVERY divert-to-guest-PAL needs this.
+  Candidate to promote to engine default (genuine correctness fix). (Also fixed an
+  MSVC break: `memoryLib/GuestMemory.cpp` needed `<new>`+`<cstdlib>`.)
+
+**STANDING WALL / RESUME POINT (EOD 2026-07-23):** with the fully faithful stack the
+DS20 `b dqa0` handoff lands back at the ORIGINAL wall: **halt code 0 (RESET) at
+PC=0x20000000, boot0 NOT fetched**. It is NOT EmulatR `kFaultHalt` (HALT-DIAG=0) --
+the line is `[CON COM1]` GUEST console output = a GUEST-SIDE RESET, almost certainly
+an MCHK at boot0's first fetch because `exit_console` restores the CONSOLE/CNS
+context (resume PC=0x20000000) but NOT the OS-exec context (OS PTBR 0x1ff82/mode/
+IPL/VPTB self-map). AXPBox tolerates this by doing ALL translation in C++ (never
+runs the guest miss handler); EmulatR runs the REAL firmware miss handler and so
+exposes the OS-context gap (real silicon would MCHK too). NEXT PROBE: UNCAP the
+`FaultEventLog` (caps at 64, all consumed by cyc 1.21B in powerup, hiding the
+cyc-1.9B handoff faults) so the boot0-entry fault->MCHK->reset chain is visible and
+names WHICH IPR is wrong after exit_console. SECONDARY: verify EmulatR models
+`I_CTL[SPE]` superpage. Wrapper: `tools/run_ds20_bplus.sh` (defaults the full
+faithful stack: 2D_NOOP + DELAYWARP + CSERVE_ROUTE + DIVERT_PALSWAP). CAVEAT: do
+NOT `u srm` in LFU (triggers a ~407e9-cyc mem re-init); plain LFU exit->n->>>> is
+~30e9 cyc.
+
+### 1.05 TB acceleration tier (strategic fork; brief authoritative)
 
 Design brief (authoritative, read it): `journals/20260715_v5_tb_implementation_brief.md`.
 Source records the brief promotes: `EmulatR_TB_Speculation_Record.txt`,
@@ -429,6 +507,19 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260722_JRN-VMB-016_0x20000000_wall_end_to_end_rootcause.md` -- the
+  DS20 OS-handoff wall: END-TO-END root cause + fix stack (2D_NOOP/DELAYWARP/CSERVE
+  routing/DIVERT_PALSWAP) + governing principle (Sec 3.7) + EOD resume. LIVE FRONTIER.
+- `journals/20260722_JRN-VMB-004_cserve_start_boot_handoff_root_cause.md` -- CSERVE
+  START (0x42) = the handoff (symptom-level, subsumed by VMB-016).
+- `journals/20260720_architecture_development_status.md` -- timeline-free system
+  snapshot (ARCH-STATUS-001; readiness table, execution model, gaps).
+- `journals/20260722_AXPbox_EmulatR_Interface_Gap_3way.md` -- AXPBox/EmulatR device
+  + handoff interface gaps.
+- `journals/20260720_network_adapter_de500_support_options.md` -- DE500/21143 NIC
+  design (NET-ADAPTER-001).
+- `journals/20260719_JRN-VMB-013/014` -- boot-transfer wall + the (corrected) r21/
+  p_temp hypothesis; VMB-016 supersedes the r21=0 read (r21 is 0xf01 scratch).
 - `journals/20260715_v5_tb_implementation_brief.md` -- the V5 TB brief (current).
 - `journals/20260715_es40_silicon_lfu_initialize_hang_HANDOFF.md` -- LFU spin.
 - `journals/20260713_es40_lfu_rscc_warp_instrumentation_spec.md` -- RSCC_DIAG A/B.

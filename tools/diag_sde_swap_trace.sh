@@ -32,7 +32,7 @@ cd "$BUILD"                    || { echo "FATAL: build dir missing: $BUILD"; exi
 
 # ---- env: match the no-warp ground-truth run that produced the DIVERT-REI ---
 unset EMULATR_IDLEWARP EMULATR_RSCCWARP EMULATR_TICKWARP EMULATR_START_WATCH EMULATR_TIG_TRACE
-export EMULATR_FLASH_ROM="ds20_flash.rom"   # DS20-isolated NVRAM
+export EMULATR_FLASH_ROM="firmware/ds20_flash.rom"   # DS20-isolated NVRAM
 rm -f "$BUILD/ds20_flash.rom"               # factory-fresh cold boot
 
 echo "=== SDE swap-ledger capture -> $OUT ==="

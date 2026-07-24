@@ -167,6 +167,33 @@ struct PipelineDriver
 #endif
 
         if (itr != mmuLib::TranslationResult::Success) {
+#if EMULATR_BRINGUP_PROBES
+            // IFETCH-DIAG (JRN-VMB-015 §11): catch the OS-entry fetch fault at the
+            // b dqa0 handoff -- confirms the 0x20000000 fetch ITB-misses on the
+            // missing OS-side base, and shows the base state (i_ctl/va_ctl VPTB,
+            // ptbr, palBase) at that exact point.  EMULATR_IFETCH_DIAG, capped.
+            {
+                static bool const s_ifDiag = (std::getenv("EMULATR_IFETCH_DIAG") != nullptr);
+                uint64_t const fpc = cpu.pc & ~uint64_t{3};
+                if (s_ifDiag && fpc >= 0x1FF00000ull && fpc < 0x20200000ull) {
+                    static unsigned long s_ifN = 0;
+                    if (s_ifN < 64) { ++s_ifN;
+                        std::fprintf(stderr,
+                            "IFETCH-DIAG#%lu cyc=%llu pc=0x%016llx itr=%u palBase=0x%016llx "
+                            "i_ctl=0x%016llx va_ctl=0x%016llx ptbr=0x%016llx\n",
+                            s_ifN,
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(cpu.pc),
+                            static_cast<unsigned>(itr),
+                            static_cast<unsigned long long>(cpu.palBase),
+                            static_cast<unsigned long long>(cpu.i_ctl),
+                            static_cast<unsigned long long>(cpu.va_ctl),
+                            static_cast<unsigned long long>(cpu.ptbr));
+                        std::fflush(stderr);
+                    }
+                }
+            }
+#endif
             // I-side translation fault (C4): route through the unified
             // retire() trap-delivery path instead of hard-halting, so ITB
             // misses / IACV deliver to PALcode exactly like D-side faults.
@@ -367,6 +394,64 @@ struct PipelineDriver
         }
         // ---- END RSCC-deadline warp ----
 
+        // ---- General SUBQ-countdown delay warp (FIX 2, JRN-VMB-016) 2026-07-22 ----
+        // The DS20 sys__reset_init settling delays -- e.g. 0x13e40 (after Pchip1
+        // WSBA programming, R12~=0xE4E1C0 iters) and 0xb740 -- are pure countdown
+        // spins with NO memory access inside:
+        //     SUBQ Rn,#1,Rn ; BEQ Rn,exit ; BR R31,<back to the SUBQ>
+        // i.e. a calibrated elapsed-time delay whose ONLY effect is that time
+        // passes.  The PC-specific warps (RSCC 0x7c304, tick 0x7c314) don't cover
+        // them, so 2D_NOOP stalls here.  Recognize the idiom by DECODE (any PC)
+        // and fast-forward: set Rn=1 so this SUBQ->0->BEQ exits next iteration, and
+        // advance cycleCount+warpCycles by the skipped iterations (3 instr each).
+        // Pure loop => safe; self-limiting (exits within 1 iter), thresholded
+        // (long spins only), PAL-only.  Arm with EMULATR_DELAYWARP=1.
+        {
+            static const bool s_delayWarp = (std::getenv("EMULATR_DELAYWARP") != nullptr);
+            // SUBQ Rn,#1,Rn : op 0x10, func 0x29, literal form, lit==1, Ra==Rc.
+            if (s_delayWarp && cpu.inPalMode()
+                && (encoded >> 26) == 0x10u                 // INTA* group
+                && ((encoded >> 5) & 0x7Fu) == 0x29u        // SUBQ
+                && ((encoded >> 12) & 1u) != 0u             // literal operand
+                && ((encoded >> 13) & 0xFFu) == 1u          // lit == 1 (decrement)
+                && ((encoded >> 21) & 0x1Fu) == (encoded & 0x1Fu)   // Ra == Rc
+                && (encoded & 0x1Fu) != 31u) {
+                uint32_t const rn = encoded & 0x1Fu;
+                uint64_t const cnt = cpu.intReg[rn];
+                constexpr uint64_t kDelayThresh = 4096ull;  // skip only long spins
+                if (cnt > kDelayThresh) {
+                    // Confirm loop shape: next = BEQ Rn (op 0x39, Ra==Rn); then
+                    // BR R31 back to THIS SUBQ (op 0x30, target == this pc).
+                    uint64_t const pcA = cpu.pcAddr();
+                    uint32_t const i1 = static_cast<uint32_t>(bus.fetch(pcA + 4u, 4).data);
+                    uint32_t const i2 = static_cast<uint32_t>(bus.fetch(pcA + 8u, 4).data);
+                    bool const beqRn = (i1 >> 26) == 0x39u && ((i1 >> 21) & 0x1Fu) == rn;
+                    int64_t const brDisp =
+                        static_cast<int64_t>(static_cast<int32_t>(i2 << 11) >> 11);
+                    bool const brBack = (i2 >> 26) == 0x30u
+                        && (static_cast<int64_t>(pcA) + 12 + brDisp * 4) == static_cast<int64_t>(pcA);
+                    if (beqRn && brBack) {
+                        uint64_t const skip = cnt - 1u;     // leave 1 -> SUBQ->0 -> BEQ exits
+                        cpu.intReg[rn] = 1u;
+                        uint64_t const adv = skip * 3ull;   // 3 instrs / iteration
+                        cpu.cycleCount += adv;
+                        cpu.warpCycles += adv;              // WARP accounting
+                        static unsigned long s_dwN = 0;
+                        if (s_dwN < 60) { ++s_dwN;
+                            std::fprintf(stderr,
+                                "DELAYWARP #%lu pc=0x%llx R%u=%llu->1 skip=%llu cyc+=%llu\n",
+                                s_dwN, static_cast<unsigned long long>(pcA),
+                                rn, static_cast<unsigned long long>(cnt),
+                                static_cast<unsigned long long>(skip),
+                                static_cast<unsigned long long>(adv));
+                            std::fflush(stderr);
+                        }
+                    }
+                }
+            }
+        }
+        // ---- END general SUBQ-countdown delay warp ----
+
         // ---- 0x7bef0 software-tick loop register dump (2026-06-08, #21) ----
         // The post-GCT/FRU + pre-dva0 + dva0 stalls are ONE loop: pc=0x7bef0
         // stores 0x3c970=counter+1 once per ~2^18 cyc; NOT covered by the RSCC/
@@ -447,8 +532,15 @@ struct PipelineDriver
         // RSCC == cycleCount (kCcMultiplier=1), so a cycleCount delta IS an RSCC
         // delta.  Off unless EMULATR_UDELAYWARP is set.
         {
+            // SUPERSEDED 2026-07-21 by the COHERENT warp in Machine.cpp (which
+            // advances only to min(deadline, next-timer-edge) so the interval
+            // timer never skips a boundary).  This cycleCount-only version
+            // jumped straight to the deadline and skipped timer ticks (0x3c970
+            // fell behind -> memory-test hang at 0x8bdb0).  Gated OFF (renamed
+            // env) -- do not re-enable; EMULATR_UDELAYWARP now drives the
+            // coherent Machine.cpp path.
             static bool const s_uDelayWarp =
-                std::getenv("EMULATR_UDELAYWARP") != nullptr;
+                std::getenv("EMULATR_UDELAYWARP_LEGACY_UNSAFE") != nullptr;
             if (s_uDelayWarp && cpu.pcAddr() == 0x000000000006a514ull) {
                 uint64_t const cur      = cpu.intReg[4];   // current RSCC (0x6a50c)
                 uint64_t const deadline = cpu.intReg[3];   // start_RSCC + N
@@ -1193,9 +1285,16 @@ private:
                 static_cast<int>(envU64("EMULATR_DIAG_WREG", ~uint64_t{0}));
             static uint64_t const diagWMin = envU64("EMULATR_DIAG_WMIN", 0);
             static int diagWN = 0;
+            // Optional PC gate for the WREG trace: when a valid PC window is set
+            // (PCLO<=PCHI), only log R<n> writes issued from that window -- lets us
+            // isolate e.g. PAL-region (0x8000..0x28000) writes to p_temp (r21) from
+            // the flood of decompressor/console scratch writes.  Default PCLO(~0) >
+            // PCHI(0) disables the gate (log all), preserving existing recipes.
+            bool const wregPcOk = (diagPcLo > diagPcHi)
+                                || (diagApc >= diagPcLo && diagApc <= diagPcHi);
             if (diagWReg >= 0 && diagWReg < 32 && !r.regWriteIsFp &&
                 r.regWriteIdx == static_cast<uint8_t>(diagWReg) &&
-                r.regWriteValue >= diagWMin && diagWN < diagCap) {
+                r.regWriteValue >= diagWMin && wregPcOk && diagWN < diagCap) {
                 ++diagWN;
                 std::fprintf(stderr,
                     "DIAG-WR: cyc=%llu pc=0x%llx enc=0x%08x R%d<=0x%llx\n",
@@ -1242,6 +1341,42 @@ private:
 
         // HALT: graceful shutdown signal, not a trap.
         if (r.faultCode == coreLib::kFaultHalt) {
+#if EMULATR_BRINGUP_PROBES
+            // HALT-DIAG (JRN-VMB-015 §11): pin WHERE the console halts on the
+            // b dqa0 handoff -- the swppal/console_exit transfer PC + halt code,
+            // so we know where to establish PT__PTBR before the OS runs.
+            static bool const s_haltDiag = (std::getenv("EMULATR_HALT_DIAG") != nullptr);
+            if (s_haltDiag) {
+                static unsigned long s_haltN = 0;
+                if (s_haltN < 64) { ++s_haltN;
+                    std::fprintf(stderr,
+                        "HALT-DIAG#%lu cyc=%llu pc=0x%016llx enc=0x%08x pal=%d mode=%u "
+                        "R16=0x%llx R0=0x%llx palBase=0x%llx va=0x%llx  "
+                        "PTBR=0x%llx p_misc(R22)=0x%llx R22sh=0x%llx phys1to1=%d "
+                        "vptb=0x%llx va_ctl=0x%llx i_ctl=0x%llx excAddr=0x%llx\n",
+                        s_haltN,
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(slot.grain.pc),
+                        static_cast<unsigned>(slot.grain.encoded),
+                        cpu.inPalMode() ? 1 : 0,
+                        static_cast<unsigned>(cpu.mode),
+                        static_cast<unsigned long long>(cpu.intReg[16]),
+                        static_cast<unsigned long long>(cpu.intReg[0]),
+                        static_cast<unsigned long long>(cpu.palBase),
+                        static_cast<unsigned long long>(cpu.va),
+                        // Execution-context: is boot0 about to run in OS mode?
+                        static_cast<unsigned long long>(cpu.ptbr),
+                        static_cast<unsigned long long>(cpu.intReg[22]),
+                        static_cast<unsigned long long>(cpu.intShadow[6]),
+                        static_cast<int>(((cpu.intReg[22] | cpu.intShadow[6]) >> 63) & 1u),
+                        static_cast<unsigned long long>(cpu.vptb),
+                        static_cast<unsigned long long>(cpu.va_ctl),
+                        static_cast<unsigned long long>(cpu.i_ctl),
+                        static_cast<unsigned long long>(cpu.excAddr));
+                    std::fflush(stderr);
+                }
+            }
+#endif
             cpu.halted        = true;
             cpu.lastFaultCode = coreLib::kFaultHalt;
             return;
@@ -1485,6 +1620,45 @@ private:
 
         // No-fault path: divert if requested, else fall through.
         if (r.divert) {
+            // 2026-07-23 (JRN-VMB-016 3.11): route a divert that CHANGES PAL mode
+            // through the shadow swap, symmetric with the FAULT path's
+            // palModeEnter (~line 1601) and HW_REI's palModeLeave.  The bare
+            // `cpu.pc = target` below raises PALmode (PC<0>=1 in the target)
+            // WITHOUT the EV6 I_CTL[SDE] shadow swap (R4-R7 / R20-R23), so a
+            // divert-to-guest-PAL (CSERVE routing / Option A exit_console) ran the
+            // guest handler on the NATIVE bank -> wrong p_misc (<63>=0 virtual vs
+            // the shadow's <63>=1 physical 1-1) -> the miss handler walked a
+            // vptb=0 self-map -> DtbMissDouble cascade -> PC=0.  AXPBox avoids this
+            // because it selects the shadow per-access (RREG: PC<0> & reg in
+            // {R4-7,R20-23} & SDE) and never runs the guest miss handler (virt2phys
+            // in C++); EmulatR runs the REAL guest PAL, so it MUST swap on entry.
+            // palModeEnter/Leave are SDE-gated and no-op when the mode is unchanged;
+            // their own pc write is overwritten by `cpu.pc = target` just below.
+            // Gated EMULATR_DIVERT_PALSWAP for A/B vs the prior (no-swap) behavior.
+            static bool const s_divertPalSwap =
+                (std::getenv("EMULATR_DIVERT_PALSWAP") != nullptr);
+            if (s_divertPalSwap) {
+                bool const nowPal    = cpu.inPalMode();
+                bool const targetPal = (r.divertTarget & uint64_t{1}) != 0;
+                if (targetPal && !nowPal) {
+                    coreLib::palModeEnter(cpu);       // native -> PAL: swap in
+                } else if (!targetPal && nowPal) {
+                    coreLib::palModeLeave(cpu);        // PAL -> native: swap out
+                }
+                static unsigned long s_dpsN = 0;
+                if (nowPal != targetPal && s_dpsN < 16) { ++s_dpsN;   // mode-CHANGING diverts only
+                    std::fprintf(stderr,
+                        "DIVERT-PALSWAP#%lu nowPal=%d targetPal=%d target=0x%llx "
+                        "sde=%d swapped=%d R22now=0x%llx cyc=%llu\n",
+                        s_dpsN, (int)nowPal, (int)targetPal,
+                        (unsigned long long)r.divertTarget,
+                        (int)coreLib::sdeEnabled(cpu),
+                        (int)((targetPal && !nowPal) || (!targetPal && nowPal)),
+                        (unsigned long long)cpu.intReg[22],
+                        (unsigned long long)cpu.cycleCount);
+                    std::fflush(stderr);
+                }
+            }
             cpu.pc = r.divertTarget;
         } else {
             cpu.pc = slot.grain.pc + 4;

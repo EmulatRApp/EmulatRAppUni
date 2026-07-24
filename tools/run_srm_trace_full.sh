@@ -126,7 +126,7 @@ TRACE_DIR="traces"
 DEC_LOG="${TRACE_DIR}/${TS}_${NAME}_dec.log"
 MACHINE_LOG="${TRACE_DIR}/${TS}_${NAME}_machine.log"
 CONSOLE_LOG="${TRACE_DIR}/${TS}_${NAME}_console.out"
-DIAG_FLASH="$RUN_DIR/${NAME}_diag_flash.rom"
+DIAG_FLASH="$RUN_DIR/firmware/${NAME}_diag_flash.rom"
 
 # ---- preflight -------------------------------------------------------------
 [[ -f "$SRC_FW" ]] || { echo "FATAL: firmware not found: $SRC_FW (no image for $MODEL yet?)"; exit 1; }
@@ -258,4 +258,8 @@ grep -aiE "Console V|Compaq AlphaServer|AlphaServer|AlphaPC|P00>>>|UPD>|LFU|init
 echo "  SYSVAR / SYSTYPE / member (badge decision):"
 grep -inE "SYSVAR|SYSTYPE|GMEM-WATCH|member" "$CONSOLE_LOG" 2>/dev/null | tail -8 | sed 's/^/    /' || true
 echo "  stall / halt / machine-check:"
-grep -inE "HALTPROBE|MCHK|mac
+grep -inE "HALTPROBE|MCHK|machine-check" "$CONSOLE_LOG" 2>/dev/null | tail -8 | sed 's/^/    /' || true
+echo ""
+echo "  console : $RUN_DIR/$CONSOLE_LOG"
+[ -n "$NEWEST_TRC" ] && echo "  trace   : $NEWEST_TRC"
+echo "============================================================="
