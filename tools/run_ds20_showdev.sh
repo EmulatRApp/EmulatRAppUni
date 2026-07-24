@@ -23,8 +23,21 @@
 #   Toggles: ATTACH_DISK=0   -> do NOT attach dqa0.img (only dqa1 CD will show)
 #            EMULATR_CONSOLE_PORT=10023  -> console TCP port (default 10023)
 #            MAXCYC=<n>       -> max guest cycles (default 2e9)
+#
+# Host    : Windows / Git Bash (PC) is the supported path; a macOS/Linux branch
+#           is stubbed via the platform guard below for the cross-platform owner.
+# Output  : run log -> <run-dir>/run_ds20_showdev_<ts>.log
 # ============================================================================
 set -euo pipefail
+
+# ---- platform guard: PC (Windows/Git Bash) authoritative --------------------
+# One script set serves Windows and (owned elsewhere) macOS/Linux.  uname picks
+# the host so the binary name and console tooling resolve per platform.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) EMU_HOST=win ;;   # Git Bash / MSYS2 on Windows (PC)
+    Darwin)               EMU_HOST=mac ;;   # macOS  (cross-platform owner)
+    *)                    EMU_HOST=nix ;;   # Linux / other POSIX
+esac
 
 # ---- locate project + repo + newest run dir --------------------------------
 # SCRIPT_DIR = .../EmulatRAppUniV4/Emulatr/tools
@@ -41,7 +54,7 @@ NEWEST=0
 for cand in "RelWithDebInfo" "out/build/relwithdebinfo" "Release" \
             "out/build/release" "out/build/cli" "Debug"; do
     d="$PROJ/$cand"
-    [[ -x "$d/Emulatr.exe" ]]                 || continue
+    { [[ -x "$d/Emulatr.exe" ]] || [[ -x "$d/Emulatr" ]]; } || continue
     [[ -f "$d/firmware/ds20_v7_3.exe" ]]      || continue
     [[ -f "$d/ds20_v7_3_platform.json" ]]     || continue
     m=$(stat -c '%Y' "$d/Emulatr.exe" 2>/dev/null || echo 0)
@@ -59,7 +72,11 @@ fi
 [[ -n "$RUN_DIR" ]] || { echo "FATAL: no run dir with Emulatr.exe + ds20 firmware + ds20 manifest under $PROJ"; exit 1; }
 cd "$RUN_DIR"
 
-EXE="./Emulatr.exe"
+# binary: Windows emits Emulatr.exe, POSIX a bare Emulatr -- prefer .exe so the
+# Windows production path is unchanged, then fall back to the mac/Linux build.
+if   [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
+elif [ -x "./Emulatr"     ]; then EXE="./Emulatr"
+else echo "FATAL: no Emulatr(.exe) in $RUN_DIR"; exit 1; fi
 FW="firmware/ds20_v7_3.exe"
 INI="config/Emulatr.ini"
 MANIFEST="ds20_v7_3_platform.json"
@@ -88,7 +105,10 @@ trap cleanup EXIT
 if [[ -f "$INI" ]]; then
     cp -f "$INI" "$INI.showdevbak"
     if grep -qiE '^[[:space:]]*model[[:space:]]*=' "$INI"; then
-        sed -i "s/^\([[:space:]]*model[[:space:]]*=[[:space:]]*\).*/\1DS20/I" "$INI"
+        # Portable across GNU and BSD/macOS sed: no in-place -i (needs a suffix
+        # arg on BSD) and no \s / /I (GNU-only) -- use a temp file + [[:space:]].
+        SED_TMP="$(mktemp)"
+        sed "s/^\([[:space:]]*model[[:space:]]*=[[:space:]]*\).*/\1DS20/" "$INI" > "$SED_TMP" && mv -f "$SED_TMP" "$INI"
     else
         echo "WARN: no model= line in $INI -- relying on firmware stem for DS20 platform"
     fi

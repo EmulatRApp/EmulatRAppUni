@@ -627,8 +627,395 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 
         case 0x42: {   // CSERVE$START -- start / release a secondary CPU
             // sys__cserve cfw_start: `br sys__exit_console`.  On a UP model
-            // there are no secondaries to start; return with nothing done.
-            return r;                // R0 untouched
+            // there are no secondaries to start -- BUT the PRIMARY OS boot
+            // transfer routes through this SAME START -> exit_console path.
+            // sys__exit_console (ev6_vms_pc264_pal.mar:4245) restores the boot
+            // context (PTBR/KSP/PS from the per-CPU HWRPB slot's HWPCB, restart
+            // PC = slot.halt_pc == 0x20000000), flushes ITB+DTB, and restarts
+            // fetch at halt_pc.  Stubbing this to a no-op stranded the entire
+            // handoff (halt at 0x20000000; PTBR never installed; ITB never
+            // flushed).  JRN-VMB-004 / memory emulatr5-cserve-start-boot-handoff.
+            //
+            // OPTION B (this block, env-gated EMULATR_CSERVE_START_RESTART, for
+            // testing): replicate sys__exit_console in C++.  OPTION A (faithful
+            // default, TODO): divert to the guest PAL exit_console once its
+            // runtime PC is located.
+            // Mode selector (2026-07-22, JRN-VMB-004): A=guest (faithful divert to
+            // the guest exit_console), B=cpp (the C++ replica below), off=no-op.
+            // Back-compat: EMULATR_CSERVE_START_RESTART => cpp.  Default off until
+            // A is verified.  EMULATR_CSERVE_START_MODE = guest | cpp | off.
+            enum { kStartOff = 0, kStartGuest = 1, kStartCpp = 2 };
+            static int const s_startMode = []() noexcept -> int {
+                char const* m = std::getenv("EMULATR_CSERVE_START_MODE");
+                if (m != nullptr && *m != '\0') {
+                    if (m[0] == 'g') return kStartGuest;
+                    if (m[0] == 'c') return kStartCpp;
+                    return kStartOff;
+                }
+                return (std::getenv("EMULATR_CSERVE_START_RESTART") != nullptr)
+                     ? kStartCpp : kStartOff;
+            }();
+
+            // OPTION A (faithful, production target): divert to the guest PAL's
+            // sys__exit_console so the REAL PAL runs pal__restore_state (full CNS
+            // context) + ITB_IA/DTB_IA + hw_ret, exactly as hardware does -- this
+            // sets the RWE bits + PAL temps the DTBM_DOUBLE handler needs (which
+            // the C++ replica B does NOT, so B's boot0 fetches but the miss-walk
+            // bails to identity).  Locate exit_console in the DECOMPRESSED PAL
+            // by its signature: hw_mtpr r31,ITB_IA immediately followed by
+            // hw_mtpr r31,DTB_IA (ev6_vms_pc264_pal.mar:4248-4249).  The IPR
+            // selector is the 8-bit scbd in bits[15:8] (iprSelector: scbd =
+            // HW_ITB_IA 0x0103 - 0x0100 = 0x03; HW_DTB_IA 0x01A3 - 0x0100 =
+            // 0xA3).  hw_mtpr emits opcode 0x1D with Ra=Rb=R31 (^x1f), so the
+            // full encodings are 0x77FF0300 (ITB_IA) / 0x77FFA300 (DTB_IA); we
+            // match opcode+scbd only (mask 0xFC00FF00) to tolerate Ra/Rb/func.
+            // exit_console's entry (`bsr pal__restore_state`) is one instruction
+            // before the ITB_IA.
+            constexpr uint32_t kMtprMask   = 0xFC00FF00u;
+            constexpr uint32_t kItbIaMatch = (0x1Du << 26) | (0x03u << 8);  // 0x74000300
+            constexpr uint32_t kDtbIaMatch = (0x1Du << 26) | (0xA3u << 8);  // 0x7400A300
+            if (s_startMode == kStartGuest && c.memory != nullptr) {
+                static uint64_t s_exitConsolePc = 0;
+                static bool     s_scanned       = false;
+                if (!s_scanned) {
+                    s_scanned = true;
+                    auto rd32 = [&](uint64_t a) noexcept -> uint32_t {
+                        uint64_t q = 0;
+                        (void)c.memory->read8(
+                            static_cast<coreLib::PAType>(a & ~uint64_t{7}), q);
+                        return static_cast<uint32_t>(
+                            (a & 4ULL) ? (q >> 32) : (q & 0xFFFFFFFFULL));
+                    };
+                    uint64_t const base = c.cpu->palBase;
+                    for (uint64_t p = base; p + 8 <= base + 0x20000ULL; p += 4) {
+                        if ((rd32(p) & kMtprMask) == kItbIaMatch &&
+                            (rd32(p + 4) & kMtprMask) == kDtbIaMatch) {
+                            s_exitConsolePc = p - 4;   // bsr pal__restore_state
+                            break;
+                        }
+                    }
+                    std::fprintf(stderr,
+                        "CSERVE-START-A: palBase=0x%llx exit_console=%s0x%llx cyc=%llu\n",
+                        static_cast<unsigned long long>(c.cpu->palBase),
+                        s_exitConsolePc ? "" : "NOT-FOUND ",
+                        static_cast<unsigned long long>(s_exitConsolePc),
+                        static_cast<unsigned long long>(c.cpu->cycleCount));
+                    std::fflush(stderr);
+                }
+                if (s_exitConsolePc != 0) {
+                    // MIRROR AXPBox vmspal_call_cserve EXACTLY: its very first line
+                    // is `p23 = state.pc` (save the CALL_PAL return PC into the PAL
+                    // linkage reg R23) BEFORE `set_pc(cfw_start)`.  sys__exit_console
+                    // terminates in `hw_ret_stall (p23)` (ev6_vms_pc264_pal.mar:769),
+                    // so p23 IS the resume target unless pal__restore_state overwrites
+                    // it.  Option A previously set excAddr/divertTarget but NOT p23,
+                    // so exit_console's hw_ret landed on stale R23 -> reset.  p23 =
+                    // instruction following the CALL_PAL (== g.pc + 4; matches the
+                    // linkage convention at PalEntries.cpp:1675 and the PAL comment
+                    // "p23 pc of instruction following call_pal instruction").  Set
+                    // BOTH the active bank (intReg[23]) and the PAL-shadow bank
+                    // (intShadow[7] == R23's other bank; swapPalShadowRegs maps
+                    // R20+i <-> intShadow[4+i]) so the value survives the shadow swap
+                    // around the divert -- same both-banks tactic B+ used for p_misc.
+                    uint64_t const retPc = g.pc + 4u;
+                    c.cpu->intReg[23]   = retPc;
+                    c.cpu->intShadow[7] = retPc;
+                    uint64_t const tgt = s_exitConsolePc | 1ULL;   // PALmode (PC<0>)
+                    c.cpu->excAddr = tgt;
+                    r.divertTarget = tgt;
+                    r.divert       = true;
+                    std::fprintf(stderr,
+                        "CSERVE-START-A2: mirror-axpbox p23(r23)<-0x%llx (g.pc+4) "
+                        "divert->cfw_start/exit_console=0x%llx cyc=%llu\n",
+                        static_cast<unsigned long long>(retPc),
+                        static_cast<unsigned long long>(s_exitConsolePc),
+                        static_cast<unsigned long long>(c.cpu->cycleCount));
+                    std::fflush(stderr);
+                    return r;
+                }
+                return r;   // scan failed: safe no-op
+            }
+
+            // ================================================================
+            // OPTION B (B+) -- C++ REPLICA of the OS-restart -- COMMENTED OUT.
+            // CONFIRMED DEAD END (2026-07-23, JRN-VMB-016 3.9-3.12): it
+            // hand-installs OS state (PTBR/VPTB, clears p_misc) + jumps to
+            // 0x20000000, so boot0 runs 4 instrs BUT the seeded PT__VPTB is then
+            // ZEROED by the guest enter_console -> DTBM_DOUBLE_3 VPTB self-test
+            // reads 0 -> crash1 halt 0xA.  Not a shadow-bank issue (the divert
+            // PAL-swap fix did NOT change this outcome -- re-tested with
+            // EMULATR_DIVERT_PALSWAP=1, still 0xA).  Fighting the guest PAL by
+            // C++-replicating its effects is the wrong shape; the faithful path
+            // is OPTION A (guest exit_console), now correct with the shadow swap.
+            // Kept #if 0 for reference (full detail lives in JRN-VMB-016).
+#if 0  // --- OPTION B (kStartCpp) : DEAD END, retained for reference only ---
+            if (s_startMode == kStartCpp && c.memory != nullptr) {
+                using deviceLib::hwrpb::Hwpcb;
+                using deviceLib::hwrpb::loadCpuFromHwpcb;
+                // Primary per-CPU slot in the single SRM-built HWRPB (PA 0x2000).
+                constexpr uint64_t kHwrpbBase = 0x2000ULL;
+                uint64_t slotOff = 0;
+                (void)c.memory->read8(
+                    static_cast<coreLib::PAType>(kHwrpbBase + 160), slotOff); // cpu_slot_offset
+                uint64_t const slotPa = kHwrpbBase + slotOff;                 // primary (index 0)
+                uint64_t haltPc = 0;
+                (void)c.memory->read8(
+                    static_cast<coreLib::PAType>(slotPa + 0xF0), haltPc);      // PerCpuSlot.halt_pc
+                // Read the HWPCB (slot start) and install it exactly as SWPCTX does.
+                Hwpcb ctx{};
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x00), ctx.ksp);
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x08), ctx.esp);
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x10), ctx.ssp);
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x18), ctx.usp);
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x20), ctx.ptbr);
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x28), ctx.asn);
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x30), ctx.asten_sr);
+                (void)c.memory->read8(static_cast<coreLib::PAType>(slotPa + 0x38), ctx.fen);
+                loadCpuFromHwpcb(*c.cpu, ctx);   // installs cpu.ptbr (<63> stripped), ksp, asn, fen
+                c.cpu->pcbb = slotPa;            // PCBB now the boot slot
+                // VPTB companion to PTBR: the single-miss VPTE fetch reads VPTB
+                // from VA_CTL/I_CTL (not cpu.ptbr).  boot.c's VPTB write does not
+                // propagate here, so va_ctl<63:43>=0 strands the self-map and the
+                // walk resolves the WRONG PFN (observed: PFN 0x10000/PA 0x20000000
+                // -> HALT).  Install hwrpb.vptb_va and merge into VA_CTL/I_CTL
+                // exactly as the MTPR_VPTB faithful fix (2026-07-19) does.
+                uint64_t vptbVa = 0;
+                (void)c.memory->read8(
+                    static_cast<coreLib::PAType>(kHwrpbBase + 120), vptbVa); // hwrpb.vptb_va
+                c.cpu->vptb  = vptbVa;
+                c.cpu->va_ctl = (c.cpu->va_ctl & ~coreLib::kVaCtlVptbMask)
+                              | (vptbVa & coreLib::kVaCtlVptbMask);
+                c.cpu->i_ctl  = (c.cpu->i_ctl  & ~coreLib::kICtlVptbLowMask)
+                              | (vptbVa & coreLib::kICtlVptbLowMask);
+                c.cpu->itbMgr.invalidateAll();   // sys__exit_console: EV6__ITB_IA
+                c.cpu->dtbMgr.invalidateAll();   // sys__exit_console: EV6__DTB_IA
+                // sys__exit_console tail: "Turn off 1-to-1 mapping" --
+                //   lda p4,1(r31); sll p4,#P_MISC__PHYS__S,p4; bic p_misc,p4,p_misc
+                // (ev6_vms_pc264_pal.mar:4274).  p_misc is PAL shadow R22, with
+                // <63> = the PHYS / 1-1-mapping bit (P_MISC__PHYS__S eq 63,
+                // ev6_alpha_defs.mar: p_misc=22).  The console + VMB run in
+                // physical mode (R22<63>=1); while it is set, EVERY EV6 TB-miss
+                // handler (DTBM_SINGLE 0x300, DTBM_DOUBLE_3 0x100, ITB_MISS)
+                // branches `blt p_misc, ...1to1` to the identity path and returns
+                // pfn = VA>>13 instead of walking the OS page table.  THAT is why
+                // VA 0x20000000 resolved to pfn 0x10000 (identity) not 0x2DE.
+                // Clearing <63> here restores virtual mode so the guest miss-walk
+                // takes the real 3-level flow.  We are in PAL mode, so intReg[22]
+                // is the shadow copy the miss handler reads; the value persists
+                // across the leave/enter shadow swap around the divert below.
+                // p_misc lives in the PAL-shadow bank across traps; at this
+                // CSERVE CALL_PAL the live intReg[22] is transient cserve scratch,
+                // so clear PHYS<63> in BOTH R22 copies (active + shadow bank) to
+                // guarantee the value the OS-trap miss handler reads has 1-1 off.
+                // intShadow[6] == R22's other bank (swapPalShadowRegs: R20+i <->
+                // intShadow[4+i], so R22 -> intShadow[6]).
+                uint64_t const r22Before  = c.cpu->intReg[22];
+                uint64_t const r22ShBefore = c.cpu->intShadow[6];
+                c.cpu->intReg[22]   &= ~(uint64_t{1} << 63);   // bic p_misc, #1<<63
+                c.cpu->intShadow[6] &= ~(uint64_t{1} << 63);   // other-bank R22
+                // ---- B+ : seed the PAL-temp MEMORY copies the guest miss-walk
+                //           reads (PT__VPTB @ p_temp+0x0, PT__PTBR @ p_temp+0x8).
+                // We installed the IPRs (cpu.vptb / cpu.ptbr) above, but the EV6
+                // DTBM_DOUBLE_3 handler (ev6_vms_pal.mar:960) does NOT read the
+                // IPRs -- it reads PAL-temp memory:
+                //   hw_ldq/p r25, PT__PTBR(p_temp)   ; phys page-table addr
+                //   .if ne check_ebox_iprs           ; DS20 build has this ON
+                //     hw_ldq/p r25, PT__VPTB(p_temp)  ; vptb
+                //     srl p4,#33,r26 ; sll r26,#33 ; xor r25,r26 ; bne crash1(0xA)
+                // With p_misc<63> now cleared we DON'T take the 1to1 branch, so the
+                // self-test runs and crashed halt-code 0xA because PT__VPTB(p_temp)
+                // did not match VPTB.  Reset_init writes PT__VPTB = 2<<32 and
+                // PT__PTBR = PFN<<13 (ev6_vms_pc264_pal.mar:4935/4944; swpctx
+                // ev6_vms_callpal.mar:428).  Match those formats here.
+                // p_temp = PAL-bank r21 (ev6_alpha_defs.mar:38) -> intShadow[5].
+                uint64_t const pTempBP = c.cpu->intShadow[5] & ~uint64_t{7};
+                bool pTempSane = (pTempBP >= 0x1000ull && pTempBP < 0x8000ull);
+                if (pTempSane) {
+                    uint64_t const ptVptb = vptbVa;                 // PT__VPTB = vptb
+                    uint64_t const ptPtbr = c.cpu->ptbr << 13;      // PT__PTBR = PFN<<13
+                    c.memory->write8(static_cast<coreLib::PAType>(pTempBP + 0x0), ptVptb);
+                    c.memory->write8(static_cast<coreLib::PAType>(pTempBP + 0x8), ptPtbr);
+                    std::fprintf(stderr,
+                        "CSERVE-START-BPLUS: p_temp=0x%llx  PT__VPTB<-0x%llx  "
+                        "PT__PTBR<-0x%llx (PFN 0x%llx<<13)\n",
+                        (unsigned long long)pTempBP,
+                        (unsigned long long)ptVptb,
+                        (unsigned long long)ptPtbr,
+                        (unsigned long long)c.cpu->ptbr);
+                } else {
+                    std::fprintf(stderr,
+                        "CSERVE-START-BPLUS: SKIP -- p_temp candidate 0x%llx "
+                        "(intShadow[5]) not in [0x1000,0x8000); PT__VPTB/PTBR "
+                        "left as-is\n", (unsigned long long)pTempBP);
+                }
+                std::fflush(stderr);
+                // ---- DISASM DUMP (2026-07-22 #1): raw instruction words at the
+                // PT__VPTB clobber site pc=0x1333c and its caller ra=0x62f6c.
+                // PA-WATCH proved the guest zeroes PT__VPTB from pc=0x1333c
+                // (ev6_vms_pc264_pal.mar:4173, console-entry/1-1 mode switch),
+                // called from 0x62f6c.  The PAL is identity-mapped in low phys
+                // memory, so read8(pa) gives the instruction words; decode offline
+                // to identify 0x62f6c (crash-to-console tail vs mis-routed OS-entry).
+                {
+                    static bool s_dumpedDisasm = false;
+                    if (!s_dumpedDisasm && c.memory != nullptr) {
+                        s_dumpedDisasm = true;
+                        // boot0 lives at VA 0x20000000 -> PA leafPa (0x5bc000 per
+                        // the PTWALK).  Dump its first ~16 instructions to see what
+                        // the 4 instrs 0x20000000..0x2000000c do and what 0x20000010
+                        // (the deterministic exit PC) faults on.
+                        struct { const char* name; uint64_t base; } sites[] = {
+                            { "clobber@0x1333c", 0x13320ull },
+                            { "caller@0x62f6c",  0x62f50ull },
+                            { "boot0@va20000000(pa5bc000)", 0x5bc000ull },
+                        };
+                        for (auto const& s : sites) {
+                            for (uint64_t off = 0; off < 0x50; off += 4) {
+                                uint64_t const a = s.base + off;
+                                uint64_t w = 0;
+                                (void)c.memory->read8(static_cast<coreLib::PAType>(a & ~7ull), w);
+                                uint32_t const insn =
+                                    static_cast<uint32_t>((a & 4) ? (w >> 32) : (w & 0xFFFFFFFFull));
+                                std::fprintf(stderr,
+                                    "CSERVE-DISASM %s pa=0x%08llx insn=0x%08x\n",
+                                    s.name, (unsigned long long)a, insn);
+                            }
+                        }
+                        std::fflush(stderr);
+                    }
+                }
+                std::fprintf(stderr,
+                    "CSERVE-START-RESTART: haltPc=0x%016llx ptbr(PFN)=0x%016llx "
+                    "vptb=0x%016llx va_ctl=0x%016llx i_ctl=0x%016llx iCtlVptb=0x%016llx "
+                    "slotPa=0x%016llx p_misc(R22)=0x%016llx->0x%016llx "
+                    "R22sh=0x%016llx->0x%016llx cyc=%llu "
+                    "-- restarting OS at halt_pc\n",
+                    static_cast<unsigned long long>(haltPc),
+                    static_cast<unsigned long long>(c.cpu->ptbr),
+                    static_cast<unsigned long long>(c.cpu->vptb),
+                    static_cast<unsigned long long>(c.cpu->va_ctl),
+                    static_cast<unsigned long long>(c.cpu->i_ctl),
+                    static_cast<unsigned long long>(coreLib::iCtlVptb(c.cpu->i_ctl)),
+                    static_cast<unsigned long long>(slotPa),
+                    static_cast<unsigned long long>(r22Before),
+                    static_cast<unsigned long long>(c.cpu->intReg[22]),
+                    static_cast<unsigned long long>(r22ShBefore),
+                    static_cast<unsigned long long>(c.cpu->intShadow[6]),
+                    static_cast<unsigned long long>(c.cpu->cycleCount));
+                std::fflush(stderr);
+                // One-shot physical 3-level page-table walk for VA 0x20000000
+                // (PTBR=l1pt; l1[VA>>33]->l2[VA>>23]->l3[VA>>13]; 8KB pages;
+                // PTE.PFN = bits[63:32]).  Shows what VMB physically built --
+                // expect leaf PFN = base_pfn (0x2DE / PA 0x5bc000).
+                {
+                    uint64_t const ptbrPfn = c.cpu->ptbr;
+                    auto walk = [&](char const* tag, uint64_t va) {
+                        uint64_t const l1Pa = (ptbrPfn << 13);
+                        uint64_t l1pte = 0, l2pte = 0, l3pte = 0;
+                        (void)c.memory->read8(static_cast<coreLib::PAType>(
+                            l1Pa + (((va >> 33) & 0x3FFULL) * 8)), l1pte);
+                        uint64_t const l2Pa = ((l1pte >> 32) << 13);
+                        (void)c.memory->read8(static_cast<coreLib::PAType>(
+                            l2Pa + (((va >> 23) & 0x3FFULL) * 8)), l2pte);
+                        uint64_t const l3Pa = ((l2pte >> 32) << 13);
+                        (void)c.memory->read8(static_cast<coreLib::PAType>(
+                            l3Pa + (((va >> 13) & 0x3FFULL) * 8)), l3pte);
+                        std::fprintf(stderr,
+                            "PTWALK %s va=0x%llx l1[%llu]pte=0x%llx l2Pa=0x%llx "
+                            "l2[%llu]pte=0x%llx l3Pa=0x%llx l3[%llu]pte=0x%llx "
+                            "leafPfn=0x%llx leafPa=0x%llx\n",
+                            tag, static_cast<unsigned long long>(va),
+                            static_cast<unsigned long long>((va >> 33) & 0x3FF),
+                            static_cast<unsigned long long>(l1pte),
+                            static_cast<unsigned long long>(l2Pa),
+                            static_cast<unsigned long long>((va >> 23) & 0x3FF),
+                            static_cast<unsigned long long>(l2pte),
+                            static_cast<unsigned long long>(l3Pa),
+                            static_cast<unsigned long long>((va >> 13) & 0x3FF),
+                            static_cast<unsigned long long>(l3pte),
+                            static_cast<unsigned long long>(l3pte >> 32),
+                            static_cast<unsigned long long>((l3pte >> 32) << 13));
+                        std::fflush(stderr);
+                    };
+                    walk("TARGET", 0x20000000ULL);      // the OS entry (boot0 code)
+                    walk("VPTE  ", 0x200080000ULL);     // the self-map VPTE addr for 0x20000000
+                    // boot0's FIRST data access is ldq r4,0x50(r0) with r0=1<<28
+                    // => VA 0x10000050 (page 0x10000000).  The deterministic exit
+                    // PC 0x20000010 faults here.  Is boot0's data page even mapped?
+                    walk("BOOT0DATA", 0x10000000ULL);   // boot0 data VA (ldq target page)
+                    walk("BOOT0VPTE", 0x200040000ULL);  // self-map VPTE addr for 0x10000000
+                }
+                // A+ RECON (2026-07-22): the faithful handoff is to prime the CNS
+                // save frame with the OS restart context, then divert to the real
+                // sys__exit_console -> pal__restore_state (which reads this frame).
+                // restore_state reads the frame at impure_base = mem[p_temp+PT__IMPURE];
+                // p_temp = R21 (ev6_alpha_defs.mar:38), PT__IMPURE = 0x88
+                // (ev6_pal_temps.mar:47).  CNS field offsets (ev6_pal_impure.mar):
+                // FLAG 0x0, HALT 0x8, R0 0x10.., PTBR 0x238, KSP 0x250, VPTB 0x268,
+                // P_MISC 0x308, VA_CTL 0x328, EXC_ADDR 0x330 (= restart PC in p23),
+                // I_CTL 0x360, M_CTL 0x390.  Dump the live frame to confirm the
+                // base is valid and whether it holds console or OS context BEFORE
+                // any write lands here.
+                {
+                    // At this CALL_PAL handler the PAL context (p_temp, p_misc)
+                    // lives in the SHADOW bank, not the active intReg[] (confirmed:
+                    // p_misc was in intShadow[6], intReg[22] was cserve scratch).
+                    // p_temp = R21 -> shadow copy intShadow[5]; try both to be sure.
+                    uint64_t const pTempRaw    = c.cpu->intShadow[5];  // p_temp (PAL bank)
+                    uint64_t const pTempActive = c.cpu->intReg[21];
+                    // p_temp must be 8-byte aligned; hw_ldq/p masks low 3 bits.
+                    // 0xf01 (odd) -> 0xf00.  Read the region at the ALIGNED base.
+                    uint64_t const pTemp       = pTempRaw & ~uint64_t{7};
+                    auto rd = [&](uint64_t pa) noexcept -> uint64_t {
+                        uint64_t v = 0;
+                        (void)c.memory->read8(
+                            static_cast<coreLib::PAType>(pa & ~uint64_t{7}), v);
+                        return v;
+                    };
+                    uint64_t const impure = rd(pTemp + 0x88ULL);       // PT__IMPURE
+                    // Hexdump the PALtemp region head to see whether the impure
+                    // pointer + WHAMI are linked (the ROOT question for the restart).
+                    std::fprintf(stderr,
+                        "A+RECON PALTEMP@0x%llx:", static_cast<unsigned long long>(pTemp));
+                    for (uint64_t o = 0; o <= 0xA0ULL; o += 0x8ULL) {
+                        std::fprintf(stderr, " [%02llx]=%016llx",
+                            static_cast<unsigned long long>(o),
+                            static_cast<unsigned long long>(rd(pTemp + o)));
+                    }
+                    std::fprintf(stderr, "\n");
+                    std::fprintf(stderr,
+                        "A+RECON pTempSh(R21sh)=0x%llx pTempAligned=0x%llx "
+                        "pTempActive(R21)=0x%llx "
+                        "impureBase=0x%llx (slotPa=0x%llx) "
+                        "CNS[FLAG=0x%llx HALT=0x%llx EXC_ADDR=0x%llx PTBR=0x%llx "
+                        "KSP=0x%llx VPTB=0x%llx P_MISC=0x%llx VA_CTL=0x%llx "
+                        "I_CTL=0x%llx M_CTL=0x%llx]\n",
+                        static_cast<unsigned long long>(pTempRaw),
+                        static_cast<unsigned long long>(pTemp),
+                        static_cast<unsigned long long>(pTempActive),
+                        static_cast<unsigned long long>(impure),
+                        static_cast<unsigned long long>(slotPa),
+                        static_cast<unsigned long long>(rd(impure + 0x0ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x8ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x330ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x238ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x250ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x268ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x308ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x328ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x360ULL)),
+                        static_cast<unsigned long long>(rd(impure + 0x390ULL)));
+                    std::fflush(stderr);
+                }
+                c.cpu->excAddr = haltPc;         // native restart PC (bit 0 = 0)
+                r.divertTarget = haltPc;
+                r.divert       = true;
+                return r;
+            }
+#endif // --- end OPTION B (kStartCpp) DEAD END ---
+            // Option B (cpp) is compiled out; if selected it now falls through to
+            // this faithful no-op (same as kStartOff).  Use kStartGuest (Option A).
+            return r;                // default: SMP-secondary start -- no-op on UP
         }
 
         case 0x43: {   // CSERVE$CALLBACK -- console <- OS callback transition
@@ -679,35 +1066,198 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         }
 
         default: {
-            // Every other CSERVE function code: the real EV6 OSF PAL falls
-            // through to `hw_ret (p23)` -- return, nothing done, R0 left as
-            // the caller set it.  This is the load-bearing fidelity fix.
-            // Unknown CSERVE is EXPECTED and TOLERATED on real hardware, NOT
-            // fatal.  V4 previously raised kFaultUnimplemented (artificial
-            // fatality), and V1's 0x44/0x65 stubs clobbered R0=0; both are
-            // wrong.  Leave R0 untouched (BoxResult defaults regWriteIdx ==
-            // kNoRegWrite) and return.  Codes WITHOUT an explicit case above
-            // that correctly land here and are no-op'd: 0x0A WRITE_BAD_CHECK_BITS,
-            // 0x0B-0x0D memory config, 0x32-0x37 MEDU/error-inject,
-            // 0x45 JUMP_TO_ARC, 0x65 MP_WORK_REQUEST.  (0x08/0x09, 0x3F, and
-            // 0x40-0x44 now have explicit cases and no longer reach default.)
+            // FAITHFULNESS AUDIT (2026-07-23).  A CSERVE func reaching here has
+            // NO C++ implementation and NO guest-PAL routing yet, so we currently
+            // no-op it (return, R0 untouched).  That no-op is a DIVERGENCE from
+            // real execution, NOT a faithful "tolerated no-op": the guest
+            // sys__cserve (ev6_vms_pc264_pal.mar:3852) would dispatch this func to
+            // a cfw_* handler with real side-effects.  The prior claim that these
+            // are silicon-tolerated no-ops was DISPROVEN by 0x65 MP_WORK_REQUEST --
+            // the console loops on it and re-inits because the guest
+            // cfw_mp_work_request never saves R18 -> CNS__WORK_REQUEST.  Per the
+            // CSERVE=run-the-guest-PAL architecture (JRN-VMB-016 PART 3), each
+            // such func must be CLOSED by routing to the guest PAL.  This block's
+            // job (goal = a referenceable ORACLE, not boot-for-boot's-sake) is to
+            // CAPTURE THE MISSING CONTRACT so it can be documented + closed: the
+            // func + its INPUTS (R16=func, R17/R18 args, R0), the caller PC, and
+            // the call pattern (one-shot vs the tight polling loops), so it
+            // cross-references to the guest cfw_* handler in the apisrm source.
+            // Codes still landing here: 0x0A, 0x0B-0x0D, 0x32-0x37, 0x45
+            // JUMP_TO_ARC, 0x65 MP_WORK_REQUEST.  (0x08/0x09/0x3F/0x40-0x44 have
+            // explicit cases.)  EMULATR_CSERVE_AUDIT=1 enables the capture (one
+            // record per distinct func code, then periodic, so the polling loops
+            // don't flood the log).
+            static bool const s_cserveAudit =
+                (std::getenv("EMULATR_CSERVE_AUDIT") != nullptr);
+            if (s_cserveAudit) {
+                static uint64_t s_seen[256] = {};
+                uint64_t const fc = funcCode & 0xFFu;
+                uint64_t const n  = ++s_seen[fc];
+                if (n <= 3u || (n & 0xFFFu) == 0u) {   // first 3 + every 4096th
+                    std::fprintf(stderr,
+                        "CSERVE-CONTRACT-MISSING: func=0x%llx %s call#%llu  "
+                        "R16=0x%016llx R17=0x%016llx R18=0x%016llx R0=0x%016llx  "
+                        "callerPc=0x%llx excAddr=0x%llx palMode=%d mode=%u cyc=%llu\n",
+                        static_cast<unsigned long long>(funcCode),
+                        cserveFuncName(funcCode),
+                        static_cast<unsigned long long>(n),
+                        static_cast<unsigned long long>(c.cpu->intReg[16]),
+                        static_cast<unsigned long long>(c.cpu->intReg[17]),
+                        static_cast<unsigned long long>(c.cpu->intReg[18]),
+                        static_cast<unsigned long long>(c.cpu->intReg[0]),
+                        static_cast<unsigned long long>(g.pc),
+                        static_cast<unsigned long long>(c.cpu->excAddr),
+                        static_cast<int>(c.cpu->inPalMode()),
+                        static_cast<unsigned>(c.cpu->mode),
+                        static_cast<unsigned long long>(c.cpu->cycleCount));
+                    std::fflush(stderr);
+                }
+            }
+            // CLOSE (discipline step 3): route to the guest sys__cserve dispatcher
+            // so the REAL firmware handles this func -- 0x65 -> cfw_mp_work_request
+            // saves R18->CNS__WORK_REQUEST (R18=MP$RESTART=1 = the OS-restart post
+            // from kernel.c:1352); genuinely-unknown codes hit the guest's own
+            // trailing hw_ret(p23) no-op, same as here.  Mirror-AXPBox invariant:
+            // p23(R23)=g.pc+4 in BOTH banks + divert, R16 intact, NO C++ effect
+            // replication -- the guest PAL does the work.  Gated EMULATR_CSERVE_ROUTE
+            // for A/B vs the capture-only no-op above.  sys__cserve located by
+            // signature scan = a run of >=8 consecutive `cmpeq r16,#lit,r0 ; bne
+            // r0,disp` pairs (the compiled full dispatch table; reference_platform=0
+            // + pc264_system=1 both confirmed, so that table IS compiled).  NOTE
+            // the boot/MP path is NOT ISP-gated -- ISP only skips real-HW device/
+            // timer/debug probes -- so this is faithful in both platform modes.
+            static bool const s_cserveRoute =
+                (std::getenv("EMULATR_CSERVE_ROUTE") != nullptr);
+            if (s_cserveRoute && c.memory != nullptr) {
+                static uint64_t s_sysCservePc   = 0;
+                static bool     s_cserveScanned = false;
+                if (!s_cserveScanned) {
+                    s_cserveScanned = true;
+                    auto rd32 = [&](uint64_t a) noexcept -> uint32_t {
+                        uint64_t q = 0;
+                        (void)c.memory->read8(
+                            static_cast<coreLib::PAType>(a & ~uint64_t{7}), q);
+                        return static_cast<uint32_t>(
+                            (a & 4ULL) ? (q >> 32) : (q & 0xFFFFFFFFULL));
+                    };
+                    // cmpeq r16,#lit,r0 : (insn & 0xFFE01FFF) == 0x420015A0
+                    //   (op 0x10, Ra=16, lit bit, func 0x2D CMPEQ, Rc=0; mask lit[20:13])
+                    // bne   r0,disp     : opcode 0x39, Ra=0
+                    auto isCmpeqR16R0 = [](uint32_t i) noexcept {
+                        return (i & 0xFFE01FFFu) == 0x420015A0u; };
+                    auto isBneR0 = [](uint32_t i) noexcept {
+                        return (i >> 26) == 0x3Du && ((i >> 21) & 0x1Fu) == 0u; };  // BNE=0x3D (0x39 is BEQ)
+                    // Require the run to CONTAIN cmpeq r16,#0x65,r0 (the
+                    // cserve$mp_work_request case) so we can only match the REAL
+                    // CSERVE dispatch, never some other r16-dispatch table.  The
+                    // cmpeq literal is bits[20:13].
+                    uint64_t const base = c.cpu->palBase;
+                    uint64_t const hi   = base + 0x20000ULL;
+                    for (uint64_t p = base; p + 8 <= hi; p += 4) {
+                        uint64_t q = p; int run = 0; bool has65 = false;
+                        while (q + 8 <= hi
+                               && isCmpeqR16R0(rd32(q)) && isBneR0(rd32(q + 4))) {
+                            if (((rd32(q) >> 13) & 0xFFu) == 0x65u) has65 = true;
+                            ++run; q += 8;
+                        }
+                        if (run >= 8 && has65) { s_sysCservePc = p; break; }
+                    }
+                    std::fprintf(stderr,
+                        "CSERVE-ROUTE: sys__cserve=%s0x%llx palBase=0x%llx\n",
+                        s_sysCservePc ? "" : "NOT-FOUND ",
+                        static_cast<unsigned long long>(s_sysCservePc),
+                        static_cast<unsigned long long>(base));
+                    // Dump the found table's first 16 words + cmpeq literals so we
+                    // can confirm it's the cserve dispatch (literals = cserve func
+                    // codes incl 0x65) and not a look-alike.
+                    if (s_sysCservePc != 0) {
+                        for (uint64_t o = 0; o < 0x40; o += 4) {
+                            uint32_t const w = rd32(s_sysCservePc + o);
+                            if (isCmpeqR16R0(w)) {
+                                std::fprintf(stderr,
+                                    "CSERVE-ROUTE-DISASM pa=0x%llx insn=0x%08x  cmpeq r16,#0x%02x,r0\n",
+                                    static_cast<unsigned long long>(s_sysCservePc + o),
+                                    w, (w >> 13) & 0xFFu);
+                            } else {
+                                std::fprintf(stderr,
+                                    "CSERVE-ROUTE-DISASM pa=0x%llx insn=0x%08x\n",
+                                    static_cast<unsigned long long>(s_sysCservePc + o), w);
+                            }
+                        }
+                    }
+                    std::fflush(stderr);
+                }
+                if (s_sysCservePc != 0) {
+                    uint64_t const retPc = g.pc + 4u;    // p23 = CALL_PAL return PC
+                    c.cpu->intReg[23]   = retPc;         // both banks (shadow swap)
+                    c.cpu->intShadow[7] = retPc;
+                    uint64_t const tgt = s_sysCservePc | 1ULL;   // PALmode (PC<0>=1)
+                    c.cpu->excAddr = tgt;
+                    r.divertTarget = tgt;
+                    r.divert       = true;
+                    std::fprintf(stderr,
+                        "CSERVE-ROUTE: func=0x%llx %s -> guest sys__cserve=0x%llx "
+                        "R16=0x%llx R17=0x%llx R18=0x%llx p23<-0x%llx cyc=%llu\n",
+                        static_cast<unsigned long long>(funcCode),
+                        cserveFuncName(funcCode),
+                        static_cast<unsigned long long>(s_sysCservePc),
+                        static_cast<unsigned long long>(c.cpu->intReg[16]),
+                        static_cast<unsigned long long>(c.cpu->intReg[17]),
+                        static_cast<unsigned long long>(c.cpu->intReg[18]),
+                        static_cast<unsigned long long>(retPc),
+                        static_cast<unsigned long long>(c.cpu->cycleCount));
+                    // ONE-SHOT primary-detection probe (2026-07-23): the 0x65 loop
+                    // is all R17=0 (primary posting MP$RESTART to ITSELF); the guest
+                    // cfw_mp_work_request's "are we restarting the primary?" check
+                    // (cmpeq WHAMI,pal$primary ; cmpeq r17,pal$primary) must be
+                    // FAILING for it not to skip.  Dump the values it reads:
+                    //   PT__WHAMI = mem[p_temp+0x98]; pal$primary = mem[get_base+0x200]
+                    //   (get_base = 0 OR palBase-pal$pal_base -> dump both candidates).
+                    static bool s_primDumped = false;
+                    if (!s_primDumped && c.memory != nullptr) {
+                        s_primDumped = true;
+                        uint64_t const pt = c.cpu->intShadow[5] & ~uint64_t{7};
+                        uint64_t whami = 0, pp0 = 0, ppPB = 0;
+                        (void)c.memory->read8(static_cast<coreLib::PAType>(pt + 0x98), whami);
+                        (void)c.memory->read8(static_cast<coreLib::PAType>(0x200), pp0);
+                        (void)c.memory->read8(static_cast<coreLib::PAType>(c.cpu->palBase + 0x200), ppPB);
+                        std::fprintf(stderr,
+                            "CSERVE-ROUTE-PRIM: p_temp=0x%llx PT__WHAMI=0x%llx "
+                            "pal$primary[@0x200]=0x%llx pal$primary[@palBase+0x200]=0x%llx "
+                            "cpuSlot=%u  (want WHAMI==pal$primary==0 so r17=0 skips)\n",
+                            static_cast<unsigned long long>(pt),
+                            static_cast<unsigned long long>(whami),
+                            static_cast<unsigned long long>(pp0),
+                            static_cast<unsigned long long>(ppPB),
+                            static_cast<unsigned>(c.cpu->cpuSlot));
+                        // MODE STATE at the routed handler entry.  The real fault is
+                        // fault=14 (DtbMissDouble) at the DTB-miss handler (pc~0x8321)
+                        // cascading to PC=0 -- i.e. the handler's loads are being
+                        // VIRTUALLY translated + miss-walked during POWERUP, when 1-1
+                        // physical mode (p_misc<63>) should identity-map.  Dump the mode:
+                        // p_misc = R22 (both banks: active intReg[22] + PAL-shadow
+                        // intShadow[6]); <63> set = 1-1 physical.  vptb/va_ctl show if
+                        // the self-map is even set yet (VPTB=0 during powerup => a walk
+                        // dereferences low addrs -> the cascade).
+                        std::fprintf(stderr,
+                            "CSERVE-ROUTE-MODE: p_misc(R22)=0x%016llx R22shadow=0x%016llx "
+                            "phys1to1=%d  vptb=0x%llx va_ctl=0x%llx i_ctl=0x%llx palMode=%d\n",
+                            static_cast<unsigned long long>(c.cpu->intReg[22]),
+                            static_cast<unsigned long long>(c.cpu->intShadow[6]),
+                            (int)(((c.cpu->intReg[22] | c.cpu->intShadow[6]) >> 63) & 1u),
+                            static_cast<unsigned long long>(c.cpu->vptb),
+                            static_cast<unsigned long long>(c.cpu->va_ctl),
+                            static_cast<unsigned long long>(c.cpu->i_ctl),
+                            (int)c.cpu->inPalMode());
+                    }
+                    std::fflush(stderr);
+                    return r;
+                }
+                // scan failed: fall through to the safe no-op below.
+            }
 
-#if EMULATR_BRINGUP_PROBES
-            std::fprintf(stderr,
-                "CSERVE Defaulted - UnImplemented: func=%llu (0x%llx) %s  pc=0x%llx grainPc=0x%llx "
-                "excAddr=0x%llx palBase=0x%llx palMode=%d mode=%u cyc=%llu\n",
-                static_cast<unsigned long long>(funcCode),
-                static_cast<unsigned long long>(funcCode),
-                cserveFuncName(funcCode),
-                static_cast<unsigned long long>(c.cpu->pc),
-                static_cast<unsigned long long>(g.pc),
-                static_cast<unsigned long long>(c.cpu->excAddr),
-                static_cast<unsigned long long>(c.cpu->palBase),
-                static_cast<int>(c.cpu->inPalMode()),
-                static_cast<unsigned>(c.cpu->mode),
-                static_cast<unsigned long long>(c.cpu->cycleCount));
-#endif
-            return r;                // R0 untouched, no fault
+            return r;                // R0 untouched, no fault (no-op when routing
+                                     // is OFF or the scan failed)
         }
     }
 }
@@ -861,6 +1411,24 @@ auto execMtprVptb_vms([[maybe_unused]] InstructionGrain const& g,
     BoxResult r;
     r.semFlags = g.semFlags;
     c.cpu->vptb = c.cpu->intReg[16];   // R16 (a0) is the standard CALL_PAL arg
+
+    // FAITHFUL FIX (2026-07-19, JRN-VMB): the real VMS PAL MTPR_VPTB
+    // (EV6_VMS_CALLPAL.MAR :1524) does NOT merely stash VPTB -- it merges VPTB
+    // into VA_CTL[VPTB] (bits 63:30) and I_CTL[VPTB] (bits 47:30, sign-extended)
+    // via EV6_MTPR, which is what actually feeds the self-map PTE address.
+    // EmulatR's D-side VA_FORM (this file :1511) reads cpu.va_ctl and the I-side
+    // IVA_FORM (:1484) reads cpu.i_ctl -- NEITHER reads cpu.vptb -- so a VPTB
+    // written only to cpu.vptb is STRANDED: computeVaForm(va_ctl=0) locates the
+    // PTE at VPTB=0, the VPTE HW_LD double-misses, and the DTB-miss handler
+    // spins forever (JRN-VMB DTBM-DBL storm, DS20 cold boot cyc ~182M).
+    // Propagate VPTB into both control registers' VPTB fields, preserving each
+    // register's control bits (VA_48 / VA_FORM_32, etc.), exactly as the PAL's
+    // `bis p7,r16 ; EV6_MTPR VA_CTL` / `... I_CTL` sequence does.
+    uint64_t const newVptb = c.cpu->intReg[16];
+    c.cpu->va_ctl = (c.cpu->va_ctl & ~coreLib::kVaCtlVptbMask)
+                  | (newVptb & coreLib::kVaCtlVptbMask);
+    c.cpu->i_ctl  = (c.cpu->i_ctl & ~coreLib::kICtlVptbLowMask)
+                  | (newVptb & coreLib::kICtlVptbLowMask);
 #if EMULATR_BRINGUP_PROBES
     // 2026-07-08: VPTB-write probe (env EMULATR_VPTB_DIAG).  ES40 SCB null-vector
     // hunt (task #29): MTPR_VPTB deposits R16 into cpu.vptb, but VA_FORM reads
@@ -872,12 +1440,20 @@ auto execMtprVptb_vms([[maybe_unused]] InstructionGrain const& g,
     if (s_vptbDiag) {
         static unsigned long s_vptbN = 0;
         if (s_vptbN < 64) { ++s_vptbN;
+            uint64_t const vaForm = coreLib::computeVaForm(
+                c.cpu->va_ctl, c.cpu->va,
+                coreLib::vaCtlIsVaForm32(c.cpu->va_ctl),
+                coreLib::vaCtlIsVa48(c.cpu->va_ctl));
             std::fprintf(stderr,
-                "VPTB-DIAG cyc=%llu pc=0x%016llx MTPR_VPTB=0x%016llx va_ctl=0x%016llx\n",
+                "VPTB-DIAG[mtpr] cyc=%llu pc=0x%016llx R16(VPTB)=0x%016llx "
+                "va_ctl=0x%016llx i_ctl=0x%016llx va=0x%016llx VA_FORM=0x%016llx\n",
                 static_cast<unsigned long long>(c.cpu->cycleCount),
                 static_cast<unsigned long long>(g.pc),
                 static_cast<unsigned long long>(c.cpu->intReg[16]),
-                static_cast<unsigned long long>(c.cpu->va_ctl));
+                static_cast<unsigned long long>(c.cpu->va_ctl),
+                static_cast<unsigned long long>(c.cpu->i_ctl),
+                static_cast<unsigned long long>(c.cpu->va),
+                static_cast<unsigned long long>(vaForm));
             std::fflush(stderr);
         }
     }
@@ -1977,7 +2553,36 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 #endif
         break;
     case coreLib::HW_MM_STAT:  c.cpu->mm_stat = c.opB;                                          break;
-    case coreLib::HW_VA_CTL:   c.cpu->va_ctl = c.opB;                                          break;
+    case coreLib::HW_VA_CTL: {
+        c.cpu->va_ctl = c.opB;
+#if EMULATR_BRINGUP_PROBES
+        // VA_CTL-write probe (env EMULATR_VPTB_DIAG): the HW_MTPR path that
+        // actually fires (the CALL_PAL MTPR_VPTB intrinsic never does on DS20).
+        // Shows the raw value the guest programs, the VPTB slice it lands in,
+        // and the resulting D-side VA_FORM (self-map PTE address).
+        static bool const s_vaCtlDiag = (std::getenv("EMULATR_VPTB_DIAG") != nullptr);
+        if (s_vaCtlDiag) {
+            static unsigned long s_n = 0;
+            if (s_n < 128) { ++s_n;
+                uint64_t const vaForm = coreLib::computeVaForm(
+                    c.cpu->va_ctl, c.cpu->va,
+                    coreLib::vaCtlIsVaForm32(c.cpu->va_ctl),
+                    coreLib::vaCtlIsVa48(c.cpu->va_ctl));
+                std::fprintf(stderr,
+                    "VPTB-DIAG[vactl] cyc=%llu pc=0x%016llx VA_CTL<-0x%016llx "
+                    "VPTB=0x%016llx va=0x%016llx VA_FORM=0x%016llx\n",
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<unsigned long long>(c.opB),
+                    static_cast<unsigned long long>(c.cpu->va_ctl & coreLib::kVaCtlVptbMask),
+                    static_cast<unsigned long long>(c.cpu->va),
+                    static_cast<unsigned long long>(vaForm));
+                std::fflush(stderr);
+            }
+        }
+#endif
+        break;
+    }
         /* NOLINT(clang-diagnostic-invalid-utf8)
          * Derived ticking -- cpu.ccOffset is the only stored field;
          * HW_MFPR HW_CC returns uint32_t(cpu.cycleCount + cpu.ccOffset),

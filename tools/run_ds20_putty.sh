@@ -11,8 +11,22 @@
 #   - leaves PuTTY auto-launch ON (does NOT set EMULATR_NO_PUTTY),
 #   - turns on the console mirror + IDLEWARP so the log shows MHz_eff,
 #   - tees console/stderr into a timestamped log.
+#
+# Host    : Windows / Git Bash (PC) is the supported path; a macOS/Linux branch
+#           is stubbed via the platform guard below for the cross-platform owner.
+# Usage   : ./tools/run_ds20_putty.sh        (RUN_DIR=<dir> overrides the run dir)
+# Output  : run log -> <run-dir>/run_ds20_<ts>.log
 # ============================================================================
 set -euo pipefail
+
+# ---- platform guard: PC (Windows/Git Bash) authoritative --------------------
+# One script set serves Windows and (owned elsewhere) macOS/Linux.  uname picks
+# the host so the binary name and console tooling resolve per platform.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) EMU_HOST=win ;;   # Git Bash / MSYS2 on Windows (PC)
+    Darwin)               EMU_HOST=mac ;;   # macOS  (cross-platform owner)
+    *)                    EMU_HOST=nix ;;   # Linux / other POSIX
+esac
 
 # ---- locate the build/run dir ----------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +34,10 @@ PROJ_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_DIR="${RUN_DIR:-$PROJ_DIR/out/build/release}"
 cd "$RUN_DIR"
 
-EXE="./Emulatr.exe"
+# binary: Windows emits Emulatr.exe, POSIX a bare Emulatr -- prefer .exe.
+if   [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
+elif [ -x "./Emulatr"     ]; then EXE="./Emulatr"
+else EXE="./Emulatr.exe"; fi   # keep a stable value; preflight below FATALs
 FW="firmware/ds20_v7_3.exe"
 INI="config/Emulatr.ini"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
@@ -53,8 +70,11 @@ fi
 if [[ -f "$INI" ]]; then
     cp -f "$INI" "$INI.puttybak"
     trap 'mv -f "$INI.puttybak" "$INI" 2>/dev/null || true' EXIT
-    if grep -qiE '^\s*model\s*=' "$INI"; then
-        sed -i "s/^\(\s*model\s*=\s*\).*/\1DS20/I" "$INI"
+    if grep -qiE '^[[:space:]]*model[[:space:]]*=' "$INI"; then
+        # Portable across GNU and BSD/macOS sed: no in-place -i (needs a suffix
+        # arg on BSD) and no \s / /I (GNU-only) -- use a temp file + [[:space:]].
+        SED_TMP="$(mktemp)"
+        sed "s/^\([[:space:]]*model[[:space:]]*=[[:space:]]*\).*/\1DS20/" "$INI" > "$SED_TMP" && mv -f "$SED_TMP" "$INI"
     else
         echo "WARN: no model= line in $INI -- relying on firmware stem for DS20 platform"
     fi

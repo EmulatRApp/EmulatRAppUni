@@ -6,14 +6,26 @@
 # Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 # Licensed under eNVy Systems Non-Commercial License v1.1
 # Project Architect: Timothy Peer.  AI Collaboration: Claude (Anthropic).
+# Host: Windows / Git Bash (PC) is the supported path; the platform guard below
+# stubs a macOS/Linux branch for the cross-platform owner.
 # ASCII(128).
+
+# ---- platform guard: PC (Windows/Git Bash) authoritative --------------------
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) EMU_HOST=win ;;   # Git Bash / MSYS2 on Windows (PC)
+    Darwin)               EMU_HOST=mac ;;   # macOS  (cross-platform owner)
+    *)                    EMU_HOST=nix ;;   # Linux / other POSIX
+esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD="${REPO}/out/build/cli"
 
-if [ ! -x "${BUILD}/Emulatr.exe" ]; then
-    echo "run: ${BUILD}/Emulatr.exe not found -- build first:  bash ${SCRIPT_DIR}/build_diag.sh" >&2
+# binary: prefer .exe (Windows) then bare (mac/Linux).
+if   [ -x "${BUILD}/Emulatr.exe" ]; then EXE="./Emulatr.exe"
+elif [ -x "${BUILD}/Emulatr"     ]; then EXE="./Emulatr"
+else
+    echo "run: ${BUILD}/Emulatr(.exe) not found -- build first:  bash ${SCRIPT_DIR}/build_diag.sh" >&2
     exit 1
 fi
 cd "$BUILD" || exit 1
@@ -28,7 +40,7 @@ fi
 
 LOG="es40_hookb.log"
 echo "run: launching ES40 to max-cycles (this takes a while)..."
-EMULATR_VPTB_DIAG=1 ./Emulatr.exe --firmware firmware/es40_v7_3.exe --mem 4294967296 \
+EMULATR_VPTB_DIAG=1 "$EXE" --firmware firmware/es40_v7_3.exe --mem 4294967296 \
     --no-autoload --max-cycles 0x50000000  2> "$LOG"
 
 echo "=== ACVPROBE HOOKB (count: $(grep -ac 'ACVPROBE HOOKB' "$LOG")) ==="

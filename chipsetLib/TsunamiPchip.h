@@ -390,6 +390,36 @@ public:
     }
 
     // ========================================================================
+    // DMA-window translation (PCI DMA address -> guest PA).
+    // ------------------------------------------------------------------------
+    // Bus-master devices (DE500 tulip TX/RX, future SCSI HBA) issue DMA using
+    // PCI addresses that the Pchip maps to system memory via WSBA/WSM/TBA
+    // (21272 HRM 10.1.4).  Direct-mapped (WSBA<1>=SG=0) translation only; a
+    // scatter-gather map walk (SG=1) is still TODO.  Returns the input
+    // unchanged if no enabled window matches (caller reads it as a raw PA).
+    // ========================================================================
+    uint64_t translateDmaToPa(uint64_t pci) const noexcept {
+        dumpWindowsOnce();
+        for (int i = 0; i < 4; ++i) {
+            if (!(m_wsba[i] & 0x1ull)) continue;                 // W_EN
+            uint64_t const maskAM = m_wsm[i]  & 0xFFF00000ull;   // window size mask
+            uint64_t const base   = m_wsba[i] & 0xFFF00000ull;   // window base <31:20>
+            if ((pci & 0xFFF00000ull & ~maskAM) != (base & ~maskAM)) continue;
+            uint64_t const inWin = pci & (maskAM | 0x000FFFFFull);       // offset in window
+            if (m_wsba[i] & 0x2ull) {                            // SG: TODO (page map walk)
+                dmaTraceOnce(pci, pci, i, /*sg=*/true);
+                return pci;
+            }
+            uint64_t const tbaBase = (m_tba[i] & 0xFFFFFC00ull) & ~(maskAM | 0x000FFFFFull);
+            uint64_t const pa = tbaBase | inWin;                 // direct-mapped
+            dmaTraceOnce(pci, pa, i, false);
+            return pa;
+        }
+        dmaTraceOnce(pci, pci, -1, false);
+        return pci;
+    }
+
+    // ========================================================================
     // MMIO Read Handler (top-level dispatch)
     // ========================================================================
 
@@ -1094,6 +1124,35 @@ private:
             rw, static_cast<unsigned>(dev), static_cast<unsigned>(fn),
             static_cast<unsigned>(reg), static_cast<unsigned>(width),
             static_cast<unsigned long long>(cfgOff), val, hit ? "hit" : "MISS");
+    }
+
+    // One-shot DMA-window dump + per-translate trace (EMULATR_TULIP_TRACE).
+    void dumpWindowsOnce() const noexcept
+    {
+        static bool const on = (std::getenv("EMULATR_TULIP_TRACE") != nullptr);
+        if (!on) return;
+        static bool done = false;
+        if (done) return;
+        done = true;
+        for (int i = 0; i < 4; ++i)
+            std::fprintf(stderr,
+                "PCHIP-DMA window%d: WSBA=0x%llx WSM=0x%llx TBA=0x%llx\n", i,
+                static_cast<unsigned long long>(m_wsba[i]),
+                static_cast<unsigned long long>(m_wsm[i]),
+                static_cast<unsigned long long>(m_tba[i]));
+        std::fflush(stderr);
+    }
+    static void dmaTraceOnce(uint64_t pci, uint64_t pa, int win, bool sg) noexcept
+    {
+        static bool const on = (std::getenv("EMULATR_TULIP_TRACE") != nullptr);
+        if (!on) return;
+        static int n = 0;
+        if (n++ < 8) {
+            std::fprintf(stderr, "PCHIP-DMA xlate pci=0x%llx -> pa=0x%llx win=%d sg=%d\n",
+                static_cast<unsigned long long>(pci),
+                static_cast<unsigned long long>(pa), win, sg ? 1 : 0);
+            std::fflush(stderr);
+        }
     }
 
     inline auto readPciConfig0(uint64_t cfgOffset, uint8_t width) const noexcept -> uint64_t

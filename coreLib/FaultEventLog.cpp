@@ -14,6 +14,7 @@
 #include "coreLib/BoxResult.h"   // kFault* constants for faultName()
 
 #include <atomic>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -31,13 +32,38 @@ namespace {
 constexpr char const* kLogPath       = "logs/faults.log";
 
 // First N faults emit at WARN level for immediate stderr visibility;
-// subsequent ones are silent on stderr but still written to the file.
-// Faults are sparse relative to retired instructions, so a generous
-// threshold is cheap and surfaces the early demand list loudly.
+// subsequent ones are silent on stderr but still written to the file
+// (the FILE is never capped -- only stderr loudness is).  Faults are sparse
+// relative to retired instructions, so a generous threshold is cheap and
+// surfaces the early demand list loudly.
 constexpr uint64_t    kLoudThreshold = 64;
 
 // Heartbeat stride past the loud threshold.
 constexpr uint64_t    kSummaryStride = 64ULL * 1024ULL;
+
+// JRN-VMB-016 Sec 3.14 probe: the default 64-fault stderr threshold is fully
+// consumed by the powerup burst (~cyc 1.21B), so the LATER handoff faults at
+// cyc ~1.9B are silent on the console (though still in logs/faults.log).  Two
+// env-gated overrides make a chosen window loud again, zero-cost when unset:
+//   EMULATR_FAULT_LOUD=<n>              -- raise (or lower) the loud threshold.
+//   EMULATR_FAULT_CYCLO / _CYCHI=<cyc>  -- ALSO emit loud for any fault whose
+//                                          cycle is in [CYCLO,CYCHI], regardless
+//                                          of the threshold (the "cyc-filter").
+// Read once on first fault after program start (getenv is not re-checked).
+struct FaultLoudCfg {
+    uint64_t threshold = kLoudThreshold;
+    uint64_t cycLo     = 0;
+    uint64_t cycHi     = 0;   // hi==0 => window disabled
+    FaultLoudCfg() noexcept
+    {
+        if (char const* s = std::getenv("EMULATR_FAULT_LOUD"))
+            threshold = std::strtoull(s, nullptr, 0);
+        if (char const* s = std::getenv("EMULATR_FAULT_CYCLO"))
+            cycLo = std::strtoull(s, nullptr, 0);
+        if (char const* s = std::getenv("EMULATR_FAULT_CYCHI"))
+            cycHi = std::strtoull(s, nullptr, 0);
+    }
+};
 
 
 std::atomic<uint64_t> s_count{0};
@@ -96,19 +122,24 @@ void logFaultEvent(uint64_t cycle,
                    bool     palMode,
                    uint64_t va) noexcept
 {
+    static FaultLoudCfg const cfg;   // env read once, thread-safe init
+
     uint64_t const n      = s_count.fetch_add(1, std::memory_order_relaxed);
     unsigned const opcode = static_cast<unsigned>((encoded >> 26) & 0x3Fu);
 
-    if (n < kLoudThreshold) {
+    bool const inCycWindow =
+        cfg.cycHi != 0 && cycle >= cfg.cycLo && cycle <= cfg.cycHi;
+
+    if (n < cfg.threshold || inCycWindow) {
         SPDLOG_WARN(
             "FAULT[{}]: cyc={} pc=0x{:016x} encoded=0x{:08x} op=0x{:02x} "
             "fault={} ({}) palMode={} va=0x{:016x}",
             n, cycle, pc, encoded, opcode,
             faultCode, faultName(faultCode), palMode ? 1 : 0, va);
-    } else if (((n - kLoudThreshold) % kSummaryStride) == 0) {
+    } else if (((n - cfg.threshold) % kSummaryStride) == 0) {
         SPDLOG_INFO("FAULT: {} total deliveries "
                     "(loud-stderr muted past first {})",
-                    n + 1, kLoudThreshold);
+                    n + 1, cfg.threshold);
     }
 
     std::lock_guard<std::mutex> lock(s_streamMutex);

@@ -956,6 +956,24 @@ add_custom_command(TARGET Emulatr POST_BUILD
     VERBATIM
 )
 
+# ----------------------------------------------------------------------------
+# User documentation -- ship the rendered Help & Manual guide (PDF)
+# ----------------------------------------------------------------------------
+# Stage the rendered guide into <run-dir>/documentation/ so it ships with the
+# build and the redist package. Source is the H&M export (sibling of the tree).
+# Non-fatal if absent (a clean checkout without the H&M build present).
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../H&M/HMDocs/EmulatRGuide.pdf")
+    add_custom_command(TARGET Emulatr POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Emulatr>/documentation"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/../H&M/HMDocs/EmulatRGuide.pdf"
+                "$<TARGET_FILE_DIR:Emulatr>/documentation/EmulatRGuide.pdf"
+        COMMENT "[Emulatr] stage user guide -> documentation/EmulatRGuide.pdf"
+        VERBATIM
+    )
+endif()
+
 option(EMULATR_BUILD_EDITORS
        "Build the PlatformEditor manifest authoring/validation tool (auxiliary)"
        OFF)

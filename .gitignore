@@ -182,3 +182,18 @@ sysvar_dump.txt
 rpcc_probe.txt
 firmware/
 /journals/DS20_Badge_IIC_Completion_Interrupt_topic.xml
+
+# packaging output + bridge deletion-staging
+redist/
+_to_delete/
+tools/_to_delete/
+# local agent/editor config
+.claude/
+tools/Editors/.claude/
+# scratch / stray
+tools/axpbox_ptemp/
+tools/.build_emulatr.lf.sh
+tools/EMULATR_BOOTTRACE=1
+tools/EMULATR_DIAG_CAP=200000
+Beta/
+srm_conformance/

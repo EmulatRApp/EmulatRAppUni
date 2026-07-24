@@ -16,7 +16,9 @@
 
 #include "memoryLib/GuestMemory.h"
 #include <cstdio>
+#include <cstdlib>   // std::calloc / std::free  (MSVC needs this explicitly; clang pulls it in transitively)
 #include <cstring>
+#include <new>       // std::bad_alloc
 
 #if defined(EMULATR_DIAGNOSTIC_LOGGING)
 #  include <cstdlib>                       // std::getenv / std::strtoull

@@ -118,7 +118,7 @@ TRACE_DIR="traces"
 DEC_LOG="${TRACE_DIR}/${TS}_es40_dec.log"
 MACHINE_LOG="${TRACE_DIR}/${TS}_es40_machine.log"
 CONSOLE_LOG="${TRACE_DIR}/${TS}_es40_console.out"
-DIAG_FLASH="$RUN_DIR/es40_diag_flash.rom"       # dedicated, wiped each run
+DIAG_FLASH="$RUN_DIR/firmware/es40_diag_flash.rom"       # dedicated, wiped each run
 
 # ---- preflight -------------------------------------------------------------
 [[ -f "$SRC_FW" ]] || { echo "FATAL: firmware not found: $SRC_FW"; exit 1; }
