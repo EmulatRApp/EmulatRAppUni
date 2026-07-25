@@ -56,9 +56,31 @@ struct Node {
     bool        dirty      = false;  // scalar was edited -> emit `edited' instead of source
     std::string edited;              // replacement token (must be valid JSON) when dirty
 
+    // Structural editing (T-08): a container whose child LIST changed is
+    // `structDirty'; emit() REGENERATES that container's text (2-space
+    // indent), while clean descendants still copy their source spans.  A node
+    // with begin==end==0 and a parent is SYNTHETIC (created by the editor,
+    // no source span); its token is generated from kind/text.
+    bool structDirty = false;
+
     bool isContainer() const noexcept {
         return kind == NodeKind::Object || kind == NodeKind::Array;
     }
+    bool isSynthetic() const noexcept {
+        return begin == 0 && end == 0 && parent != nullptr;
+    }
+
+    // ---- structural mutation (marks this container structDirty) ------------
+    // Create a detached node (scalar text = decoded value; containers empty).
+    static std::unique_ptr<Node> make(NodeKind kind, std::string key,
+                                      std::string text = "");
+    // Insert `child' at `at' (npos = append); returns the raw pointer.
+    Node* insertChild(std::unique_ptr<Node> child,
+                      std::size_t at = static_cast<std::size_t>(-1));
+    // Remove the child at index `i' (true on success).
+    bool  removeChildAt(std::size_t i);
+    // Index of a direct child, or -1.
+    int   indexOfChild(const Node* c) const;
 
     // Canonical path from the root, e.g. "$.pci_devices[2].slot" (Section 6.1).
     std::string path() const;
@@ -70,6 +92,10 @@ struct Node {
     Node*       elem(std::size_t index);
     const Node* elem(std::size_t index) const;
 };
+
+// Deep copy of a subtree (detached: parent=nullptr).  Source spans are kept,
+// so a clone emitted within the SAME Document reuses the original bytes.
+std::unique_ptr<Node> cloneNode(const Node& n);
 
 // Parse outcome.  On failure `ok' is false and the tree is empty.
 struct ParseError {

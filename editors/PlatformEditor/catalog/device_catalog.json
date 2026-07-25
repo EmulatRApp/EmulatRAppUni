@@ -18,7 +18,13 @@
     { "model": "symbios_53c810", "vendor": "0x1000", "device": "0x0001",
       "class_code": "0x010000", "interrupt_pin": 1, "bars": [],
       "supports": ["storage", "scsi"], "channels": 1,
-      "comment": "_PROVISIONAL SCSI (SPEC-SCSIH-001 Sec 10). Symbios/NCR 53C810, KZPAA lineage; narrow bus. Identity estimated; verify before landing." }
+      "comment": "_PROVISIONAL SCSI (SPEC-SCSIH-001 Sec 10). Symbios/NCR 53C810, KZPAA lineage; narrow bus. Identity estimated; verify before landing." },
+    { "model": "ncr53c810", "vendor": "0x1000", "device": "0x0001",
+      "class_code": "0x010000", "interrupt_pin": 2,
+      "bars": [ { "index": 0, "kind": "io", "size": "0x100" },
+                { "index": 1, "kind": "mem", "size": "0x100" } ],
+      "supports": ["storage", "scsi"], "channels": 1,
+      "comment": "NCR 53C810 SCSI HBA (KZPAA lineage) as landed in ds20_v7_3_platform.json 2026-07-25 (JRN-SCSI-001): apisrm io_device_list.h bind row 0x00011000 -> n810/pk/PKE; console pka0 + dka disks. unit = SCSI target id 0..6 (id 7 = HBA). Same silicon as symbios_53c810 (alias kept for spec continuity)." }
   ],
   "backing_models": ["generic", "passive"],
   "platforms": ["DS10", "DS20", "DS25", "ES40", "ES45"]
