@@ -3,6 +3,7 @@
 // ============================================================================
 #include "OrderedJson.h"
 
+#include <cstdio>
 #include <stdexcept>
 
 namespace platedit {
@@ -222,24 +223,153 @@ private:
     }
 };
 
-// Format-preserving emit: copy the source, replacing only dirty scalar spans.
-void emitNode(const std::string& src, const Node* n, std::string& out)
+// JSON string escaping for regenerated tokens.  NOTE: parser stores \uXXXX
+// escapes RAW in text; manifests are ASCII(128) by project rule, so that case
+// does not arise in regenerated content.
+std::string escapeString(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size() + 2);
+    for (char ch : s) {
+        switch (ch) {
+        case '"':  out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\n': out += "\\n";  break;
+        case '\r': out += "\\r";  break;
+        case '\t': out += "\\t";  break;
+        default:
+            if (static_cast<unsigned char>(ch) < 0x20) {
+                char buf[8];
+                std::snprintf(buf, sizeof buf, "\\u%04x", ch);
+                out += buf;
+            } else out += ch;
+        }
+    }
+    return out;
+}
+
+void emitNode(const std::string& src, const Node* n, std::string& out, int depth);
+
+// Regenerate a container's text (structural edit or synthetic subtree):
+// 2-space indent per level, one member/element per line.  Clean descendants
+// still emit via their source spans inside this.
+void regenNode(const std::string& src, const Node* n, std::string& out, int depth)
+{
+    const std::string ind(static_cast<std::size_t>(depth) * 2, ' ');
+    const std::string ind2(static_cast<std::size_t>(depth + 1) * 2, ' ');
+    const char open  = (n->kind == NodeKind::Object) ? '{' : '[';
+    const char close = (n->kind == NodeKind::Object) ? '}' : ']';
+    if (n->children.empty()) { out += open; out += close; return; }
+    out += open;
+    out += '\n';
+    for (std::size_t i = 0; i < n->children.size(); ++i) {
+        const Node* c = n->children[i].get();
+        out += ind2;
+        if (n->kind == NodeKind::Object) {
+            out += '"';
+            out += escapeString(c->key);
+            out += "\": ";
+        }
+        emitNode(src, c, out, depth + 1);
+        if (i + 1 < n->children.size()) out += ',';
+        out += '\n';
+    }
+    out += ind;
+    out += close;
+}
+
+// Format-preserving emit: copy the source, replacing dirty scalar spans and
+// regenerating structurally-edited / synthetic containers.
+void emitNode(const std::string& src, const Node* n, std::string& out, int depth)
 {
     if (!n->isContainer()) {
-        if (n->dirty) out += n->edited;
-        else          out.append(src, n->begin, n->end - n->begin);
+        if (n->dirty)             out += n->edited;
+        else if (n->isSynthetic()) {
+            if (n->kind == NodeKind::String) {
+                out += '"';
+                out += escapeString(n->text);
+                out += '"';
+            } else out += n->text;             // number/bool/null literal
+        }
+        else out.append(src, n->begin, n->end - n->begin);
+        return;
+    }
+    if (n->structDirty || n->isSynthetic()) {
+        regenNode(src, n, out, depth);
         return;
     }
     std::size_t cursor = n->begin;
     for (const auto& child : n->children) {
         out.append(src, cursor, child->begin - cursor);   // gap: punctuation/keys/ws
-        emitNode(src, child.get(), out);
+        emitNode(src, child.get(), out, depth + 1);
         cursor = child->end;
     }
     out.append(src, cursor, n->end - cursor);              // trailing ws + close bracket
 }
 
 } // namespace
+
+// ---- structural mutation ---------------------------------------------------
+
+std::unique_ptr<Node> Node::make(NodeKind kind, std::string key, std::string text)
+{
+    auto n = std::make_unique<Node>();
+    n->kind = kind;
+    n->key  = std::move(key);
+    n->text = std::move(text);
+    return n;
+}
+
+Node* Node::insertChild(std::unique_ptr<Node> child, std::size_t at)
+{
+    if (!isContainer()) return nullptr;
+    child->parent = this;
+    Node* raw = child.get();
+    if (at >= children.size()) children.push_back(std::move(child));
+    else children.insert(children.begin() + static_cast<std::ptrdiff_t>(at),
+                         std::move(child));
+    for (std::size_t i = 0; i < children.size(); ++i)
+        children[i]->originIndex = static_cast<int>(i);
+    structDirty = true;
+    return raw;
+}
+
+bool Node::removeChildAt(std::size_t i)
+{
+    if (!isContainer() || i >= children.size()) return false;
+    children.erase(children.begin() + static_cast<std::ptrdiff_t>(i));
+    for (std::size_t k = 0; k < children.size(); ++k)
+        children[k]->originIndex = static_cast<int>(k);
+    structDirty = true;
+    return true;
+}
+
+int Node::indexOfChild(const Node* c) const
+{
+    for (std::size_t i = 0; i < children.size(); ++i)
+        if (children[i].get() == c) return static_cast<int>(i);
+    return -1;
+}
+
+std::unique_ptr<Node> cloneNode(const Node& n)
+{
+    auto out = std::make_unique<Node>();
+    out->kind        = n.kind;
+    out->key         = n.key;
+    out->text        = n.text;
+    out->begin       = n.begin;
+    out->end         = n.end;
+    out->originIndex = n.originIndex;
+    out->dirty       = n.dirty;
+    out->edited      = n.edited;
+    out->structDirty = n.structDirty;
+    for (const auto& c : n.children) {
+        auto cc = cloneNode(*c);
+        cc->parent = out.get();
+        out->children.push_back(std::move(cc));
+    }
+    return out;
+}
 
 // ---- Document --------------------------------------------------------------
 
@@ -264,7 +394,7 @@ std::string Document::emit() const
     if (!root_) return out;
     out.reserve(source_.size() + 16);
     out.append(source_, 0, root_->begin);                   // prefix (BOM/leading ws)
-    emitNode(source_, root_.get(), out);
+    emitNode(source_, root_.get(), out, 0);
     out.append(source_, root_->end, source_.size() - root_->end);  // suffix (trailing nl)
     return out;
 }

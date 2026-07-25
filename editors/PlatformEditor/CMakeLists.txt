@@ -17,7 +17,11 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-add_compile_options(-Wall -Wextra)
+if(MSVC)
+  add_compile_options(/W4)
+else()
+  add_compile_options(-Wall -Wextra)
+endif()
 
 # --- Qt-free core library ---------------------------------------------------
 add_library(platedit_core STATIC
@@ -26,9 +30,41 @@ add_library(platedit_core STATIC
   core/SchemaPolicy.cpp
   core/DeviceCatalog.cpp
   core/ManifestView.cpp
+  core/Validate.cpp
   tui/Renderer.cpp
 )
 target_include_directories(platedit_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# --- Qt Widgets frontend (D-025 shipping frontend) ---------------------------
+# Gated: absent Qt, the core/TUI/tests still configure and build everywhere.
+# AUTOMOC is enabled per-target; no Qt types below qt/ (D-025/D-026).
+find_package(Qt6 QUIET COMPONENTS Widgets)
+if(Qt6_FOUND)
+  add_executable(platedit_qt
+    qt/main.cpp
+    qt/MainWindow.cpp
+    qt/ManifestModel.cpp
+    qt/PropertyPane.cpp
+    qt/MainWindow.h
+    qt/ManifestModel.h
+    qt/PropertyPane.h
+    qt/EditOps.h
+  )
+  set_target_properties(platedit_qt PROPERTIES AUTOMOC ON)
+  if(APPLE)
+    # Bundle so macOS gives the app a reliable global menu bar + dock entry.
+    set_target_properties(platedit_qt PROPERTIES
+      MACOSX_BUNDLE TRUE
+      MACOSX_BUNDLE_BUNDLE_NAME "EmulatR Platform Editor"
+      MACOSX_BUNDLE_GUI_IDENTIFIER "com.envysys.emulatr.platformeditor")
+  endif()
+  target_link_libraries(platedit_qt PRIVATE platedit_core Qt6::Widgets)
+  target_compile_definitions(platedit_qt PRIVATE
+    PLATEDIT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  message(STATUS "PlatformEditor: Qt6 ${Qt6_VERSION} found -- platedit_qt enabled")
+else()
+  message(STATUS "PlatformEditor: Qt6 not found -- platedit_qt skipped (core/TUI unaffected)")
+endif()
 
 # --- Round-trip test (T-01 gate) --------------------------------------------
 add_executable(roundtrip_test tests/roundtrip_test.cpp)
@@ -45,6 +81,10 @@ target_link_libraries(catalog_test PRIVATE platedit_core)
 # --- TUI view-model + renderer test -----------------------------------------
 add_executable(view_test tests/view_test.cpp)
 target_link_libraries(view_test PRIVATE platedit_core)
+
+# --- Structural-writer test (T-08 gate) --------------------------------------
+add_executable(structural_test tests/structural_test.cpp)
+target_link_libraries(structural_test PRIVATE platedit_core)
 
 # --- TUI application --------------------------------------------------------
 add_executable(platedit_tui tui/main.cpp)
@@ -77,3 +117,6 @@ add_test(NAME view
     "${PLATEDIT_MANIFEST_DIR}/ds20_v7_3_platform.json"
     "${CMAKE_CURRENT_SOURCE_DIR}/schema/platform_schema.json"
     "${CMAKE_CURRENT_SOURCE_DIR}/catalog/device_catalog.json")
+
+add_test(NAME structural
+  COMMAND structural_test "${PLATEDIT_MANIFEST_DIR}/ds20_v7_3_platform.json")
