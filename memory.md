@@ -639,6 +639,18 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-017_p1_gosub_tree_enumerated.md` -- P1 DONE:
+  token low-9-bits = opcode (CMPULT 0x1f6 splits matcher/control at
+  0x20095bb8); GOSUB = `f6 05|param16|disp16`, target = disp_VA+sext+2
+  (cursor-proven).  TWO productions: A @ 0x9922c (8 fields + wwid
+  alternative w/ terminal 81f5) and B @ 0x992b8 (VARIANT: f8-action pair
+  replaces field 8).  Both failing walks used section-1/production-A only.
+  Env rules live at 0x991d0+ (operand pool 0x2005c4xx; nibble tables
+  0x99150+).  Verdict math: status 1..7 = structurally FAIL (bits[27:3]);
+  only gosub stores or f8-action verdicts can accept; 19f8 targets
+  0x20039278/0x20049278 = suspected IOVEC-builder action CODE (P1b debt:
+  f8 encodings).  P2 = DIAG window 0x20096440-0x20096530 logs which rules
+  get tried.  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-016_n1_accept_mechanism_subwalk.md` -- N1'
   DONE: the resolver has exactly FOUR status stores; the ONLY success
   store is 0x20096524, guarded by "recursive sub-walk (BSR 0x200964fc ->
