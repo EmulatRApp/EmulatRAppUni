@@ -661,8 +661,14 @@ dispatch matches them (silent PAL corruption otherwise).
   .log; first run of NEW ./tools/run_taskboot001_phase1.sh reached
   %APB-F-NOIOVEC (run_ds20_showdev_20260725_180201.log).  L0 OPEN.
   Re-baseline PASS 18:09 (old window: 752 unique PCs EXACT vs JRN-SCSI-004;
-  run_ds20_showdev_20260725_180914.log).  Pending decisions:
-  P1 flip 0x42 default to guest; P4 mode-off tripwire.  LIVE FRONTIER.
+  run_ds20_showdev_20260725_180914.log).  P1+P4 APPLIED + VERIFIED same
+  evening (session autonomy): engine defaults now START=guest, ROUTE=on,
+  DIVERT_PALSWAP=on (opt-out via =0/off) + two loud no-op tripwires;
+  verified by a scrubbed-env boot with ONLY EMULATR_2D_NOOP=1 -> NOIOVEC
+  (logs/bareboot_p1_20260725_204341.log).  CAVEAT: fully-bare DS20 boots
+  still need EMULATR_2D_NOOP=1 -- without it p_temp is never built and
+  the guest restore_state RESETS into the LFU (0x2d disposition = open
+  architect decision, JRN-SCSI-010 Sec 5 Leg B).  LIVE FRONTIER.
 - `journals/20260725_JRN-SCSI-006..009` -- NOIOVEC track continued: mode =
   arg4/r19 not r7 (-006); env-audit scope correction (-007); manifest vs
   discovery reconciliation + PREEDIT A/B staging (-008); the layered causal

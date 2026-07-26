@@ -208,28 +208,49 @@ ASCII(128) only.  Hex radix.
 --------------------------------------------------------------------------------
 ## 5. Durable fixes so this class of loss cannot recur (proposals)
 
-  P1  (DISCUSS-FIRST; one-line) Flip the case 0x42 default from kStartOff
-      to kStartGuest in PalEntries.cpp.  The guard comment says "Default
-      off until A is verified" -- A was verified 2026-07-24 (JRN-VMB-017/
-      -020: locator unambiguous, APB executed to NOIOVEC).  The condition
-      has been met; the default is stale.  Note the paired knobs: Option A
-      also needs EMULATR_DIVERT_PALSWAP semantics -- if the default flips,
-      decide whether DIVERT_PALSWAP (and CSERVE_ROUTE) flip with it or
-      whether the engine defaults already cover them.  Edit shape: the
-      two `return`s in the s_startMode lambda (PalEntries.cpp mode
-      selector) return kStartGuest instead of kStartOff.
-  P2  (already queued, TASK-BOOT-001 Sec 7) autoloadLatest -> opt-in.
+  P1  APPLIED + VERIFIED (2026-07-25 evening; session-scope autonomy
+      granted by the architect).  Three engine defaults flipped so bare
+      launches match scripted ones:
+        - PalEntries.cpp case 0x42 s_startMode: kStartOff -> kStartGuest
+          (explicit opt-out: EMULATR_CSERVE_START_MODE=off).  The "off
+          until A is verified" guard was retired -- A was verified
+          2026-07-24 (JRN-VMB-017/-020).
+        - PalEntries.cpp s_cserveRoute: default ON (disable with
+          EMULATR_CSERVE_ROUTE=0 or empty).
+        - PipelineDriver.h s_divertPalSwap: default ON (disable with
+          EMULATR_DIVERT_PALSWAP=0 or empty); required by guest START.
+      VERIFICATION (operator console run + telnet-scripted legs, new
+      relwithdebinfo build 19:27):
+        Leg A (env scrubbed to ONLY EMULATR_2D_NOOP=1; log
+        logs/bareboot_p1_20260725_204341.log): CSERVE-START-A locator
+        hit (restore_state=0xe3a0 exit_console=0x13480, identical to
+        every working run), CSERVE-START-A2 x82, CSERVE-ROUTE x102,
+        DIVERT-PALSWAP swaps present, ZERO tripwire lines, console
+        reached %APB-F-NOIOVEC.  The defaults carry the handoff.
+        Leg B FINDING (fully bare, NO vars at all; log
+        logs/bareboot_p1_20260725_195412.log): with guest START active a
+        launch missing EMULATR_2D_NOOP does NOT halt-0 -- the 0x2d fault
+        path skips sys__reset_init, p_temp is never built, and
+        pal__restore_state reads garbage -> divert lands at PAL 0x12d85
+        -> console RESETS into the LFU (reproduced twice, cyc 829M and
+        3.10B).  Full bare-launch parity is therefore gated on the 0x2d
+        disposition, which REMAINS an open architect decision
+        (PalEntries.cpp scaffold comment: no-op'ing 0x2d regresses DS10
+        to its 0x13d38 device poll; journals/20260706_0x2d_path_
+        selector...).  Until decided, DS20 boots need EMULATR_2D_NOOP=1
+        -- every tools/ launcher supplies it.
+  P2  (still queued, TASK-BOOT-001 Sec 7) autoloadLatest -> opt-in.
       07-25 produced the SECOND contaminated session; E3 documents it.
   P3  Launch discipline: diagnostic recipes in journals should name the
       LAUNCHER (run_taskboot001_phase1.sh / run_ds20_bplus.sh), never a
       bare Emulatr.exe line, so the boot stack can never be forgotten;
       multi-line `export` pastes are a proven failure mode (E3's
       .logexport).  This journal's Sec 4 recipe follows its own rule.
-  P4  Cheap tripwire (optional): when the DS20 console issues CSERVE START
-      and s_startMode==kStartOff, print one loud line, e.g.
-      "CSERVE-START: MODE OFF -- handoff will strand at halt_pc (export
-      EMULATR_CSERVE_START_MODE=guest)".  Would have named this cause at
-      16:45 on 07-25.
+  P4  APPLIED with P1: two loud tripwires in case 0x42 --
+      "CSERVE-START: MODE OFF/cpp ..." (once, when START no-ops by
+      explicit mode) and "CSERVE-START: LOCATOR FAILED ..." (when the
+      exit_console scan comes up empty).  Neither fired in the Leg-A
+      verification; either would have named the 07-25 outage at 16:45.
 
 --------------------------------------------------------------------------------
 ## 6. Files touched by this phase
@@ -237,4 +258,7 @@ ASCII(128) only.  Hex radix.
   - tools/run_taskboot001_phase1.sh      NEW (launcher, Sec 4)
   - journals/20260726_JRN-SCSI-010_l0_cause_named_cserve_start_mode_unset.md
                                           NEW (this record)
-  No emulator code changed.  P1/P4 await approval.
+  - palBoxLib/grains/PalEntries.cpp      P1 defaults (START guest, ROUTE
+                                          on) + P4 tripwires
+  - pipelineLib/PipelineDriver.h         P1 default (DIVERT_PALSWAP on)
+  P1/P4 applied under session-scope autonomy and verified (Sec 5).
