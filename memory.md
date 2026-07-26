@@ -639,6 +639,19 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-019_apisrm_source_grounding.md` -- SOURCE
+  GROUNDING (architect pointer): booted_dev is built by file2dev
+  (apisrm filesys.c:2812, sprintf "%s %d %d %d %d %d%s", numbers
+  reversed, fd_table suffix) -> "SCSI 0 8 0 0 0 0 0" is BYTE-CANONICAL;
+  console string builder exonerated for good.  "@wwid%d" = the SCSI3/
+  fibre suffix = the grammar's wwid alternative (N = env var number).
+  CORRECTION: CRB callback 0x22 = cbfunc$k_GET_ENV (open=0x10) -- the
+  accept path issues another get_env, not open.  APB classify list
+  {DVA,RAID,SCSI,MSCP,FLOP} lacks IDE -> IDE unbootable by this APB
+  (VMB-022 source-grounded).  L1 residue: runtime-primed descriptor/
+  position cells from get_env ANSWER transport; R4 reframed to answer
+  BYTES (length/terminator), Q2 strtol DIAG run still decisive.
+  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-018_p1b_death_site_field3_strtol.md` -- P1b
   DONE: the death site is field-3's numeric parse.  VM opcode dispatch =
   jump table [ctx-0x10]+4*(op-0xe4), code-base [ctx+0x8]; op 0xf3 ->
