@@ -416,10 +416,20 @@ constexpr uint8_t hwQuadSize(InstructionGrain const& g) noexcept
 
 // ----------------------------------------------------------------------------
 // HW_LD Ra, disp12(Rb) -- PAL hardware load.
-// EA = Rb + sext(disp12); memSize per encoded[12]; sign-extension of
-// 4-byte loads follows the standard mBox convention applied at MEM
-// drain.  No reservation, no alignment trap (HW_LD is permitted to
-// take whatever the translator gives it).
+// EA = (Rb + sext(disp12)) with the low bits IGNORED: EV6 hardware
+// truncates HW_LD/HW_ST effective addresses to the access size (quad:
+// va<2:0>, long: va<1:0>) rather than trapping.  This is load-bearing,
+// not cosmetic (fixed 2026-07-24, JRN-VMB-017 Part 2): the VMS PAL's
+// DTBM_DOUBLE_3 self-map walk (pc264 v7_3 image, walk at PA 0xc088)
+// extracts index fields that DELIBERATELY carry junk in bits <2:0>
+// (r4[32:20] and r4[22:10] used as raw byte offsets), relying on the
+// quadword load to discard them.  Passing the unmasked EA through
+// produced a byte-shifted L1 PTE read at 0x3ff04001, a garbage leaf
+// PA 0x20003fe401 (NXM -> all-ones PTE, FOR set), a false kFaultFor
+// on the retried ld_vpte, and the guest's invalid-PTBR halt (code 4)
+// during the DS20 VMB bootstrap.  memSize per encoded[12];
+// sign-extension of 4-byte loads follows the standard mBox convention
+// applied at MEM drain.  No reservation, no alignment trap.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execHwLd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
@@ -428,8 +438,9 @@ auto execHwLd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
-    r.memAddr      = c.opB + static_cast<uint64_t>(hwDispSext(g));
     r.memSize      = hwQuadSize(g);
+    r.memAddr      = (c.opB + static_cast<uint64_t>(hwDispSext(g)))
+                     & ~static_cast<uint64_t>(r.memSize - 1u);   // EV6: va<2:0>/<1:0> ignored
     r.memIsStore   = false;
     return r;
 }
@@ -437,7 +448,10 @@ auto execHwLd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 
 // ----------------------------------------------------------------------------
 // HW_ST Ra, disp12(Rb) -- PAL hardware store.
-// EA = Rb + sext(disp12); memSize per encoded[12]; data = Ra.
+// EA = (Rb + sext(disp12)) truncated to the access size, exactly as
+// HW_LD above (EV6 ignores va<2:0> quad / va<1:0> long -- see the
+// HW_LD comment for the JRN-VMB-017 Part 2 root cause).  memSize per
+// encoded[12]; data = Ra.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execHwSt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
@@ -445,9 +459,10 @@ auto execHwSt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
     BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
-    r.memAddr     = c.opB + static_cast<uint64_t>(hwDispSext(g));
-    r.memData     = c.opA;
     r.memSize     = hwQuadSize(g);
+    r.memAddr     = (c.opB + static_cast<uint64_t>(hwDispSext(g)))
+                    & ~static_cast<uint64_t>(r.memSize - 1u);   // EV6: va<2:0>/<1:0> ignored
+    r.memData     = c.opA;
     r.memIsStore  = true;
     return r;
 }
@@ -474,24 +489,20 @@ auto execFetch(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noe
 #pragma endregion Misc-format Hint
 
 // ============================================================================
-// TODO -- additional Misc-format cache hints not yet wired
+// Misc-format cache hints -- WIRED (2026-07-24, JRN-VMB-017 Part 2)
 // ============================================================================
 //
-// The following four no-op cache hints exist in the Alpha SRM but do
-// not yet have rows in GrainMasterV4.tsv, so they are not dispatched
-// and not implemented here.  Each is a Misc-format opcode 0x18 sub-
-// function; once master TSV rows land they slot in alongside execFetch
-// with identical bodies (semFlags propagation, no register effect, no
-// memory effect):
+// FETCH_M (0x18/0xA000), WH64 (0x18/0xF800), and WH64EN (0x18/0xFC00)
+// now have GrainMasterV4.tsv rows with leafBase=FETCH, so all three
+// dispatch to execFetch above (S_PrefetchOnly: no register effect, no
+// memory effect) -- exactly the "identical bodies" plan this TODO
+// recorded.  The trigger was live, not cosmetic: DS20 VMB executes
+// WH64 in its memory-clear loop (pc=0x20077bd0, enc=0x63f0f800); the
+// former OPCDEC vectored through a zero SCB slot -> jump to VA 0 ->
+// kernel-stack-not-valid halt (code 2, PC=0).  Hints must be no-ops,
+// never OPCDEC.
 //
-//   FETCH_M (0x18 / 0xA000)  Mbox  prefetch with modify intent
-//   WH64    (0x18 / 0xF800)  Mbox  write hint, 64 bytes
-//   WH64EN  (0x18 / 0xFC00)  Mbox  write hint, 64 bytes, evict next
-//
-// ECB lives in the Cbox dispatch arm (master TSV line 345 already
-// classifies it Cbox) and belongs in cBoxLib/grains/ when that
-// directory exists; do not implement it here even though it is a
-// trivial no-op.
+// ECB remains in the Cbox dispatch arm (cBox::execEcb) -- unchanged.
 //
 // ============================================================================
 

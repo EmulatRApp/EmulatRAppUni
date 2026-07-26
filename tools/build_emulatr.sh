@@ -80,15 +80,26 @@ if [ "$HOST" = "win" ]; then
     OUT="$SRC/out/build/$CONFIG"
     mkdir -p "$OUT"
     # Mirror runtime deps (exe, Qt6*.dll, icuuc.dll, config/, tls/,
-    # networkinformation/, firmware/, *_platform.json, *.rom). SKIP the run-
-    # OUTPUT dirs -- traces/ alone can be 100+ GB; logs/ and snapshots/ are also
-    # emitted at run time, not build inputs. Copying them would be catastrophic.
+    # networkinformation/, firmware/, *_platform.json, *.rom) -- and editors/,
+    # the PlatformEditor payload (platedit_qt/platedit_tui + their Qt DLLs +
+    # schema/ + catalog/ + webui/), which CMake now links/stages DIRECTLY into
+    # <root>/<Config>/editors, so this one loop carries it: no special case.
+    # SKIP the run-OUTPUT dirs -- traces/ alone can be 100+ GB; logs/ and
+    # snapshots/ are also emitted at run time, not build inputs. Copying them
+    # would be catastrophic.
     for item in "$SRC/$BUILD_TYPE"/*; do
         case "$(basename "$item")" in
             traces|logs|snapshots) continue ;;
             *) cp -rf "$item" "$OUT/" ;;
         esac
     done
+    # NOTE(2026-07-25): the old <root>/editors/<Config> -> $OUT/editors copy is
+    # GONE with the layout fix (run layout is <config>/editors).  Do not restore
+    # it: that source-tree path is now stale build output at best, and copying it
+    # AFTER the loop above would overwrite the fresh editors/ with old binaries.
+    if [ -d "$SRC/editors/$BUILD_TYPE" ]; then
+        echo "WARN: stale legacy output dir $SRC/editors/$BUILD_TYPE exists (pre-2026-07-25 layout) -- not mirrored; delete it."
+    fi
     EXE="$OUT/$TARGET.exe"
 else
     # ---- macOS / Linux clang, out-of-source Ninja (mirrors build_mac.sh) ---

@@ -1,0 +1,66 @@
+Emulatr: unknown flag: EMULATR_PCTRACE=1
+
+Emulatr -- Alpha AXP / EV6 Architecture Emulator (V4)
+
+Usage: Emulatr --firmware <path> [options]
+
+Required:
+  --firmware <path>      raw-binary firmware image to load
+
+Optional:
+  --firmware-format <auto|raw|srm>   loader contract (default auto;
+                                     auto picks srm on .exe and signature
+                                     match, raw otherwise)
+  --load-pa  <hex|dec>   physical address to load image at  (default 0x0
+                                                            for raw, 0x900000
+                                                            for srm)
+  --start-pa <hex|dec>   physical address to start at; low bit is PAL bit
+                         (default 0x0; ignored in srm format -- entry comes
+                         from the descriptor)
+  --mem      <bytes>     guest memory size                  (default 64 MiB)
+  --max-cycles <N>       cap on the run loop                (default unlimited)
+  --autosnapshot <on|off>  periodic auto_*.axpsnap saves      (default on;
+                              off = only the named --snapshot-on-pc file is
+                              written -- use for cold-boot mint runs to avoid
+                              the disk cliff.  Env: EMULATR_AUTOSNAP=off)
+  --no-autoload          skip autoload-newest at startup -- forces a genuine
+                              cold boot instead of restoring the newest
+                              snapshot.  Env: EMULATR_NO_AUTOLOAD=1
+  --pal-mode             force palMode = true regardless of start-pa low bit
+  --trace    <dec,machine>  DEC listing + machine-parsable trace channels
+  --snapshot-on-pc <hex|dec>[,<hex|dec>...]  one-shot snapshot trigger(s);
+                              first retire at each PC writes a predig_*.axpsnap.
+                              ONE PC: legacy behavior -- also disables auto-save
+                              so the file stays mtime-newest for autoload.
+                              MULTIPLE PCs (comma-list): each fires once; pair
+                              with --autosnapshot off (no auto-save disable) to
+                              mint several entry-PC snapshots in one boot.
+                              predig_ files are never pruned.
+  --snapshot-name-tag <s>  base tag inserted after `predig_` (e.g. gctbuild);
+                           multi-PC appends _<pchex> per file.  Default: hex PC
+  --inject-interrupt-at-cycle <hex|dec>  EXPERIMENTAL.  Fires a one-shot
+                                         synthetic INTERRUPT-class trap (divert
+                                         to palBase + 0x100) when cpu.cycleCount
+                                         first reaches this value.  Tests the
+                                         hypothesis that the sys__cbox MCHK loop
+                                         is a deliberate idle wait for an external
+                                         IRQ.  Zero = off (default).
+  --dump-disasm <pa>:<count>  one-shot disassembly dump fired after firmware
+                              load and before run; <count> 4-byte instructions
+                              starting at physical address <pa>.  Renders to
+                              stderr in the PaDump format (see coreLib/PaDump.h).
+                              Requires EMULATR_PA_DUMP=ON at compile time.
+  --log-disable <subsys>      silence one subsystem entirely
+  --log-only <csv>            silence every subsystem not in the list
+  --log-verbose <subsys>      unthrottled emit for one subsystem
+  --log-file <subsys>=<path>  redirect one subsystem's emit stream to a file
+                              <subsys> is one of: Cbox Unalign IntervalTimer
+                              Snapshot PalRelocation ChipsetCsr StepD Misc
+                              (case-insensitive).  Requires
+                              EMULATR_DIAGNOSTIC_LOGGING=ON at compile time.
+  --help                 print this help and exit
+
+On exit:
+  0  CPU halted cleanly (CALL_PAL HALT)
+  1  any other stop reason (fault, max cycles, parse error)
+  2  firmware load failure

@@ -87,6 +87,7 @@ bool storageTypeFromString(const QString& s, StorageType& out)
 {
     if (s == "atapi_cdrom") { out = StorageType::AtapiCdrom; return true; }
     if (s == "ata_disk")    { out = StorageType::AtaDisk;    return true; }
+    if (s == "scsi_disk")   { out = StorageType::ScsiDisk;   return true; } // JRN-SCSI-001
     return false;
 }
 
@@ -287,6 +288,23 @@ ManifestLoadResult PlatformConfig::loadFromString(const std::string& json)
         m.pci.push_back(e);
     }
 
+    // BOARD DATA (2026-07-25, JRN-SCSI-003): per-hose PCI INTx -> DRIR
+    // routing table, mirroring the console's pci_irq_table (pc264_io.c:727).
+    // Optional; absent = devices needing INTx routing warn loud at wire-up.
+    const QJsonArray irqArr = root.value("pci_irq_table_hose0").toArray();
+    for (const QJsonValue& v : irqArr) {
+        int const b = v.toInt(255);
+        if (b < 0 || b > 255) {
+            issues.push_back("pci_irq_table_hose0: entry out of range (0..255)");
+            m.pciIrqTableHose0.push_back(255);
+        } else {
+            m.pciIrqTableHose0.push_back(static_cast<uint8_t>(b));
+        }
+    }
+    if (!m.pciIrqTableHose0.empty() && m.pciIrqTableHose0.size() > 28)
+        issues.push_back("WARN: pci_irq_table_hose0 longer than 28 entries "
+                         "(slots 5..11 x 4 pins)");
+
     const bool valid = validate(m, issues);
     if (!valid) {
         return fallback("manifest failed validation ("
@@ -379,15 +397,24 @@ bool PlatformConfig::validate(const DeviceManifest& m,
         std::set<uint16_t> chanUnit;
         for (const StorageTarget& s : e.storage) {
             if (!s.enabled) continue;          // disabled: not wired, may share a slot
-            if (s.channel > 1) err(tag + ": storage channel > 1");
-            if (s.unit > 1)    err(tag + ": storage unit > 1");
+            bool const isScsi = (s.type == StorageType::ScsiDisk);   // JRN-SCSI-001
+            if (isScsi) {
+                // SCSI addressing: unit = target id 0..6 (7 = the HBA itself);
+                // channel unused (single narrow bus).
+                if (s.unit > 6) err(tag + ": scsi_disk unit (target id) > 6");
+                if (s.channel != 0) err(tag + ": scsi_disk channel must be 0");
+            } else {
+                if (s.channel > 1) err(tag + ": storage channel > 1");
+                if (s.unit > 1)    err(tag + ": storage unit > 1");
+            }
             const uint16_t cu = static_cast<uint16_t>((uint16_t(s.channel) << 8)
                                                        | uint16_t(s.unit));
             if (!chanUnit.insert(cu).second)
                 err(tag + ": duplicate storage channel/unit (among enabled targets)");
             if (s.createIfMissing) {           // auto-provision a blank disk image
-                if (s.type != StorageType::AtaDisk)
-                    err(tag + ": create_if_missing only valid on a writable ata_disk");
+                if (s.type != StorageType::AtaDisk && !isScsi)
+                    err(tag + ": create_if_missing only valid on a writable "
+                              "ata_disk or scsi_disk");
                 if (s.sizeBytes == 0)
                     err(tag + ": create_if_missing requires a non-zero 'size'");
                 else if (s.sizeBytes % 512u != 0)

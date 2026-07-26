@@ -12,6 +12,42 @@ drill into journals only as needed.
 
 # EmulatR -- Project Memory
 
+## -1. LATEST (2026-07-25): SCSI live gate PASSED; NOIOVEC is PROTOCOL-INDEPENDENT
+
+- **JRN-SCSI-003 P1/P2 acceptance PASSED live:** DS20 `show config` shows
+  "NCR 53C810" at slot 8; `show dev` shows pka0.7.0.8.0 + dka0..dka600 (7
+  disks) -- the console's own pke driver enumerated the bus through the
+  SCRIPTS engine + S1 DMA seam.  Boot READS off dka0 (APB, 1226 blocks) run
+  clean through the HBA.  SCSI stack DONE for this frontier (P4 debts remain).
+- **P3 RESULT (decisive): `b dka0` still dies %APB-F-NOIOVEC, and the
+  resolver DIAG-PC footprint is BYTE-IDENTICAL to the IDE run** (752 unique
+  PCs, PC-set diff EMPTY, same 4 CMOVEQ births, zero accept-region retires;
+  JRN-SCSI-004 Sec 4).  GETENV delivered canonical "SCSI 0 8 0 0 0 0 0".
+  REFUTES VMB-022's "APB predates IDE boot" as root cause: the 0xf3-tail
+  gate (0x20096d14-0x20096e44) refuses ALL protocols identically -- the walk
+  is a validate/probe pass whose execute mode never engages (VMB-021 f.4:
+  token flag bits 10/11/12/14 x MODE R7=1 x sub-request r25=4).
+- **A4 EXECUTED (JRN-SCSI-005): AXPBox ES40 BOOTS the SAME dka0.vdisk into
+  OpenVMS V8.3** (same 627,712-byte APB; no NOIOVEC; disk read-only).
+  Media + APB + SCSI stack ALL exonerated; **NOIOVEC = EMULATR ENVIRONMENT
+  GAP** (something APB reads flips its resolver probe-only vs execute).
+  A3p3 gate decoded from the halt snapshot: token bit 10 = probe-only
+  entry; scanner pair -> BNE r0 exit -> CMOVEQ plants 0x158284 when result
+  slot bits 27:3 stay 0.  Probe 4.1 (EmulatR-ES40 same-disk) EXECUTED ->
+  BLOCKED by pre-existing #32 (ES40 console skips the partition/GCT/
+  driver-init phase entirely; show dev = dva0 only; zero SCSI CSR traffic;
+  manifest gained pka_53c810@slot3 + IDE dqa0 media emptied; ini restored
+  to DS20).  NARROWING: the skipped phase = partition/GCT/driver init;
+  VMB-019's GCT exoneration covered only the FAILING WINDOW, not an EARLY
+  config-tree read caching the mode flag -- GCT content is BACK on the
+  suspect list.  NEXT (JRN-SCSI-005 Sec 6): N1 EMULATR_DIAG_WREG=18 mode
+  provenance on DS20; N2 EMULATR_PA_WATCH on GCT 0x3ff32000 whole-run;
+  N3 #32 root cause.  Caller 0x2000e5d0 = VMS procedure-descriptor
+  trampoline (static chase deep; prefer N1 dynamic).  AXPBox harness notes
+  (working binary = axpbox/test/rom/axpbox.exe May-20; both local rebuilds
+  BROKEN; telnet driver required; console-client disconnect KILLS it):
+  JRN-SCSI-005 Sec 5-6.  User separately testing `b dqa1` (V8.2 CD).
+
 ## 0. Orientation (read first)
 
 - **V5 is the active, writable development target** (`D:\EmulatR\EmulatRAppUniV5`,
@@ -25,10 +61,33 @@ drill into journals only as needed.
   naming, behavior) is DISCUSS-FIRST.
 - **MILESTONE (2026-07-15):** SRM `>>>` reached on DS10, DS20, ES40 (default/ISP
   mode). That closed the V4 objective and gated the V5 Translation Buffer fork.
-- **LIVE FRONTIER (2026-07-23):** DS20 OpenVMS boot-handoff. The SRM->OS transfer
-  at VA `0x20000000` is now driven by a FULLY FAITHFUL path (no C++ stub/replica);
-  standing wall is a guest-side RESET at boot0 entry (OS IPR context gap). See 1.0
-  + `journals/20260722_JRN-VMB-016_0x20000000_wall_end_to_end_rootcause.md`.
+- **LIVE FRONTIER (2026-07-24): `%APB-F-NOIOVEC` -- the PCI-enumeration gate.**
+  FIVE walls fell in one day (all root-caused, fixed, VERIFIED live; full record
+  `journals/20260724_JRN-VMB-017_exit_console_divert_target_rootcause.md`):
+  (1) the 0x20000000 halt-0 wall was a WRONG DIVERT TARGET -- the Option A scan
+  hit a TB-flush stub at 0xa6cc, not sys__exit_console (=0x13480); two-stage
+  locator anchored on pal__restore_state landed; (2) HW_LD/HW_ST must IGNORE
+  EA low bits (EV6 truncates; the PAL walk fields carry deliberate junk) --
+  mBoxLib/LoadStore.cpp fix cleared the invalid-PTBR halt; (3) WH64/FETCH_M/
+  WH64EN wired as no-op hints (TSV leafBase=FETCH) -- cleared the OPCDEC ->
+  kernel-stack halt in VMB's memory-clear loop; (4) CSERVE 0x43 CALLBACK
+  no-op case REMOVED -> routes to guest cfw_callback; the OS<->console
+  callback round trip (halt-33/cbip/START) runs faithfully; (5) p23 linkage
+  now written to the PAL'S VIEW of R23 ONLY (native R23 = the callback ABI's
+  PUTS length; the both-banks write was dumping binary garbage to COM1).
+  RESULT: OpenVMS APB (primary bootstrap) RUNS and prints readable output --
+  the first OS-generated console text in EmulatR's history -- then fails
+  fatally at its boot-adapter phase: `%APB-F-NOIOVEC, Failed to create
+  IOVEC`, clean return to console.  UPDATE (JRN-VMB-018/-019, later same
+  day): the "KNOWN PCI gate" hypothesis is REFUTED for NOIOVEC -- PCI (zero
+  config cycles in the failing window), boot_dev env var, the GCT walk
+  (zero GCT reads), and the BOOT_DEV string are ALL EXONERATED (GETENV
+  delivers the complete canonical 19-char "IDE 0 105 0 0 0 0 0" per apisrm
+  filesys.c).  The failure is isolated to APB's INTERNAL pattern-matching
+  VM: status 0x158284 is born at exactly ONE site (CMOVEQ @0x20096e58);
+  the success stores (0x20097e30+) never execute.  Probe order + PCI #41
+  plan: JRN-VMB-019 Sec 2/3.  DS10/ES40: fixes 2+3 apply unconditionally
+  -- regression pass to `>>>` OWED.
 - **SANDBOX MOUNT CAVEAT (load-bearing):** the Cowork Linux sandbox sees this
   repo over a FUSE mount that returns TRUNCATED reads and cannot unlink. The
   Read/Edit/Write file tools (host side) are GROUND TRUTH; bash `wc`/`grep` on
@@ -48,12 +107,73 @@ Two live frontiers run in parallel: **1.0 boot-correctness** (the DS20 OS handof
 where the last several sessions have been) and **1.1-1.4 the TB acceleration tier**
 (the strategic fork; brief is authoritative but not the recent-session focus).
 
-### 1.0 Boot-correctness -- the DS20 OS handoff at VA 0x20000000
+### 1.0 Boot-correctness -- DS20 OpenVMS bootstrap (now INSIDE APB)
 
-Authoritative journal (read it):
-`journals/20260722_JRN-VMB-016_0x20000000_wall_end_to_end_rootcause.md` (end-to-end
-root cause + fix stack + EOD resume). Also `20260722_JRN-VMB-004` (CSERVE START =
-the handoff), `20260720_architecture_development_status.md` (system snapshot).
+Authoritative journals (read in this order):
+`journals/20260724_JRN-VMB-020_a1_a2_executed_apb_exonerated.md` --
+CURRENT: probes A1 + A2 EXECUTED, both CLEAN.  A1: full-image snapshot
+diff at the halt -- state tables, token stream, literals, message table
+ALL byte-identical; only 499 bytes diverge, every one legitimate runtime
+data.  A2: mechanical AARM replay-oracle over all 11,620 windowed retires
+-- ZERO divergences (values, stores, EAs, branch directions, memory
+consistency; all 313 xH shift-64 edge cases correct).  The search
+exhausts LEGITIMATELY.  Frontier -> A3 (descriptor provenance) / A4
+(AXPBox oracle diff).  ALSO: after NOIOVEC, APB HALTs @0x20003a38 and
+EmulatR EXITS (HaltedClean) -- there is NO return to the SRM console
+(earlier "clean return to console" was wrong); use the auto_halt snapshot
+(KEPT: snapshots/auto_halt_1784955322_1842256525.axpsnap) for post-mortem
+memory.  Scripted-console runbook + EMULATR_NO_PUTTY requirement
+(Machine.cpp:312 hardcodes PuTTY autolaunch) in VMB-020 Sec 3.  Then
+`journals/20260724_JRN-VMB-019_noiovec_string_exonerated_pci_plan.md` --
+BOOT_DEV string EXONERATED (complete canonical 19-char form);
+failure isolated to APB's internal pattern-VM (0x158284 born only at
+CMOVEQ @0x20096e58); Track A probe order + Track B PCI #41 scope (B1 BAR
+rebind + B2 IDSEL boundary first).  Then
+`journals/20260724_JRN-VMB-018_apb_noiovec_investigation.md` (+ its
+`_P2_apb_exe_static_analysis.md`: the decision module is a table-driven
+path matcher; NOTE its Sec 2 GCT hypothesis and the P2/P4 truncated-string
+finding are REFUTED by VMB-019), then
+`journals/20260724_JRN-VMB-017_exit_console_divert_target_rootcause.md`
+(the five 2026-07-24 fixes), then
+`journals/20260722_JRN-VMB-016_0x20000000_wall_end_to_end_rootcause.md`
+(the upstream chain + governing principle), `20260720_architecture_development_status.md`.
+
+**2026-07-24 state (EOD):** `b dqa0` -> VMB completes -> APB runs, converses
+with the console via faithful CSERVE 0x43 round trips (message chunks in
+R22/R23 per the callback ABI), prints `%APB-F-NOIOVEC, Failed to create
+IOVEC`, exits to console.  RULED OUT for NOIOVEC (JRN-VMB-018/-019): PCI
+(zero config cycles in the failing window), boot_dev env var, the GCT walk
+(zero GCT reads at failure time), string truncation (GETENV delivers the
+full "IDE 0 105 0 0 0 0 0").  The failing search is APB-INTERNAL: the
+request-code-0xf8 walk over a STATIC token stream inside the APB image;
+both top-level invocations return the 0x158284 no-match sentinel.
+A1 + A2 both EXECUTED CLEAN (VMB-020); A3 parts 1+2 DONE (VMB-021/-022):
+the module is a BYTECODE VM; the walk matched "IDE","0","105" then
+exited with the accept stores never reached.  DECISIVE (VMB-022): a
+whole-boot DIAG-PC scan proves the resolver NEVER succeeds anywhere in
+the run, and the APB image contains NO "IDE" AT ALL -- zero raw "IDE"
+bytes, zero "IDE"-forming LDAH/LDA immediates; its COMPLETE protocol
+set is {DVA_,RAID,SCSI,MSCP,FLOP -> type 0x11; MOP_,BOOT}.  LEADING
+HYPOTHESIS: this APB (A13-03, TC-era driver names) PREDATES IDE boot;
+%APB-F-NOIOVEC is its CORRECT answer to "IDE 0 105 0 0 0 0 0" --
+EmulatR exonerated END-TO-END (console string canonical, database
+intact, execution faithful, no-match semantically right).  JRN-019's
+"IDE boot IS supported by this vintage" is REFUTED for this image.
+NEXT (decisive, cheap): A4 = boot the SAME dka0.vdisk on AXPBox ES40
+(also-NOIOVEC -> confirmed; boots -> resume VMB-021 Sec 3 gate map);
+also enumerate the V8.2 ISO's APB keywords (if it has "IDE", that
+system is the direct unblock).  If confirmed: options = newer media /
+SCSI HBA model (REVERSES "SCSI not prerequisite") / MSCP / MOP.
+**DIRECTION SET (user, 2026-07-24): PCI->SCSI virtual disk is NEXT.**
+Design (discuss-first, awaiting approval): JRN-SCSI-001 -- NCR 53C810
+(PKE; VID/DID 0x1000/0x0001; driver proven live in the DS20 console;
+pke_driver.c + pke_script.mar = the contract; AXPBox Sym53C810 =
+secondary reference; deviceLib/scsi/ target layer already exists; B1
+BAR-rebind lands first).  User is separately testing `b dqa1` (V8.2
+CD) on their own console.  Track B (PCI
+#41) remains REQUIRED for SYSBOOT but is NO LONGER assumed to fix NOIOVEC.
+Housekeeping owed: throttle the CSERVE entry ledger; DS10/ES40 regression
+pass to `>>>`; promote DIVERT_PALSWAP toward engine default after soak.
 
 **GOVERNING PRINCIPLE (2026-07-23, durable, generalizes past this bug):** the goal
 is FAITHFUL INSTRUCTION EXECUTION -- EmulatR as an EV6 Oracle. Booting VMS is a SIDE
@@ -102,17 +222,29 @@ SCAFFOLD that reached `>>>` precisely BY skipping the real-HW init that builds p
 **STANDING WALL / RESUME POINT (EOD 2026-07-23):** with the fully faithful stack the
 DS20 `b dqa0` handoff lands back at the ORIGINAL wall: **halt code 0 (RESET) at
 PC=0x20000000, boot0 NOT fetched**. It is NOT EmulatR `kFaultHalt` (HALT-DIAG=0) --
-the line is `[CON COM1]` GUEST console output = a GUEST-SIDE RESET, almost certainly
-an MCHK at boot0's first fetch because `exit_console` restores the CONSOLE/CNS
-context (resume PC=0x20000000) but NOT the OS-exec context (OS PTBR 0x1ff82/mode/
-IPL/VPTB self-map). AXPBox tolerates this by doing ALL translation in C++ (never
-runs the guest miss handler); EmulatR runs the REAL firmware miss handler and so
-exposes the OS-context gap (real silicon would MCHK too). NEXT PROBE: UNCAP the
-`FaultEventLog` (caps at 64, all consumed by cyc 1.21B in powerup, hiding the
-cyc-1.9B handoff faults) so the boot0-entry fault->MCHK->reset chain is visible and
-names WHICH IPR is wrong after exit_console. SECONDARY: verify EmulatR models
-`I_CTL[SPE]` superpage. Wrapper: `tools/run_ds20_bplus.sh` (defaults the full
-faithful stack: 2D_NOOP + DELAYWARP + CSERVE_ROUTE + DIVERT_PALSWAP). CAVEAT: do
+the `[CON COM1]` line is GUEST console output = a GUEST-SIDE RESET. **The MCHK theory
+is DISPROVEN** (re-read of the 17:36 faithful run: the ENTIRE run has ONLY
+kFaultDtbMissDouble -- 5085 rows spanning past the 1.9417e9 handoff -- ZERO MCHK,
+ACV, or OPCDEC; the reset is a CLEAN guest halt code 0, not a fault cascade; VA
+0x20000000 is never even fetched). Root: `exit_console` restores the CONSOLE/CNS
+context (resume PC=0x20000000) but NOT the OS-exec context (boot PTBR 0x1ff82 =
+0x3ff04000 table / mode / IPL / VPTB self-map). AXPBox tolerates this by doing ALL
+translation in C++ (never runs the guest miss handler); EmulatR runs the REAL
+firmware and exposes the gap. TWO CANDIDATES the probe splits: (A) restore_state
+bails to caller p23=console 0x1ae39c, 0x20000000 never attempted (p23/final-PC
+0x1adab0 lean this way); (B) it HW_REIs toward 0x20000000 but PTBR stays the
+console's (not 0x1ff82) -> wrong translation -> halt. **NEXT PROBE: `EMULATR_PCTRACE`
+(landed 2026-07-23; coreLib/PcTrace.h + PalEntries case 0x42 arm + PipelineDriver
+retire record + main.cpp +/-64-word GuestMemory windows). Arms at the exit_console
+divert, snapshots PTBR(vs 0x1ff82)/VPTB/p_misc, records the next N retired PCs,
+latches the first console re-entry (BAIL), dumps the collapsed trajectory + bail
+context.** READ: PCTRACE-ARM ptbr==0x1ff82 -> disposition/mode bug (A); ==console ->
+(B). RUN (PC): `tools/build_emulatr.sh relwithdebinfo` then
+`EMULATR_PCTRACE=1 tools/run_ds20_bplus.sh` -> `b dqa0`. (The 17:36 run used the
+STALE 17:02 exe built before the cyc-filter commit, so EMULATR_FAULT_CYCLO was not
+in it -- a FRESH PC build is owed; a mac clang build confirmed the cyc-filter + the
+PCTRACE symbols DO land.) Wrapper `tools/run_ds20_bplus.sh` defaults the full
+faithful stack (2D_NOOP + DELAYWARP + CSERVE_ROUTE + DIVERT_PALSWAP). CAVEAT: do
 NOT `u srm` in LFU (triggers a ~407e9-cyc mem re-init); plain LFU exit->n->>>> is
 ~30e9 cyc.
 
@@ -507,9 +639,90 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-011_crb_callback_conversation_decoded.md` --
+  L1 FRONTIER: the CRB-window run captured the COMPLETE APB<->console
+  conversation (86 calls, run_ds20_showdev_20260725_181452.log): get_env
+  tty_dev->"0"; code 0x07 (undefined)->CBS$FAIL; set_term_int; get_env
+  booted_osflags->"0"; get_env booted_dev AND boot_dev ->
+  "SCSI 0 8 0 0 0 0 0" (= the JRN-VMB-021 ident+7-fields production); then
+  40x getc/puts = the NOIOVEC message.  APB NEVER calls open/read -- the
+  resolver judges ONLY that topology string.  NEXT (R4): get AXPBox's
+  boot_dev/booted_dev strings for the same media and diff; (a) differ ->
+  fix EmulatR's console-side string builder; (b) same -> pattern-VM
+  comparison-site instrumentation with the known string.  Decoder tool:
+  tools/crb_conversation_decode.py (one command re-derives the
+  conversation from any CRB-window run).  LIVE FRONTIER.
+- `journals/20260726_JRN-SCSI-010_l0_cause_named_cserve_start_mode_unset.md` --
+  TASK-BOOT-001 Phase 1+2 CLOSED (acceptance MET 07-25 18:02): the evening
+  L0 wall (halt 0 @ 0x20000000) was EMULATR_CSERVE_START_MODE unset in bare
+  evening shells (CSERVE$START defaults OFF, PalEntries case 0x42); no code
+  regression, ZERO code changed.  Proof: "CSERVE entry: func=66 (0x42)" x2
+  with ZERO CSERVE-START-A lines in logs/pctrace_bootfail_20260725_172726
+  .log; first run of NEW ./tools/run_taskboot001_phase1.sh reached
+  %APB-F-NOIOVEC (run_ds20_showdev_20260725_180201.log).  L0 OPEN.
+  Re-baseline PASS 18:09 (old window: 752 unique PCs EXACT vs JRN-SCSI-004;
+  run_ds20_showdev_20260725_180914.log).  Pending decisions:
+  P1 flip 0x42 default to guest; P4 mode-off tripwire.  LIVE FRONTIER.
+- `journals/20260725_JRN-SCSI-006..009` -- NOIOVEC track continued: mode =
+  arg4/r19 not r7 (-006); env-audit scope correction (-007); manifest vs
+  discovery reconciliation + PREEDIT A/B staging (-008); the layered causal
+  model L0/L1/L2 + ordered runbook R1-R5 (-009, READ FIRST for boot work).
+- `journals/20260725_JRN-SCSI-005_a4_axpbox_boots_same_media.md` -- A4:
+  AXPBox boots the same dka0.vdisk into OpenVMS V8.3 (no NOIOVEC) ->
+  EmulatR ENVIRONMENT GAP confirmed; 0xf3-tail gate decoded (bit 10 =
+  probe-only; CMOVEQ no-match birth); probe plan (EmulatR-ES40 control,
+  r7-mode caller disasm, env diff); AXPBox harness ops notes.  LIVE
+  FRONTIER.
+- `journals/20260725_JRN-SCSI-004_p3_noiovec_scsi_identical_footprint.md` --
+  live gate PASSED (pka0/dka0 enumerated via pke+SCRIPTS); P3 `b dka0` ->
+  NOIOVEC with a BYTE-IDENTICAL resolver footprint vs IDE (752 PCs, diff
+  empty); "APB predates IDE" REFUTED as root cause; 0xf3-tail gate is
+  protocol-independent; A4 AXPBox same-media = top probe.  LIVE FRONTIER.
+- `journals/20260725_JRN-SCSI-003_implementation_p0_p2_landed.md` -- SCSI
+  IMPLEMENTATION LANDED (S1 seams: Pchip unregister APIs + chipset bulk-DMA
+  helpers + real tulip rebind; Ncr53C810 HBA with SCRIPTS engine;
+  VirtualDiskDevice; manifest scsi_disk type; DS20 slot 8 entry).  Unit
+  green: full SCRIPTS INQUIRY/READ(10) transactions pass; 487-case suite
+  clean except 3 PRE-EXISTING drift failures (ide_wiring + 2x mmio_csc).
+  OWED: live `show dev` gate (pka0/dka0), then P3 `b dka0` NOIOVEC retest.
+  ACTIVE WORK ITEM.
+- `journals/20260724_JRN-SCSI-002_io_stack_architecture_map.md` -- the
+  CPU-to-SCSI-disk I/O stack: faithful layer map (outbound PIO, inbound
+  DMA + interrupts, SCSI bus, guest software stack), EmulatR status per
+  layer, and the gap/seam ledger G-A..G-G (deepest: NO bus-master/DMA
+  seam exists; PciMemRange 16-bit squeeze; BAR rebind; SCSI bus; device
+  snapshot participation).  Read WITH SCSI-001/-003.
+- `journals/20260724_JRN-SCSI-001_pci_scsi_hba_design.md` -- PCI SCSI HBA +
+  virtual disk design (NCR 53C810/PKE recommended; console driver PROVEN
+  present in DS20 v7.3-2; pke_driver.c+pke_script.mar = contract; AXPBox
+  Sym53C810 = secondary reference; B1 BAR-rebind prerequisite; phases
+  P0-P4 with open questions Q1-Q5).  ACTIVE WORK ITEM (user-directed
+  2026-07-24), awaiting design approval.
+- `journals/20260724_JRN-VMB-022_a3p2_no_ide_keyword_in_apb.md` -- NOIOVEC
+  part 6: whole-boot scan (resolver never succeeds); APB has NO "IDE" keyword
+  anywhere; hypothesis = this APB predates IDE boot, NOIOVEC is correct;
+  EmulatR exonerated end-to-end; A4 AXPBox same-media test is decisive.
+  LIVE FRONTIER.
+- `journals/20260724_JRN-VMB-021_a3_walk_transcript_grammar_decoded.md` -- NOIOVEC
+  part 5: full walk transcript; grammar decoded (production EXISTS: ident+7
+  fields); walk dies at field 2 with handler PDSCs never called; bottleneck =
+  the 0xf3-tail mode/flag gate.
+- `journals/20260724_JRN-VMB-020_a1_a2_executed_apb_exonerated.md` -- NOIOVEC
+  part 4: A1 (snapshot diff) + A2 (AARM replay oracle) both CLEAN; halt-exits-
+  process correction; scripted-console runbook; frontier -> A3/A4.
+- `journals/20260724_JRN-VMB-019_noiovec_string_exonerated_pci_plan.md` -- NOIOVEC
+  part 3: BOOT_DEV string + PCI exonerated; failure isolated to APB's internal
+  pattern-VM (0x158284 @0x20096e58); Track A probes + Track B PCI #41 scope.
+- `journals/20260724_JRN-VMB-018_apb_noiovec_investigation.md` +
+  `20260724_JRN-VMB-018_P2_apb_exe_static_analysis.md` -- NOIOVEC parts 1-2:
+  callback/GETENV decode + APB.EXE static analysis (their GCT and
+  truncated-string hypotheses are REFUTED by VMB-019).
+- `journals/20260724_JRN-VMB-017_exit_console_divert_target_rootcause.md` -- the
+  five 2026-07-24 fixes (divert locator, HW_LD/ST EA truncation, WH64/FETCH
+  hints, CSERVE 0x43 routing, p23 PAL-view).
 - `journals/20260722_JRN-VMB-016_0x20000000_wall_end_to_end_rootcause.md` -- the
   DS20 OS-handoff wall: END-TO-END root cause + fix stack (2D_NOOP/DELAYWARP/CSERVE
-  routing/DIVERT_PALSWAP) + governing principle (Sec 3.7) + EOD resume. LIVE FRONTIER.
+  routing/DIVERT_PALSWAP) + governing principle (Sec 3.7) + EOD resume (upstream chain).
 - `journals/20260722_JRN-VMB-004_cserve_start_boot_handoff_root_cause.md` -- CSERVE
   START (0x42) = the handoff (symptom-level, subsumed by VMB-016).
 - `journals/20260720_architecture_development_status.md` -- timeline-free system

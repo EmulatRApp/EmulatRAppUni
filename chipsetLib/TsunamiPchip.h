@@ -354,6 +354,35 @@ public:
 
     }
 
+    /**
+     * @brief Remove a previously registered I/O port range (S1 seam, JRN-SCSI-002
+     *        G-B).  Exact-match on (start, end, handler); no-op if absent.
+     *
+     * Needed the moment a BAR is RE-programmed: without removal the stale
+     * range stays live and (first-match dispatch) shadows the new one.
+     * Counterpart of registerIoPortRange; the tulip/HBA rebind callbacks
+     * (TsunamiChipset wireDevices) call this from programBar.
+     */
+    auto unregisterIoPortRange(uint16_t        startPort, uint16_t endPort,
+                               IIoPortHandler* handler) noexcept -> void
+    {
+        for (auto it = m_ioPortRegistry.begin(); it != m_ioPortRegistry.end(); ++it) {
+            if (it->startPort == startPort && it->endPort == endPort &&
+                it->handler == handler) {
+                m_ioPortRegistry.erase(it);
+                std::fprintf(stderr,
+                    "TsunamiPchip: unregistered I/O ports 0x%04X-0x%04X\n",
+                    static_cast<unsigned int>(startPort),
+                    static_cast<unsigned int>(endPort - 1));
+                return;
+            }
+        }
+        std::fprintf(stderr,
+            "TsunamiPchip: unregisterIoPortRange MISS 0x%04X-0x%04X (not registered)\n",
+            static_cast<unsigned int>(startPort),
+            static_cast<unsigned int>(endPort - 1));
+    }
+
     // ========================================================================
     // PCI Dense-Memory Claim Registration (G3-lite, 2026-06-03)
     // ========================================================================
@@ -385,6 +414,34 @@ public:
 
         std::fprintf(stderr,
             "TsunamiPchip: registered PCI mem 0x%08llX-0x%08llX\n",
+            static_cast<unsigned long long>(start),
+            static_cast<unsigned long long>(end - 1));
+    }
+
+    /**
+     * @brief Remove a previously registered dense-memory claim (S1 seam,
+     *        JRN-SCSI-002 G-B).  Exact-match on (start, end, handler).
+     *
+     * Counterpart of registerPciMemRange for BAR re-programming: the SRM
+     * sizes a BAR (all-ones probe), assigns a base, and may re-assign it
+     * during a later pass -- each move must retire the old claim or the
+     * first-match dispatch keeps routing to the stale base.
+     */
+    auto unregisterPciMemRange(uint64_t start, uint64_t end,
+                               IIoPortHandler* handler) noexcept -> void
+    {
+        for (auto it = m_pciMemRegistry.begin(); it != m_pciMemRegistry.end(); ++it) {
+            if (it->start == start && it->end == end && it->handler == handler) {
+                m_pciMemRegistry.erase(it);
+                std::fprintf(stderr,
+                    "TsunamiPchip: unregistered PCI mem 0x%08llX-0x%08llX\n",
+                    static_cast<unsigned long long>(start),
+                    static_cast<unsigned long long>(end - 1));
+                return;
+            }
+        }
+        std::fprintf(stderr,
+            "TsunamiPchip: unregisterPciMemRange MISS 0x%08llX-0x%08llX (not registered)\n",
             static_cast<unsigned long long>(start),
             static_cast<unsigned long long>(end - 1));
     }

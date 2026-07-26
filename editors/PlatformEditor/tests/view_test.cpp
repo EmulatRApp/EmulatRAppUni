@@ -46,8 +46,10 @@ int main(int argc, char** argv)
     Node* root = doc.root();
     check(containerLabel(root, policy, &cat) == "DS20", "root label -> platform 'DS20'");
 
+    // Corpus updated 2026-07-25: pka_53c810 (NCR SCSI HBA) joined the three
+    // original controllers -> 4 PCI devices.
     Node* pci = root->member("pci_devices");
-    check(containerLabel(pci, policy, &cat) == "pci_devices [3]", "array label 'pci_devices [3]'");
+    check(containerLabel(pci, policy, &cat) == "pci_devices [4]", "array label 'pci_devices [4]'");
 
     Node* ide = pci->elem(1);   // cypress_ide
     std::string ideLabel = containerLabel(ide, policy, &cat);
@@ -83,12 +85,17 @@ int main(int argc, char** argv)
     check(hasLabel("storage [2]"), "cypress_ide storage [2] present");
     check(hasLabel("bars [2]"), "de500_tulip bars [2] present");
 
-    // Collapse: root stays open, its two arrays collapse -> root + 2 array rows.
+    // Collapse: root stays open, its top-level arrays collapse.  Count them
+    // from the DOM so corpus growth (e.g. pci_irq_table_hose0, 2026-07-25)
+    // does not go stale here.
     tv.collapseAll();
-    check(tv.rows().size() == 3, "collapseAll shows root + 2 collapsed arrays");
+    const std::size_t topArrays = TreeView::containerChildren(root).size();
+    check(tv.rows().size() == 1 + topArrays,
+          "collapseAll shows root + its collapsed container children");
     Node* iic = root->member("iic_devices");
     tv.setExpanded(iic, true);
-    check(tv.rows().size() == 3 + 8, "expanding iic_devices reveals its 8 devices");
+    check(tv.rows().size() == 1 + topArrays + 8,
+          "expanding iic_devices reveals its 8 devices");
 
     // ---- properties ----
     std::printf("\n== properties ==\n");
