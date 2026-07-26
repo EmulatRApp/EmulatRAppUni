@@ -639,6 +639,18 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-016_n1_accept_mechanism_subwalk.md` -- N1'
+  DONE: the resolver has exactly FOUR status stores; the ONLY success
+  store is 0x20096524, guarded by "recursive sub-walk (BSR 0x200964fc ->
+  0x20095840) returned non-sentinel".  The grammar is a recursive-descent
+  VM (gosub records: 16-bit stream-relative or 32-bit cursor forms at
+  0x200964a0-f8).  Accept = some sub-production returns non-sentinel; on
+  EmulatR all 3 sub-walks returned the sentinel (trace-confirmed, own
+  CMOVEQ each).  wwid terminals 0x2000e450/e470 = IOVEC param writers
+  (dest +0x148/14c/150/154), no status effect.  NEXT: P1 static gosub-tree
+  enumeration; P2 targeted DIAG window 0x20096440-0x20096530 (log sub-walk
+  cursors); P3 AXPBox with "which gosub target returns non-sentinel".
+  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-015_t3_grammar_ctx_object_decoded.md` -- T3 +
   grammar DONE: operand record = {u64 typeHeader, u64 handlerVA}, rel32 is
   END-of-record relative (+6).  Production fully mapped: ident (0x2000e140)
