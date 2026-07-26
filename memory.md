@@ -639,6 +639,17 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-015_t3_grammar_ctx_object_decoded.md` -- T3 +
+  grammar DONE: operand record = {u64 typeHeader, u64 handlerVA}, rel32 is
+  END-of-record relative (+6).  Production fully mapped: ident (0x2000e140)
+  + 7 field validators (e1e0/e260/e000/e2e0/e300/dfe0/e020).  The ctx
+  0x20063820 is an OBJECT of the same format (classify e9d0, wrappers
+  e890/e770, walk def0, msg f940/fb60, string buf 0x2006aab8) -- hence
+  zero static call sites.  ALL main-production records are bit-10-SET
+  (probe); the ONLY bit-10-CLEAR terminal (0x81f5 -> handler 0x2000e450)
+  is in the wwid-alternative tail.  NEXT (N1'): decode 0x2000e450/e470 +
+  the loop-exit 0x20096624->0x20096cbc; T4 via key-record inspection on a
+  working boot.  Tool: tools/apb_stream_decode.py.  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-014_t2_verdict_dataflow_decoded.md` -- T2/T2b
   DONE: fail sentinel = 0x158284 (cell 0x20065320), born at CMOVEQ
   0x20096e58 when status-longword (stack 0x28(r29)) bits[27:3]==0.  Status
