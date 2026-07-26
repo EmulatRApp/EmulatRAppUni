@@ -639,6 +639,19 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-014_t2_verdict_dataflow_decoded.md` -- T2/T2b
+  DONE: fail sentinel = 0x158284 (cell 0x20065320), born at CMOVEQ
+  0x20096e58 when status-longword (stack 0x28(r29)) bits[27:3]==0.  Status
+  is stored per matching record (0x20096834) and KILLED by the record's
+  own token flags (0x20096ae0); the flags word at 0x18(r29) IS the raw
+  stream token (proven at 0x20096b18).  Token bits: 9=ext-byte,
+  [16:11]=operand idx, 10=advance-record (probe-only), 12/13/14=class
+  (14=link deref, NOT accept).  Boot_dev stream = 0x99216..0x99328 static;
+  NO token in the whole image survives store-kill -> walk can never accept
+  on this path regardless of string content; ident classify + field
+  extraction PROVABLY WORK.  NEXT: N1 decode bit-10-clear token chains'
+  exit path; N2 = T3 ctx/dispatch enumeration; N3 AXPBox with the specific
+  "which status write is last" question.  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-013_t1_noiovec_branch_named.md` -- T1 DONE:
   the NOIOVEC-vs-accept branch is BLBS r0 @ 0x20003a10 (r0 = the
   0x2000def0 walk chain's return, ZAPNOT'd at 0x2000e844); not-taken ->
