@@ -639,6 +639,18 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-013_t1_noiovec_branch_named.md` -- T1 DONE:
+  the NOIOVEC-vs-accept branch is BLBS r0 @ 0x20003a10 (r0 = the
+  0x2000def0 walk chain's return, ZAPNOT'd at 0x2000e844); not-taken ->
+  byte loop + BSR 0x2000f940 -> 40x CRB puts; taken -> CRB callback 0x22
+  via HWRPB+0xc0 (the open/IOVEC call APB never makes).  CORRECTS -012
+  Sec 5.2: the walk runs TWICE (r18=0 probe @ 0x2000e974, r18=1 accept @
+  0x2000e834, flag stored at ctx+0x18c) -- the ACCEPT PASS RUNS AND FAILS.
+  Ident classify (0x2000e9d0, "SCSI" vs DVA/RAID/SCSI/MSCP/FLOP literals)
+  SUCCEEDS.  Verdict compare operand: XOR vs static cell 0x20065320
+  (0x20096514-20) = T2's new start point.  Tools: run_taskboot001_t1.sh +
+  t1_apb_trace_analyze.py; hog note: 0x200098d0 bitmap loop eats 5e6
+  retires (exclude via PCLO=0x2000a000).  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-011_crb_callback_conversation_decoded.md` --
   L1 FRONTIER: the CRB-window run captured the COMPLETE APB<->console
   conversation (86 calls, run_ds20_showdev_20260725_181452.log): get_env
