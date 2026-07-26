@@ -639,6 +639,17 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-018_p1b_death_site_field3_strtol.md` -- P1b
+  DONE: the death site is field-3's numeric parse.  VM opcode dispatch =
+  jump table [ctx-0x10]+4*(op-0xe4), code-base [ctx+0x8]; op 0xf3 ->
+  0x20096040 -> custom strtol 0x2005e3a0 (base 10, +/- only, NO
+  whitespace skip) returns 0 on a non-digit (cyc 1941882905).  Stream
+  reads STOP at QW 0x99238 (field-3 operand never consumed).  Leading
+  model: strtol starts at the separator space (descriptor +0x14 lags the
+  whitespace scan); source string 0x2006aab8 is clean single-space.
+  19f8-as-code WITHDRAWN (f8 encodings still open).  DECISIVE NEXT: Q2
+  one DIAG boot over 0x2005e3a0-0x2005e6b0 names strtol's start offset;
+  R4 AXPBox byte-exact boot_dev string.  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-017_p1_gosub_tree_enumerated.md` -- P1 DONE:
   token low-9-bits = opcode (CMPULT 0x1f6 splits matcher/control at
   0x20095bb8); GOSUB = `f6 05|param16|disp16`, target = disp_VA+sext+2
