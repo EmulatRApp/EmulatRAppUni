@@ -43,6 +43,9 @@ compile_commands.json
 *.vcxproj.user
 .qt/
 
+_to_delete/
+.claude/
+
 # Exception: the vendored SoftFloat host-config header (platform.h) lives
 # under a build/ path but is REQUIRED source, not build output -- a fresh
 # clone (any OS) cannot compile softfloat without it.  Re-include precisely
