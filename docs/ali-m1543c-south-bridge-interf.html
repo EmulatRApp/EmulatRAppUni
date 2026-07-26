@@ -1,0 +1,259 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>5. Architecture &amp; Internals &gt; 5.3 Chipset &amp; Devices &gt; South Bridge &gt; ALi M1543C South-Bridge Interface</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="ALi M1543C,south bridge,ES40,ES45,AliM1543C,0x10B9,0x1533,PIRQ,M5229" />
+   <meta name="description" content="The Acer Labs (ALi) M1543C is the PCI-to-ISA south bridge of the AlphaServer ES40 and ES45 -- the counterpart to the Cypress CY82C693 used by the DS10/DS20. EmulatR models it..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "ali-m1543c-south-bridge-interf.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">ALi M1543C South-Bridge Interface</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?ali-m1543c-south-bridge-interf.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="5_-architecture--internals----.html">5. Architecture &amp; Internals</a> &gt; <a href="chipset.html">5.3 Chipset &amp; Devices</a> &gt; <a href="southbridge.html">South Bridge</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">ALi M1543C South-Bridge Interface</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="southbridge.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="southbridge.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="cypress.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">The Acer Labs (ALi) M1543C is the PCI-to-ISA south bridge of the AlphaServer ES40 and ES45 -- the counterpart to the Cypress CY82C693 used by the DS10/DS20. EmulatR models it so that ES40 firmware enumeration finds the bridge instead of master-aborting. ES40 is Tsunami (21272) silicon, so the south bridge is the only platform piece that differs from the DS10.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">PCI identity and functions</span></h2>
+<div style="text-align: left; text-indent: 0; padding: 0 0 0 0; margin: 0 0 0 0;"><table style="border:none; border-spacing:0; border-collapse:collapse;">
+<thead>
+<tr>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold; color: #000000;">Function</span></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold; color: #000000;">Role</span></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold; color: #000000;">Vendor:Device</span></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Func 0</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">PCI-to-ISA bridge (class 0x060100)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x10B9:0x1533</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">M5229</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">IDE controller</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x10B9:0x5229</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">M5237</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">USB host</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x10B9:0x5237</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">M7101</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Power management / SMBus</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_CodeExample"><span class="f_CodeExample">0x10B9:0x7101</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Function 0 advertises header type <span class="f_CodeExample">0x80</span> (multifunction). The bridge/interrupt-routing config registers the ES40 SRM programs live at config index <span class="f_CodeExample">0x40-0x4B</span>: ISA-bus / decode / IDE control (0x40-0x47) and PCI INTx (PIRQ) steering to ISA IRQs (0x48-0x4B).</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">EmulatR model</span></h2>
+<p class="p_Normal"><span class="f_CodeExample">chipsetLib/AliM1543C.h</span> mirrors the Cypress contract exactly: it implements <span class="f_CodeExample">IPciDeviceHandler</span> + <span class="f_CodeExample">IIoPortHandler</span> over a 256-byte config space, with read-only-protected vendor/device IDs and store-through config writes. A small <span class="f_CodeExample">AliPciFunctionStub</span> gives the SRM's multifunction probe valid headers for the IDE/USB/PMU companions instead of a master abort. The header was ported from <span class="f_CodeExample">Processor Support/ALi M1543_Datasheet</span> (Section 4) and verified standalone with g++ (identity reads back 0x1533_10B9; PIRQ store-through and RO protection both correct).</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Selection and wiring</span></h2>
+<p class="p_Normal"><span class="f_CodeExample">TsunamiChipset::wireDevices()</span> selects the bridge from the <span class="f_CodeExample">m_southBridge</span> enum (the former <span class="f_CodeExample">isAliPlatform(model)</span> string test was retired) -- ES40/ES45/DS25 wire the ALi (<span class="f_CodeExample">m_ali</span>), everything else wires the Cypress (default). The SAME lever also selects the func1 IDE (ALi M5229 vs Cypress), so bridge and IDE stay consistent. DS10 still resolves to Tsunami / cpuCount 1, byte-identical to before, so the working path is untouched.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Faithful vs stubbed</span></h2>
+<p class="p_Normal">Faithful: func0 identity, class, multifunction header, companion identities, config store-through with RO IDs, the model-gated selection, and -- since Phase 2B -- the func1 M5229 IDE via <span class="f_CodeExample">AliM5229Ide</span> (selected by the same south-bridge lever; it answers the taskfile / IDENTIFY probe on dqa0 / dqb0). Stubbed (<span class="f_CodeExample">TODO ali-irq-route</span>): the PIRQ steering (idx 0x48-0x4B) and IDE INTAJ level/edge (0x44) currently store through with no field effect; the USB (M5237) and PMU/SMBus (M7101) companion internals are not modeled beyond their identities.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_NotesBox"><span class="f_NotesBox">Run the ES40 with [System] model=ES40, cpuCount=1 and [ROM] firmwareImage=firmware/es40_v7_3.exe. Build and smoke-test the DS10 first to confirm no regression. The most likely first divergence is ALi config/IRQ-routing init (only the identity is faithful so far), ahead of the halt-button check. Full detail: journal 20260617_es40_ali_m1543c_interface.md.</span></p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Source References</span></h2>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">chipsetLib/AliM1543C.h</span><span class="f_NotesBox"> -- the ISA-bridge model (config space, RO IDs, PIRQ store-through, companion stubs).</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">deviceLib/Tsunami/AliM5229Ide.h</span><span class="f_NotesBox"> -- the func1 M5229 IDE (0x5229), wired for ES40 / ES45 / DS25.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">chipsetLib/TsunamiChipset.h</span><span class="f_NotesBox"> -- wireDevices(); the m_southBridge lever that gates bridge + IDE.</span></p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="southbridge.html" class="topiclink">South Bridge</a></p>
+<p class="p_Normal"><a href="cy82c693-.html" class="topiclink">CY82C693</a></p>
+<p class="p_Normal"><a href="tsunami-_-typhoon.html" class="topiclink">Tsunami / Typhoon (21272)</a></p>
+<p class="p_Normal"><a href="chipset.html" class="topiclink">Chipset</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

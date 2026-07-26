@@ -1,0 +1,220 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>4. Operating EmulatR &gt; 4.5 Snapshots &amp; Boot Acceleration &gt; Boot Acceleration - Entry Snapshot</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="axpsnap,determinism,EMULATR_FAST_DECOMPRESS,entryPa,faithful,oracle,restore-except-flash,snapshot" />
+   <meta name="description" content="EmulatR can skip re-running the guest self-decompression on a subsequent run by capturing a complete-machine snapshot at the firmware's own init-to-console handoff and..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "--boot-acceleration-entry-snap.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Boot Acceleration - Entry Snapshot</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?--boot-acceleration-entry-snap.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="4_-operating-emulatr----------.html">4. Operating EmulatR</a> &gt; <a href="--automatic-_-creating-_-resto.html">4.5 Snapshots &amp; Boot Acceleration</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Boot Acceleration - Entry Snapshot</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="--automatic-_-creating-_-resto.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="--automatic-_-creating-_-resto.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="4_6-firmware-update-utility-(l.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">EmulatR can skip re-running the guest self-decompression on a subsequent run by capturing a complete-machine snapshot at the firmware's own init-to-console handoff and restoring it. The handoff is the point where the decompressor stub transfers control into the decompressed console -- the entry PC the image declares, <span class="f_CodeExample">entryPa = targetPalBase + finalPC</span>, the same point the decompressor internals describe. The feature is governed by the <span class="f_CodeExample">EMULATR_FAST_DECOMPRESS</span> environment lever and is OFF by default: with it unset EmulatR always runs the faithful decompressor and is the Oracle.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The lever</span></h2>
+<p class="p_Normal">Set <span class="f_CodeExample">EMULATR_FAST_DECOMPRESS</span> before launching:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">unset or faithful -- the Oracle default: run the guest decompressor on every init.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_NotesBox">snapshot (or 1) -- on the first run, decompress faithfully and MINT a snapshot at entryPa; on a later run, REUSE that snapshot to skip the decompressor.</span></p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">The convenience wrapper <span class="f_CodeExample">tools/es40_fast_decompress.sh {snapshot|faithful}</span> sets the lever and runs the ES40 harness; the same lever works for any SRM firmware (see Model coverage below).</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">How it works</span></h2>
+<p class="p_Normal">The mint fires once, from the same translated-physical-address handoff detection the console-relocation trigger uses (so it is immune to the PAL-mode bit that a raw PC compare would miss). At that instant the machine is quiescent -- the previous instruction has retired and its writeback is resolved into the CPU state -- so the snapshot is a complete, consistent image: the full CPU state (all registers and IPRs, PC, PAL_BASE, mode), the page-sparse guest memory at its true addresses, and the chipset state. The image the guest decompressor itself produced is captured as-is; EmulatR does not recompute the decompressed layout.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">On a subsequent run the snapshot is validated and restored, and the boot re-enters at entryPa without re-running the decompression.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The snapshot file</span></h2>
+<p class="p_Normal">The snapshot is written next to the firmware, named for it: <span class="f_CodeExample">firmware/&lt;stem&gt;.axpsnap</span> (for example <span class="f_CodeExample">firmware/es40_v7_3.axpsnap</span>). The name binds the machine state to the exact firmware image it was decoded from. It is a per-run performance artifact: it survives a normal exit, a clean shutdown, and an abort so it remains diagnostically available, and it is regenerated (overwritten) only when a run reaches entryPa and finds no VALID snapshot already in place.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Determinism and validation</span></h2>
+<p class="p_Normal">A restored snapshot must match the run that consumes it, or determinism is lost. EmulatR enforces this with the existing snapshot validator before any restore: a stored checksum plus the CPU-state and chipset format versions plus the chipset VARIANT. Any mismatch -- a rebuild bumped a version, the file is truncated or corrupt, or it belongs to a different platform -- fails the load cleanly and the run falls back to the faithful decompressor and re-mints. A stale-code snapshot can therefore never be silently consumed. Determinism is broken only by a change the validator catches (a code rebuild) or by an input change; it is NOT necessary to delete the file between runs.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Restore-except-flash</span></h2>
+<p class="p_Normal">The snapshot carries the TIG flash / NVRAM image, but a reuse re-points the flash to the CURRENT backing after restore. This means live environment changes -- a <span class="f_CodeExample">set</span> at the <span class="f_CodeExample">&gt;&gt;&gt;</span> prompt, or an <span class="f_CodeExample">update srm</span>, persisted to <span class="f_CodeExample">&lt;stem&gt;.rom</span> / <span class="f_CodeExample">ds10_flash.rom</span> -- are honored on the next run, not reverted to the snapshot's capture-time environment. Real flash is nonvolatile; the restore treats it that way.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Model coverage</span></h2>
+<p class="p_Normal">The lever lives in the shared SRM load path, so it applies uniformly to DS10, DS20, and ES40. Two independent layers keep models isolated: each firmware keys its own <span class="f_CodeExample">&lt;stem&gt;.axpsnap</span>, and the chipset-variant check in the validator blocks an ES40 (Typhoon) snapshot from ever restoring into a DS10 / DS20 (Tsunami) machine. Cross-model, wrong-build, or corrupt snapshots all resolve to a faithful decompress, never to silent corruption.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">What it does and does not accelerate</span></h2>
+<p class="p_Normal">The entry snapshot skips the self-decompression -- the roughly four-million-cycle spin at PC <span class="f_CodeExample">0x60111c</span> -- and the boot up to entryPa. It does NOT by itself skip the post-entryPa silicon-mode initialization (the long real-hardware timing grind); that is addressed by the separate warp knobs. The two are complementary levers.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><a href="host-decompressor.html" class="topiclink">Host Decompressor</a></p>
+<p class="p_Normal"><a href="--automatic-_-creating-_-resto.html" class="topiclink">Automatic / Creating / Restoring</a></p>
+<p class="p_Normal"><a href="--env-vars-operation-ref-_-kil.html" class="topiclink">Env Vars Operation Ref</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>
