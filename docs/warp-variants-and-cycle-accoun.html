@@ -1,0 +1,363 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>5. Architecture &amp; Internals &gt; 5.6 Platform Execution Modes &amp; Clock &gt; WARP Variants and Cycle-Accounting</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="0x3c970,architectural CC,cycle_count_freq,cycleCount,effective MHz,IDLEWARP,interval timer,kCchipTimerMask,kProfileAlphaClockHz,RPCC,RSCCWARP,systemNow,tick counter,WARP" />
+   <meta name="description" content="WARP collapses idle and delay spins by fast-forwarding the simulation clock to a known target instead of executing every cycle. This topic catalogs the WARP variants, the..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "warp-variants-and-cycle-accoun.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">WARP Variants and Cycle-Accounting for Reported CPU Speed</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?warp-variants-and-cycle-accoun.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="5_-architecture--internals----.html">5. Architecture &amp; Internals</a> &gt; <a href="execution-modes.html">5.6 Platform Execution Modes &amp; Clock</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">WARP Variants and Cycle-Accounting for Reported CPU Speed</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="clock-frequency--mhz.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="execution-modes.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="diagnostic-instrumentation.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">WARP collapses idle and delay spins by fast-forwarding the simulation clock to a known target instead of executing every cycle. This topic catalogs the WARP variants, the counters each one touches, the single safety rule that separates the clean variant from the quarantined ones, and a cycle-accounting scheme that turns the warp deltas into an honest &quot;real vs effective&quot; performance number. It closes by relating that number to the SRM CPU-speed field so the badge and the perf gauge stay cleanly separated.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The three counters (do not conflate)</span></h2>
+<p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">1. Simulation clock -- </span><span class="f_CodeExample">cpu.cycleCount</span>. The fundamental time base; advances per retired instruction AND by every WARP jump. The interval timer fires against it (<span class="f_CodeExample">cycleCount &amp; kCchipTimerMask</span>). This is the counter WARP is allowed to move.</p>
+<p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">2. Architectural cycle counter (RPCC / HW_CC)</span> -- the 2026-05-11 split. It is <span class="f_CodeExample">cpu.cycleCount + ccBias</span>, where <span class="f_CodeExample">ccBias</span> is the offset the guest last wrote via <span class="f_CodeExample">HW_MTPR HW_CC</span>. RPCC and HW_MFPR HW_CC both return that expression (IntArith.cpp). It is derived from counter 1, not independent.</p>
+<p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">3. Guest tick counter</span> -- DRAM word at <span class="f_CodeExample">0x3c970</span>, the SRM uptime-in-ticks, incremented by the interval-timer ISR. This is guest state and must be advanced only by the real ISR, never written out-of-band.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">WARP variants</span></h2>
+<div style="text-align: left; text-indent: 0; padding: 0 0 0 0; margin: 0 0 0 0;"><table style="border:none; border-spacing:0; border-collapse:collapse;">
+<thead>
+<tr>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Variant (gate)</span></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Where</span></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">What it does</span></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Status</span></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">IDLEWARP (<span class="f_CodeExample">EMULATR_IDLEWARP</span>)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">krn$_idle loop, pc <span class="f_CodeExample">0x7bad0..0x7bb10</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Advances cycleCount to the NEXT tick edge: <span class="f_CodeExample">(c0 | kCchipTimerMask) + 1</span>. The FIRE path then runs the real ISR (bumps 0x3c970). One tick per hit.</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">CLEAN, active</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Tick-delay warp (<span class="f_CodeExample">EMULATR_RSCCWARP</span>)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">pc <span class="f_CodeExample">0x7c314</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Data-driven: reads the firmware's own counter (R5 addr, R6 target, R0 cur); writes counter to target and advances cycleCount by <span class="f_CodeExample">delta * kTickInterval</span>.</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">QUARANTINED</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">RSCC-deadline warp (<span class="f_CodeExample">EMULATR_RSCCWARP</span>)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">pc <span class="f_CodeExample">0x7c304</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">Data-driven: R19 elapsed, R07 duration; advances cycleCount by (duration - elapsed) AND writes 0x3c970 out-of-band.</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">QUARANTINED (0x3c970 rewrite = 0x7f4xx corruption)</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The safety rule</span></h2>
+<p class="p_Normal">WARP may advance <span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">only the simulation counter</span> (<span class="f_CodeExample">cpu.cycleCount</span> / the system clock). The guest tick counter <span class="f_CodeExample">0x3c970</span> must be delivered by the real interval-timer ISR through the normal FIRE path, never written directly. IDLEWARP obeys this -- it moves the clock and lets <span class="f_CodeExample">fireIntervalTimer</span> deliver the tick. The RSCC-deadline warp violates it (out-of-band 0x3c970 write) and is quarantined. The delay-loop warps are otherwise sound (they are data-driven -- they read the firmware's OWN loop bounds, so they adapt to any clock), so re-homing them onto the IDLEWARP model (advance cycleCount, let the ISR post the ticks) is the path to un-quarantining them.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Cycle-accounting: the one new counter</span></h2>
+<p class="p_Normal"><span class="f_CodeExample">cpu.cycleCount</span> conflates executed and warped cycles. Add a single accumulator that captures only the warp deltas; everything else derives from the invariant <span class="f_CodeExample">cycleCount = execCycles + warpCycles</span>.</p>
+<p class="p_CodeExample"><span class="f_CodeExample">uint64_t&nbsp;s_warpCycles;&nbsp;//&nbsp;NEW:&nbsp;sum&nbsp;of&nbsp;every&nbsp;warp&nbsp;advance</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">//&nbsp;at&nbsp;each&nbsp;warp:&nbsp;cpu.cycleCount&nbsp;+=&nbsp;delta;&nbsp;s_warpCycles&nbsp;+=&nbsp;delta;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">uint64_t&nbsp;execCycles&nbsp;=&nbsp;cpu.cycleCount&nbsp;-&nbsp;s_warpCycles;&nbsp;//&nbsp;real&nbsp;executed&nbsp;cycles</span></p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">The math (T = kProfileAlphaClockHz / 1024 cycles per tick; W = host wall-clock seconds)</span></h2>
+<div style="text-align: left; text-indent: 0; padding: 0 0 0 0; margin: 0 0 0 0;"><table style="border:none; border-spacing:0; border-collapse:collapse;">
+<thead>
+<tr>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Quantity</span></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Meaning</span></p>
+</th>
+<th style="vertical-align:top; background-color:#00FFFF; padding:0; border:solid thin #000000;" scope="col"><p class="p_Normal"><span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">Formula</span></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">cycleCount</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">system/guest clock (warped)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">execCycles + warpCycles</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">warpCycles</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">NEW: accumulated warp advance</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">sum of warp deltas</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">execCycles</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">real executed cycles</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">cycleCount - warpCycles</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">ticks_total</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">all ticks (== 0x3c970)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">cycleCount / T</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">ticks_warp</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">ticks fast-forwarded</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">warpCycles / T</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">ticks_exec</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">ticks actually executed</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">ticks_total - ticks_warp</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">MHz_real</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">honest EmulatR throughput</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">execCycles / W / 1e6</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">MHz_eff</span></p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">warp-inflated (guest wall view)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">cycleCount / W / 1e6</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">K</span> (warp factor)</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">over-performance ratio</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">cycleCount / execCycles = ticks_total / ticks_exec = MHz_eff / MHz_real</span></p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">relation</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal">effective is K times real</p>
+</td>
+<td style="vertical-align:top; padding:0; border:solid thin #000000;"><p class="p_Normal"><span class="f_CodeExample">MHz_eff = K * MHz_real</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Why the guest cannot see the warp (and where the gauge must live)</span></h2>
+<p class="p_Normal">Inside the guest, RPCC (<span class="f_CodeExample">cycleCount</span>) and the tick counter (<span class="f_CodeExample">0x3c970</span>) advance <span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">coherently</span> through every warp. Any guest-side measurement -- cycles divided by ticks, times 1024 -- therefore recovers exactly <span class="f_CodeExample">kProfileAlphaClockHz</span>, warp-invariant. The over-performance <span class="f_CodeExample">K</span> exists only relative to the HOST clock, so it is observable only by correlating guest cycles against host wall-time <span class="f_CodeExample">W</span>. That is precisely what <span class="f_CodeExample">warpCycles</span> plus a host timestamp provide. The gauge is an EmulatR-side readout (PROFILE line), NOT a guest-visible register.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Relation to the CPU-speed badge</span></h2>
+<p class="p_Normal">The SRM banner &quot;%3d MHz&quot; comes from <span class="f_CodeExample">krn$_timer_get_cycle_time()/1e6</span>, which on the ISP path reads the HWRPB cycle-counter-frequency field at PA <span class="f_CodeExample">0x2070</span> (the same self-built HWRPB whose SYSVAR is at 0x2058). That field is <span style="font-size: 13px; font-family: Arial,Helvetica,sans-serif; font-weight: bold;">functional</span> -- the firmware's delay/timeout loops key off it, and the WARP thresholds are tuned against the current value -- so it must NOT be repurposed as a raw performance gauge. Keep it frozen (or set it to a true model clock only as part of the warp refactor, since a realistic clock enlarges the delay loops and only the re-homed delay-loop warp collapses them for free). The build-relative performance number (<span class="f_CodeExample">MHz_real</span>, <span class="f_CodeExample">MHz_eff</span>, <span class="f_CodeExample">K</span>) lives EmulatR-side, computed from <span class="f_CodeExample">warpCycles</span> + wall-time, independent of the guest.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Implementation order</span></h2>
+<p class="p_Normal">1. Add <span class="f_CodeExample">s_warpCycles</span> and increment it at every warp site (IDLEWARP now; the delay-loop warps when re-homed). Emit <span class="f_CodeExample">MHz_real / MHz_eff / K</span> on the PROFILE line. Zero guest impact; immediate build-relative perf gauge. 2. Re-home the delay-loop warps onto the clean sim-counter model (advance cycleCount, let the ISR post 0x3c970) to un-quarantine them. 3. Only then, if a realistic banner is wanted, set the model clock at PA 0x2070 -- now free, because the re-homed warp collapses the enlarged delay loops.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Source References</span></h2>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">pipelineLib/MemDrainer.h</span><span class="f_NotesBox"> -- IDLEWARP/RSCCWARP warp sites; advances cpu.cycleCount.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">eBoxLib/grains/IntArith.cpp</span><span class="f_NotesBox"> -- RPCC / HW_MFPR HW_CC return cpu.cycleCount + ccBias.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">chipsetLib/CchipIntervalTimer.h</span><span class="f_NotesBox"> -- kCchipTimerMask FIRE path posting the real tick.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_NotesBox" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">deviceLib/BadgeMhzGauge.h</span><span class="f_NotesBox"> -- SRM MHz badge gauge (kept separate from the perf gauge).</span></p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span> Model Badging: SRM Platform Identity from an IIC Discriminator Device; Diagnostics: GuestMemory Store-Watch and Retire-Trace Arm; <a href="hwrpb---ds20.html" class="topiclink">HWRPB - DS20</a>.</p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>
