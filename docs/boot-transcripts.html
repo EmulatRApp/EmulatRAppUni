@@ -1,0 +1,462 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>4. Operating EmulatR &gt; 4.3 SRM Console &gt; Successful Boot to SRM (per platform)</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="AlphaServer DS20,AlphaServer ES40,boot transcript,golden boot,P00,show config,show dev,Silicon Mode,SRM prompt" />
+   <meta name="description" content="Reference transcripts of a healthy boot to the SRM console prompt for each platform, so the testing teams have a known-good baseline to diff their own runs against. Two fields..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "boot-transcripts.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Successful Boot to SRM (per platform)</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?boot-transcripts.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="4_-operating-emulatr----------.html">4. Operating EmulatR</a> &gt; <a href="4_3-srm-console.html">4.3 SRM Console</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">Successful Boot to SRM (per platform)</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="--srm-overview.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="4_3-srm-console.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="--common-commands.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">Reference transcripts of a healthy boot to the SRM console prompt for each platform, so the testing teams have a known-good baseline to diff their own runs against. Two fields in the firmware banner (SROM Revision on Tsunami, ARC Console on ES40) emit uninitialized / binary bytes on a real boot; they are shown here as <span class="f_CodeExample">[unset -- binary]</span> for ASCII fidelity, not literal console text.</p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">DS10 (Tsunami, Virtual/ISP)</span></h2>
+<p class="p_Normal">DS10 reaches the same <span class="f_CodeExample">P00&gt;&gt;&gt;</span> prompt reliably. A worked DS10 console session (examine / deposit) is in Example (Console) execution. A full DS10 <span class="f_CodeExample">show config</span> capture will be dropped in below.</p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">ASA&nbsp;EmulatR&nbsp;--&nbsp;Alpha&nbsp;AXP&nbsp;(EV6&nbsp;/&nbsp;21264)&nbsp;Emulator</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Alpha&nbsp;Emulator&nbsp;Console&nbsp;V1.4</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">(c)&nbsp;2026&nbsp;Timothy&nbsp;Peer&nbsp;/&nbsp;eNVy&nbsp;Systems,&nbsp;Inc.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">***&nbsp;keyboard&nbsp;not&nbsp;plugged&nbsp;in...</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Running&nbsp;on&nbsp;the&nbsp;ISP&nbsp;model.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Flash&nbsp;ROM&nbsp;writes&nbsp;are&nbsp;disabled</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">2048&nbsp;Meg&nbsp;of&nbsp;system&nbsp;memory</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">probing&nbsp;hose&nbsp;0,&nbsp;PCI</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">probing&nbsp;PCI-to-ISA&nbsp;bridge,&nbsp;bus&nbsp;1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">ERROR:&nbsp;ISA&nbsp;table&nbsp;corrupt!</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Initializing&nbsp;table&nbsp;to&nbsp;defaults</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">type&nbsp;&gt;&gt;&gt;init&nbsp;to&nbsp;use&nbsp;these&nbsp;changes</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">bus&nbsp;0,&nbsp;slot&nbsp;5&nbsp;--&nbsp;dqa&nbsp;--&nbsp;Cypress&nbsp;82C693&nbsp;IDE</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">***&nbsp;system&nbsp;serial&nbsp;number&nbsp;not&nbsp;set.&nbsp;use&nbsp;set&nbsp;sys_serial_num&nbsp;command.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;GCT/FRU&nbsp;at&nbsp;3ff32000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Checking&nbsp;dqa1.1.0.105.0&nbsp;for&nbsp;the&nbsp;option&nbsp;firmware&nbsp;files.&nbsp;.&nbsp;.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">dqa1.1.0.105.0&nbsp;has&nbsp;no&nbsp;media&nbsp;present&nbsp;or&nbsp;is&nbsp;disabled&nbsp;via&nbsp;the&nbsp;RUN/STOP&nbsp;switch</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Checking&nbsp;dva0.0.0.0.0&nbsp;for&nbsp;the&nbsp;option&nbsp;firmware&nbsp;files.&nbsp;.&nbsp;.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Option&nbsp;firmware&nbsp;files&nbsp;were&nbsp;not&nbsp;found&nbsp;on&nbsp;CD&nbsp;or&nbsp;floppy.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">If&nbsp;you&nbsp;want&nbsp;to&nbsp;load&nbsp;the&nbsp;options&nbsp;firmware,</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">please&nbsp;enter&nbsp;the&nbsp;device&nbsp;on&nbsp;which&nbsp;the&nbsp;files&nbsp;are&nbsp;located(ewa0),</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">or&nbsp;just&nbsp;hit&nbsp;&lt;return&gt;&nbsp;to&nbsp;proceed&nbsp;with&nbsp;a&nbsp;standard&nbsp;console&nbsp;update:</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*****&nbsp;Loadable&nbsp;Firmware&nbsp;Update&nbsp;Utility&nbsp;*****</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">------------------------------------------------------------------------------</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Function&nbsp;&nbsp;&nbsp;&nbsp;Description</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">------------------------------------------------------------------------------</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Display&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Displays&nbsp;the&nbsp;system's&nbsp;configuration&nbsp;table.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Exit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Done&nbsp;exit&nbsp;LFU&nbsp;(reset).</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;List&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Lists&nbsp;the&nbsp;device,&nbsp;revision,&nbsp;firmware&nbsp;name,&nbsp;and&nbsp;update&nbsp;revision.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Readme&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Lists&nbsp;important&nbsp;release&nbsp;information.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Update&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Replaces&nbsp;current&nbsp;firmware&nbsp;with&nbsp;loadable&nbsp;data&nbsp;image.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Verify&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Compares&nbsp;loadable&nbsp;and&nbsp;hardware&nbsp;images.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;?&nbsp;or&nbsp;Help&nbsp;&nbsp;&nbsp;Scrolls&nbsp;this&nbsp;function&nbsp;table.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">------------------------------------------------------------------------------</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">UPD&gt;&nbsp;u&nbsp;srm</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Confirm&nbsp;update&nbsp;on:</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">srm&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Y/(N)]y</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">WARNING:&nbsp;updates&nbsp;may&nbsp;take&nbsp;several&nbsp;minutes&nbsp;to&nbsp;complete&nbsp;for&nbsp;each&nbsp;device.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DO&nbsp;NOT&nbsp;ABORT!</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">srm&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Updating&nbsp;to&nbsp;7.3-1...&nbsp;&nbsp;Verifying&nbsp;7.3-1...&nbsp;&nbsp;PASSED.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">UPD&gt;&nbsp;exit</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Initializing....</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Testing&nbsp;the&nbsp;System</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Testing&nbsp;the&nbsp;Disks&nbsp;(read&nbsp;only)</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">exer:&nbsp;No&nbsp;such&nbsp;command</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">AlphaServer&nbsp;DS10&nbsp;&nbsp;&nbsp;5&nbsp;MHz&nbsp;Console&nbsp;V7.3-2,&nbsp;Feb&nbsp;27&nbsp;2007&nbsp;13:25:53</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&gt;&gt;&gt;show&nbsp;dev</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">dqa1.1.0.105.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DQA1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EMULATR&nbsp;VIRTUAL&nbsp;CDROM</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">dva0.0.0.0.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DVA0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&gt;&gt;&gt;show&nbsp;config</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AlphaServer&nbsp;DS10&nbsp;&nbsp;&nbsp;5&nbsp;MHz</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">SRM&nbsp;Console:&nbsp;&nbsp;&nbsp;&nbsp;V7.3-2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">PALcode:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OpenVMS&nbsp;PALcode&nbsp;V1.98-83,&nbsp;Tru64&nbsp;UNIX&nbsp;PALcode&nbsp;V1.92-73</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Processors</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">CPU&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Alpha&nbsp;EV6&nbsp;pass&nbsp;1&nbsp;&nbsp;&nbsp;5&nbsp;MHz</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SROM&nbsp;Revision:&nbsp;&nbsp;&nbsp;P▒</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Bcache&nbsp;is&nbsp;disabled</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Core&nbsp;Logic</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Cchip&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DECchip&nbsp;21272-CA&nbsp;Rev&nbsp;2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Dchip&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DECchip&nbsp;21272-DA&nbsp;Rev&nbsp;2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Pchip&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DECchip&nbsp;21272-EA&nbsp;Rev&nbsp;1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">TIG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rev&nbsp;0.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Arbiter&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Rev&nbsp;0.0&nbsp;(0x0)</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">MEMORY</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Array&nbsp;#&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Size&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Base&nbsp;Addr</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">-------&nbsp;&nbsp;&nbsp;&nbsp;----------&nbsp;&nbsp;---------</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1024&nbsp;MB&nbsp;&nbsp;&nbsp;&nbsp;000000000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1024&nbsp;MB&nbsp;&nbsp;&nbsp;&nbsp;040000000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Total&nbsp;Bad&nbsp;Pages&nbsp;=&nbsp;0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Total&nbsp;Good&nbsp;Memory&nbsp;=&nbsp;2048&nbsp;MBytes</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">PCI&nbsp;Hose&nbsp;00</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Bus&nbsp;00&nbsp;&nbsp;Slot&nbsp;05/0:&nbsp;Cypress&nbsp;82C693</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Bridge&nbsp;to&nbsp;Bus&nbsp;1,&nbsp;ISA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Bus&nbsp;00&nbsp;&nbsp;Slot&nbsp;05/1:&nbsp;Cypress&nbsp;82C693&nbsp;IDE</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dqa.0.0.105.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dqa1.1.0.105.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EMULATR&nbsp;VIRTUAL&nbsp;CDRO</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">ISA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Slot&nbsp;&nbsp;&nbsp;&nbsp;Device&nbsp;&nbsp;Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Enabled&nbsp;&nbsp;BaseAddr&nbsp;&nbsp;IRQ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DMA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MOUSE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Yes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;60&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;KBD&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Yes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;60&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COM1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Yes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3f8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COM2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Yes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2f8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;LPT1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Yes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3bc&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FLOPPY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Yes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3f0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&gt;&gt;&gt;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">DS20 (Tsunami, Virtual/ISP)</span></h2>
+<p class="p_Normal">Boot to prompt, then <span class="f_CodeExample">show dev</span> and <span class="f_CodeExample">show config</span>. South bridge is the Cypress 82C693; four 1 GB arrays interleaved to 4 GB; both IDE units (dqa0 disk, dqa1 CDROM) enumerate.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_CodeExample"><span class="f_CodeExample">ASA&nbsp;EmulatR&nbsp;--&nbsp;Alpha&nbsp;AXP&nbsp;(EV6&nbsp;/&nbsp;21264)&nbsp;Emulator</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Alpha&nbsp;Emulator&nbsp;Console&nbsp;V1.4</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">(c)&nbsp;2026&nbsp;Timothy&nbsp;Peer&nbsp;/&nbsp;eNVy&nbsp;Systems,&nbsp;Inc.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Initializing....</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Testing&nbsp;the&nbsp;System</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Testing&nbsp;the&nbsp;Memory</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">memtest:&nbsp;No&nbsp;such&nbsp;command</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">System&nbsp;Temperature&nbsp;is&nbsp;0&nbsp;degrees&nbsp;C</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">AlphaServer&nbsp;DS20&nbsp;5&nbsp;MHz&nbsp;Console&nbsp;V7.3-2,&nbsp;Feb&nbsp;27&nbsp;2007&nbsp;13:07:36</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">P00&gt;&gt;&gt;show&nbsp;dev</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">dqa0.0.0.105.0&nbsp;DQA0&nbsp;EMULATR&nbsp;VIRTUAL&nbsp;DISK&nbsp;1.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">dqa1.1.0.105.0&nbsp;DQA1&nbsp;EMULATR&nbsp;VIRTUAL&nbsp;CDROM</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">dva0.0.0.0.0&nbsp;DVA0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">P00&gt;&gt;&gt;show&nbsp;config</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;AlphaServer&nbsp;DS20&nbsp;5&nbsp;MHz</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">SRM&nbsp;Console:&nbsp;V7.3-2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">PALcode:&nbsp;OpenVMS&nbsp;PALcode&nbsp;V1.98-79,&nbsp;Tru64&nbsp;UNIX&nbsp;PALcode&nbsp;V1.92-74</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Processors</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">CPU&nbsp;0&nbsp;Alpha&nbsp;EV6&nbsp;pass&nbsp;1&nbsp;5&nbsp;MHz&nbsp;SROM&nbsp;Revision:&nbsp;[unset&nbsp;--&nbsp;binary]</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Bcache&nbsp;is&nbsp;disabled</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Core&nbsp;Logic</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Cchip&nbsp;DECchip&nbsp;21272-CA&nbsp;Rev&nbsp;2.1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Dchip&nbsp;DECchip&nbsp;21272-DA&nbsp;Rev&nbsp;2.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Pchip&nbsp;0&nbsp;DECchip&nbsp;21272-EA&nbsp;Rev&nbsp;1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Pchip&nbsp;1&nbsp;DECchip&nbsp;21272-EA&nbsp;Rev&nbsp;4.2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">TIG&nbsp;Rev&nbsp;0.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Arbiter&nbsp;Rev&nbsp;0.0&nbsp;(0x0)</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">MEMORY</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Array&nbsp;#&nbsp;Size&nbsp;Base&nbsp;Addr</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">-------&nbsp;----------&nbsp;---------</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;0&nbsp;1024&nbsp;MB&nbsp;000000000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;1&nbsp;1024&nbsp;MB&nbsp;040000000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;2&nbsp;1024&nbsp;MB&nbsp;080000000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;3&nbsp;1024&nbsp;MB&nbsp;0C0000000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Total&nbsp;Bad&nbsp;Pages&nbsp;=&nbsp;0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Total&nbsp;Good&nbsp;Memory&nbsp;=&nbsp;4096&nbsp;MBytes</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">PCI&nbsp;Hose&nbsp;00</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Bus&nbsp;00&nbsp;Slot&nbsp;05/0:&nbsp;Cypress&nbsp;82C693</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Bridge&nbsp;to&nbsp;Bus&nbsp;1,&nbsp;ISA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Bus&nbsp;00&nbsp;Slot&nbsp;05/1:&nbsp;Cypress&nbsp;82C693&nbsp;IDE</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;dqa.0.0.105.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;dqa0.0.0.105.0&nbsp;EMULATR&nbsp;VIRTUAL&nbsp;DISK</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;dqa1.1.0.105.0&nbsp;EMULATR&nbsp;VIRTUAL&nbsp;CDRO</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">PCI&nbsp;Hose&nbsp;01</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">ISA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Slot&nbsp;Device&nbsp;Name&nbsp;Type&nbsp;Enabled&nbsp;BaseAddr&nbsp;IRQ&nbsp;DMA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;0&nbsp;MOUSE&nbsp;Embedded&nbsp;Yes&nbsp;60&nbsp;12</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;1&nbsp;KBD&nbsp;Embedded&nbsp;Yes&nbsp;60&nbsp;1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;2&nbsp;COM1&nbsp;Embedded&nbsp;Yes&nbsp;3f8&nbsp;4</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;3&nbsp;COM2&nbsp;Embedded&nbsp;Yes&nbsp;2f8&nbsp;3</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;4&nbsp;LPT1&nbsp;Embedded&nbsp;Yes&nbsp;3bc&nbsp;7</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;5&nbsp;FLOPPY&nbsp;Embedded&nbsp;Yes&nbsp;3f0&nbsp;6&nbsp;2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">P00&gt;&gt;&gt;</span></p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">ES40 (Typhoon, Virtual/ISP)</span></h2>
+<p class="p_Normal">A Virtual (ISP) boot. The <span class="f_CodeExample">(Silicon Mode)</span> string in the console banner is the FIRMWARE build variant, NOT the EmulatR execution mode -- this run is Virtual/ISP. ES40 reaches <span class="f_CodeExample">P00&gt;&gt;&gt;</span> in Virtual mode; it does NOT yet reach the prompt under EmulatR Silicon Mode (see Known Gaps G-24). South bridge is the Acer Labs (ALi) M1543C at slot 5/0; the full firmware init log (heap / drivers / GCT-FRU / memory test) runs to the banner.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_CodeExample"><span class="f_CodeExample">ASA&nbsp;EmulatR&nbsp;--&nbsp;Alpha&nbsp;AXP&nbsp;(EV6&nbsp;/&nbsp;21264)&nbsp;Emulator</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Alpha&nbsp;Emulator&nbsp;Console&nbsp;V1.4</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">(c)&nbsp;2026&nbsp;Timothy&nbsp;Peer&nbsp;/&nbsp;eNVy&nbsp;Systems,&nbsp;Inc.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">starting&nbsp;console&nbsp;on&nbsp;CPU&nbsp;0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initialized&nbsp;idle&nbsp;PCB</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;semaphores</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;heap</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initial&nbsp;heap&nbsp;240c0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">memory&nbsp;low&nbsp;limit&nbsp;=&nbsp;60e000&nbsp;heap&nbsp;=&nbsp;240c0,&nbsp;17fc0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;driver&nbsp;structures</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;idle&nbsp;process&nbsp;PID</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;file&nbsp;system</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;hardware</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;timer&nbsp;data&nbsp;structures</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">lowering&nbsp;IPL</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">create&nbsp;dead_eater</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">create&nbsp;poll</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">create&nbsp;timer</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">create&nbsp;powerup</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">access&nbsp;NVRAM</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Memory&nbsp;size&nbsp;4096&nbsp;MB</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">testing&nbsp;memory</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">...</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">probe&nbsp;I/O&nbsp;subsystem</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">probing&nbsp;hose&nbsp;1,&nbsp;PCI</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">probing&nbsp;hose&nbsp;0,&nbsp;PCI</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">probing&nbsp;PCI-to-ISA&nbsp;bridge,&nbsp;bus&nbsp;1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">bus&nbsp;0,&nbsp;slot&nbsp;5&nbsp;--&nbsp;dqa&nbsp;--&nbsp;Cypress&nbsp;82C693&nbsp;IDE</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">starting&nbsp;drivers</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">entering&nbsp;idle&nbsp;loop</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">***&nbsp;system&nbsp;serial&nbsp;number&nbsp;not&nbsp;set.&nbsp;use&nbsp;set&nbsp;sys_serial_num&nbsp;command.</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Partition&nbsp;0,&nbsp;Memory&nbsp;base:&nbsp;000000000,&nbsp;size:&nbsp;100000000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">initializing&nbsp;GCT/FRU&nbsp;at&nbsp;3fc30000</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Memory&nbsp;Testing&nbsp;and&nbsp;Configuration&nbsp;Status</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Array&nbsp;Size&nbsp;Base&nbsp;Address&nbsp;Intlv&nbsp;Mode</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">---------&nbsp;----------&nbsp;----------------&nbsp;----------</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;0&nbsp;1024Mb&nbsp;0000000000000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;1&nbsp;1024Mb&nbsp;0000000040000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;2&nbsp;1024Mb&nbsp;0000000080000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;3&nbsp;1024Mb&nbsp;00000000c0000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;4096&nbsp;MB&nbsp;of&nbsp;System&nbsp;Memory</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Testing&nbsp;the&nbsp;System</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">AlphaServer&nbsp;ES40&nbsp;Console&nbsp;V7.3-2,&nbsp;built&nbsp;on&nbsp;Feb&nbsp;27&nbsp;2007&nbsp;at&nbsp;13:07:26&nbsp;(ISP-Virtual&nbsp;Mode)</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">P00&gt;&gt;&gt;show&nbsp;dev</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">dva0.0.0.1000.0&nbsp;DVA0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">P00&gt;&gt;&gt;sh&nbsp;config</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;hp&nbsp;AlphaServer&nbsp;ES40</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Firmware</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">SRM&nbsp;Console:&nbsp;V7.3-2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">ARC&nbsp;Console:&nbsp;[unset&nbsp;--&nbsp;binary]</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">PALcode:&nbsp;OpenVMS&nbsp;PALcode&nbsp;V1.98-4,&nbsp;Tru64&nbsp;UNIX&nbsp;PALcode&nbsp;V1.92-5</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Serial&nbsp;ROM:&nbsp;V2.22G</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">RMC&nbsp;ROM:&nbsp;V1.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">RMC&nbsp;Flash&nbsp;ROM:&nbsp;V1.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Processors</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">CPU&nbsp;0&nbsp;Alpha&nbsp;EV6&nbsp;pass&nbsp;1&nbsp;5&nbsp;MHz&nbsp;8MB&nbsp;Bcache</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Core&nbsp;Logic</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Cchip&nbsp;DECchip&nbsp;21272-CA&nbsp;Rev&nbsp;9(C4)</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Dchip&nbsp;DECchip&nbsp;21272-DA&nbsp;Rev&nbsp;2</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Pchip&nbsp;0&nbsp;DECchip&nbsp;21272-EA&nbsp;Rev&nbsp;1</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Pchip&nbsp;1&nbsp;DECchip&nbsp;21272-EA&nbsp;Rev&nbsp;4</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">TIG&nbsp;Rev&nbsp;00</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">Memory</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Array&nbsp;Size&nbsp;Base&nbsp;Address&nbsp;Intlv&nbsp;Mode</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">---------&nbsp;----------&nbsp;----------------&nbsp;----------</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;0&nbsp;1024Mb&nbsp;0000000000000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;1&nbsp;1024Mb&nbsp;0000000040000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;2&nbsp;1024Mb&nbsp;0000000080000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;3&nbsp;1024Mb&nbsp;00000000c0000000&nbsp;4-Way</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;4096&nbsp;MB&nbsp;of&nbsp;System&nbsp;Memory</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Slot&nbsp;Option&nbsp;Hose&nbsp;0,&nbsp;Bus&nbsp;0,&nbsp;PCI</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;5/0&nbsp;Acer&nbsp;Labs&nbsp;M1543C&nbsp;Bridge&nbsp;to&nbsp;Bus&nbsp;1,&nbsp;ISA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;5/1&nbsp;Cypress&nbsp;82C693&nbsp;IDE&nbsp;dqa0.0.0.105.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Option&nbsp;Hose&nbsp;0,&nbsp;Bus&nbsp;1,&nbsp;ISA</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">&nbsp;Floppy&nbsp;dva0.0.0.1000.0</span></p>
+<p class="p_CodeExample"><span class="f_CodeExample">P00&gt;&gt;&gt;</span></p>
+<p class="p_Normal">&nbsp;</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Note -- </span></h2>
+<p class="p_Normal">Separately, even in Virtual mode ES40 device enumeration is incomplete: <span class="f_CodeExample">show dev</span> lists only <span class="f_CodeExample">dva0</span> (floppy) with no <span class="f_CodeExample">dqa</span> disk/CDROM, though <span class="f_CodeExample">show config</span> shows the IDE bridge (see G-01 / G-06).</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal"><span class="f_SeeAlso">See Also.</span></p>
+<p class="p_Normal"><a href="execution-matrix.html" class="topiclink">Execution Matrix (Models x Modes)</a></p>
+<p class="p_Normal"><a href="--reaching-the-srm-prompt.html" class="topiclink">Reaching the SRM Prompt</a></p>
+<p class="p_Normal"><a href="--example-(console)-execution.html" class="topiclink">Example (Console) execution</a></p>
+<p class="p_Normal"><a href="known-gaps.html" class="topiclink">Known Gaps</a></p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>

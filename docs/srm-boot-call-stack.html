@@ -1,0 +1,215 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+   <title>8. Appendices - Developer Reference &gt; 8.1 Platform Appendices &gt; SRM Boot Call-Stack</title>
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />   
+   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   <meta name="generator" content="Help &amp; Manual" />
+   <meta name="keywords" content="" />
+   <meta name="description" content="Before the file list, one scope correction that matters for where you look: `apisrm/ref` is the *platform/chip reference leaf* — drivers (`dq_driver.c`), PAL macros..." />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+   <link type="text/css" href="custom.css" rel="stylesheet" />
+
+   <style TYPE="text/css" media="screen"> 
+      html, body { margin:0; 
+        padding:0; 
+        background: #ffffff; 
+      } 
+      div#printheader { display: none; }
+      #idheader { 
+        width:100%; 
+        min-height: 60px; 
+        padding: 0; 
+        margin: 0;
+        position: fixed;
+        top: 0;
+        background: #2C5D88;
+        z-index: 2;
+      } 
+      /* The "min-height" for "#idheader table" ensures that the (blue) header of the topic
+         has at least the same height as the header of the navigation panel left of it */
+      #idheader table { min-height: 59px;}             
+      #idheader h1 span { color: #FFF }     
+      #idnav {
+        text-align: right;
+        width: 126px;
+        vertical-align: middle;        
+      } 
+      #idnav a { text-decoration: none }
+      #idnav span {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        margin-left: 4px;
+        background:url('hm_webhelp_buttons_grey.png') top left no-repeat;
+      } 
+      #idnav a span {
+        background-image:url('hm_webhelp_buttons_white.png');
+      } 
+      #idnav a span:hover {
+        background-image:url('hm_webhelp_buttons_orange.png');
+      } 
+      #idnav span.hmbtnprev { background-position: 0 -32px }
+      #idnav span.hmbtnnext { background-position: -24px -32px }
+      #idnav span.hmbtntop  { background-position: -48px -32px }
+      #idnav span.hmbtntoggle  { width: 20px; background-position: -70px -32px }
+      #idnav span.hmbtnprint  { background-position: -88px -32px }
+
+      #callout-table, #overview-table {display:block; position:relative; top:0; left:0;}
+      #callout-icon {display:block; position:absolute; top:-11px; left:-11px;}
+      #callout-icon-flag {display:block; position:absolute; top:-11px; left:-8px;}
+      #callout-table a {text-decoration: none; color: blue;}
+      #callout-table a:visited {text-decoration: none; color: blue;}
+      #overview-table a {text-decoration: none; color: black;}
+      #overview-table a:visited {text-decoration: none; color: black;}
+      #callout-table a:hover, #overview-table a:hover {text-decoration: underline;}       
+      p.help-url { margin: 20px 0 5px 0; text-align: center; }
+	  p.help-url a:link { font-size: 50%; text-decoration: none; color: black; }
+	  p.help-url a:visited { color: black; }
+	  p.help-url a:hover { font-size: 95%; text-decoration: underline; }
+      #switchtoggles { text-align: right; padding: 0 2px 0 0; font-size: 90%; } 
+      .sync-toc { color: #FFF; font-size: 8pt; font-weight: bold; display: none; }
+      .sync-toc a { color: #FFF; text-decoration: none; font-weight: bold;}
+      .sync-toc a:visited { color: #FFF; }
+      .sync-toc a:hover { text-decoration: underline; }
+	  a#printbuttonlink { cursor: pointer; }
+      a.hmanchor { display: inline-block; margin-top: -4em; padding-top: 4em; }  
+   </style>
+   <style TYPE="text/css" media="print">
+      div#idheader, img.dropdown-toggle-icon, p.help-url { display:none } 
+   </style>
+   
+   <script type="text/javascript" src="jquery.js"></script>
+   <script type="text/javascript" src="helpman_settings.js"></script>
+   <script type="text/javascript" src="helpman_topicinit.js"></script>
+
+   <script type="text/javascript">
+     HMSyncTOC("index.html", "srm-boot-call-stack.html");
+   </script>
+   <script type="text/javascript" src="highlight.js"></script>
+   <script type="text/javascript">
+     $(document).ready(function(){highlight();});
+   </script>
+</head>
+<body>
+
+
+<div id="printheader"><h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">SRM Boot Call-Stack</span></h1>
+</div>
+<div id="idheader">
+<div id="idheaderbg">
+<table style="width:100%;border:none;margin:0px;" cellspacing="0" cellpadding="0"> 
+  <tr>
+    <td class="topichead" style="text-align:left; vertical-align:middle">
+      <p class="sync-toc">&lt;&lt; <a rel="nofollow" href="index.html?srm-boot-call-stack.html" target="_top">Click to Display Table of Contents</a> &gt;&gt;</p>
+      <p class="crumbs"><b>Navigation:</b>&nbsp;
+      
+      <a href="8_-appendices---developer-refe.html">8. Appendices - Developer Reference</a> &gt; <a href="8_1-platform-appendices.html">8.1 Platform Appendices</a>&nbsp;&gt;</p>
+   
+      <h1 class="p_Heading1" style="page-break-after: avoid;"><span class="f_Heading1">SRM Boot Call-Stack</span></h1>
+
+    </td>
+    <td class="topichead" id="idnav">
+      
+      <a href="--appendix-ds20-_-es40-_-es45.html" title="Previous Topic"><span class="hmbtnprev"></span></a>
+      <a href="8_1-platform-appendices.html" title="Parent Chapter"><span class="hmbtntop"></span></a>
+      <a href="8_4-tools.html" title="Next Topic"><span class="hmbtnnext"></span></a>
+      
+    </td>
+  </tr>  
+</table>
+</div>
+</div>  
+
+<div id="idcontent"><div id="innerdiv">
+<!-- Ask Internet Explorer 6.users to update their obsolete and dangerous browser --> 
+<!--[if lt IE 7]><div style=' clear: both; height: 59px; padding:0 0 0 15px; position: relative;'><a href="http://windows.microsoft.com/en-US/internet-explorer/products/ie/home?ocid=ie6_countdown_bannercode"><img src="http://storage.ie6countdown.com/assets/100/images/banners/warning_bar_0000_us.jpg" border="0" height="42" width="820" alt="You are using an outdated browser. For a faster, safer browsing experience, upgrade for free today." /></a></div><![endif]-->
+
+<!--ZOOMRESTART-->
+<p class="p_Normal">Before the file list, one scope correction that matters for where you look: `apisrm/ref` is the *platform/chip reference leaf* — drivers (`dq_driver.c`), PAL macros (`ev6_huf_decom.m64`), the defs files (`ev6_defs.mar`, `osfalpha_defs.mar`), the IPR examine/deposit driver (`ev6_ipr_driver.c`). The boot-to-prompt *spine* — the kernel executive, the secondary-start logic, and the shell that actually prints `&gt;&gt;&gt;` — lives in the shared apisrm source dirs, not under `ref/`. So a call stack confined to `ref/` is incomplete by construction; treat ROSETTA_STONE.md's &quot;console shell&quot; and &quot;kernel&quot; sections as the real index. Below I name files where the project has confirmed them and mark the rest `[LOCATE]` with the grep string that resolves them against your live tree.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">The ordered pipeline, anchored to the ES45/Titan power-up display (which is ground truth in the project knowledge:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">1.</span>**SROM + image expansion (pre-C).** Serial ROM inits EV6/Bcache, then expands the Huffman-packed console image into RAM and jumps to it (your beep-code-1 &quot;Jump to Console&quot;). Decompressor macros: `ref/ev6_huf_decom.m64` (confirmed). This is the same relocating-copy you already traced at 0x6003ec.</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">2.</span>**PALcode RESET + console cold entry.** RESET PAL entry establishes PALmode/stack and transfers to the C console kernel. The `starting console on CPU 0` line marks the handoff. PAL: `srmconsole/EV6_OSF_PAL.MAR` + Tsunami layer `EV6_OSF_PC264_PAL.MAR` (confirmed). C entry: `[LOCATE: grep &quot;starting console on CPU&quot;]`.</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">3.</span>**Kernel executive init.** semaphores, heap, driver structures, idle PCB/PID, file system, timer structures, lower IPL, then `create dead_eater / poll / timer / powerup`. This is the multithreaded console RTOS. `[LOCATE: grep &quot;initializing semaphores&quot; / &quot;initializing heap&quot;]` — this file is the scheduler core.</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">4.</span>**Platform + chipset bring-up.** access NVRAM, memory test/config, probe I/O subsystem, PCI hose probe, driver attach (`pka`, `eia`, `dqa`...). Tsunami init. `[LOCATE: grep &quot;probe I/O subsystem&quot; / &quot;probing hose&quot;]` for the platform module; drivers attach from `ref/` (`dq_driver.c` confirmed, plus `pk*`/`e*`). None of these are required to *reach* the prompt — a failed `dqa` logs and continues.</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">5.</span>**MP secondary bring-up — this is the stage DS10 never executes.** `starting console on CPU 1`, `CPU 1 speed is...`, etc. The primary builds each per-CPU HWRPB slot, signals the secondary via an implementation-specific hardware register, and the secondary polls its RXRDY flag and runs its idle PCB. `[LOCATE: grep &quot;starting console on CPU&quot; / &quot;secondary&quot;]`.</p>
+<p class="p_Normal" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">6.</span>**Banner + prompt (the shell).** `SRM Console Vx.x...` then the prompt. `&gt;&gt;&gt;` is the uniprocessor form; `P%02d&gt;&gt;&gt;` is the MP form, the `%02d` filled from the primary's WHAMI. `[LOCATE: grep &quot;&gt;&gt;&gt;&quot; and &quot;P%&quot; — the literal lands you directly on the shell's prompt builder; grep &quot;whami&quot; in that same file for the CPU-number source]`.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Now the part you actually care about. The reason DS10 reaches `&gt;&gt;&gt;` and DS20 stalls is almost certainly stage 5, and the project already contains the smoking gun: V4's `execCserve` is hardcoded uniprocessor. `CSERVE$WHAMI` (0x41) returns a literal 0 with the comment &quot;V4 is uniprocessor... revisit when an MP profile lands,&quot; and `CSERVE$START` (0x42) is a deliberate no-op (&quot;on a UP model there are no secondaries to start; return with nothing done&quot;). On a DS20 the console *expects* two CPUs, so it enters the stage-5 rendezvous, signals CPU1, and waits for CPU1 to set the per-CPU slot flags (PV/PMV/CV/BIP). With START no-op'd and no second CPU actually running, that wait never completes — so you hang somewhere after the last successful stage-4 message and before the banner.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">That also answers your doubt about the harness. You're right that the deterministic-async CPU harness won't be enough on its own. The harness gives you two CPUs with coherent LDQ_L/STQ_C and ordered memory — which is the *substrate* the rendezvous needs (primary selection is a shared single-bit mutex via LL/SC per arch-ref 27.8.1.1, and the RXRDY/TXRDY channel is shared memory). But sitting on top of that substrate, you still need three things the harness doesn't provide:</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">- A **Tsunami secondary-wakeup path** — the implementation-specific register the primary writes to release CPU1 (on this chipset family that's a Cchip MISC/IPIR-style CSR). Without it, CPU1 never leaves its console spin even if the harness is scheduling it.</p>
+<p class="p_Normal">- **Per-CPU WHAMI** returning the real CPU id, not a hardcoded 0 — both for the prompt format and so each console instance indexes the correct per-CPU slot.</p>
+<p class="p_Normal">- The **per-CPU slot flag handshake** honored end to end (CV → BIP/RC → PV/PMV), which means `CSERVE$START` has to actually do something on the MP model instead of no-op'ing.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">The fastest diagnostic to confirm all of this before you build any of it: **what is the last console line printed before DS20 goes quiet?** If it stops right after a stage-4 line (drivers/probe) and before any `starting console on CPU 1`, the console is hanging entering the rendezvous — likely reading a 2-CPU count from the chipset and then blocking. If it prints `starting console on CPU 1` and *then* hangs, it's inside the START/poll loop waiting on CPU1's slot flags. Either way the last line localizes the stall to a single file you can then `[LOCATE]`.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">And a tactical fork worth weighing: if your near-term goal is just to *get DS20 to `P00&gt;&gt;&gt;`*, the cheap path is to make the platform/chipset config report a single present CPU so the console skips stage 5 entirely (you'd still get the MP `P00&gt;&gt;&gt;` prompt from the MP console build, just no secondary wait). Standing up the full two-CPU rendezvous — wakeup CSR, per-CPU WHAMI, START semantics, slot-flag dance on top of your harness — is the real SMP milestone and is separable from reaching the prompt.</p>
+<p class="p_Normal">&nbsp;</p>
+<p class="p_Normal">Want me to turn the &quot;last console line → stage → file&quot; localization into a Cowork briefing, or spec the single-CPU-config short-circuit as the first DS20 step?</p>
+<h2 class="p_Heading2" style="page-break-after: avoid;"><span class="f_Heading2">Source References</span></h2>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">palBoxLib/grains/PalEntries.cpp</span><span class="f_NotesBox"> -- execCserve: CSERVE$WHAMI=0, CSERVE$START no-op (UP model).</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">schedLib/SmpHarness.h</span><span class="f_NotesBox"> -- MP rendezvous substrate (with AlphaCpuAgent.cpp).</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">chipsetLib/TsunamiCchip.h</span><span class="f_NotesBox"> -- Cchip MISC/IPI secondary-wakeup CSR path.</span></p>
+<p class="p_NotesBox" style="text-indent: 0; padding-left: 13px; margin-left: 0;"><span class="f_Normal" style="font-family: Arial,'Lucida Sans Unicode','Lucida Grande','Lucida Sans';display:inline-block;width:13px;margin-left:-13px">&#8226;</span><span class="f_CodeExample">deviceLib/Hwrpb.h</span><span class="f_NotesBox"> -- per-CPU slot flags (BIP/RC/PV/PMV) the rendezvous handshakes.</span></p>
+<p class="p_Normal">&nbsp;</p>
+
+<!--ZOOMSTOP-->
+</div></div>
+<script type="text/javascript">
+
+
+
+function normHeaders() {
+ var topicHeadHeight =  $("#idheaderbg > table").first().height() + 1,
+	 $topicHeaderBox = $("#idheader"),
+	 $topicContentBox = $("#idcontent"),
+	 $navHeader = $("#navbar", parent.document),			 
+	$navBox = $("div#hmnavframe", parent.document),
+	 navHeaderHeight = $navHeader.height();
+ if (topicHeadHeight != navHeaderHeight) {
+	 $navHeader.css("height",topicHeadHeight + "px");
+	 $navBox.css("top", topicHeadHeight + "px");
+	 $topicHeaderBox.css("height", topicHeadHeight + "px");
+		if ($topicHeaderBox.css("position") == "fixed"){
+			$topicContentBox.css("margin-top", topicHeadHeight + "px");
+			}
+		}
+    }
+			 
+  $(document).ready(function(){
+    $(window).on('resize', function() {
+      var y = $('#idheader').height(); 
+      $('#idcontent').css('margin-top', y);
+      var par = window.parent;
+      if ($( par ).width() <= $( window ).width()+20) {
+        $('#idheader').css('position', 'relative');
+        $('#idcontent').css('margin-top', 0);
+        $('#idbacktotop').css('display', 'block');
+        $('.hmanchor').css('margin-top', -20);
+	$('.hmanchor').css('padding-top', 20);
+      }
+      else {
+        $('#idheader').css('position', 'fixed');
+        $('#idcontent').css('margin-top', $('#idheader').height());
+        $('#idbacktotop').css('display', 'none');
+        $('.hmanchor').css('margin-top', -y-20);
+		$('.hmanchor').css('padding-top', y+20);
+		$("div#hmsplitter", parent.document).css('width', '3px');
+      }
+	normHeaders();
+    });
+    
+	 $(window).resize(); //trigger event for initially small displays
+  });
+ 
+
+if ((!parent.hmNavigationFrame) && (parent.location) && (parent.location.href)) { $('.sync-toc').show();$('p.crumbs').hide();}
+
+</script>
+</body>
+</html>
