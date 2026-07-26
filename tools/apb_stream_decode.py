@@ -66,10 +66,25 @@ def record_str(snap, va):
 
 
 def do_stream(snap, va0, ln):
+    # Token low 9 bits = opcode (the VM's dispatch CMPULTs them against
+    # 0x1f6: below = matcher, at/above = control).  Encodings proven by
+    # the run-B trace + static disasm (JRN-SCSI-016/-017):
+    #   opc 0x1f7 (rule header)    : token + ext16
+    #   opc 0x1f6, high byte 0x05  : GOSUB = token + param16 + disp16;
+    #        sub-stream cursor = VA_of_disp + sext(disp) + 2
+    #        (0x200964a4-c4: word at cursor r8, r5=r8+disp, r17=r5+2)
+    #   matchers (0x1f1/f3/f5/e6..): token + rel32 -> operand record,
+    #        target END-of-record relative (+6)
+    #   opc 0x1f8 (action)         : subcode in high byte; operand size
+    #        varies (4/6/8 bytes observed) -- printed raw, best effort
     d = snap.rd(va0, ln)
 
     def u16(o):
         return d[o] | (d[o + 1] << 8)
+
+    def s16(o):
+        v = u16(o)
+        return v - 0x10000 if v & 0x8000 else v
     i = 0
     print('%-10s %-6s b10 idx  operand' % ('token VA', 'token'))
     while i < len(d) - 1:
@@ -79,16 +94,31 @@ def do_stream(snap, va0, ln):
             print('0x%08x 0x0000          == section separator ==' % va)
             i += 2
             continue
+        opc = tok & 0x1ff
         b10 = (tok >> 10) & 1
         idx = (tok >> 11) & 0x3f
+        if opc == 0x1f6 and (tok >> 8) == 0x05 and i + 6 <= len(d):
+            param, disp = u16(i + 2), s16(i + 4)
+            tgt = (va + 4 + disp + 2) & 0xffffffff
+            print('0x%08x 0x%04x  %d  %2d  GOSUB param=0x%04x disp=%d '
+                  '-> sub-stream 0x%08x' % (va, tok, b10, idx, param,
+                                            disp, tgt))
+            i += 6
+            continue
         has32 = (i + 6 <= len(d) and d[i + 5] == 0xff
                  and d[i + 4] in (0xfc, 0xfa, 0xf4, 0xf2, 0xfe))
-        if has32:
+        if has32 and (tok >> 15) & 1:
             rel = struct.unpack_from('<i', d, i + 2)[0]
             tgt = (va + 6 + rel) & 0xffffffff       # END-of-record relative
             rec = record_str(snap, tgt) if in_image(tgt) else '(out of image)'
             print('0x%08x 0x%04x  %d  %2d  -> 0x%08x  %s'
                   % (va, tok, b10, idx, tgt, rec))
+            i += 6
+        elif has32:
+            rel = struct.unpack_from('<i', d, i + 2)[0]
+            tgt = (va + 6 + rel) & 0xffffffff
+            print('0x%08x 0x%04x  %d  %2d  ctl rel32 -> 0x%08x'
+                  % (va, tok, b10, idx, tgt))
             i += 6
         else:
             ext = u16(i + 2) if i + 4 <= len(d) else 0
