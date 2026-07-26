@@ -639,6 +639,19 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-020_L1_ROOT_CAUSE_extxh_aligned_case.md` --
+  **L1 ROOT CAUSE NAMED**: coreLib/alpha_int_byteops.h extwh/extlh/extqh
+  return 0 for Rbv<2:0>=0; AARM Sec 4.6.1 (alpha_arch_ref.txt:9193)
+  requires shift byte_loc<5:0> -- 64 truncates to 0 = PASS-THROUGH.
+  Every pre-BWX byte read at addr==7 (mod 8) yields NUL: in
+  "SCSI 0 8 0 0 0 0 0" the slot digit (offset 7) reads as 0 -> strtol
+  "non-digit" -> walk sentinel -> %APB-F-NOIOVEC.  Q2 proof: byte-exact
+  strtol start ptrs (DIAG_WREG=22) + PC-flow diff isolating the ONE
+  divergent branch (0x2005e604).  Explains content-independence,
+  IDE==SCSI footprint, AXPBox pass, probe==accept fail.  INSxH/MSKxH/
+  EXTxL audited CORRECT; defect isolated to the 3 EXTxH.  FIX PROPOSED
+  (shift = ((8-bytePos)*8) & 63) -- AWAITING ARCHITECT APPROVAL;
+  verification plan V1-V3 in the journal.  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-019_apisrm_source_grounding.md` -- SOURCE
   GROUNDING (architect pointer): booted_dev is built by file2dev
   (apisrm filesys.c:2812, sprintf "%s %d %d %d %d %d%s", numbers
