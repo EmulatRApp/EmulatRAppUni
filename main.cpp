@@ -57,6 +57,7 @@
 #include <QCoreApplication>
 
 #include "coreLib/LogSubsystem.h"
+#include "coreLib/PcTrace.h"
 #include "memoryLib/GuestMemory.h"
 #include "systemLib/AppOptions.h"
 #include "systemLib/CpuStateDump.h"
@@ -742,67 +743,55 @@ int main(int argc, char* argv[])
     systemLib::dumpStopReason(sr, mach.cpu(), std::cout);
 
     // ------------------------------------------------------------------
-    // DIAGNOSTIC: on fault stops, dump 10 instruction words from three
-    // candidate addresses to test the "R30 holds palBase implicitly"
-    // hypothesis.  If the bytes at (palBase | dispatch_offset) look
-    // like real PALcode (typical patterns: BIS for register clears,
-    // HW_LD for IPR-side reads, BR/JSR for control flow), the SRM
-    // decompressor populated 0x600000+ correctly and the only fix
-    // needed is to keep palBase IPR non-zero.  If those bytes are
-    // also garbage, the decompressor isn't placing PALcode where we
-    // think it is.  Skipped on clean halts -- only useful for fault
-    // post-mortems.
+    // DIAGNOSTIC (fault stops only).  2026-07-24 TASK-PROBE-001 TASK A:
+    // the three-address instruction-window probe that lived here (fault
+    // PC / fault PC + R30 / masked-R30 combination) is RETIRED -- readout
+    // complete (PA 0xa6e88 decoded as coherent console code, no
+    // corruption), it wrote to stdout (collides with the interactive SRM
+    // console stream), and a PC added to a stack pointer has no
+    // architectural meaning as an address basis.  The guard block REMAINS
+    // because it also hosts the EMULATR_PCTRACE post-mortem dump
+    // (JRN-VMB-016), which is live and separately gated at runtime.
     // ------------------------------------------------------------------
 #if EMULATR_BRINGUP_PROBES
     if (sr != systemLib::StopReason::HaltedClean) {
-        auto const& cpu = mach.cpu();
-        auto& memory    = mach.memory();
+        auto& memory = mach.memory();
 
-        struct Probe {
-            char const* label;
-            uint64_t    pa;
-        };
-
-        // Reconstruct the three candidate addresses we want to inspect.
-        uint64_t const r30          = cpu.intReg[30];
-        uint64_t const faultPc      = cpu.pc;
-        // V1 dispatch formula evaluated against R30 in place of palBase
-        // IPR.  Hard-coded for the func-0x29 case; if cpu.pc points at
-        // a CALL_PAL function we can recompute, but for now use a
-        // simple OR with the low-15-bit displacement of the fault PC.
-        uint64_t const r30Combined  = (r30 & ~uint64_t{0x7FFF})
-                                    | (faultPc & uint64_t{0x7FFE});
-        uint64_t const r30PlusFault = r30 + faultPc;
-
-        Probe const probes[] = {
-            { "fault_pc                       ", faultPc },
-            { "fault_pc + R30  (Tim's idea)   ", r30PlusFault },
-            { "(R30 & ~0x7FFF) | low15(faultPc)", r30Combined },
-        };
-
-        std::cout << "\nInstruction-stream probes (10 words each):\n";
-        for (Probe const& p : probes) {
-            std::cout << "  " << p.label << "= 0x" << std::hex
-                      << std::setw(16) << std::setfill('0') << p.pa
-                      << std::dec << std::setfill(' ') << "\n";
-            for (uint64_t i = 0; i < 10; ++i) {
-                uint64_t const pa = p.pa + (uint64_t{i} * 4);
-                uint32_t word = 0;
-                memoryLib::MemStatus const st = memory.read4(pa, word);
-                std::cout << "    +" << std::setw(2) << std::setfill('0')
-                          << (i * 4) << std::setfill(' ')
-                          << "  pa=0x" << std::hex << std::setw(16)
-                          << std::setfill('0') << pa
-                          << std::setfill(' ');
-                if (st == memoryLib::MemStatus::Ok) {
-                    std::cout << "  word=0x" << std::setw(8)
-                              << std::setfill('0') << word
-                              << std::setfill(' ') << std::dec << "\n";
-                } else {
-                    std::cout << "  <out-of-range>\n" << std::dec;
+        // EMULATR_PCTRACE: dump the forward retire-trajectory (if the run ended
+        // before it auto-dumped) and 64 words above+below the bail PC (where
+        // control was misdirected back into the console) and boot0's leaf PA
+        // (VA 0x20000000 -> pfn 0x2de -> PA 0x5bc000).  Guest memory is read
+        // physically; the console runs 1-1 during boot.  See coreLib/PcTrace.h,
+        // JRN-VMB-016.
+        if (coreLib::g_pctraceEnabled) {
+            coreLib::pctraceDumpTrajectory();
+            struct Ctr { char const* label; uint64_t pa; };
+            Ctr const centers[] = {
+                { "bail PC (console re-entry)", coreLib::g_pctraceBailPc },
+                { "boot0 leaf (VA 0x20000000)", 0x5bc000ULL },
+            };
+            for (Ctr const& ct : centers) {
+                if (ct.pa == 0) continue;
+                std::cout << "\nPCTRACE window +/-64 words @ 0x" << std::hex
+                          << ct.pa << std::dec << "  (" << ct.label << "):\n";
+                for (int64_t k = -64; k <= 64; ++k) {
+                    uint64_t const pa =
+                        ct.pa + static_cast<uint64_t>(k * 4);
+                    uint32_t word = 0;
+                    memoryLib::MemStatus const st = memory.read4(pa, word);
+                    std::cout << "    " << (k < 0 ? '-' : '+') << std::setw(3)
+                              << std::setfill('0') << (k < 0 ? -k * 4 : k * 4)
+                              << std::setfill(' ') << "  pa=0x" << std::hex
+                              << std::setw(16) << std::setfill('0') << pa
+                              << std::setfill(' ');
+                    if (st == memoryLib::MemStatus::Ok)
+                        std::cout << "  word=0x" << std::setw(8)
+                                  << std::setfill('0') << word
+                                  << std::setfill(' ') << std::dec << "\n";
+                    else
+                        std::cout << "  <out-of-range>\n" << std::dec;
                 }
             }
-            std::cout << '\n';
         }
     }
 #endif

@@ -256,6 +256,76 @@ inline TranslationResult applyTlbHit(
 }
 
 
+#if defined(EMULATR_BRINGUP_PROBES)
+// EMULATR_XLATE (2026-07-23, JRN-VMB-016 3.16 follow-on): classify HOW each VA
+// resolves at the console->VMB handoff -- hardware 1:1 superpage (KSEG/SPE), a
+// filled TLB entry (TLBHIT; identity=1 == a guest-PAL identity fill pfn==va>>13,
+// the "fake 1:1"; identity=0 == a real page-table pfn), or a miss that falls
+// through to the guest PAL miss handler (TLBMISS).  Reports VA<->PA, the SPE
+// register in force (i_spe/m_spe), and mode/asn/ptbr/p_misc<63>.  Default VA
+// window = the 0x20000000 boot page + the 0x2_0000_0000 VPTB self-map region;
+// override with EMULATR_XLATE_VALO/_VAHI (single range), floor with
+// EMULATR_XLATE_CYC, cap 200.  Zero-cost unless EMULATR_XLATE is set.
+// Enable + cycle-floor are parsed ONCE.  The call-site front xlateLog() is a
+// cheap AXP_ALWAYS_INLINE guard so a translation outside the active window pays
+// only two compares and NO call in the hot translate path; the window test +
+// print live in the out-of-line worker, reached only when active.  IMPORTANT:
+// set EMULATR_XLATE_CYC to the handoff window (~1900000000) so the 200-line cap
+// is spent THERE and not on the powerup VPTB-self-map DtbMissDouble cascade
+// (whose 0x2_00xx_xxxx VAs also fall in the default window).
+inline bool const     g_xlateOn  = (std::getenv("EMULATR_XLATE") != nullptr);
+inline uint64_t const g_xlateCyc = []() noexcept -> uint64_t {
+    char const* e = std::getenv("EMULATR_XLATE_CYC");
+    return (e != nullptr && *e != '\0') ? std::strtoull(e, nullptr, 0) : 0ULL;
+}();
+
+inline void xlateLogImpl(char stream, char const* path,
+                         coreLib::CpuState const& cpu, coreLib::VAType va,
+                         coreLib::PAType pa, unsigned spe, uint64_t pfn) noexcept
+{
+    auto envq = [](char const* k, uint64_t d) noexcept -> uint64_t {
+        char const* e = std::getenv(k);
+        return (e != nullptr && *e != '\0') ? std::strtoull(e, nullptr, 0) : d;
+    };
+    static uint64_t const valo = envq("EMULATR_XLATE_VALO", 0ULL);
+    static uint64_t const vahi = envq("EMULATR_XLATE_VAHI", 0ULL);
+    static unsigned long s_n = 0;
+    uint64_t const v = static_cast<uint64_t>(va);
+    bool inwin;
+    if (valo != 0ULL || vahi != 0ULL) {
+        inwin = (v >= valo && v <= vahi);
+    } else {
+        inwin = ((v & ~uint64_t{0x1FFF}) == 0x20000000ULL)          // boot0 page
+             || (v >= 0x200000000ULL && v < 0x201000000ULL);        // VPTB self-map
+    }
+    if (!inwin || s_n >= 200) return;
+    ++s_n;
+    uint64_t const pmisc = cpu.intReg[22];
+    int const identity = (pfn != 0ULL && pfn == (v >> kEv6BasePageShift)) ? 1 : 0;
+    std::fprintf(stderr,
+        "XLATE %c va=0x%016llx pa=0x%016llx path=%-7s spe=0x%x pfn=0x%llx "
+        "identity=%d va48=%d mode=%d asn=%u ptbr=0x%llx pmisc63=%d cyc=%llu\n",
+        stream, static_cast<unsigned long long>(v),
+        static_cast<unsigned long long>(pa), path, spe,
+        static_cast<unsigned long long>(pfn), identity,
+        static_cast<int>((cpu.va_ctl & 0x2ULL) != 0),
+        static_cast<int>(cpu.mode), static_cast<unsigned>(cpu.asn),
+        static_cast<unsigned long long>(cpu.ptbr),
+        static_cast<int>((pmisc >> 63) & 1),
+        static_cast<unsigned long long>(cpu.cycleCount));
+    std::fflush(stderr);
+}
+
+AXP_ALWAYS_INLINE inline void xlateLog(char stream, char const* path,
+    coreLib::CpuState const& cpu, coreLib::VAType va, coreLib::PAType pa,
+    unsigned spe, uint64_t pfn) noexcept
+{
+    if (g_xlateOn && cpu.cycleCount >= g_xlateCyc)
+        xlateLogImpl(stream, path, cpu, va, pa, spe, pfn);
+}
+#endif  // EMULATR_BRINGUP_PROBES
+
+
 // ---------------------------------------------------------------------------
 // Ev6Translator -- public translator entry points.
 // ---------------------------------------------------------------------------
@@ -325,6 +395,10 @@ struct Ev6Translator
             va, cpu.mode, cpu.m_spe, ksegPa);
         if (kr == TranslationResult::Success) {
             pa_out = ksegPa & kEv6PaMask;
+#if defined(EMULATR_BRINGUP_PROBES)
+            xlateLog('D', "KSEG", cpu, va, pa_out, cpu.m_spe,
+                     pa_out >> kEv6BasePageShift);
+#endif
             return TranslationResult::Success;
         }
         if (kr == TranslationResult::AccessViolation) {
@@ -407,6 +481,9 @@ struct Ev6Translator
                 }
             }
 #endif
+#if defined(EMULATR_BRINGUP_PROBES)
+            xlateLog('D', "TLBHIT", cpu, va, pa_out, cpu.m_spe, r.pte.pfn());
+#endif
             return hit;   // ACVPROBE Hook B wraps this hit-path return
         }
 #if defined(EMULATR_BRINGUP_PROBES)
@@ -475,6 +552,9 @@ struct Ev6Translator
                 std::fflush(stderr);
             }
         }
+#endif
+#if defined(EMULATR_BRINGUP_PROBES)
+        xlateLog('D', "TLBMISS", cpu, va, 0, cpu.m_spe, 0);
 #endif
         return TranslationResult::DtbMiss;
     }
@@ -582,6 +662,10 @@ struct Ev6Translator
             va, cpu.mode, cpu.i_spe, ksegPa);
         if (kr == TranslationResult::Success) {
             pa_out = ksegPa & kEv6PaMask;
+#if defined(EMULATR_BRINGUP_PROBES)
+            xlateLog('I', "KSEG", cpu, va, pa_out, cpu.i_spe,
+                     pa_out >> kEv6BasePageShift);
+#endif
             return TranslationResult::Success;
         }
         if (kr == TranslationResult::AccessViolation) {
@@ -646,6 +730,9 @@ struct Ev6Translator
                 }
             }
 #endif
+#if defined(EMULATR_BRINGUP_PROBES)
+            xlateLog('I', "TLBHIT", cpu, va, pa_out, cpu.i_spe, r.pte.pfn());
+#endif
             return hit;   // ITBPROBE hit-path wraps this return
         }
 #if defined(EMULATR_BRINGUP_PROBES)
@@ -667,6 +754,9 @@ struct Ev6Translator
                 std::fflush(stderr);
             }
         }
+#endif
+#if defined(EMULATR_BRINGUP_PROBES)
+        xlateLog('I', "TLBMISS", cpu, va, 0, cpu.i_spe, 0);
 #endif
         return TranslationResult::ItbMiss;
     }

@@ -72,6 +72,7 @@
 #include "coreLib/ExecCtx.h"
 #include "coreLib/FaultEventLog.h"
 #include "coreLib/PalShadow.h"
+#include "coreLib/PcTrace.h"
 #include "coreLib/InstructionGrain.h"
 #include "coreLib/PipelineSlot.h"
 #include "coreLib/VA_types.h"
@@ -1281,6 +1282,14 @@ private:
                     static_cast<unsigned long long>(cpu.excAddr));
                 std::fflush(stderr);
             }
+            // EMULATR_PCTRACE: forward retire-trace, armed at the CSERVE-START
+            // handoff (PalEntries case 0x42).  Records the next N retired PCs and
+            // latches the first console re-entry (bail) to expose where the
+            // console->VMB handoff misdirects.  Inert (one bool load) unless
+            // armed -- see coreLib/PcTrace.h, JRN-VMB-016.
+            coreLib::pctraceRecord(cpu.cycleCount, slot.grain.pc,
+                slot.grain.encoded, cpu.inPalMode() ? 1 : 0,
+                static_cast<int>(r.faultCode), cpu.ptbr);
             static int const diagWReg =
                 static_cast<int>(envU64("EMULATR_DIAG_WREG", ~uint64_t{0}));
             static uint64_t const diagWMin = envU64("EMULATR_DIAG_WMIN", 0);
@@ -1635,8 +1644,16 @@ private:
             // palModeEnter/Leave are SDE-gated and no-op when the mode is unchanged;
             // their own pc write is overwritten by `cpu.pc = target` just below.
             // Gated EMULATR_DIVERT_PALSWAP for A/B vs the prior (no-swap) behavior.
-            static bool const s_divertPalSwap =
-                (std::getenv("EMULATR_DIVERT_PALSWAP") != nullptr);
+            // DEFAULT = ON (2026-07-26, JRN-SCSI-010 P1): the swap is a verified
+            // correctness fix ("REQUIRED for Option A to work") and CSERVE START
+            // now defaults to guest, which depends on it -- the engine default
+            // must match or a bare launch diverts on the wrong bank (vptb=0
+            // cascade).  Disable explicitly with EMULATR_DIVERT_PALSWAP=0 (or
+            // empty) for the A/B.
+            static bool const s_divertPalSwap = []() noexcept {
+                char const* v = std::getenv("EMULATR_DIVERT_PALSWAP");
+                return (v == nullptr) || !(v[0] == '\0' || v[0] == '0');
+            }();
             if (s_divertPalSwap) {
                 bool const nowPal    = cpu.inPalMode();
                 bool const targetPal = (r.divertTarget & uint64_t{1}) != 0;

@@ -46,6 +46,8 @@
 
 #include "chipsetLib/Tsunami21272_CsrSpec.h"
 #include "chipsetLib/TsunamiVariant.h"
+#include "chipsetLib/TsunamiDchip.h"          // live DREV read surface (2026-07-24)
+#include "chipsetLib/Tsunami21272_RegisterMap.h"
 
 #include <cstdint>
 
@@ -312,8 +314,19 @@ TEST_CASE("MISC REV reset value depends on chipset variant")
     CHECK(Spec::resetMiscRev(ChipsetVariant::Typhoon) == 0x08);
 }
 
-TEST_CASE("Dchip DREV reset value depends on chipset variant")
+// 2026-07-24: resetDchipDrev() was REMOVED (T0-3, 2026-07-11) after the HRM
+// faithfulness audit (journals/20260707_tsunami_typhoon_hrm_faithfulness_
+// audit.md) DISPROVED the variant-keyed 0x10/0x20 encoding: DREV per HRM
+// 10.2.4.4 T10-34 is byte-sliced -- a 4-bit REVn per Dchip, init 1 -- read
+// as 0x0101010101010101 on BOTH variants.  This case now pins the LIVE
+// reset value through the Dchip read surface instead of the dead selector
+// (the removal missed these two CHECKs; Emulatr_tests had not been built
+// since -- caught 2026-07-24 by the S1-seam test build).
+TEST_CASE("Dchip DREV reset value is byte-sliced 0x0101... on both variants")
 {
-    CHECK(Spec::resetDchipDrev(ChipsetVariant::Tsunami) == 0x10);
-    CHECK(Spec::resetDchipDrev(ChipsetVariant::Typhoon) == 0x20);
+    constexpr uint64_t kDrevReset = 0x0101010101010101ULL;
+    TsunamiDchip dTsunami(ChipsetVariant::Tsunami);
+    TsunamiDchip dTyphoon(ChipsetVariant::Typhoon);
+    CHECK(dTsunami.read(Dchip::DREV) == kDrevReset);
+    CHECK(dTyphoon.read(Dchip::DREV) == kDrevReset);
 }

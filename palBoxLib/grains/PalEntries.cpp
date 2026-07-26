@@ -76,6 +76,7 @@
 #include "coreLib/InstructionGrain.h"
 #include "coreLib/IprFields.h"
 #include "coreLib/PalShadow.h"
+#include "coreLib/PcTrace.h"
 #include "coreLib/axp_attributes_core.h"
 
 #include "grainFactoryLib/generated/SemanticFlagsEnum.h"
@@ -642,8 +643,13 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             // runtime PC is located.
             // Mode selector (2026-07-22, JRN-VMB-004): A=guest (faithful divert to
             // the guest exit_console), B=cpp (the C++ replica below), off=no-op.
-            // Back-compat: EMULATR_CSERVE_START_RESTART => cpp.  Default off until
-            // A is verified.  EMULATR_CSERVE_START_MODE = guest | cpp | off.
+            // Back-compat: EMULATR_CSERVE_START_RESTART => cpp.
+            // DEFAULT = guest (2026-07-26, JRN-SCSI-010 P1): the "off until A is
+            // verified" guard was retired -- A was verified 2026-07-24 (JRN-VMB-017/
+            // -020: unambiguous locator, APB executes to NOIOVEC), and the off
+            // default caused the 07-25 L0 outage (bare launches silently no-op'd
+            // the console->APB handoff).  EMULATR_CSERVE_START_MODE = guest | cpp
+            // | off (any other non-empty value = off, explicit opt-out).
             enum { kStartOff = 0, kStartGuest = 1, kStartCpp = 2 };
             static int const s_startMode = []() noexcept -> int {
                 char const* m = std::getenv("EMULATR_CSERVE_START_MODE");
@@ -653,7 +659,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     return kStartOff;
                 }
                 return (std::getenv("EMULATR_CSERVE_START_RESTART") != nullptr)
-                     ? kStartCpp : kStartOff;
+                     ? kStartCpp : kStartGuest;
             }();
 
             // OPTION A (faithful, production target): divert to the guest PAL's
@@ -661,19 +667,34 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             // context) + ITB_IA/DTB_IA + hw_ret, exactly as hardware does -- this
             // sets the RWE bits + PAL temps the DTBM_DOUBLE handler needs (which
             // the C++ replica B does NOT, so B's boot0 fetches but the miss-walk
-            // bails to identity).  Locate exit_console in the DECOMPRESSED PAL
-            // by its signature: hw_mtpr r31,ITB_IA immediately followed by
-            // hw_mtpr r31,DTB_IA (ev6_vms_pc264_pal.mar:4248-4249).  The IPR
-            // selector is the 8-bit scbd in bits[15:8] (iprSelector: scbd =
-            // HW_ITB_IA 0x0103 - 0x0100 = 0x03; HW_DTB_IA 0x01A3 - 0x0100 =
-            // 0xA3).  hw_mtpr emits opcode 0x1D with Ra=Rb=R31 (^x1f), so the
-            // full encodings are 0x77FF0300 (ITB_IA) / 0x77FFA300 (DTB_IA); we
-            // match opcode+scbd only (mask 0xFC00FF00) to tolerate Ra/Rb/func.
-            // exit_console's entry (`bsr pal__restore_state`) is one instruction
-            // before the ITB_IA.
-            constexpr uint32_t kMtprMask   = 0xFC00FF00u;
-            constexpr uint32_t kItbIaMatch = (0x1Du << 26) | (0x03u << 8);  // 0x74000300
-            constexpr uint32_t kDtbIaMatch = (0x1Du << 26) | (0xA3u << 8);  // 0x7400A300
+            // bails to identity).
+            //
+            // LOCATOR (corrected 2026-07-24, JRN-VMB-017): the previous
+            // ITB_IA/DTB_IA adjacent-pair scan was AMBIGUOUS.  The BUILT PAL
+            // image carries EIGHT such pairs, ALL preceded by NOP padding
+            // (never by the `bsr` -- the assembler pads between exit_console's
+            // bsr and its flushes), and the FIRST pair in ascending order
+            // (DS20 v7_3: 0xa6d0, target-4 = 0xa6cc) is a MTPR_TBIA/IMB-family
+            // flush stub whose tail `hw_ret_stall(p23)` bounced the handoff
+            // straight back to the console -- THE halt-0-at-0x20000000 wall.
+            // Even skipping that false positive, sys__enter_console's pair
+            // (0x132c0) precedes sys__exit_console's (0x134a0), so the pair
+            // signature is unfixably ambiguous.  The unambiguous anchor is
+            // pal__restore_state ITSELF:
+            //   STAGE 1 -- pal__restore_state entry: its first instruction is
+            //     `hw_ldq/p r1, PT__IMPURE(p_temp)` (ev6_vms_pal.mar:6228) =
+            //     op 0x1B, Ra=r1, Rb=r21(p_temp), disp 0x88 (enc 0x6c351088
+            //     on DS20 v7_3).  LOWEST match in the window = the ACTIVE PAL
+            //     personality copy (the image holds a second copy higher up,
+            //     e.g. 0x1d324 -- ignored).
+            //   STAGE 2 -- sys__exit_console entry: the `bsr p7,
+            //     pal__restore_state` (ev6_vms_pc264_pal.mar:4245-4247) = op
+            //     0x34, Ra=r7, whose branch target == the STAGE-1 address.
+            //     LOWEST match = the active copy (DS20 v7_3: 0x13480, enc
+            //     0xd0ffebc7 -> 0xe3a0).
+            // Padding-immune, personality-copy-aware, and self-verifying: the
+            // located entry IS a bsr-to-restore_state by construction.  Both
+            // addresses + the entry encoding are emitted for the boot canary.
             if (s_startMode == kStartGuest && c.memory != nullptr) {
                 static uint64_t s_exitConsolePc = 0;
                 static bool     s_scanned       = false;
@@ -687,18 +708,44 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                             (a & 4ULL) ? (q >> 32) : (q & 0xFFFFFFFFULL));
                     };
                     uint64_t const base = c.cpu->palBase;
-                    for (uint64_t p = base; p + 8 <= base + 0x20000ULL; p += 4) {
-                        if ((rd32(p) & kMtprMask) == kItbIaMatch &&
-                            (rd32(p + 4) & kMtprMask) == kDtbIaMatch) {
-                            s_exitConsolePc = p - 4;   // bsr pal__restore_state
+                    uint64_t restoreStatePc = 0;
+                    // STAGE 1 -- pal__restore_state: hw_ldq/p r1,0x88(r21).
+                    for (uint64_t p = base; p + 4 <= base + 0x20000ULL; p += 4) {
+                        uint32_t const w = rd32(p);
+                        if ((w >> 26) == 0x1Bu &&          // HW_LD
+                            ((w >> 21) & 31u) == 1u &&     // Ra = r1
+                            ((w >> 16) & 31u) == 21u &&    // Rb = r21 (p_temp)
+                            (w & 0xFFFu) == 0x88u) {       // disp = PT__IMPURE
+                            restoreStatePc = p;
                             break;
                         }
                     }
+                    // STAGE 2 -- sys__exit_console: the `bsr p7` targeting it.
+                    if (restoreStatePc != 0) {
+                        for (uint64_t p = base; p + 4 <= base + 0x20000ULL; p += 4) {
+                            uint32_t const w = rd32(p);
+                            if ((w >> 26) != 0x34u ||      // BSR
+                                ((w >> 21) & 31u) != 7u)   // Ra = r7 (p7)
+                                continue;
+                            int64_t disp = static_cast<int64_t>(w & 0x1FFFFFu);
+                            if (disp & 0x100000) disp -= 0x200000;
+                            int64_t const tgt =
+                                static_cast<int64_t>(p) + 4 + 4 * disp;
+                            if (tgt == static_cast<int64_t>(restoreStatePc)) {
+                                s_exitConsolePc = p;
+                                break;
+                            }
+                        }
+                    }
                     std::fprintf(stderr,
-                        "CSERVE-START-A: palBase=0x%llx exit_console=%s0x%llx cyc=%llu\n",
+                        "CSERVE-START-A: palBase=0x%llx restore_state=%s0x%llx "
+                        "exit_console=%s0x%llx enc=0x%08x cyc=%llu\n",
                         static_cast<unsigned long long>(c.cpu->palBase),
+                        restoreStatePc ? "" : "NOT-FOUND ",
+                        static_cast<unsigned long long>(restoreStatePc),
                         s_exitConsolePc ? "" : "NOT-FOUND ",
                         static_cast<unsigned long long>(s_exitConsolePc),
+                        s_exitConsolePc ? rd32(s_exitConsolePc) : 0u,
                         static_cast<unsigned long long>(c.cpu->cycleCount));
                     std::fflush(stderr);
                 }
@@ -711,19 +758,35 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     // it.  Option A previously set excAddr/divertTarget but NOT p23,
                     // so exit_console's hw_ret landed on stale R23 -> reset.  p23 =
                     // instruction following the CALL_PAL (== g.pc + 4; matches the
-                    // linkage convention at PalEntries.cpp:1675 and the PAL comment
-                    // "p23 pc of instruction following call_pal instruction").  Set
-                    // BOTH the active bank (intReg[23]) and the PAL-shadow bank
-                    // (intShadow[7] == R23's other bank; swapPalShadowRegs maps
-                    // R20+i <-> intShadow[4+i]) so the value survives the shadow swap
-                    // around the divert -- same both-banks tactic B+ used for p_misc.
+                    // linkage convention and the PAL comment "p23 pc of instruction
+                    // following call_pal instruction").
+                    // CORRECTED 2026-07-24 (console-garbage root cause): write the
+                    // linkage into the PAL'S VIEW of R23 ONLY -- real CALL_PAL
+                    // hardware PRESERVES the native R23 (it is caller state; the
+                    // console callback ABI passes the PUTS length there, and the
+                    // old both-banks write clobbered it -> cb_puts fwrite with a
+                    // return-PC-sized length -> binary garbage on COM1).  With
+                    // SDE<1> set, the divert's palModeEnter swaps the shadow bank
+                    // in, so seeding intShadow[7] (== post-swap R23; swapPalShadowRegs
+                    // maps R20+i <-> intShadow[4+i]) reaches the handler.  With SDE
+                    // clear there is no swap: seed intReg[23] directly.
                     uint64_t const retPc = g.pc + 4u;
-                    c.cpu->intReg[23]   = retPc;
-                    c.cpu->intShadow[7] = retPc;
+                    if (coreLib::iCtlSdeHigh(c.cpu->i_ctl) && !c.cpu->inPalMode())
+                        c.cpu->intShadow[7] = retPc;
+                    else
+                        c.cpu->intReg[23]   = retPc;
                     uint64_t const tgt = s_exitConsolePc | 1ULL;   // PALmode (PC<0>)
                     c.cpu->excAddr = tgt;
                     r.divertTarget = tgt;
                     r.divert       = true;
+                    // EMULATR_PCTRACE: arm the forward retire-trace at the
+                    // exit_console target so we can watch where the console->VMB
+                    // handoff sends control (and whether PTBR is the boot table
+                    // 0x1ff82) -- see coreLib/PcTrace.h, JRN-VMB-016.  Inert
+                    // unless EMULATR_PCTRACE is set.
+                    coreLib::pctraceArm(s_exitConsolePc, c.cpu->ptbr,
+                        c.cpu->vptb, c.cpu->intReg[22],
+                        c.cpu->inPalMode() ? 1 : 0, c.cpu->cycleCount);
                     std::fprintf(stderr,
                         "CSERVE-START-A2: mirror-axpbox p23(r23)<-0x%llx (g.pc+4) "
                         "divert->cfw_start/exit_console=0x%llx cyc=%llu\n",
@@ -733,6 +796,13 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     std::fflush(stderr);
                     return r;
                 }
+                // TRIPWIRE (JRN-SCSI-010 P4): a silent no-op here strands the
+                // console->APB handoff at halt_pc with halt code 0 -- say so.
+                std::fprintf(stderr,
+                    "CSERVE-START: LOCATOR FAILED -- exit_console not found; "
+                    "handoff will strand at halt_pc (halt code 0).  cyc=%llu\n",
+                    static_cast<unsigned long long>(c.cpu->cycleCount));
+                std::fflush(stderr);
                 return r;   // scan failed: safe no-op
             }
 
@@ -1015,17 +1085,41 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 #endif // --- end OPTION B (kStartCpp) DEAD END ---
             // Option B (cpp) is compiled out; if selected it now falls through to
             // this faithful no-op (same as kStartOff).  Use kStartGuest (Option A).
+            // TRIPWIRE (JRN-SCSI-010 P4): with the mode off/cpp this START is a
+            // no-op, which on the PRIMARY-boot path strands the console->APB
+            // handoff ("halted CPU 0 / halt code = 0 / PC = 20000000", the 07-25
+            // L0 outage).  Loud once per distinct mode so a disabled handoff can
+            // never again masquerade as a guest-side failure.
+            {
+                static bool s_warned = false;
+                if (!s_warned) {
+                    s_warned = true;
+                    std::fprintf(stderr,
+                        "CSERVE-START: MODE %s -- START (0x42) is a no-op; a boot "
+                        "handoff will strand at halt_pc (halt code 0).  Set "
+                        "EMULATR_CSERVE_START_MODE=guest (default) to enable.  "
+                        "cyc=%llu\n",
+                        s_startMode == kStartCpp ? "cpp (compiled out)" : "OFF",
+                        static_cast<unsigned long long>(c.cpu->cycleCount));
+                    std::fflush(stderr);
+                }
+            }
             return r;                // default: SMP-secondary start -- no-op on UP
         }
 
-        case 0x43: {   // CSERVE$CALLBACK -- console <- OS callback transition
-            // sys__cserve cfw_callback: sets a callback flag and HALTs into
-            // the console (trap__update_pcb_and_halt).  This is an OS-driven
-            // transition, not part of SRM cold-boot bring-up.  Until console
-            // re-entry is modelled, return with nothing done; the entry-state
-            // ledger above already records every reach of this code.
-            return r;                // R0 untouched
-        }
+        // case 0x43 CSERVE$CALLBACK -- REMOVED as an explicit no-op
+        // (2026-07-24, JRN-VMB-017 P2 follow-on).  The no-op was the next
+        // 0x65-class faithfulness violation: after VMB handed off, the OS
+        // called the console callback dispatcher (caller pc=0x101ab054, the
+        // dispatch routine boot.c maps into the OS space), which issued
+        // CSERVE 0x43 in a tight retry loop (~86 cyc period, identical
+        // registers) because nothing was done.  0x43 now falls through to
+        // the default: routing block below -- with EMULATR_CSERVE_ROUTE=1
+        // it diverts to the guest sys__cserve (p23 + DIVERT_PALSWAP
+        // invariant), so the real cfw_callback runs: set callback flag,
+        // HALT into the console (hlt$c_callback=33); the console LOOP path
+        // (apisrm kernel.c:2683 cbip) services the request and returns to
+        // the OS via exit_console(START) -- the faithful Option A path.
 
         case 0x66: {   // CSERVE 0x66 -- return masked PAL_BASE
             // 2026-07-11: REINSTATED with CORRECTED semantics; machine-code
@@ -1126,8 +1220,15 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             // + pc264_system=1 both confirmed, so that table IS compiled).  NOTE
             // the boot/MP path is NOT ISP-gated -- ISP only skips real-HW device/
             // timer/debug probes -- so this is faithful in both platform modes.
-            static bool const s_cserveRoute =
-                (std::getenv("EMULATR_CSERVE_ROUTE") != nullptr);
+            // DEFAULT = ON (2026-07-26, JRN-SCSI-010 P1): routing to the guest
+            // sys__cserve is the faithful behavior and has been the script-
+            // supplied default since 2026-07-23; the engine default now matches
+            // so bare launches boot like scripted ones.  Disable explicitly with
+            // EMULATR_CSERVE_ROUTE=0 (or empty) for the A/B-vs-no-op comparison.
+            static bool const s_cserveRoute = []() noexcept {
+                char const* v = std::getenv("EMULATR_CSERVE_ROUTE");
+                return (v == nullptr) || !(v[0] == '\0' || v[0] == '0');
+            }();
             if (s_cserveRoute && c.memory != nullptr) {
                 static uint64_t s_sysCservePc   = 0;
                 static bool     s_cserveScanned = false;
@@ -1188,9 +1289,19 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     std::fflush(stderr);
                 }
                 if (s_sysCservePc != 0) {
-                    uint64_t const retPc = g.pc + 4u;    // p23 = CALL_PAL return PC
-                    c.cpu->intReg[23]   = retPc;         // both banks (shadow swap)
-                    c.cpu->intShadow[7] = retPc;
+                    // p23 = CALL_PAL return PC -- written to the PAL'S VIEW of R23
+                    // ONLY (corrected 2026-07-24).  The old both-banks write also
+                    // clobbered the NATIVE R23, which is caller state: the console
+                    // callback ABI packs the PUTS string LENGTH in R23 (cb_puts
+                    // reads cns$gpr[2*23]), so the clobber made the console fwrite
+                    // a return-PC-sized length -> binary garbage on COM1.  With
+                    // SDE<1> set the divert's palModeEnter swaps the shadow bank in
+                    // (intShadow[7] == post-swap R23); with SDE clear, no swap.
+                    uint64_t const retPc = g.pc + 4u;
+                    if (coreLib::iCtlSdeHigh(c.cpu->i_ctl) && !c.cpu->inPalMode())
+                        c.cpu->intShadow[7] = retPc;
+                    else
+                        c.cpu->intReg[23]   = retPc;
                     uint64_t const tgt = s_sysCservePc | 1ULL;   // PALmode (PC<0>=1)
                     c.cpu->excAddr = tgt;
                     r.divertTarget = tgt;

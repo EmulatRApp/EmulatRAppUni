@@ -643,3 +643,55 @@ PS/mode/IPL?).  SECONDARY: verify I_CTL[SPE] superpage modeled.  Everything upst
 (CSERVE routing, shadow swap, exit_console) is faithful; this is the last guest-reset
 question.  Files touched: coreLib/FaultEventLog.cpp (+<cstdlib>, FaultLoudCfg struct,
 loud-gate).
+
+### 3.16 MCHK HYPOTHESIS DEAD; A/B SPLIT; EMULATR_PCTRACE probe landed (2026-07-23 late-2)
+Re-read the fresh faithful-path run (run_ds20_showdev_20260723_173218, the 17:36 diag) end
+to end.  FACTS:
+ - Handoff fired FAITHFULLY: CSERVE-START-A2 + DIVERT-PALSWAP#3 target=0xa6cd swapped=1 at
+   cyc 1.9417e9 (R22<63>=1 physical).  Console: "jumping to bootstrap code" -> "halted CPU 0
+   / halt code = 0 / PC = 20000000" -> P00>>>.  MaxCycles stop at PC=0x1adab0 (console).
+ - The ENTIRE run has ONLY kFaultDtbMissDouble (5085 rows in faults.log, spanning
+   1.17e9..1.946e9 -- i.e. PAST the 1.9417e9 handoff).  ZERO MachineCheck, ZERO ACV, ZERO
+   OPCDEC.  => the 3.14 "boot0-entry MACHINE-CHECK" hypothesis is DISPROVEN.  The 0x20000000
+   reset is a CLEAN guest-side halt code 0, NOT a fault cascade.  (So the 3.15 "uncap the
+   fault log to find the MCHK" plan is ANSWERED: there is no fault to find.)
+ - VA 0x20000000 is NEVER fetched/translated (zero ITBPROBE there).  The reset is AT ARRIVAL,
+   before boot0 executes.  p23(r23) was set to 0x1ae39c (a CONSOLE return PC); MaxCycles PC
+   0x1adab0 (console).  => strong prior that exit_console returns to the console, not the OS.
+ - CAVEAT: the 17:36 run used the STALE 17:02 PC exe, built BEFORE the 17:24 cyc-filter commit,
+   so EMULATR_FAULT_CYCLO was NOT in that binary (wrapper exported it, exe ignored it).
+   Conclusion holds anyway (faults.log records every demand/anomaly fault regardless of
+   stderr loudness).  A FRESH PC build is still owed for the intended targeted capture; a mac
+   clang build confirmed the cyc-filter DOES land in a fresh binary.
+
+STAGE MODEL (understood): this is the SRM console -> VMB (primary bootstrap / APB) handoff.
+Console loads VMB (627712 B, base PA 0x5bc000), maps it at the architectural bootstrap VA
+0x20000000 (pfn 0x2de), builds HWRPB@0x2000 + the BOOT page table @0x3ff04000, then LEAVES
+console via the VMS PAL exit_console/restore_state (CSERVE START -> cfw_start -> br
+sys__exit_console) and HW_REI to 0x20000000 in kernel context.  KEY: 0x1ff82 << 13 ==
+0x3ff04000 == the "initializing page table at 3ff04000" banner, so the BOOT PTBR pfn = 0x1ff82.
+
+Two candidate mechanisms for the halt-code-0 (the REMAINING unknown the probe resolves):
+ (A) BAIL-BEFORE-OS: restore_state finds no valid OS restart record, returns to caller
+     p23=console 0x1ae39c; 0x20000000 never attempted.  (p23/final-PC evidence leans this way.)
+ (B) PTBR-MISDIRECTION (Tim): it HW_REIs toward 0x20000000 but PTBR is still the CONSOLE's
+     (never switched to boot pfn 0x1ff82) -> VA 0x20000000 translates wrong -> halt.
+
+EMULATR_PCTRACE probe (LANDED this session; env-gated, compiled in non-release like DIAG_*):
+ - coreLib/PcTrace.h (new, header-only C++17 inline globals) + arm in PalEntries.cpp case 0x42
+   at the exit_console divert + record in PipelineDriver.h retire() + main.cpp +/-64-word
+   GuestMemory windows (under EMULATR_BRINGUP_PROBES, PC build only).  EMULATR_PCTRACE=1 to
+   enable; EMULATR_PCTRACE_N default 4096.  Mac clang compile-verified (full build + the
+   BRINGUP_PROBES window block via a forced -D syntax-check).
+ - Arms at the divert, snapshots PTBR(vs 0x1ff82)/VPTB/p_misc, records the next N retired PCs,
+   latches the first PC < 0x00200000 (console re-entry = BAIL), dumps the collapsed trajectory
+   (loops compressed, BAIL row marked) + bail context, and +/-64 words of guest mem at the
+   bail PC and boot0 leaf 0x5bc000.
+ - READ: PCTRACE-ARM ptbr==0x1ff82 -> base is right, bug is restart-disposition/mode (A-ish);
+   ptbr==console -> (B) live.  The "<== BAIL" trajectory row names the exact exit_console
+   instruction where control diverges from the OS.
+RUN (PC): tools/build_emulatr.sh relwithdebinfo ; grep -a -c PCTRACE-ARM
+out/build/relwithdebinfo/Emulatr.exe (>0) ; EMULATR_PCTRACE=1 tools/run_ds20_bplus.sh ; b dqa0.
+Files: coreLib/PcTrace.h (new), main.cpp, palBoxLib/grains/PalEntries.cpp,
+pipelineLib/PipelineDriver.h.  (Stray tools/_build_nocr.sh = a mac CR-strip build shim,
+untracked, rm on PC.)

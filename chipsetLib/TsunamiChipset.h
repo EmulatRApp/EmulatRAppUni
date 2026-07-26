@@ -1,7 +1,10 @@
 #ifndef TSUNAMI_CHIPSET_H
 #define TSUNAMI_CHIPSET_H
 
+#include <algorithm>   // std::min (dmaReadBytes/dmaWriteBytes chunking, S1 seam)
+#include <array>       // manifest-pinned SCSI disk instances (2026-07-25)
 #include <atomic>
+#include <memory>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -31,7 +34,9 @@
 #include "deviceLib/Tsunami/Dec21143Tulip.h" // DE500-AA 21143 NIC (ewa) -- Phase 1 enumerate+init
 #include "deviceLib/Tsunami/Smc37c669SuperIo.h" // FDC37C669 SuperIO: config port + FDC (#22)
 #include "deviceLib/Tsunami/VgaTextConsole.h"    // VGA text-console interface (JRN-VMB-006, 2026-07-18)
+#include "deviceLib/Tsunami/Ncr53C810.h"         // NCR 53C810 SCSI HBA (pka) -- JRN-SCSI-001 P1/P2
 #include "deviceLib/scsi/VirtualIsoDevice.h"
+#include "deviceLib/scsi/VirtualDiskDevice.h"    // SCSI direct-access target (dka0) -- JRN-SCSI-001
 
 
 /* considerations
@@ -444,6 +449,56 @@ public:
         m_cchip.deassertInterrupt(pciIntxToDrirBit(pchipId, intxLine));
     }
 
+    // --------------------------------------------------------------------
+    // Bus-master bulk DMA (S1 seam, JRN-SCSI-002 G-A).
+    // --------------------------------------------------------------------
+    // A PCI bus-master device (SCSI HBA SCRIPTS fetch/block-move, tulip
+    // descriptor rings) reads/writes GUEST memory using PCI addresses; the
+    // Pchip inbound windows (WSBA/WSM/TBA) map those to PAs.  These helpers
+    // are the device-facing capability: arbitrary length, byte-accurate,
+    // window-translated per 4 KiB chunk so a burst crossing a window/page
+    // boundary re-translates rather than assuming contiguity.  Built on the
+    // existing translateDmaToPa (direct-map; SG walk stays a TODO inside
+    // that seam per JRN-VMB-019 B4 -- consumers are unaffected when it
+    // lands).  GuestMemory accessors are page-crossing-safe (memory.md 2.3).
+    // Returns bytes transferred (== n today; short only if a future SG
+    // fault path needs to report one).
+    size_t dmaReadBytes(uint64_t pciAddr, void* dst, size_t n) noexcept
+    {
+        auto* out = static_cast<uint8_t*>(dst);
+        size_t done = 0;
+        while (done < n) {
+            uint64_t const pci   = pciAddr + done;
+            size_t const   chunk = static_cast<size_t>(
+                std::min<uint64_t>(n - done, 0x1000ULL - (pci & 0xFFFULL)));
+            uint64_t const paBase = m_pchip.translateDmaToPa(pci);
+            for (size_t i = 0; i < chunk; ++i) {
+                uint8_t b = 0;
+                (void) m_guestMemory.read1(paBase + i, b);
+                out[done + i] = b;
+            }
+            done += chunk;
+        }
+        return done;
+    }
+
+    size_t dmaWriteBytes(uint64_t pciAddr, void const* src, size_t n) noexcept
+    {
+        auto const* in = static_cast<uint8_t const*>(src);
+        size_t done = 0;
+        while (done < n) {
+            uint64_t const pci   = pciAddr + done;
+            size_t const   chunk = static_cast<size_t>(
+                std::min<uint64_t>(n - done, 0x1000ULL - (pci & 0xFFFULL)));
+            uint64_t const paBase = m_pchip.translateDmaToPa(pci);
+            for (size_t i = 0; i < chunk; ++i) {
+                (void) m_guestMemory.write1(paBase + i, in[done + i]);
+            }
+            done += chunk;
+        }
+        return done;
+    }
+
     // Bus -> Cchip NXM promotion.  Latches MISC<NXM> and locks MISC<NXS>
     // (source).  Firmware later W1C-clears NXM.  The faulting PA is captured
     // separately by the bus trace; the Cchip only needs the source per HRM.
@@ -554,7 +609,34 @@ public:
             return m_activeIde;
         if (modelName == "de500" || modelName == "dec21143")
             return &m_tulip;
+        if (modelName == "ncr53c810")                     // JRN-SCSI-001 (pka)
+            return &m_scsi;
         return nullptr;
+    }
+
+    // Manifest-driven SCSI wiring (JRN-SCSI-003): Machine resolves the DRIR
+    // bit from the manifest's board routing table (slot x interrupt_pin) and
+    // pushes it + the config-space pin here after manifest load.
+    void setScsiIntxRouting(int drirBit) noexcept { m_scsiIntxDrir = drirBit; }
+    void setScsiInterruptPin(uint8_t pin) noexcept { m_scsi.setInterruptPin(pin); }
+
+    // SCSI disk media attach (JRN-SCSI-001/-003; mirrors setDiskMedia for
+    // IDE).  MANIFEST-PINNED (2026-07-25, per architect direction): a disk
+    // target INSTANCE exists on the bus ONLY for a platform.json storage row
+    // that attaches media here -- there are no compiled-in disk devices.  An
+    // id with no declared media stays empty and the console's selection of
+    // it times out (STO), matching an unpopulated bus.  One instance per id
+    // (ids 0..6; id 7 = the HBA itself).
+    bool setScsiDiskMedia(int scsiId,
+                          std::unique_ptr<scsi::IBlockMedia> media) noexcept
+    {
+        if (scsiId < 0 || scsiId > 6) return false;   // 7 = HBA
+        auto disk = std::make_unique<scsi::VirtualDiskDevice>(std::move(media));
+        if (!disk->hasMedia()) return false;
+        if (!m_scsi.attachTarget(static_cast<unsigned>(scsiId), disk.get()))
+            return false;
+        m_scsiDisks[scsiId] = std::move(disk);
+        return true;
     }
 
     // TIG-bus flash / NVRAM (AMD Am29F016).  Machine binds its backing file
@@ -718,8 +800,11 @@ private:
         // When the SRM programs a BAR, the model calls back to register its
         // 0x80-byte CSR window at the assigned base so CSR accesses route here.
         // (Pchip mem/IO registries are offset-from-kMMIO_Start / port space; a
-        // BAR base is exactly that offset.)  Removal API is a TODO -- BARs are
-        // programmed once during enumeration and don't move.
+        // BAR base is exactly that offset.)  2026-07-24 (S1 seam, JRN-SCSI-002
+        // G-B): removal is now REAL -- a BAR re-program retires the old claim
+        // via unregister{PciMemRange,IoPortRange}, so re-assignment during a
+        // later SRM/OS enumeration pass cannot leave a stale first-match range
+        // shadowing the new base.
         m_tulip.setRangeCallbacks(
             [this](uint64_t base, uint32_t len, bool isMem, IIoPortHandler* self) {
                 if (isMem) m_pchip.registerPciMemRange(base, base + len, self);
@@ -727,7 +812,12 @@ private:
                                static_cast<uint16_t>(base),
                                static_cast<uint16_t>(base + len), self);
             },
-            [](uint64_t, uint32_t, bool, IIoPortHandler*) { /* no removal API yet */ });
+            [this](uint64_t base, uint32_t len, bool isMem, IIoPortHandler* self) {
+                if (isMem) m_pchip.unregisterPciMemRange(base, base + len, self);
+                else       m_pchip.unregisterIoPortRange(
+                               static_cast<uint16_t>(base),
+                               static_cast<uint16_t>(base + len), self);
+            });
         // DMA access for TX/RX descriptor completion.  Descriptor addresses in
         // CSR3/4 are PCI-DMA addresses; wired direct-to-guest-PA for now (the
         // tulip's TULIP-TX trace verifies whether a Pchip DMA-window translation
@@ -745,6 +835,53 @@ private:
         m_tulip.setIntrCallback([this](bool level) {
             if (level) raisePciInterrupt(/*pchip*/0, /*INTA*/0);
             else       lowerPciInterrupt(0, 0);
+        });
+
+        // NCR 53C810 SCSI HBA (pka; JRN-SCSI-001 P1/P2).  Same three seams as
+        // the tulip: relocatable BARs (S1 rebind, register+unregister both
+        // real), bulk bus-master DMA (G-A: SCRIPTS fetch + block moves through
+        // dmaRead/WriteBytes -> Pchip window translation), and INTx (INTB =
+        // line 1, distinct from the tulip's INTA).  The console pke driver
+        // accesses the CSR file through the MEM BAR (n810_read_byte_csr ->
+        // inmemb) and may run POLLED (ISTAT reads) -- both paths served.
+        m_scsi.setRangeCallbacks(
+            [this](uint64_t base, uint32_t len, bool isMem, IIoPortHandler* self) {
+                if (isMem) m_pchip.registerPciMemRange(base, base + len, self);
+                else       m_pchip.registerIoPortRange(
+                               static_cast<uint16_t>(base),
+                               static_cast<uint16_t>(base + len), self);
+            },
+            [this](uint64_t base, uint32_t len, bool isMem, IIoPortHandler* self) {
+                if (isMem) m_pchip.unregisterPciMemRange(base, base + len, self);
+                else       m_pchip.unregisterIoPortRange(
+                               static_cast<uint16_t>(base),
+                               static_cast<uint16_t>(base + len), self);
+            });
+        m_scsi.setDmaAccess(
+            [this](uint64_t pci, void* dst, size_t n) { dmaReadBytes(pci, dst, n); },
+            [this](uint64_t pci, void const* src, size_t n) { dmaWriteBytes(pci, src, n); });
+        // INTx routing is BOARD DATA, not a formula (2026-07-25 finding: the
+        // generic pciIntxToDrirBit(32+..) convention does NOT match PC264
+        // option slots; the tulip's DRIR32 is equally suspect on DS20).  The
+        // DRIR bit comes from the MANIFEST's pci_irq_table_hose0 (mirroring
+        // the console's own pci_irq_table, pc264_io.c:727), delivered by
+        // Machine via setScsiIntxRouting() AFTER manifest load.  Until then
+        // m_scsiIntxDrir = -1 and an assert warns loud instead of lighting a
+        // wrong bit.  S3 generalizes this to every option-card device.
+        m_scsi.setIntrCallback([this](bool level) {
+            if (m_scsiIntxDrir < 0) {
+                static bool warned = false;
+                if (!warned) {
+                    warned = true;
+                    std::fprintf(stderr,
+                        "TsunamiChipset: SCSI INTx asserted but no DRIR routing "
+                        "configured (manifest pci_irq_table_hose0 missing?) -- "
+                        "interrupt DROPPED\n");
+                }
+                return;
+            }
+            if (level) m_cchip.assertInterrupt(m_scsiIntxDrir);
+            else       m_cchip.deassertInterrupt(m_scsiIntxDrir);
         });
         m_pchip.registerIoPortRange(0x1F0, 0x1F8, m_activeIde); // primary command block
         m_pchip.registerIoPortRange(0x170, 0x178, m_activeIde); // secondary command block
@@ -980,6 +1117,11 @@ private:
     Cy82C693Ide            m_ide;            // CY82C693 IDE controller (func 1; DS10/DS20)
     AliM5229Ide            m_aliIde;         // ALi M5229 IDE controller (func 1; ES40/ES45/DS25)
     deviceLib::Dec21143Tulip m_tulip;        // DE500-AA 21143 NIC (ewa); wired via the manifest (slot 7)
+    deviceLib::Ncr53C810     m_scsi;         // NCR 53C810 SCSI HBA (pka); manifest slot 8 (JRN-SCSI-001)
+    // Disk targets ids 0..6, instantiated ONLY from platform.json storage
+    // rows (setScsiDiskMedia); id 7 = the HBA.  2026-07-25 manifest-pinning.
+    std::array<std::unique_ptr<scsi::VirtualDiskDevice>, 7> m_scsiDisks{};
+    int                      m_scsiIntxDrir = -1;  // DRIR bit from manifest routing (JRN-SCSI-003)
     ITsunamiIde*           m_activeIde = nullptr;  // -> m_ide or m_aliIde; set in wireDevices()
     Smc37c669SuperIo       m_superio;       // FDC37C669 SuperIO: config port + FDC LDN (#22)
 

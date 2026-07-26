@@ -106,7 +106,9 @@ enum class PciModel : uint8_t {
 // ---------------------------------------------------------------------------
 enum class StorageType : uint8_t {
     AtapiCdrom,  // ATAPI CD/DVD logical unit (scsi::VirtualIsoDevice)
-    AtaDisk      // ATA fixed disk (future disk model)
+    AtaDisk,     // ATA fixed disk (future disk model)
+    ScsiDisk     // SCSI direct-access disk behind the NCR 53C810 (JRN-SCSI-001);
+                 // StorageTarget.unit = SCSI target id (0..6; HBA = 7)
 };
 
 // ---------------------------------------------------------------------------
@@ -168,6 +170,22 @@ struct DeviceManifest {
     std::string                  platform;
     std::vector<IicDeviceEntry>  iic;
     std::vector<PciDeviceEntry>  pci;
+
+    // BOARD DATA (2026-07-25, JRN-SCSI-003): per-hose PCI INTx -> Cchip DRIR
+    // routing, mirroring the console's own pci_irq_table (apisrm
+    // pc264_io.c:727).  Indexed ((slot - 5) * 4) + (pin - 1); value = DRIR
+    // bit, 255 = not routed (ISA-special or absent).  Empty = manifest did
+    // not provide one (devices needing INTx then warn loud at wire-up).
+    std::vector<uint8_t>         pciIrqTableHose0;
+
+    // Look up the DRIR bit for (slot, pin 1..4); -1 when unrouted/unknown.
+    int intxDrirBit(uint8_t slot, uint8_t pin) const {
+        if (pin < 1 || pin > 4 || slot < 5) return -1;
+        size_t const idx = (size_t(slot) - 5u) * 4u + (pin - 1u);
+        if (idx >= pciIrqTableHose0.size()) return -1;
+        uint8_t const v = pciIrqTableHose0[idx];
+        return (v == 255 || v >= 64) ? -1 : int(v);
+    }
 };
 
 // ---------------------------------------------------------------------------

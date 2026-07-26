@@ -34,10 +34,10 @@ namespace coreLib {
 // reaches the OPCDEC executor rather than dispatching into
 // garbage.
 GrainEntry const kOpcDecEntry = {
-    .fn = &coreLib::execOpcDec,
-    .semFlags = grainFactory::GrainSem::S_OpcDec,
-    .box = Box::PalBox,
-    .mnemonic = "OPCDEC"
+    &coreLib::execOpcDec,
+    grainFactory::GrainSem::S_OpcDec,
+    Box::PalBox,
+    "OPCDEC"
 };
 
 } // namespace coreLib
@@ -58,31 +58,25 @@ GrainEntry const* lookupPalVms(uint32_t func) noexcept;
 // IntArith sub-table: 128 entries, 18 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_intArithSubTable[128] = {
-    /* 0x0000 */ {.fn = &eBox::execAddl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "ADDL" },
+    /* 0x0000 */ { &eBox::execAddl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ADDL" },
     /* 0x0001 */ kOpcDecEntry,
-    /* 0x0002 */ {.fn = &eBox::execS4addl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S4ADDL" },
+    /* 0x0002 */ { &eBox::execS4addl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S4ADDL" },
     /* 0x0003 */ kOpcDecEntry,
     /* 0x0004 */ kOpcDecEntry,
     /* 0x0005 */ kOpcDecEntry,
     /* 0x0006 */ kOpcDecEntry,
     /* 0x0007 */ kOpcDecEntry,
     /* 0x0008 */ kOpcDecEntry,
-    /* 0x0009 */ {.fn = &eBox::execSubl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "SUBL" },
+    /* 0x0009 */ { &eBox::execSubl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SUBL" },
     /* 0x000a */ kOpcDecEntry,
-    /* 0x000b */ {.fn = &eBox::execS4subl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S4SUBL" },
+    /* 0x000b */ { &eBox::execS4subl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S4SUBL" },
     /* 0x000c */ kOpcDecEntry,
     /* 0x000d */ kOpcDecEntry,
     /* 0x000e */ kOpcDecEntry,
-    /* 0x000f */ {.fn = &eBox::execCmpbge, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMPBGE" },
+    /* 0x000f */ { &eBox::execCmpbge, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMPBGE" },
     /* 0x0010 */ kOpcDecEntry,
     /* 0x0011 */ kOpcDecEntry,
-    /* 0x0012 */ {.fn = &eBox::execS8addl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S8ADDL" },
+    /* 0x0012 */ { &eBox::execS8addl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S8ADDL" },
     /* 0x0013 */ kOpcDecEntry,
     /* 0x0014 */ kOpcDecEntry,
     /* 0x0015 */ kOpcDecEntry,
@@ -91,38 +85,30 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x0018 */ kOpcDecEntry,
     /* 0x0019 */ kOpcDecEntry,
     /* 0x001a */ kOpcDecEntry,
-    /* 0x001b */ {.fn = &eBox::execS8subl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S8SUBL" },
+    /* 0x001b */ { &eBox::execS8subl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S8SUBL" },
     /* 0x001c */ kOpcDecEntry,
-    /* 0x001d */ {.fn = &eBox::execCmpult, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMPULT" },
+    /* 0x001d */ { &eBox::execCmpult, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMPULT" },
     /* 0x001e */ kOpcDecEntry,
     /* 0x001f */ kOpcDecEntry,
-    /* 0x0020 */ {.fn = &eBox::execAddq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "ADDQ" },
+    /* 0x0020 */ { &eBox::execAddq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ADDQ" },
     /* 0x0021 */ kOpcDecEntry,
-    /* 0x0022 */ {.fn = &eBox::execS4addq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S4ADDQ" },
+    /* 0x0022 */ { &eBox::execS4addq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S4ADDQ" },
     /* 0x0023 */ kOpcDecEntry,
     /* 0x0024 */ kOpcDecEntry,
     /* 0x0025 */ kOpcDecEntry,
     /* 0x0026 */ kOpcDecEntry,
     /* 0x0027 */ kOpcDecEntry,
     /* 0x0028 */ kOpcDecEntry,
-    /* 0x0029 */ {.fn = &eBox::execSubq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "SUBQ" },
+    /* 0x0029 */ { &eBox::execSubq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SUBQ" },
     /* 0x002a */ kOpcDecEntry,
-    /* 0x002b */ {.fn = &eBox::execS4subq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S4SUBQ" },
+    /* 0x002b */ { &eBox::execS4subq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S4SUBQ" },
     /* 0x002c */ kOpcDecEntry,
-    /* 0x002d */ {.fn = &eBox::execCmpeq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMPEQ" },
+    /* 0x002d */ { &eBox::execCmpeq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMPEQ" },
     /* 0x002e */ kOpcDecEntry,
     /* 0x002f */ kOpcDecEntry,
     /* 0x0030 */ kOpcDecEntry,
     /* 0x0031 */ kOpcDecEntry,
-    /* 0x0032 */ {.fn = &eBox::execS8addq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S8ADDQ" },
+    /* 0x0032 */ { &eBox::execS8addq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S8ADDQ" },
     /* 0x0033 */ kOpcDecEntry,
     /* 0x0034 */ kOpcDecEntry,
     /* 0x0035 */ kOpcDecEntry,
@@ -131,11 +117,9 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x0038 */ kOpcDecEntry,
     /* 0x0039 */ kOpcDecEntry,
     /* 0x003a */ kOpcDecEntry,
-    /* 0x003b */ {.fn = &eBox::execS8subq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "S8SUBQ" },
+    /* 0x003b */ { &eBox::execS8subq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "S8SUBQ" },
     /* 0x003c */ kOpcDecEntry,
-    /* 0x003d */ {.fn = &eBox::execCmpule, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMPULE" },
+    /* 0x003d */ { &eBox::execCmpule, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMPULE" },
     /* 0x003e */ kOpcDecEntry,
     /* 0x003f */ kOpcDecEntry,
     /* 0x0040 */ kOpcDecEntry,
@@ -151,8 +135,7 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x004a */ kOpcDecEntry,
     /* 0x004b */ kOpcDecEntry,
     /* 0x004c */ kOpcDecEntry,
-    /* 0x004d */ {.fn = &eBox::execCmplt, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMPLT" },
+    /* 0x004d */ { &eBox::execCmplt, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMPLT" },
     /* 0x004e */ kOpcDecEntry,
     /* 0x004f */ kOpcDecEntry,
     /* 0x0050 */ kOpcDecEntry,
@@ -184,8 +167,7 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x006a */ kOpcDecEntry,
     /* 0x006b */ kOpcDecEntry,
     /* 0x006c */ kOpcDecEntry,
-    /* 0x006d */ {.fn = &eBox::execCmple, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMPLE" },
+    /* 0x006d */ { &eBox::execCmple, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMPLE" },
     /* 0x006e */ kOpcDecEntry,
     /* 0x006f */ kOpcDecEntry,
     /* 0x0070 */ kOpcDecEntry,
@@ -210,8 +192,7 @@ GrainEntry const g_intArithSubTable[128] = {
 // IntLogical sub-table: 128 entries, 16 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_intLogicalSubTable[128] = {
-    /* 0x0000 */ {.fn = &eBox::execAnd, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "AND" },
+    /* 0x0000 */ { &eBox::execAnd, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "AND" },
     /* 0x0001 */ kOpcDecEntry,
     /* 0x0002 */ kOpcDecEntry,
     /* 0x0003 */ kOpcDecEntry,
@@ -219,8 +200,7 @@ GrainEntry const g_intLogicalSubTable[128] = {
     /* 0x0005 */ kOpcDecEntry,
     /* 0x0006 */ kOpcDecEntry,
     /* 0x0007 */ kOpcDecEntry,
-    /* 0x0008 */ {.fn = &eBox::execBic, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "BIC" },
+    /* 0x0008 */ { &eBox::execBic, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "BIC" },
     /* 0x0009 */ kOpcDecEntry,
     /* 0x000a */ kOpcDecEntry,
     /* 0x000b */ kOpcDecEntry,
@@ -232,11 +212,9 @@ GrainEntry const g_intLogicalSubTable[128] = {
     /* 0x0011 */ kOpcDecEntry,
     /* 0x0012 */ kOpcDecEntry,
     /* 0x0013 */ kOpcDecEntry,
-    /* 0x0014 */ {.fn = &eBox::execCmovlbs, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVLBS" },
+    /* 0x0014 */ { &eBox::execCmovlbs, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVLBS" },
     /* 0x0015 */ kOpcDecEntry,
-    /* 0x0016 */ {.fn = &eBox::execCmovlbc, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVLBC" },
+    /* 0x0016 */ { &eBox::execCmovlbc, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVLBC" },
     /* 0x0017 */ kOpcDecEntry,
     /* 0x0018 */ kOpcDecEntry,
     /* 0x0019 */ kOpcDecEntry,
@@ -246,19 +224,15 @@ GrainEntry const g_intLogicalSubTable[128] = {
     /* 0x001d */ kOpcDecEntry,
     /* 0x001e */ kOpcDecEntry,
     /* 0x001f */ kOpcDecEntry,
-    /* 0x0020 */ {.fn = &eBox::execBis, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "BIS" },
+    /* 0x0020 */ { &eBox::execBis, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "BIS" },
     /* 0x0021 */ kOpcDecEntry,
     /* 0x0022 */ kOpcDecEntry,
     /* 0x0023 */ kOpcDecEntry,
-    /* 0x0024 */ {.fn = &eBox::execCmoveq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVEQ" },
+    /* 0x0024 */ { &eBox::execCmoveq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVEQ" },
     /* 0x0025 */ kOpcDecEntry,
-    /* 0x0026 */ {.fn = &eBox::execCmovne, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVNE" },
+    /* 0x0026 */ { &eBox::execCmovne, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVNE" },
     /* 0x0027 */ kOpcDecEntry,
-    /* 0x0028 */ {.fn = &eBox::execOrnot, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "ORNOT" },
+    /* 0x0028 */ { &eBox::execOrnot, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ORNOT" },
     /* 0x0029 */ kOpcDecEntry,
     /* 0x002a */ kOpcDecEntry,
     /* 0x002b */ kOpcDecEntry,
@@ -282,19 +256,15 @@ GrainEntry const g_intLogicalSubTable[128] = {
     /* 0x003d */ kOpcDecEntry,
     /* 0x003e */ kOpcDecEntry,
     /* 0x003f */ kOpcDecEntry,
-    /* 0x0040 */ {.fn = &eBox::execXor, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "XOR" },
+    /* 0x0040 */ { &eBox::execXor, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "XOR" },
     /* 0x0041 */ kOpcDecEntry,
     /* 0x0042 */ kOpcDecEntry,
     /* 0x0043 */ kOpcDecEntry,
-    /* 0x0044 */ {.fn = &eBox::execCmovlt, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVLT" },
+    /* 0x0044 */ { &eBox::execCmovlt, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVLT" },
     /* 0x0045 */ kOpcDecEntry,
-    /* 0x0046 */ {.fn = &eBox::execCmovge, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVGE" },
+    /* 0x0046 */ { &eBox::execCmovge, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVGE" },
     /* 0x0047 */ kOpcDecEntry,
-    /* 0x0048 */ {.fn = &eBox::execEqv, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EQV" },
+    /* 0x0048 */ { &eBox::execEqv, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EQV" },
     /* 0x0049 */ kOpcDecEntry,
     /* 0x004a */ kOpcDecEntry,
     /* 0x004b */ kOpcDecEntry,
@@ -319,22 +289,18 @@ GrainEntry const g_intLogicalSubTable[128] = {
     /* 0x005e */ kOpcDecEntry,
     /* 0x005f */ kOpcDecEntry,
     /* 0x0060 */ kOpcDecEntry,
-    /* 0x0061 */ {.fn = &eBox::execAmask, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "AMASK" },
+    /* 0x0061 */ { &eBox::execAmask, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "AMASK" },
     /* 0x0062 */ kOpcDecEntry,
     /* 0x0063 */ kOpcDecEntry,
-    /* 0x0064 */ {.fn = &eBox::execCmovle, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVLE" },
+    /* 0x0064 */ { &eBox::execCmovle, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVLE" },
     /* 0x0065 */ kOpcDecEntry,
-    /* 0x0066 */ {.fn = &eBox::execCmovgt, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CMOVGT" },
+    /* 0x0066 */ { &eBox::execCmovgt, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMOVGT" },
     /* 0x0067 */ kOpcDecEntry,
     /* 0x0068 */ kOpcDecEntry,
     /* 0x0069 */ kOpcDecEntry,
     /* 0x006a */ kOpcDecEntry,
     /* 0x006b */ kOpcDecEntry,
-    /* 0x006c */ {.fn = &eBox::execImplver, .semFlags = GrainSem::S_OpFormat | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "IMPLVER" },
+    /* 0x006c */ { &eBox::execImplver, GrainSem::S_OpFormat | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "IMPLVER" },
     /* 0x006d */ kOpcDecEntry,
     /* 0x006e */ kOpcDecEntry,
     /* 0x006f */ kOpcDecEntry,
@@ -362,82 +328,65 @@ GrainEntry const g_intLogicalSubTable[128] = {
 GrainEntry const g_intShiftSubTable[128] = {
     /* 0x0000 */ kOpcDecEntry,
     /* 0x0001 */ kOpcDecEntry,
-    /* 0x0002 */ {.fn = &eBox::execMskbl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MSKBL" },
+    /* 0x0002 */ { &eBox::execMskbl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MSKBL" },
     /* 0x0003 */ kOpcDecEntry,
     /* 0x0004 */ kOpcDecEntry,
     /* 0x0005 */ kOpcDecEntry,
-    /* 0x0006 */ {.fn = &eBox::execExtbl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EXTBL" },
+    /* 0x0006 */ { &eBox::execExtbl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EXTBL" },
     /* 0x0007 */ kOpcDecEntry,
     /* 0x0008 */ kOpcDecEntry,
     /* 0x0009 */ kOpcDecEntry,
     /* 0x000a */ kOpcDecEntry,
-    /* 0x000b */ {.fn = &eBox::execInsbl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "INSBL" },
+    /* 0x000b */ { &eBox::execInsbl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "INSBL" },
     /* 0x000c */ kOpcDecEntry,
     /* 0x000d */ kOpcDecEntry,
     /* 0x000e */ kOpcDecEntry,
     /* 0x000f */ kOpcDecEntry,
     /* 0x0010 */ kOpcDecEntry,
     /* 0x0011 */ kOpcDecEntry,
-    /* 0x0012 */ {.fn = &eBox::execMskwl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MSKWL" },
+    /* 0x0012 */ { &eBox::execMskwl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MSKWL" },
     /* 0x0013 */ kOpcDecEntry,
     /* 0x0014 */ kOpcDecEntry,
     /* 0x0015 */ kOpcDecEntry,
-    /* 0x0016 */ {.fn = &eBox::execExtwl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EXTWL" },
+    /* 0x0016 */ { &eBox::execExtwl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EXTWL" },
     /* 0x0017 */ kOpcDecEntry,
     /* 0x0018 */ kOpcDecEntry,
     /* 0x0019 */ kOpcDecEntry,
     /* 0x001a */ kOpcDecEntry,
-    /* 0x001b */ {.fn = &eBox::execInswl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "INSWL" },
+    /* 0x001b */ { &eBox::execInswl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "INSWL" },
     /* 0x001c */ kOpcDecEntry,
     /* 0x001d */ kOpcDecEntry,
     /* 0x001e */ kOpcDecEntry,
     /* 0x001f */ kOpcDecEntry,
     /* 0x0020 */ kOpcDecEntry,
     /* 0x0021 */ kOpcDecEntry,
-    /* 0x0022 */ {.fn = &eBox::execMskll, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MSKLL" },
+    /* 0x0022 */ { &eBox::execMskll, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MSKLL" },
     /* 0x0023 */ kOpcDecEntry,
     /* 0x0024 */ kOpcDecEntry,
     /* 0x0025 */ kOpcDecEntry,
-    /* 0x0026 */ {.fn = &eBox::execExtll, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EXTLL" },
+    /* 0x0026 */ { &eBox::execExtll, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EXTLL" },
     /* 0x0027 */ kOpcDecEntry,
     /* 0x0028 */ kOpcDecEntry,
     /* 0x0029 */ kOpcDecEntry,
     /* 0x002a */ kOpcDecEntry,
-    /* 0x002b */ {.fn = &eBox::execInsll, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "INSLL" },
+    /* 0x002b */ { &eBox::execInsll, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "INSLL" },
     /* 0x002c */ kOpcDecEntry,
     /* 0x002d */ kOpcDecEntry,
     /* 0x002e */ kOpcDecEntry,
     /* 0x002f */ kOpcDecEntry,
-    /* 0x0030 */ {.fn = &eBox::execZap, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "ZAP" },
-    /* 0x0031 */ {.fn = &eBox::execZapnot, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "ZAPNOT" },
-    /* 0x0032 */ {.fn = &eBox::execMskql, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MSKQL" },
+    /* 0x0030 */ { &eBox::execZap, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ZAP" },
+    /* 0x0031 */ { &eBox::execZapnot, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ZAPNOT" },
+    /* 0x0032 */ { &eBox::execMskql, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MSKQL" },
     /* 0x0033 */ kOpcDecEntry,
-    /* 0x0034 */ {.fn = &eBox::execSrl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "SRL" },
+    /* 0x0034 */ { &eBox::execSrl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SRL" },
     /* 0x0035 */ kOpcDecEntry,
-    /* 0x0036 */ {.fn = &eBox::execExtql, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EXTQL" },
+    /* 0x0036 */ { &eBox::execExtql, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EXTQL" },
     /* 0x0037 */ kOpcDecEntry,
     /* 0x0038 */ kOpcDecEntry,
-    /* 0x0039 */ {.fn = &eBox::execSll, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "SLL" },
+    /* 0x0039 */ { &eBox::execSll, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SLL" },
     /* 0x003a */ kOpcDecEntry,
-    /* 0x003b */ {.fn = &eBox::execInsql, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "INSQL" },
-    /* 0x003c */ {.fn = &eBox::execSra, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "SRA" },
+    /* 0x003b */ { &eBox::execInsql, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "INSQL" },
+    /* 0x003c */ { &eBox::execSra, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SRA" },
     /* 0x003d */ kOpcDecEntry,
     /* 0x003e */ kOpcDecEntry,
     /* 0x003f */ kOpcDecEntry,
@@ -459,18 +408,15 @@ GrainEntry const g_intShiftSubTable[128] = {
     /* 0x004f */ kOpcDecEntry,
     /* 0x0050 */ kOpcDecEntry,
     /* 0x0051 */ kOpcDecEntry,
-    /* 0x0052 */ {.fn = &eBox::execMskwh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MSKWH" },
+    /* 0x0052 */ { &eBox::execMskwh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MSKWH" },
     /* 0x0053 */ kOpcDecEntry,
     /* 0x0054 */ kOpcDecEntry,
     /* 0x0055 */ kOpcDecEntry,
     /* 0x0056 */ kOpcDecEntry,
-    /* 0x0057 */ {.fn = &eBox::execInswh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "INSWH" },
+    /* 0x0057 */ { &eBox::execInswh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "INSWH" },
     /* 0x0058 */ kOpcDecEntry,
     /* 0x0059 */ kOpcDecEntry,
-    /* 0x005a */ {.fn = &eBox::execExtwh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EXTWH" },
+    /* 0x005a */ { &eBox::execExtwh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EXTWH" },
     /* 0x005b */ kOpcDecEntry,
     /* 0x005c */ kOpcDecEntry,
     /* 0x005d */ kOpcDecEntry,
@@ -478,18 +424,15 @@ GrainEntry const g_intShiftSubTable[128] = {
     /* 0x005f */ kOpcDecEntry,
     /* 0x0060 */ kOpcDecEntry,
     /* 0x0061 */ kOpcDecEntry,
-    /* 0x0062 */ {.fn = &eBox::execMsklh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MSKLH" },
+    /* 0x0062 */ { &eBox::execMsklh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MSKLH" },
     /* 0x0063 */ kOpcDecEntry,
     /* 0x0064 */ kOpcDecEntry,
     /* 0x0065 */ kOpcDecEntry,
     /* 0x0066 */ kOpcDecEntry,
-    /* 0x0067 */ {.fn = &eBox::execInslh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "INSLH" },
+    /* 0x0067 */ { &eBox::execInslh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "INSLH" },
     /* 0x0068 */ kOpcDecEntry,
     /* 0x0069 */ kOpcDecEntry,
-    /* 0x006a */ {.fn = &eBox::execExtlh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EXTLH" },
+    /* 0x006a */ { &eBox::execExtlh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EXTLH" },
     /* 0x006b */ kOpcDecEntry,
     /* 0x006c */ kOpcDecEntry,
     /* 0x006d */ kOpcDecEntry,
@@ -497,18 +440,15 @@ GrainEntry const g_intShiftSubTable[128] = {
     /* 0x006f */ kOpcDecEntry,
     /* 0x0070 */ kOpcDecEntry,
     /* 0x0071 */ kOpcDecEntry,
-    /* 0x0072 */ {.fn = &eBox::execMskqh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MSKQH" },
+    /* 0x0072 */ { &eBox::execMskqh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MSKQH" },
     /* 0x0073 */ kOpcDecEntry,
     /* 0x0074 */ kOpcDecEntry,
     /* 0x0075 */ kOpcDecEntry,
     /* 0x0076 */ kOpcDecEntry,
-    /* 0x0077 */ {.fn = &eBox::execInsqh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "INSQH" },
+    /* 0x0077 */ { &eBox::execInsqh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "INSQH" },
     /* 0x0078 */ kOpcDecEntry,
     /* 0x0079 */ kOpcDecEntry,
-    /* 0x007a */ {.fn = &eBox::execExtqh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "EXTQH" },
+    /* 0x007a */ { &eBox::execExtqh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "EXTQH" },
     /* 0x007b */ kOpcDecEntry,
     /* 0x007c */ kOpcDecEntry,
     /* 0x007d */ kOpcDecEntry,
@@ -520,8 +460,7 @@ GrainEntry const g_intShiftSubTable[128] = {
 // IntMul sub-table: 128 entries, 3 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_intMulSubTable[128] = {
-    /* 0x0000 */ {.fn = &eBox::execMull, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MULL" },
+    /* 0x0000 */ { &eBox::execMull, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MULL" },
     /* 0x0001 */ kOpcDecEntry,
     /* 0x0002 */ kOpcDecEntry,
     /* 0x0003 */ kOpcDecEntry,
@@ -553,8 +492,7 @@ GrainEntry const g_intMulSubTable[128] = {
     /* 0x001d */ kOpcDecEntry,
     /* 0x001e */ kOpcDecEntry,
     /* 0x001f */ kOpcDecEntry,
-    /* 0x0020 */ {.fn = &eBox::execMulq, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MULQ" },
+    /* 0x0020 */ { &eBox::execMulq, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MULQ" },
     /* 0x0021 */ kOpcDecEntry,
     /* 0x0022 */ kOpcDecEntry,
     /* 0x0023 */ kOpcDecEntry,
@@ -570,8 +508,7 @@ GrainEntry const g_intMulSubTable[128] = {
     /* 0x002d */ kOpcDecEntry,
     /* 0x002e */ kOpcDecEntry,
     /* 0x002f */ kOpcDecEntry,
-    /* 0x0030 */ {.fn = &eBox::execUmulh, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "UMULH" },
+    /* 0x0030 */ { &eBox::execUmulh, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "UMULH" },
     /* 0x0031 */ kOpcDecEntry,
     /* 0x0032 */ kOpcDecEntry,
     /* 0x0033 */ kOpcDecEntry,
@@ -661,17 +598,14 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0001 */ kOpcDecEntry,
     /* 0x0002 */ kOpcDecEntry,
     /* 0x0003 */ kOpcDecEntry,
-    /* 0x0004 */ {.fn = &eBox::execItofs, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Ebox, .mnemonic = "ITOFS" },
+    /* 0x0004 */ { &eBox::execItofs, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Ebox, "ITOFS" },
     /* 0x0005 */ kOpcDecEntry,
     /* 0x0006 */ kOpcDecEntry,
     /* 0x0007 */ kOpcDecEntry,
     /* 0x0008 */ kOpcDecEntry,
     /* 0x0009 */ kOpcDecEntry,
-    /* 0x000a */ {.fn = &fBox::execSqrtfC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF_C" },
-    /* 0x000b */ {.fn = &fBox::execSqrtsC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_C" },
+    /* 0x000a */ { &fBox::execSqrtfC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF_C" },
+    /* 0x000b */ { &fBox::execSqrtsC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_C" },
     /* 0x000c */ kOpcDecEntry,
     /* 0x000d */ kOpcDecEntry,
     /* 0x000e */ kOpcDecEntry,
@@ -680,8 +614,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0011 */ kOpcDecEntry,
     /* 0x0012 */ kOpcDecEntry,
     /* 0x0013 */ kOpcDecEntry,
-    /* 0x0014 */ {.fn = &eBox::execItoff, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Ebox, .mnemonic = "ITOFF" },
+    /* 0x0014 */ { &eBox::execItoff, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Ebox, "ITOFF" },
     /* 0x0015 */ kOpcDecEntry,
     /* 0x0016 */ kOpcDecEntry,
     /* 0x0017 */ kOpcDecEntry,
@@ -697,17 +630,14 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0021 */ kOpcDecEntry,
     /* 0x0022 */ kOpcDecEntry,
     /* 0x0023 */ kOpcDecEntry,
-    /* 0x0024 */ {.fn = &eBox::execItoft, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Ebox, .mnemonic = "ITOFT" },
+    /* 0x0024 */ { &eBox::execItoft, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Ebox, "ITOFT" },
     /* 0x0025 */ kOpcDecEntry,
     /* 0x0026 */ kOpcDecEntry,
     /* 0x0027 */ kOpcDecEntry,
     /* 0x0028 */ kOpcDecEntry,
     /* 0x0029 */ kOpcDecEntry,
-    /* 0x002a */ {.fn = &fBox::execSqrtgC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG_C" },
-    /* 0x002b */ {.fn = &fBox::execSqrttC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_C" },
+    /* 0x002a */ { &fBox::execSqrtgC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG_C" },
+    /* 0x002b */ { &fBox::execSqrttC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_C" },
     /* 0x002c */ kOpcDecEntry,
     /* 0x002d */ kOpcDecEntry,
     /* 0x002e */ kOpcDecEntry,
@@ -739,8 +669,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0048 */ kOpcDecEntry,
     /* 0x0049 */ kOpcDecEntry,
     /* 0x004a */ kOpcDecEntry,
-    /* 0x004b */ {.fn = &fBox::execSqrtsM, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_M" },
+    /* 0x004b */ { &fBox::execSqrtsM, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_M" },
     /* 0x004c */ kOpcDecEntry,
     /* 0x004d */ kOpcDecEntry,
     /* 0x004e */ kOpcDecEntry,
@@ -772,8 +701,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0068 */ kOpcDecEntry,
     /* 0x0069 */ kOpcDecEntry,
     /* 0x006a */ kOpcDecEntry,
-    /* 0x006b */ {.fn = &fBox::execSqrttM, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_M" },
+    /* 0x006b */ { &fBox::execSqrttM, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_M" },
     /* 0x006c */ kOpcDecEntry,
     /* 0x006d */ kOpcDecEntry,
     /* 0x006e */ kOpcDecEntry,
@@ -804,10 +732,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0087 */ kOpcDecEntry,
     /* 0x0088 */ kOpcDecEntry,
     /* 0x0089 */ kOpcDecEntry,
-    /* 0x008a */ {.fn = &fBox::execSqrtf, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF" },
-    /* 0x008b */ {.fn = &fBox::execSqrts, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS" },
+    /* 0x008a */ { &fBox::execSqrtf, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF" },
+    /* 0x008b */ { &fBox::execSqrts, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS" },
     /* 0x008c */ kOpcDecEntry,
     /* 0x008d */ kOpcDecEntry,
     /* 0x008e */ kOpcDecEntry,
@@ -838,10 +764,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x00a7 */ kOpcDecEntry,
     /* 0x00a8 */ kOpcDecEntry,
     /* 0x00a9 */ kOpcDecEntry,
-    /* 0x00aa */ {.fn = &fBox::execSqrtg, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG" },
-    /* 0x00ab */ {.fn = &fBox::execSqrtt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT" },
+    /* 0x00aa */ { &fBox::execSqrtg, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG" },
+    /* 0x00ab */ { &fBox::execSqrtt, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT" },
     /* 0x00ac */ kOpcDecEntry,
     /* 0x00ad */ kOpcDecEntry,
     /* 0x00ae */ kOpcDecEntry,
@@ -873,8 +797,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x00c8 */ kOpcDecEntry,
     /* 0x00c9 */ kOpcDecEntry,
     /* 0x00ca */ kOpcDecEntry,
-    /* 0x00cb */ {.fn = &fBox::execSqrtsD, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_D" },
+    /* 0x00cb */ { &fBox::execSqrtsD, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_D" },
     /* 0x00cc */ kOpcDecEntry,
     /* 0x00cd */ kOpcDecEntry,
     /* 0x00ce */ kOpcDecEntry,
@@ -906,8 +829,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x00e8 */ kOpcDecEntry,
     /* 0x00e9 */ kOpcDecEntry,
     /* 0x00ea */ kOpcDecEntry,
-    /* 0x00eb */ {.fn = &fBox::execSqrttD, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_D" },
+    /* 0x00eb */ { &fBox::execSqrttD, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_D" },
     /* 0x00ec */ kOpcDecEntry,
     /* 0x00ed */ kOpcDecEntry,
     /* 0x00ee */ kOpcDecEntry,
@@ -938,10 +860,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0107 */ kOpcDecEntry,
     /* 0x0108 */ kOpcDecEntry,
     /* 0x0109 */ kOpcDecEntry,
-    /* 0x010a */ {.fn = &fBox::execSqrtfUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF_UC" },
-    /* 0x010b */ {.fn = &fBox::execSqrtsUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_UC" },
+    /* 0x010a */ { &fBox::execSqrtfUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF_UC" },
+    /* 0x010b */ { &fBox::execSqrtsUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_UC" },
     /* 0x010c */ kOpcDecEntry,
     /* 0x010d */ kOpcDecEntry,
     /* 0x010e */ kOpcDecEntry,
@@ -972,10 +892,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0127 */ kOpcDecEntry,
     /* 0x0128 */ kOpcDecEntry,
     /* 0x0129 */ kOpcDecEntry,
-    /* 0x012a */ {.fn = &fBox::execSqrtgUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG_UC" },
-    /* 0x012b */ {.fn = &fBox::execSqrttUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_UC" },
+    /* 0x012a */ { &fBox::execSqrtgUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG_UC" },
+    /* 0x012b */ { &fBox::execSqrttUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_UC" },
     /* 0x012c */ kOpcDecEntry,
     /* 0x012d */ kOpcDecEntry,
     /* 0x012e */ kOpcDecEntry,
@@ -1007,8 +925,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0148 */ kOpcDecEntry,
     /* 0x0149 */ kOpcDecEntry,
     /* 0x014a */ kOpcDecEntry,
-    /* 0x014b */ {.fn = &fBox::execSqrtsUm, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_UM" },
+    /* 0x014b */ { &fBox::execSqrtsUm, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_UM" },
     /* 0x014c */ kOpcDecEntry,
     /* 0x014d */ kOpcDecEntry,
     /* 0x014e */ kOpcDecEntry,
@@ -1040,8 +957,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0168 */ kOpcDecEntry,
     /* 0x0169 */ kOpcDecEntry,
     /* 0x016a */ kOpcDecEntry,
-    /* 0x016b */ {.fn = &fBox::execSqrttUm, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_UM" },
+    /* 0x016b */ { &fBox::execSqrttUm, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_UM" },
     /* 0x016c */ kOpcDecEntry,
     /* 0x016d */ kOpcDecEntry,
     /* 0x016e */ kOpcDecEntry,
@@ -1072,10 +988,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0187 */ kOpcDecEntry,
     /* 0x0188 */ kOpcDecEntry,
     /* 0x0189 */ kOpcDecEntry,
-    /* 0x018a */ {.fn = &fBox::execSqrtfU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF_U" },
-    /* 0x018b */ {.fn = &fBox::execSqrtsU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_U" },
+    /* 0x018a */ { &fBox::execSqrtfU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF_U" },
+    /* 0x018b */ { &fBox::execSqrtsU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_U" },
     /* 0x018c */ kOpcDecEntry,
     /* 0x018d */ kOpcDecEntry,
     /* 0x018e */ kOpcDecEntry,
@@ -1106,10 +1020,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x01a7 */ kOpcDecEntry,
     /* 0x01a8 */ kOpcDecEntry,
     /* 0x01a9 */ kOpcDecEntry,
-    /* 0x01aa */ {.fn = &fBox::execSqrtgU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG_U" },
-    /* 0x01ab */ {.fn = &fBox::execSqrttU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_U" },
+    /* 0x01aa */ { &fBox::execSqrtgU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG_U" },
+    /* 0x01ab */ { &fBox::execSqrttU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_U" },
     /* 0x01ac */ kOpcDecEntry,
     /* 0x01ad */ kOpcDecEntry,
     /* 0x01ae */ kOpcDecEntry,
@@ -1141,8 +1053,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x01c8 */ kOpcDecEntry,
     /* 0x01c9 */ kOpcDecEntry,
     /* 0x01ca */ kOpcDecEntry,
-    /* 0x01cb */ {.fn = &fBox::execSqrtsUd, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_UD" },
+    /* 0x01cb */ { &fBox::execSqrtsUd, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_UD" },
     /* 0x01cc */ kOpcDecEntry,
     /* 0x01cd */ kOpcDecEntry,
     /* 0x01ce */ kOpcDecEntry,
@@ -1174,8 +1085,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x01e8 */ kOpcDecEntry,
     /* 0x01e9 */ kOpcDecEntry,
     /* 0x01ea */ kOpcDecEntry,
-    /* 0x01eb */ {.fn = &fBox::execSqrttUd, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_UD" },
+    /* 0x01eb */ { &fBox::execSqrttUd, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_UD" },
     /* 0x01ec */ kOpcDecEntry,
     /* 0x01ed */ kOpcDecEntry,
     /* 0x01ee */ kOpcDecEntry,
@@ -1718,8 +1628,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0407 */ kOpcDecEntry,
     /* 0x0408 */ kOpcDecEntry,
     /* 0x0409 */ kOpcDecEntry,
-    /* 0x040a */ {.fn = &fBox::execSqrtfSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF_SC" },
+    /* 0x040a */ { &fBox::execSqrtfSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF_SC" },
     /* 0x040b */ kOpcDecEntry,
     /* 0x040c */ kOpcDecEntry,
     /* 0x040d */ kOpcDecEntry,
@@ -1751,8 +1660,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0427 */ kOpcDecEntry,
     /* 0x0428 */ kOpcDecEntry,
     /* 0x0429 */ kOpcDecEntry,
-    /* 0x042a */ {.fn = &fBox::execSqrtgSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG_SC" },
+    /* 0x042a */ { &fBox::execSqrtgSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG_SC" },
     /* 0x042b */ kOpcDecEntry,
     /* 0x042c */ kOpcDecEntry,
     /* 0x042d */ kOpcDecEntry,
@@ -1848,8 +1756,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0487 */ kOpcDecEntry,
     /* 0x0488 */ kOpcDecEntry,
     /* 0x0489 */ kOpcDecEntry,
-    /* 0x048a */ {.fn = &fBox::execSqrtfS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF_S" },
+    /* 0x048a */ { &fBox::execSqrtfS, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF_S" },
     /* 0x048b */ kOpcDecEntry,
     /* 0x048c */ kOpcDecEntry,
     /* 0x048d */ kOpcDecEntry,
@@ -1881,8 +1788,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x04a7 */ kOpcDecEntry,
     /* 0x04a8 */ kOpcDecEntry,
     /* 0x04a9 */ kOpcDecEntry,
-    /* 0x04aa */ {.fn = &fBox::execSqrtgS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG_S" },
+    /* 0x04aa */ { &fBox::execSqrtgS, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG_S" },
     /* 0x04ab */ kOpcDecEntry,
     /* 0x04ac */ kOpcDecEntry,
     /* 0x04ad */ kOpcDecEntry,
@@ -1978,10 +1884,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0507 */ kOpcDecEntry,
     /* 0x0508 */ kOpcDecEntry,
     /* 0x0509 */ kOpcDecEntry,
-    /* 0x050a */ {.fn = &fBox::execSqrtfSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF_SUC" },
-    /* 0x050b */ {.fn = &fBox::execSqrtsSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SUC" },
+    /* 0x050a */ { &fBox::execSqrtfSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF_SUC" },
+    /* 0x050b */ { &fBox::execSqrtsSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SUC" },
     /* 0x050c */ kOpcDecEntry,
     /* 0x050d */ kOpcDecEntry,
     /* 0x050e */ kOpcDecEntry,
@@ -2012,10 +1916,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0527 */ kOpcDecEntry,
     /* 0x0528 */ kOpcDecEntry,
     /* 0x0529 */ kOpcDecEntry,
-    /* 0x052a */ {.fn = &fBox::execSqrtgSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG_SUC" },
-    /* 0x052b */ {.fn = &fBox::execSqrttSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SUC" },
+    /* 0x052a */ { &fBox::execSqrtgSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG_SUC" },
+    /* 0x052b */ { &fBox::execSqrttSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SUC" },
     /* 0x052c */ kOpcDecEntry,
     /* 0x052d */ kOpcDecEntry,
     /* 0x052e */ kOpcDecEntry,
@@ -2047,8 +1949,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0548 */ kOpcDecEntry,
     /* 0x0549 */ kOpcDecEntry,
     /* 0x054a */ kOpcDecEntry,
-    /* 0x054b */ {.fn = &fBox::execSqrtsSum, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SUM" },
+    /* 0x054b */ { &fBox::execSqrtsSum, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SUM" },
     /* 0x054c */ kOpcDecEntry,
     /* 0x054d */ kOpcDecEntry,
     /* 0x054e */ kOpcDecEntry,
@@ -2080,8 +1981,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0568 */ kOpcDecEntry,
     /* 0x0569 */ kOpcDecEntry,
     /* 0x056a */ kOpcDecEntry,
-    /* 0x056b */ {.fn = &fBox::execSqrttSum, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SUM" },
+    /* 0x056b */ { &fBox::execSqrttSum, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SUM" },
     /* 0x056c */ kOpcDecEntry,
     /* 0x056d */ kOpcDecEntry,
     /* 0x056e */ kOpcDecEntry,
@@ -2112,10 +2012,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0587 */ kOpcDecEntry,
     /* 0x0588 */ kOpcDecEntry,
     /* 0x0589 */ kOpcDecEntry,
-    /* 0x058a */ {.fn = &fBox::execSqrtfSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTF_SU" },
-    /* 0x058b */ {.fn = &fBox::execSqrtsSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SU" },
+    /* 0x058a */ { &fBox::execSqrtfSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTF_SU" },
+    /* 0x058b */ { &fBox::execSqrtsSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SU" },
     /* 0x058c */ kOpcDecEntry,
     /* 0x058d */ kOpcDecEntry,
     /* 0x058e */ kOpcDecEntry,
@@ -2146,10 +2044,8 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x05a7 */ kOpcDecEntry,
     /* 0x05a8 */ kOpcDecEntry,
     /* 0x05a9 */ kOpcDecEntry,
-    /* 0x05aa */ {.fn = &fBox::execSqrtgSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTG_SU" },
-    /* 0x05ab */ {.fn = &fBox::execSqrttSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SU" },
+    /* 0x05aa */ { &fBox::execSqrtgSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTG_SU" },
+    /* 0x05ab */ { &fBox::execSqrttSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SU" },
     /* 0x05ac */ kOpcDecEntry,
     /* 0x05ad */ kOpcDecEntry,
     /* 0x05ae */ kOpcDecEntry,
@@ -2181,8 +2077,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x05c8 */ kOpcDecEntry,
     /* 0x05c9 */ kOpcDecEntry,
     /* 0x05ca */ kOpcDecEntry,
-    /* 0x05cb */ {.fn = &fBox::execSqrtsSud, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SUD" },
+    /* 0x05cb */ { &fBox::execSqrtsSud, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SUD" },
     /* 0x05cc */ kOpcDecEntry,
     /* 0x05cd */ kOpcDecEntry,
     /* 0x05ce */ kOpcDecEntry,
@@ -2214,8 +2109,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x05e8 */ kOpcDecEntry,
     /* 0x05e9 */ kOpcDecEntry,
     /* 0x05ea */ kOpcDecEntry,
-    /* 0x05eb */ {.fn = &fBox::execSqrttSud, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SUD" },
+    /* 0x05eb */ { &fBox::execSqrttSud, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SUD" },
     /* 0x05ec */ kOpcDecEntry,
     /* 0x05ed */ kOpcDecEntry,
     /* 0x05ee */ kOpcDecEntry,
@@ -2503,8 +2397,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0708 */ kOpcDecEntry,
     /* 0x0709 */ kOpcDecEntry,
     /* 0x070a */ kOpcDecEntry,
-    /* 0x070b */ {.fn = &fBox::execSqrtsSuic, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SUIC" },
+    /* 0x070b */ { &fBox::execSqrtsSuic, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SUIC" },
     /* 0x070c */ kOpcDecEntry,
     /* 0x070d */ kOpcDecEntry,
     /* 0x070e */ kOpcDecEntry,
@@ -2536,8 +2429,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0728 */ kOpcDecEntry,
     /* 0x0729 */ kOpcDecEntry,
     /* 0x072a */ kOpcDecEntry,
-    /* 0x072b */ {.fn = &fBox::execSqrttSuic, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SUIC" },
+    /* 0x072b */ { &fBox::execSqrttSuic, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SUIC" },
     /* 0x072c */ kOpcDecEntry,
     /* 0x072d */ kOpcDecEntry,
     /* 0x072e */ kOpcDecEntry,
@@ -2569,8 +2461,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0748 */ kOpcDecEntry,
     /* 0x0749 */ kOpcDecEntry,
     /* 0x074a */ kOpcDecEntry,
-    /* 0x074b */ {.fn = &fBox::execSqrtsSuim, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SUIM" },
+    /* 0x074b */ { &fBox::execSqrtsSuim, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SUIM" },
     /* 0x074c */ kOpcDecEntry,
     /* 0x074d */ kOpcDecEntry,
     /* 0x074e */ kOpcDecEntry,
@@ -2602,8 +2493,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0768 */ kOpcDecEntry,
     /* 0x0769 */ kOpcDecEntry,
     /* 0x076a */ kOpcDecEntry,
-    /* 0x076b */ {.fn = &fBox::execSqrttSuim, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SUIM" },
+    /* 0x076b */ { &fBox::execSqrttSuim, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SUIM" },
     /* 0x076c */ kOpcDecEntry,
     /* 0x076d */ kOpcDecEntry,
     /* 0x076e */ kOpcDecEntry,
@@ -2635,8 +2525,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x0788 */ kOpcDecEntry,
     /* 0x0789 */ kOpcDecEntry,
     /* 0x078a */ kOpcDecEntry,
-    /* 0x078b */ {.fn = &fBox::execSqrtsSui, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SUI" },
+    /* 0x078b */ { &fBox::execSqrtsSui, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SUI" },
     /* 0x078c */ kOpcDecEntry,
     /* 0x078d */ kOpcDecEntry,
     /* 0x078e */ kOpcDecEntry,
@@ -2668,8 +2557,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x07a8 */ kOpcDecEntry,
     /* 0x07a9 */ kOpcDecEntry,
     /* 0x07aa */ kOpcDecEntry,
-    /* 0x07ab */ {.fn = &fBox::execSqrttSui, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SUI" },
+    /* 0x07ab */ { &fBox::execSqrttSui, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SUI" },
     /* 0x07ac */ kOpcDecEntry,
     /* 0x07ad */ kOpcDecEntry,
     /* 0x07ae */ kOpcDecEntry,
@@ -2701,8 +2589,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x07c8 */ kOpcDecEntry,
     /* 0x07c9 */ kOpcDecEntry,
     /* 0x07ca */ kOpcDecEntry,
-    /* 0x07cb */ {.fn = &fBox::execSqrtsSuid, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTS_SUID" },
+    /* 0x07cb */ { &fBox::execSqrtsSuid, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTS_SUID" },
     /* 0x07cc */ kOpcDecEntry,
     /* 0x07cd */ kOpcDecEntry,
     /* 0x07ce */ kOpcDecEntry,
@@ -2734,8 +2621,7 @@ GrainEntry const g_itFpSubTable[2048] = {
     /* 0x07e8 */ kOpcDecEntry,
     /* 0x07e9 */ kOpcDecEntry,
     /* 0x07ea */ kOpcDecEntry,
-    /* 0x07eb */ {.fn = &fBox::execSqrttSuid, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SQRTT_SUID" },
+    /* 0x07eb */ { &fBox::execSqrttSuid, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SQRTT_SUID" },
     /* 0x07ec */ kOpcDecEntry,
     /* 0x07ed */ kOpcDecEntry,
     /* 0x07ee */ kOpcDecEntry,
@@ -2762,14 +2648,10 @@ GrainEntry const g_itFpSubTable[2048] = {
 // FltVax sub-table: 2048 entries, 106 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_fltVaxSubTable[2048] = {
-    /* 0x0000 */ {.fn = &fBox::execAddfC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF_C" },
-    /* 0x0001 */ {.fn = &fBox::execSubfC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF_C" },
-    /* 0x0002 */ {.fn = &fBox::execMulfC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF_C" },
-    /* 0x0003 */ {.fn = &fBox::execDivfC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF_C" },
+    /* 0x0000 */ { &fBox::execAddfC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF_C" },
+    /* 0x0001 */ { &fBox::execSubfC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF_C" },
+    /* 0x0002 */ { &fBox::execMulfC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF_C" },
+    /* 0x0003 */ { &fBox::execDivfC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF_C" },
     /* 0x0004 */ kOpcDecEntry,
     /* 0x0005 */ kOpcDecEntry,
     /* 0x0006 */ kOpcDecEntry,
@@ -2796,17 +2678,12 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x001b */ kOpcDecEntry,
     /* 0x001c */ kOpcDecEntry,
     /* 0x001d */ kOpcDecEntry,
-    /* 0x001e */ {.fn = &fBox::execCvtdgC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG_C" },
+    /* 0x001e */ { &fBox::execCvtdgC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG_C" },
     /* 0x001f */ kOpcDecEntry,
-    /* 0x0020 */ {.fn = &fBox::execAddgC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG_C" },
-    /* 0x0021 */ {.fn = &fBox::execSubgC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG_C" },
-    /* 0x0022 */ {.fn = &fBox::execMulgC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG_C" },
-    /* 0x0023 */ {.fn = &fBox::execDivgC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG_C" },
+    /* 0x0020 */ { &fBox::execAddgC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG_C" },
+    /* 0x0021 */ { &fBox::execSubgC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG_C" },
+    /* 0x0022 */ { &fBox::execMulgC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG_C" },
+    /* 0x0023 */ { &fBox::execDivgC, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG_C" },
     /* 0x0024 */ kOpcDecEntry,
     /* 0x0025 */ kOpcDecEntry,
     /* 0x0026 */ kOpcDecEntry,
@@ -2815,13 +2692,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x0029 */ kOpcDecEntry,
     /* 0x002a */ kOpcDecEntry,
     /* 0x002b */ kOpcDecEntry,
-    /* 0x002c */ {.fn = &fBox::execCvtgfC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF_C" },
-    /* 0x002d */ {.fn = &fBox::execCvtgdC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD_C" },
+    /* 0x002c */ { &fBox::execCvtgfC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF_C" },
+    /* 0x002d */ { &fBox::execCvtgdC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD_C" },
     /* 0x002e */ kOpcDecEntry,
-    /* 0x002f */ {.fn = &fBox::execCvtgqC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ_C" },
+    /* 0x002f */ { &fBox::execCvtgqC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ_C" },
     /* 0x0030 */ kOpcDecEntry,
     /* 0x0031 */ kOpcDecEntry,
     /* 0x0032 */ kOpcDecEntry,
@@ -2834,11 +2708,9 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x0039 */ kOpcDecEntry,
     /* 0x003a */ kOpcDecEntry,
     /* 0x003b */ kOpcDecEntry,
-    /* 0x003c */ {.fn = &fBox::execCvtqfC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQF_C" },
+    /* 0x003c */ { &fBox::execCvtqfC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQF_C" },
     /* 0x003d */ kOpcDecEntry,
-    /* 0x003e */ {.fn = &fBox::execCvtqgC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQG_C" },
+    /* 0x003e */ { &fBox::execCvtqgC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQG_C" },
     /* 0x003f */ kOpcDecEntry,
     /* 0x0040 */ kOpcDecEntry,
     /* 0x0041 */ kOpcDecEntry,
@@ -2904,14 +2776,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x007d */ kOpcDecEntry,
     /* 0x007e */ kOpcDecEntry,
     /* 0x007f */ kOpcDecEntry,
-    /* 0x0080 */ {.fn = &fBox::execAddf, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF" },
-    /* 0x0081 */ {.fn = &fBox::execSubf, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF" },
-    /* 0x0082 */ {.fn = &fBox::execMulf, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF" },
-    /* 0x0083 */ {.fn = &fBox::execDivf, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF" },
+    /* 0x0080 */ { &fBox::execAddf, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF" },
+    /* 0x0081 */ { &fBox::execSubf, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF" },
+    /* 0x0082 */ { &fBox::execMulf, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF" },
+    /* 0x0083 */ { &fBox::execDivf, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF" },
     /* 0x0084 */ kOpcDecEntry,
     /* 0x0085 */ kOpcDecEntry,
     /* 0x0086 */ kOpcDecEntry,
@@ -2938,35 +2806,24 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x009b */ kOpcDecEntry,
     /* 0x009c */ kOpcDecEntry,
     /* 0x009d */ kOpcDecEntry,
-    /* 0x009e */ {.fn = &fBox::execCvtdg, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG" },
+    /* 0x009e */ { &fBox::execCvtdg, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG" },
     /* 0x009f */ kOpcDecEntry,
-    /* 0x00a0 */ {.fn = &fBox::execAddg, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG" },
-    /* 0x00a1 */ {.fn = &fBox::execSubg, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG" },
-    /* 0x00a2 */ {.fn = &fBox::execMulg, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG" },
-    /* 0x00a3 */ {.fn = &fBox::execDivg, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG" },
+    /* 0x00a0 */ { &fBox::execAddg, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG" },
+    /* 0x00a1 */ { &fBox::execSubg, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG" },
+    /* 0x00a2 */ { &fBox::execMulg, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG" },
+    /* 0x00a3 */ { &fBox::execDivg, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG" },
     /* 0x00a4 */ kOpcDecEntry,
-    /* 0x00a5 */ {.fn = &fBox::execCmpgeq, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPGEQ" },
-    /* 0x00a6 */ {.fn = &fBox::execCmpglt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPGLT" },
-    /* 0x00a7 */ {.fn = &fBox::execCmpgle, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPGLE" },
+    /* 0x00a5 */ { &fBox::execCmpgeq, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPGEQ" },
+    /* 0x00a6 */ { &fBox::execCmpglt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPGLT" },
+    /* 0x00a7 */ { &fBox::execCmpgle, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPGLE" },
     /* 0x00a8 */ kOpcDecEntry,
     /* 0x00a9 */ kOpcDecEntry,
     /* 0x00aa */ kOpcDecEntry,
     /* 0x00ab */ kOpcDecEntry,
-    /* 0x00ac */ {.fn = &fBox::execCvtgf, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF" },
-    /* 0x00ad */ {.fn = &fBox::execCvtgd, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD" },
+    /* 0x00ac */ { &fBox::execCvtgf, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF" },
+    /* 0x00ad */ { &fBox::execCvtgd, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD" },
     /* 0x00ae */ kOpcDecEntry,
-    /* 0x00af */ {.fn = &fBox::execCvtgq, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ" },
+    /* 0x00af */ { &fBox::execCvtgq, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ" },
     /* 0x00b0 */ kOpcDecEntry,
     /* 0x00b1 */ kOpcDecEntry,
     /* 0x00b2 */ kOpcDecEntry,
@@ -2979,11 +2836,9 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x00b9 */ kOpcDecEntry,
     /* 0x00ba */ kOpcDecEntry,
     /* 0x00bb */ kOpcDecEntry,
-    /* 0x00bc */ {.fn = &fBox::execCvtqf, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQF" },
+    /* 0x00bc */ { &fBox::execCvtqf, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQF" },
     /* 0x00bd */ kOpcDecEntry,
-    /* 0x00be */ {.fn = &fBox::execCvtqg, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQG" },
+    /* 0x00be */ { &fBox::execCvtqg, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQG" },
     /* 0x00bf */ kOpcDecEntry,
     /* 0x00c0 */ kOpcDecEntry,
     /* 0x00c1 */ kOpcDecEntry,
@@ -3049,14 +2904,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x00fd */ kOpcDecEntry,
     /* 0x00fe */ kOpcDecEntry,
     /* 0x00ff */ kOpcDecEntry,
-    /* 0x0100 */ {.fn = &fBox::execAddfUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF_UC" },
-    /* 0x0101 */ {.fn = &fBox::execSubfUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF_UC" },
-    /* 0x0102 */ {.fn = &fBox::execMulfUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF_UC" },
-    /* 0x0103 */ {.fn = &fBox::execDivfUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF_UC" },
+    /* 0x0100 */ { &fBox::execAddfUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF_UC" },
+    /* 0x0101 */ { &fBox::execSubfUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF_UC" },
+    /* 0x0102 */ { &fBox::execMulfUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF_UC" },
+    /* 0x0103 */ { &fBox::execDivfUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF_UC" },
     /* 0x0104 */ kOpcDecEntry,
     /* 0x0105 */ kOpcDecEntry,
     /* 0x0106 */ kOpcDecEntry,
@@ -3083,17 +2934,12 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x011b */ kOpcDecEntry,
     /* 0x011c */ kOpcDecEntry,
     /* 0x011d */ kOpcDecEntry,
-    /* 0x011e */ {.fn = &fBox::execCvtdgUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG_UC" },
+    /* 0x011e */ { &fBox::execCvtdgUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG_UC" },
     /* 0x011f */ kOpcDecEntry,
-    /* 0x0120 */ {.fn = &fBox::execAddgUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG_UC" },
-    /* 0x0121 */ {.fn = &fBox::execSubgUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG_UC" },
-    /* 0x0122 */ {.fn = &fBox::execMulgUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG_UC" },
-    /* 0x0123 */ {.fn = &fBox::execDivgUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG_UC" },
+    /* 0x0120 */ { &fBox::execAddgUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG_UC" },
+    /* 0x0121 */ { &fBox::execSubgUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG_UC" },
+    /* 0x0122 */ { &fBox::execMulgUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG_UC" },
+    /* 0x0123 */ { &fBox::execDivgUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG_UC" },
     /* 0x0124 */ kOpcDecEntry,
     /* 0x0125 */ kOpcDecEntry,
     /* 0x0126 */ kOpcDecEntry,
@@ -3102,13 +2948,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x0129 */ kOpcDecEntry,
     /* 0x012a */ kOpcDecEntry,
     /* 0x012b */ kOpcDecEntry,
-    /* 0x012c */ {.fn = &fBox::execCvtgfUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF_UC" },
-    /* 0x012d */ {.fn = &fBox::execCvtgdUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD_UC" },
+    /* 0x012c */ { &fBox::execCvtgfUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF_UC" },
+    /* 0x012d */ { &fBox::execCvtgdUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD_UC" },
     /* 0x012e */ kOpcDecEntry,
-    /* 0x012f */ {.fn = &fBox::execCvtgqVc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ_VC" },
+    /* 0x012f */ { &fBox::execCvtgqVc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ_VC" },
     /* 0x0130 */ kOpcDecEntry,
     /* 0x0131 */ kOpcDecEntry,
     /* 0x0132 */ kOpcDecEntry,
@@ -3189,14 +3032,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x017d */ kOpcDecEntry,
     /* 0x017e */ kOpcDecEntry,
     /* 0x017f */ kOpcDecEntry,
-    /* 0x0180 */ {.fn = &fBox::execAddfU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF_U" },
-    /* 0x0181 */ {.fn = &fBox::execSubfU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF_U" },
-    /* 0x0182 */ {.fn = &fBox::execMulfU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF_U" },
-    /* 0x0183 */ {.fn = &fBox::execDivfU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF_U" },
+    /* 0x0180 */ { &fBox::execAddfU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF_U" },
+    /* 0x0181 */ { &fBox::execSubfU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF_U" },
+    /* 0x0182 */ { &fBox::execMulfU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF_U" },
+    /* 0x0183 */ { &fBox::execDivfU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF_U" },
     /* 0x0184 */ kOpcDecEntry,
     /* 0x0185 */ kOpcDecEntry,
     /* 0x0186 */ kOpcDecEntry,
@@ -3223,17 +3062,12 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x019b */ kOpcDecEntry,
     /* 0x019c */ kOpcDecEntry,
     /* 0x019d */ kOpcDecEntry,
-    /* 0x019e */ {.fn = &fBox::execCvtdgU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG_U" },
+    /* 0x019e */ { &fBox::execCvtdgU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG_U" },
     /* 0x019f */ kOpcDecEntry,
-    /* 0x01a0 */ {.fn = &fBox::execAddgU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG_U" },
-    /* 0x01a1 */ {.fn = &fBox::execSubgU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG_U" },
-    /* 0x01a2 */ {.fn = &fBox::execMulgU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG_U" },
-    /* 0x01a3 */ {.fn = &fBox::execDivgU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG_U" },
+    /* 0x01a0 */ { &fBox::execAddgU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG_U" },
+    /* 0x01a1 */ { &fBox::execSubgU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG_U" },
+    /* 0x01a2 */ { &fBox::execMulgU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG_U" },
+    /* 0x01a3 */ { &fBox::execDivgU, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG_U" },
     /* 0x01a4 */ kOpcDecEntry,
     /* 0x01a5 */ kOpcDecEntry,
     /* 0x01a6 */ kOpcDecEntry,
@@ -3242,13 +3076,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x01a9 */ kOpcDecEntry,
     /* 0x01aa */ kOpcDecEntry,
     /* 0x01ab */ kOpcDecEntry,
-    /* 0x01ac */ {.fn = &fBox::execCvtgfU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF_U" },
-    /* 0x01ad */ {.fn = &fBox::execCvtgdU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD_U" },
+    /* 0x01ac */ { &fBox::execCvtgfU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF_U" },
+    /* 0x01ad */ { &fBox::execCvtgdU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD_U" },
     /* 0x01ae */ kOpcDecEntry,
-    /* 0x01af */ {.fn = &fBox::execCvtgqV, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ_V" },
+    /* 0x01af */ { &fBox::execCvtgqV, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ_V" },
     /* 0x01b0 */ kOpcDecEntry,
     /* 0x01b1 */ kOpcDecEntry,
     /* 0x01b2 */ kOpcDecEntry,
@@ -3841,14 +3672,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x03fd */ kOpcDecEntry,
     /* 0x03fe */ kOpcDecEntry,
     /* 0x03ff */ kOpcDecEntry,
-    /* 0x0400 */ {.fn = &fBox::execAddfSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF_SC" },
-    /* 0x0401 */ {.fn = &fBox::execSubfSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF_SC" },
-    /* 0x0402 */ {.fn = &fBox::execMulfSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF_SC" },
-    /* 0x0403 */ {.fn = &fBox::execDivfSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF_SC" },
+    /* 0x0400 */ { &fBox::execAddfSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF_SC" },
+    /* 0x0401 */ { &fBox::execSubfSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF_SC" },
+    /* 0x0402 */ { &fBox::execMulfSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF_SC" },
+    /* 0x0403 */ { &fBox::execDivfSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF_SC" },
     /* 0x0404 */ kOpcDecEntry,
     /* 0x0405 */ kOpcDecEntry,
     /* 0x0406 */ kOpcDecEntry,
@@ -3875,17 +3702,12 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x041b */ kOpcDecEntry,
     /* 0x041c */ kOpcDecEntry,
     /* 0x041d */ kOpcDecEntry,
-    /* 0x041e */ {.fn = &fBox::execCvtdgSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG_SC" },
+    /* 0x041e */ { &fBox::execCvtdgSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG_SC" },
     /* 0x041f */ kOpcDecEntry,
-    /* 0x0420 */ {.fn = &fBox::execAddgSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG_SC" },
-    /* 0x0421 */ {.fn = &fBox::execSubgSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG_SC" },
-    /* 0x0422 */ {.fn = &fBox::execMulgSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG_SC" },
-    /* 0x0423 */ {.fn = &fBox::execDivgSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG_SC" },
+    /* 0x0420 */ { &fBox::execAddgSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG_SC" },
+    /* 0x0421 */ { &fBox::execSubgSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG_SC" },
+    /* 0x0422 */ { &fBox::execMulgSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG_SC" },
+    /* 0x0423 */ { &fBox::execDivgSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG_SC" },
     /* 0x0424 */ kOpcDecEntry,
     /* 0x0425 */ kOpcDecEntry,
     /* 0x0426 */ kOpcDecEntry,
@@ -3894,13 +3716,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x0429 */ kOpcDecEntry,
     /* 0x042a */ kOpcDecEntry,
     /* 0x042b */ kOpcDecEntry,
-    /* 0x042c */ {.fn = &fBox::execCvtgfSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF_SC" },
-    /* 0x042d */ {.fn = &fBox::execCvtgdSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD_SC" },
+    /* 0x042c */ { &fBox::execCvtgfSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF_SC" },
+    /* 0x042d */ { &fBox::execCvtgdSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD_SC" },
     /* 0x042e */ kOpcDecEntry,
-    /* 0x042f */ {.fn = &fBox::execCvtgqSc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ_SC" },
+    /* 0x042f */ { &fBox::execCvtgqSc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ_SC" },
     /* 0x0430 */ kOpcDecEntry,
     /* 0x0431 */ kOpcDecEntry,
     /* 0x0432 */ kOpcDecEntry,
@@ -3981,14 +3800,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x047d */ kOpcDecEntry,
     /* 0x047e */ kOpcDecEntry,
     /* 0x047f */ kOpcDecEntry,
-    /* 0x0480 */ {.fn = &fBox::execAddfS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF_S" },
-    /* 0x0481 */ {.fn = &fBox::execSubfS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF_S" },
-    /* 0x0482 */ {.fn = &fBox::execMulfS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF_S" },
-    /* 0x0483 */ {.fn = &fBox::execDivfS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF_S" },
+    /* 0x0480 */ { &fBox::execAddfS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF_S" },
+    /* 0x0481 */ { &fBox::execSubfS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF_S" },
+    /* 0x0482 */ { &fBox::execMulfS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF_S" },
+    /* 0x0483 */ { &fBox::execDivfS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF_S" },
     /* 0x0484 */ kOpcDecEntry,
     /* 0x0485 */ kOpcDecEntry,
     /* 0x0486 */ kOpcDecEntry,
@@ -4015,35 +3830,24 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x049b */ kOpcDecEntry,
     /* 0x049c */ kOpcDecEntry,
     /* 0x049d */ kOpcDecEntry,
-    /* 0x049e */ {.fn = &fBox::execCvtdgS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG_S" },
+    /* 0x049e */ { &fBox::execCvtdgS, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG_S" },
     /* 0x049f */ kOpcDecEntry,
-    /* 0x04a0 */ {.fn = &fBox::execAddgS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG_S" },
-    /* 0x04a1 */ {.fn = &fBox::execSubgS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG_S" },
-    /* 0x04a2 */ {.fn = &fBox::execMulgS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG_S" },
-    /* 0x04a3 */ {.fn = &fBox::execDivgS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG_S" },
+    /* 0x04a0 */ { &fBox::execAddgS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG_S" },
+    /* 0x04a1 */ { &fBox::execSubgS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG_S" },
+    /* 0x04a2 */ { &fBox::execMulgS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG_S" },
+    /* 0x04a3 */ { &fBox::execDivgS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG_S" },
     /* 0x04a4 */ kOpcDecEntry,
-    /* 0x04a5 */ {.fn = &fBox::execCmpgeqS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPGEQ_S" },
-    /* 0x04a6 */ {.fn = &fBox::execCmpgltS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPGLT_S" },
-    /* 0x04a7 */ {.fn = &fBox::execCmpgleS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPGLE_S" },
+    /* 0x04a5 */ { &fBox::execCmpgeqS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPGEQ_S" },
+    /* 0x04a6 */ { &fBox::execCmpgltS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPGLT_S" },
+    /* 0x04a7 */ { &fBox::execCmpgleS, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPGLE_S" },
     /* 0x04a8 */ kOpcDecEntry,
     /* 0x04a9 */ kOpcDecEntry,
     /* 0x04aa */ kOpcDecEntry,
     /* 0x04ab */ kOpcDecEntry,
-    /* 0x04ac */ {.fn = &fBox::execCvtgfS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF_S" },
-    /* 0x04ad */ {.fn = &fBox::execCvtgdS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD_S" },
+    /* 0x04ac */ { &fBox::execCvtgfS, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF_S" },
+    /* 0x04ad */ { &fBox::execCvtgdS, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD_S" },
     /* 0x04ae */ kOpcDecEntry,
-    /* 0x04af */ {.fn = &fBox::execCvtgqS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ_S" },
+    /* 0x04af */ { &fBox::execCvtgqS, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ_S" },
     /* 0x04b0 */ kOpcDecEntry,
     /* 0x04b1 */ kOpcDecEntry,
     /* 0x04b2 */ kOpcDecEntry,
@@ -4124,14 +3928,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x04fd */ kOpcDecEntry,
     /* 0x04fe */ kOpcDecEntry,
     /* 0x04ff */ kOpcDecEntry,
-    /* 0x0500 */ {.fn = &fBox::execAddfSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF_SUC" },
-    /* 0x0501 */ {.fn = &fBox::execSubfSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF_SUC" },
-    /* 0x0502 */ {.fn = &fBox::execMulfSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF_SUC" },
-    /* 0x0503 */ {.fn = &fBox::execDivfSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF_SUC" },
+    /* 0x0500 */ { &fBox::execAddfSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF_SUC" },
+    /* 0x0501 */ { &fBox::execSubfSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF_SUC" },
+    /* 0x0502 */ { &fBox::execMulfSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF_SUC" },
+    /* 0x0503 */ { &fBox::execDivfSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF_SUC" },
     /* 0x0504 */ kOpcDecEntry,
     /* 0x0505 */ kOpcDecEntry,
     /* 0x0506 */ kOpcDecEntry,
@@ -4158,17 +3958,12 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x051b */ kOpcDecEntry,
     /* 0x051c */ kOpcDecEntry,
     /* 0x051d */ kOpcDecEntry,
-    /* 0x051e */ {.fn = &fBox::execCvtdgSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG_SUC" },
+    /* 0x051e */ { &fBox::execCvtdgSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG_SUC" },
     /* 0x051f */ kOpcDecEntry,
-    /* 0x0520 */ {.fn = &fBox::execAddgSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG_SUC" },
-    /* 0x0521 */ {.fn = &fBox::execSubgSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG_SUC" },
-    /* 0x0522 */ {.fn = &fBox::execMulgSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG_SUC" },
-    /* 0x0523 */ {.fn = &fBox::execDivgSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG_SUC" },
+    /* 0x0520 */ { &fBox::execAddgSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG_SUC" },
+    /* 0x0521 */ { &fBox::execSubgSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG_SUC" },
+    /* 0x0522 */ { &fBox::execMulgSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG_SUC" },
+    /* 0x0523 */ { &fBox::execDivgSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG_SUC" },
     /* 0x0524 */ kOpcDecEntry,
     /* 0x0525 */ kOpcDecEntry,
     /* 0x0526 */ kOpcDecEntry,
@@ -4177,13 +3972,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x0529 */ kOpcDecEntry,
     /* 0x052a */ kOpcDecEntry,
     /* 0x052b */ kOpcDecEntry,
-    /* 0x052c */ {.fn = &fBox::execCvtgfSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF_SUC" },
-    /* 0x052d */ {.fn = &fBox::execCvtgdSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD_SUC" },
+    /* 0x052c */ { &fBox::execCvtgfSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF_SUC" },
+    /* 0x052d */ { &fBox::execCvtgdSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD_SUC" },
     /* 0x052e */ kOpcDecEntry,
-    /* 0x052f */ {.fn = &fBox::execCvtgqSvc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ_SVC" },
+    /* 0x052f */ { &fBox::execCvtgqSvc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ_SVC" },
     /* 0x0530 */ kOpcDecEntry,
     /* 0x0531 */ kOpcDecEntry,
     /* 0x0532 */ kOpcDecEntry,
@@ -4264,14 +4056,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x057d */ kOpcDecEntry,
     /* 0x057e */ kOpcDecEntry,
     /* 0x057f */ kOpcDecEntry,
-    /* 0x0580 */ {.fn = &fBox::execAddfSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDF_SU" },
-    /* 0x0581 */ {.fn = &fBox::execSubfSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBF_SU" },
-    /* 0x0582 */ {.fn = &fBox::execMulfSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULF_SU" },
-    /* 0x0583 */ {.fn = &fBox::execDivfSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVF_SU" },
+    /* 0x0580 */ { &fBox::execAddfSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDF_SU" },
+    /* 0x0581 */ { &fBox::execSubfSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBF_SU" },
+    /* 0x0582 */ { &fBox::execMulfSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULF_SU" },
+    /* 0x0583 */ { &fBox::execDivfSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVF_SU" },
     /* 0x0584 */ kOpcDecEntry,
     /* 0x0585 */ kOpcDecEntry,
     /* 0x0586 */ kOpcDecEntry,
@@ -4298,17 +4086,12 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x059b */ kOpcDecEntry,
     /* 0x059c */ kOpcDecEntry,
     /* 0x059d */ kOpcDecEntry,
-    /* 0x059e */ {.fn = &fBox::execCvtdgSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTDG_SU" },
+    /* 0x059e */ { &fBox::execCvtdgSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTDG_SU" },
     /* 0x059f */ kOpcDecEntry,
-    /* 0x05a0 */ {.fn = &fBox::execAddgSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDG_SU" },
-    /* 0x05a1 */ {.fn = &fBox::execSubgSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBG_SU" },
-    /* 0x05a2 */ {.fn = &fBox::execMulgSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULG_SU" },
-    /* 0x05a3 */ {.fn = &fBox::execDivgSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVG_SU" },
+    /* 0x05a0 */ { &fBox::execAddgSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDG_SU" },
+    /* 0x05a1 */ { &fBox::execSubgSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBG_SU" },
+    /* 0x05a2 */ { &fBox::execMulgSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULG_SU" },
+    /* 0x05a3 */ { &fBox::execDivgSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVG_SU" },
     /* 0x05a4 */ kOpcDecEntry,
     /* 0x05a5 */ kOpcDecEntry,
     /* 0x05a6 */ kOpcDecEntry,
@@ -4317,13 +4100,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
     /* 0x05a9 */ kOpcDecEntry,
     /* 0x05aa */ kOpcDecEntry,
     /* 0x05ab */ kOpcDecEntry,
-    /* 0x05ac */ {.fn = &fBox::execCvtgfSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGF_SU" },
-    /* 0x05ad */ {.fn = &fBox::execCvtgdSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGD_SU" },
+    /* 0x05ac */ { &fBox::execCvtgfSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGF_SU" },
+    /* 0x05ad */ { &fBox::execCvtgdSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGD_SU" },
     /* 0x05ae */ kOpcDecEntry,
-    /* 0x05af */ {.fn = &fBox::execCvtgqSv, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTGQ_SV" },
+    /* 0x05af */ { &fBox::execCvtgqSv, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTGQ_SV" },
     /* 0x05b0 */ kOpcDecEntry,
     /* 0x05b1 */ kOpcDecEntry,
     /* 0x05b2 */ kOpcDecEntry,
@@ -4922,14 +4702,10 @@ GrainEntry const g_fltVaxSubTable[2048] = {
 // FltIeee sub-table: 2048 entries, 186 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_fltIeeeSubTable[2048] = {
-    /* 0x0000 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_C" },
-    /* 0x0001 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_C" },
-    /* 0x0002 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_C" },
-    /* 0x0003 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_C" },
+    /* 0x0000 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_C" },
+    /* 0x0001 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_C" },
+    /* 0x0002 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_C" },
+    /* 0x0003 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_C" },
     /* 0x0004 */ kOpcDecEntry,
     /* 0x0005 */ kOpcDecEntry,
     /* 0x0006 */ kOpcDecEntry,
@@ -4958,14 +4734,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x001d */ kOpcDecEntry,
     /* 0x001e */ kOpcDecEntry,
     /* 0x001f */ kOpcDecEntry,
-    /* 0x0020 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_C" },
-    /* 0x0021 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_C" },
-    /* 0x0022 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_C" },
-    /* 0x0023 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_C" },
+    /* 0x0020 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_C" },
+    /* 0x0021 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_C" },
+    /* 0x0022 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_C" },
+    /* 0x0023 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_C" },
     /* 0x0024 */ kOpcDecEntry,
     /* 0x0025 */ kOpcDecEntry,
     /* 0x0026 */ kOpcDecEntry,
@@ -4974,12 +4746,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0029 */ kOpcDecEntry,
     /* 0x002a */ kOpcDecEntry,
     /* 0x002b */ kOpcDecEntry,
-    /* 0x002c */ {.fn = &fBox::execCvttsC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_C" },
+    /* 0x002c */ { &fBox::execCvttsC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_C" },
     /* 0x002d */ kOpcDecEntry,
     /* 0x002e */ kOpcDecEntry,
-    /* 0x002f */ {.fn = &fBox::execCvttqC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_C" },
+    /* 0x002f */ { &fBox::execCvttqC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_C" },
     /* 0x0030 */ kOpcDecEntry,
     /* 0x0031 */ kOpcDecEntry,
     /* 0x0032 */ kOpcDecEntry,
@@ -4992,20 +4762,14 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0039 */ kOpcDecEntry,
     /* 0x003a */ kOpcDecEntry,
     /* 0x003b */ kOpcDecEntry,
-    /* 0x003c */ {.fn = &fBox::execCvtqsC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS_C" },
+    /* 0x003c */ { &fBox::execCvtqsC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS_C" },
     /* 0x003d */ kOpcDecEntry,
-    /* 0x003e */ {.fn = &fBox::execCvtqtC, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT_C" },
+    /* 0x003e */ { &fBox::execCvtqtC, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT_C" },
     /* 0x003f */ kOpcDecEntry,
-    /* 0x0040 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_M" },
-    /* 0x0041 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_M" },
-    /* 0x0042 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_M" },
-    /* 0x0043 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_M" },
+    /* 0x0040 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_M" },
+    /* 0x0041 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_M" },
+    /* 0x0042 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_M" },
+    /* 0x0043 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_M" },
     /* 0x0044 */ kOpcDecEntry,
     /* 0x0045 */ kOpcDecEntry,
     /* 0x0046 */ kOpcDecEntry,
@@ -5034,14 +4798,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x005d */ kOpcDecEntry,
     /* 0x005e */ kOpcDecEntry,
     /* 0x005f */ kOpcDecEntry,
-    /* 0x0060 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_M" },
-    /* 0x0061 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_M" },
-    /* 0x0062 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_M" },
-    /* 0x0063 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_M" },
+    /* 0x0060 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_M" },
+    /* 0x0061 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_M" },
+    /* 0x0062 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_M" },
+    /* 0x0063 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_M" },
     /* 0x0064 */ kOpcDecEntry,
     /* 0x0065 */ kOpcDecEntry,
     /* 0x0066 */ kOpcDecEntry,
@@ -5050,12 +4810,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0069 */ kOpcDecEntry,
     /* 0x006a */ kOpcDecEntry,
     /* 0x006b */ kOpcDecEntry,
-    /* 0x006c */ {.fn = &fBox::execCvttsM, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_M" },
+    /* 0x006c */ { &fBox::execCvttsM, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_M" },
     /* 0x006d */ kOpcDecEntry,
     /* 0x006e */ kOpcDecEntry,
-    /* 0x006f */ {.fn = &fBox::execCvttqM, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_M" },
+    /* 0x006f */ { &fBox::execCvttqM, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_M" },
     /* 0x0070 */ kOpcDecEntry,
     /* 0x0071 */ kOpcDecEntry,
     /* 0x0072 */ kOpcDecEntry,
@@ -5068,20 +4826,14 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0079 */ kOpcDecEntry,
     /* 0x007a */ kOpcDecEntry,
     /* 0x007b */ kOpcDecEntry,
-    /* 0x007c */ {.fn = &fBox::execCvtqsM, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS_M" },
+    /* 0x007c */ { &fBox::execCvtqsM, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS_M" },
     /* 0x007d */ kOpcDecEntry,
-    /* 0x007e */ {.fn = &fBox::execCvtqtM, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT_M" },
+    /* 0x007e */ { &fBox::execCvtqtM, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT_M" },
     /* 0x007f */ kOpcDecEntry,
-    /* 0x0080 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS" },
-    /* 0x0081 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS" },
-    /* 0x0082 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS" },
-    /* 0x0083 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS" },
+    /* 0x0080 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS" },
+    /* 0x0081 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS" },
+    /* 0x0082 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS" },
+    /* 0x0083 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS" },
     /* 0x0084 */ kOpcDecEntry,
     /* 0x0085 */ kOpcDecEntry,
     /* 0x0086 */ kOpcDecEntry,
@@ -5110,32 +4862,22 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x009d */ kOpcDecEntry,
     /* 0x009e */ kOpcDecEntry,
     /* 0x009f */ kOpcDecEntry,
-    /* 0x00a0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT" },
-    /* 0x00a1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT" },
-    /* 0x00a2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT" },
-    /* 0x00a3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT" },
-    /* 0x00a4 */ {.fn = &fBox::execCmptun, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTUN" },
-    /* 0x00a5 */ {.fn = &fBox::execCmpteq, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTEQ" },
-    /* 0x00a6 */ {.fn = &fBox::execCmptlt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTLT" },
-    /* 0x00a7 */ {.fn = &fBox::execCmptle, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTLE" },
+    /* 0x00a0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT" },
+    /* 0x00a1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT" },
+    /* 0x00a2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT" },
+    /* 0x00a3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT" },
+    /* 0x00a4 */ { &fBox::execCmptun, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTUN" },
+    /* 0x00a5 */ { &fBox::execCmpteq, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTEQ" },
+    /* 0x00a6 */ { &fBox::execCmptlt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTLT" },
+    /* 0x00a7 */ { &fBox::execCmptle, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTLE" },
     /* 0x00a8 */ kOpcDecEntry,
     /* 0x00a9 */ kOpcDecEntry,
     /* 0x00aa */ kOpcDecEntry,
     /* 0x00ab */ kOpcDecEntry,
-    /* 0x00ac */ {.fn = &fBox::execCvtts, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS" },
+    /* 0x00ac */ { &fBox::execCvtts, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS" },
     /* 0x00ad */ kOpcDecEntry,
     /* 0x00ae */ kOpcDecEntry,
-    /* 0x00af */ {.fn = &fBox::execCvttq, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ" },
+    /* 0x00af */ { &fBox::execCvttq, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ" },
     /* 0x00b0 */ kOpcDecEntry,
     /* 0x00b1 */ kOpcDecEntry,
     /* 0x00b2 */ kOpcDecEntry,
@@ -5148,20 +4890,14 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x00b9 */ kOpcDecEntry,
     /* 0x00ba */ kOpcDecEntry,
     /* 0x00bb */ kOpcDecEntry,
-    /* 0x00bc */ {.fn = &fBox::execCvtqs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS" },
+    /* 0x00bc */ { &fBox::execCvtqs, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS" },
     /* 0x00bd */ kOpcDecEntry,
-    /* 0x00be */ {.fn = &fBox::execCvtqt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT" },
+    /* 0x00be */ { &fBox::execCvtqt, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT" },
     /* 0x00bf */ kOpcDecEntry,
-    /* 0x00c0 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_D" },
-    /* 0x00c1 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_D" },
-    /* 0x00c2 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_D" },
-    /* 0x00c3 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_D" },
+    /* 0x00c0 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_D" },
+    /* 0x00c1 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_D" },
+    /* 0x00c2 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_D" },
+    /* 0x00c3 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_D" },
     /* 0x00c4 */ kOpcDecEntry,
     /* 0x00c5 */ kOpcDecEntry,
     /* 0x00c6 */ kOpcDecEntry,
@@ -5190,14 +4926,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x00dd */ kOpcDecEntry,
     /* 0x00de */ kOpcDecEntry,
     /* 0x00df */ kOpcDecEntry,
-    /* 0x00e0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_D" },
-    /* 0x00e1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_D" },
-    /* 0x00e2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_D" },
-    /* 0x00e3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_D" },
+    /* 0x00e0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_D" },
+    /* 0x00e1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_D" },
+    /* 0x00e2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_D" },
+    /* 0x00e3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_D" },
     /* 0x00e4 */ kOpcDecEntry,
     /* 0x00e5 */ kOpcDecEntry,
     /* 0x00e6 */ kOpcDecEntry,
@@ -5206,12 +4938,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x00e9 */ kOpcDecEntry,
     /* 0x00ea */ kOpcDecEntry,
     /* 0x00eb */ kOpcDecEntry,
-    /* 0x00ec */ {.fn = &fBox::execCvttsD, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_D" },
+    /* 0x00ec */ { &fBox::execCvttsD, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_D" },
     /* 0x00ed */ kOpcDecEntry,
     /* 0x00ee */ kOpcDecEntry,
-    /* 0x00ef */ {.fn = &fBox::execCvttqD, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_D" },
+    /* 0x00ef */ { &fBox::execCvttqD, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_D" },
     /* 0x00f0 */ kOpcDecEntry,
     /* 0x00f1 */ kOpcDecEntry,
     /* 0x00f2 */ kOpcDecEntry,
@@ -5224,20 +4954,14 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x00f9 */ kOpcDecEntry,
     /* 0x00fa */ kOpcDecEntry,
     /* 0x00fb */ kOpcDecEntry,
-    /* 0x00fc */ {.fn = &fBox::execCvtqsD, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS_D" },
+    /* 0x00fc */ { &fBox::execCvtqsD, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS_D" },
     /* 0x00fd */ kOpcDecEntry,
-    /* 0x00fe */ {.fn = &fBox::execCvtqtD, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT_D" },
+    /* 0x00fe */ { &fBox::execCvtqtD, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT_D" },
     /* 0x00ff */ kOpcDecEntry,
-    /* 0x0100 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_UC" },
-    /* 0x0101 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_UC" },
-    /* 0x0102 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_UC" },
-    /* 0x0103 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_UC" },
+    /* 0x0100 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_UC" },
+    /* 0x0101 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_UC" },
+    /* 0x0102 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_UC" },
+    /* 0x0103 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_UC" },
     /* 0x0104 */ kOpcDecEntry,
     /* 0x0105 */ kOpcDecEntry,
     /* 0x0106 */ kOpcDecEntry,
@@ -5266,14 +4990,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x011d */ kOpcDecEntry,
     /* 0x011e */ kOpcDecEntry,
     /* 0x011f */ kOpcDecEntry,
-    /* 0x0120 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_UC" },
-    /* 0x0121 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_UC" },
-    /* 0x0122 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_UC" },
-    /* 0x0123 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_UC" },
+    /* 0x0120 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_UC" },
+    /* 0x0121 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_UC" },
+    /* 0x0122 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_UC" },
+    /* 0x0123 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_UC" },
     /* 0x0124 */ kOpcDecEntry,
     /* 0x0125 */ kOpcDecEntry,
     /* 0x0126 */ kOpcDecEntry,
@@ -5282,12 +5002,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0129 */ kOpcDecEntry,
     /* 0x012a */ kOpcDecEntry,
     /* 0x012b */ kOpcDecEntry,
-    /* 0x012c */ {.fn = &fBox::execCvttsUc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_UC" },
+    /* 0x012c */ { &fBox::execCvttsUc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_UC" },
     /* 0x012d */ kOpcDecEntry,
     /* 0x012e */ kOpcDecEntry,
-    /* 0x012f */ {.fn = &fBox::execCvttqVc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_VC" },
+    /* 0x012f */ { &fBox::execCvttqVc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_VC" },
     /* 0x0130 */ kOpcDecEntry,
     /* 0x0131 */ kOpcDecEntry,
     /* 0x0132 */ kOpcDecEntry,
@@ -5304,14 +5022,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x013d */ kOpcDecEntry,
     /* 0x013e */ kOpcDecEntry,
     /* 0x013f */ kOpcDecEntry,
-    /* 0x0140 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_UM" },
-    /* 0x0141 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_UM" },
-    /* 0x0142 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_UM" },
-    /* 0x0143 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_UM" },
+    /* 0x0140 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_UM" },
+    /* 0x0141 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_UM" },
+    /* 0x0142 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_UM" },
+    /* 0x0143 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_UM" },
     /* 0x0144 */ kOpcDecEntry,
     /* 0x0145 */ kOpcDecEntry,
     /* 0x0146 */ kOpcDecEntry,
@@ -5340,14 +5054,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x015d */ kOpcDecEntry,
     /* 0x015e */ kOpcDecEntry,
     /* 0x015f */ kOpcDecEntry,
-    /* 0x0160 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_UM" },
-    /* 0x0161 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_UM" },
-    /* 0x0162 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_UM" },
-    /* 0x0163 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_UM" },
+    /* 0x0160 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_UM" },
+    /* 0x0161 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_UM" },
+    /* 0x0162 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_UM" },
+    /* 0x0163 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_UM" },
     /* 0x0164 */ kOpcDecEntry,
     /* 0x0165 */ kOpcDecEntry,
     /* 0x0166 */ kOpcDecEntry,
@@ -5356,12 +5066,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0169 */ kOpcDecEntry,
     /* 0x016a */ kOpcDecEntry,
     /* 0x016b */ kOpcDecEntry,
-    /* 0x016c */ {.fn = &fBox::execCvttsUm, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_UM" },
+    /* 0x016c */ { &fBox::execCvttsUm, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_UM" },
     /* 0x016d */ kOpcDecEntry,
     /* 0x016e */ kOpcDecEntry,
-    /* 0x016f */ {.fn = &fBox::execCvttqVm, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_VM" },
+    /* 0x016f */ { &fBox::execCvttqVm, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_VM" },
     /* 0x0170 */ kOpcDecEntry,
     /* 0x0171 */ kOpcDecEntry,
     /* 0x0172 */ kOpcDecEntry,
@@ -5378,14 +5086,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x017d */ kOpcDecEntry,
     /* 0x017e */ kOpcDecEntry,
     /* 0x017f */ kOpcDecEntry,
-    /* 0x0180 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_U" },
-    /* 0x0181 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_U" },
-    /* 0x0182 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_U" },
-    /* 0x0183 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_U" },
+    /* 0x0180 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_U" },
+    /* 0x0181 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_U" },
+    /* 0x0182 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_U" },
+    /* 0x0183 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_U" },
     /* 0x0184 */ kOpcDecEntry,
     /* 0x0185 */ kOpcDecEntry,
     /* 0x0186 */ kOpcDecEntry,
@@ -5414,14 +5118,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x019d */ kOpcDecEntry,
     /* 0x019e */ kOpcDecEntry,
     /* 0x019f */ kOpcDecEntry,
-    /* 0x01a0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_U" },
-    /* 0x01a1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_U" },
-    /* 0x01a2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_U" },
-    /* 0x01a3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_U" },
+    /* 0x01a0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_U" },
+    /* 0x01a1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_U" },
+    /* 0x01a2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_U" },
+    /* 0x01a3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_U" },
     /* 0x01a4 */ kOpcDecEntry,
     /* 0x01a5 */ kOpcDecEntry,
     /* 0x01a6 */ kOpcDecEntry,
@@ -5430,12 +5130,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x01a9 */ kOpcDecEntry,
     /* 0x01aa */ kOpcDecEntry,
     /* 0x01ab */ kOpcDecEntry,
-    /* 0x01ac */ {.fn = &fBox::execCvttsU, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_U" },
+    /* 0x01ac */ { &fBox::execCvttsU, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_U" },
     /* 0x01ad */ kOpcDecEntry,
     /* 0x01ae */ kOpcDecEntry,
-    /* 0x01af */ {.fn = &fBox::execCvttqV, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_V" },
+    /* 0x01af */ { &fBox::execCvttqV, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_V" },
     /* 0x01b0 */ kOpcDecEntry,
     /* 0x01b1 */ kOpcDecEntry,
     /* 0x01b2 */ kOpcDecEntry,
@@ -5452,14 +5150,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x01bd */ kOpcDecEntry,
     /* 0x01be */ kOpcDecEntry,
     /* 0x01bf */ kOpcDecEntry,
-    /* 0x01c0 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_UD" },
-    /* 0x01c1 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_UD" },
-    /* 0x01c2 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_UD" },
-    /* 0x01c3 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_UD" },
+    /* 0x01c0 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_UD" },
+    /* 0x01c1 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_UD" },
+    /* 0x01c2 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_UD" },
+    /* 0x01c3 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_UD" },
     /* 0x01c4 */ kOpcDecEntry,
     /* 0x01c5 */ kOpcDecEntry,
     /* 0x01c6 */ kOpcDecEntry,
@@ -5488,14 +5182,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x01dd */ kOpcDecEntry,
     /* 0x01de */ kOpcDecEntry,
     /* 0x01df */ kOpcDecEntry,
-    /* 0x01e0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_UD" },
-    /* 0x01e1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_UD" },
-    /* 0x01e2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_UD" },
-    /* 0x01e3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_UD" },
+    /* 0x01e0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_UD" },
+    /* 0x01e1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_UD" },
+    /* 0x01e2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_UD" },
+    /* 0x01e3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_UD" },
     /* 0x01e4 */ kOpcDecEntry,
     /* 0x01e5 */ kOpcDecEntry,
     /* 0x01e6 */ kOpcDecEntry,
@@ -5504,12 +5194,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x01e9 */ kOpcDecEntry,
     /* 0x01ea */ kOpcDecEntry,
     /* 0x01eb */ kOpcDecEntry,
-    /* 0x01ec */ {.fn = &fBox::execCvttsUd, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_UD" },
+    /* 0x01ec */ { &fBox::execCvttsUd, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_UD" },
     /* 0x01ed */ kOpcDecEntry,
     /* 0x01ee */ kOpcDecEntry,
-    /* 0x01ef */ {.fn = &fBox::execCvttqVd, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_VD" },
+    /* 0x01ef */ { &fBox::execCvttqVd, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_VD" },
     /* 0x01f0 */ kOpcDecEntry,
     /* 0x01f1 */ kOpcDecEntry,
     /* 0x01f2 */ kOpcDecEntry,
@@ -5698,8 +5386,7 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x02a9 */ kOpcDecEntry,
     /* 0x02aa */ kOpcDecEntry,
     /* 0x02ab */ kOpcDecEntry,
-    /* 0x02ac */ {.fn = &fBox::execCvtst, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTST" },
+    /* 0x02ac */ { &fBox::execCvtst, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTST" },
     /* 0x02ad */ kOpcDecEntry,
     /* 0x02ae */ kOpcDecEntry,
     /* 0x02af */ kOpcDecEntry,
@@ -6295,14 +5982,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x04fd */ kOpcDecEntry,
     /* 0x04fe */ kOpcDecEntry,
     /* 0x04ff */ kOpcDecEntry,
-    /* 0x0500 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SUC" },
-    /* 0x0501 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SUC" },
-    /* 0x0502 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SUC" },
-    /* 0x0503 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SUC" },
+    /* 0x0500 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SUC" },
+    /* 0x0501 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SUC" },
+    /* 0x0502 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SUC" },
+    /* 0x0503 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SUC" },
     /* 0x0504 */ kOpcDecEntry,
     /* 0x0505 */ kOpcDecEntry,
     /* 0x0506 */ kOpcDecEntry,
@@ -6331,14 +6014,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x051d */ kOpcDecEntry,
     /* 0x051e */ kOpcDecEntry,
     /* 0x051f */ kOpcDecEntry,
-    /* 0x0520 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SUC" },
-    /* 0x0521 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SUC" },
-    /* 0x0522 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SUC" },
-    /* 0x0523 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SUC" },
+    /* 0x0520 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SUC" },
+    /* 0x0521 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SUC" },
+    /* 0x0522 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SUC" },
+    /* 0x0523 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SUC" },
     /* 0x0524 */ kOpcDecEntry,
     /* 0x0525 */ kOpcDecEntry,
     /* 0x0526 */ kOpcDecEntry,
@@ -6347,12 +6026,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0529 */ kOpcDecEntry,
     /* 0x052a */ kOpcDecEntry,
     /* 0x052b */ kOpcDecEntry,
-    /* 0x052c */ {.fn = &fBox::execCvttsSuc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SUC" },
+    /* 0x052c */ { &fBox::execCvttsSuc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SUC" },
     /* 0x052d */ kOpcDecEntry,
     /* 0x052e */ kOpcDecEntry,
-    /* 0x052f */ {.fn = &fBox::execCvttqSvc, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SVC" },
+    /* 0x052f */ { &fBox::execCvttqSvc, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SVC" },
     /* 0x0530 */ kOpcDecEntry,
     /* 0x0531 */ kOpcDecEntry,
     /* 0x0532 */ kOpcDecEntry,
@@ -6369,14 +6046,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x053d */ kOpcDecEntry,
     /* 0x053e */ kOpcDecEntry,
     /* 0x053f */ kOpcDecEntry,
-    /* 0x0540 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SUM" },
-    /* 0x0541 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SUM" },
-    /* 0x0542 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SUM" },
-    /* 0x0543 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SUM" },
+    /* 0x0540 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SUM" },
+    /* 0x0541 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SUM" },
+    /* 0x0542 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SUM" },
+    /* 0x0543 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SUM" },
     /* 0x0544 */ kOpcDecEntry,
     /* 0x0545 */ kOpcDecEntry,
     /* 0x0546 */ kOpcDecEntry,
@@ -6405,14 +6078,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x055d */ kOpcDecEntry,
     /* 0x055e */ kOpcDecEntry,
     /* 0x055f */ kOpcDecEntry,
-    /* 0x0560 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SUM" },
-    /* 0x0561 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SUM" },
-    /* 0x0562 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SUM" },
-    /* 0x0563 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SUM" },
+    /* 0x0560 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SUM" },
+    /* 0x0561 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SUM" },
+    /* 0x0562 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SUM" },
+    /* 0x0563 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SUM" },
     /* 0x0564 */ kOpcDecEntry,
     /* 0x0565 */ kOpcDecEntry,
     /* 0x0566 */ kOpcDecEntry,
@@ -6421,12 +6090,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0569 */ kOpcDecEntry,
     /* 0x056a */ kOpcDecEntry,
     /* 0x056b */ kOpcDecEntry,
-    /* 0x056c */ {.fn = &fBox::execCvttsSum, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SUM" },
+    /* 0x056c */ { &fBox::execCvttsSum, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SUM" },
     /* 0x056d */ kOpcDecEntry,
     /* 0x056e */ kOpcDecEntry,
-    /* 0x056f */ {.fn = &fBox::execCvttqSvm, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SVM" },
+    /* 0x056f */ { &fBox::execCvttqSvm, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SVM" },
     /* 0x0570 */ kOpcDecEntry,
     /* 0x0571 */ kOpcDecEntry,
     /* 0x0572 */ kOpcDecEntry,
@@ -6443,14 +6110,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x057d */ kOpcDecEntry,
     /* 0x057e */ kOpcDecEntry,
     /* 0x057f */ kOpcDecEntry,
-    /* 0x0580 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SU" },
-    /* 0x0581 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SU" },
-    /* 0x0582 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SU" },
-    /* 0x0583 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SU" },
+    /* 0x0580 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SU" },
+    /* 0x0581 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SU" },
+    /* 0x0582 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SU" },
+    /* 0x0583 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SU" },
     /* 0x0584 */ kOpcDecEntry,
     /* 0x0585 */ kOpcDecEntry,
     /* 0x0586 */ kOpcDecEntry,
@@ -6479,32 +6142,22 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x059d */ kOpcDecEntry,
     /* 0x059e */ kOpcDecEntry,
     /* 0x059f */ kOpcDecEntry,
-    /* 0x05a0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SU" },
-    /* 0x05a1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SU" },
-    /* 0x05a2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SU" },
-    /* 0x05a3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SU" },
-    /* 0x05a4 */ {.fn = &fBox::execCmptunSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTUN_SU" },
-    /* 0x05a5 */ {.fn = &fBox::execCmpteqSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTEQ_SU" },
-    /* 0x05a6 */ {.fn = &fBox::execCmptltSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTLT_SU" },
-    /* 0x05a7 */ {.fn = &fBox::execCmptleSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CMPTLE_SU" },
+    /* 0x05a0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SU" },
+    /* 0x05a1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SU" },
+    /* 0x05a2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SU" },
+    /* 0x05a3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SU" },
+    /* 0x05a4 */ { &fBox::execCmptunSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTUN_SU" },
+    /* 0x05a5 */ { &fBox::execCmpteqSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTEQ_SU" },
+    /* 0x05a6 */ { &fBox::execCmptltSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTLT_SU" },
+    /* 0x05a7 */ { &fBox::execCmptleSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CMPTLE_SU" },
     /* 0x05a8 */ kOpcDecEntry,
     /* 0x05a9 */ kOpcDecEntry,
     /* 0x05aa */ kOpcDecEntry,
     /* 0x05ab */ kOpcDecEntry,
-    /* 0x05ac */ {.fn = &fBox::execCvttsSu, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SU" },
+    /* 0x05ac */ { &fBox::execCvttsSu, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SU" },
     /* 0x05ad */ kOpcDecEntry,
     /* 0x05ae */ kOpcDecEntry,
-    /* 0x05af */ {.fn = &fBox::execCvttqSv, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SV" },
+    /* 0x05af */ { &fBox::execCvttqSv, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SV" },
     /* 0x05b0 */ kOpcDecEntry,
     /* 0x05b1 */ kOpcDecEntry,
     /* 0x05b2 */ kOpcDecEntry,
@@ -6521,14 +6174,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x05bd */ kOpcDecEntry,
     /* 0x05be */ kOpcDecEntry,
     /* 0x05bf */ kOpcDecEntry,
-    /* 0x05c0 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SUD" },
-    /* 0x05c1 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SUD" },
-    /* 0x05c2 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SUD" },
-    /* 0x05c3 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SUD" },
+    /* 0x05c0 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SUD" },
+    /* 0x05c1 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SUD" },
+    /* 0x05c2 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SUD" },
+    /* 0x05c3 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SUD" },
     /* 0x05c4 */ kOpcDecEntry,
     /* 0x05c5 */ kOpcDecEntry,
     /* 0x05c6 */ kOpcDecEntry,
@@ -6557,14 +6206,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x05dd */ kOpcDecEntry,
     /* 0x05de */ kOpcDecEntry,
     /* 0x05df */ kOpcDecEntry,
-    /* 0x05e0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SUD" },
-    /* 0x05e1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SUD" },
-    /* 0x05e2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SUD" },
-    /* 0x05e3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SUD" },
+    /* 0x05e0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SUD" },
+    /* 0x05e1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SUD" },
+    /* 0x05e2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SUD" },
+    /* 0x05e3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SUD" },
     /* 0x05e4 */ kOpcDecEntry,
     /* 0x05e5 */ kOpcDecEntry,
     /* 0x05e6 */ kOpcDecEntry,
@@ -6573,12 +6218,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x05e9 */ kOpcDecEntry,
     /* 0x05ea */ kOpcDecEntry,
     /* 0x05eb */ kOpcDecEntry,
-    /* 0x05ec */ {.fn = &fBox::execCvttsSud, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SUD" },
+    /* 0x05ec */ { &fBox::execCvttsSud, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SUD" },
     /* 0x05ed */ kOpcDecEntry,
     /* 0x05ee */ kOpcDecEntry,
-    /* 0x05ef */ {.fn = &fBox::execCvttqSvd, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SVD" },
+    /* 0x05ef */ { &fBox::execCvttqSvd, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SVD" },
     /* 0x05f0 */ kOpcDecEntry,
     /* 0x05f1 */ kOpcDecEntry,
     /* 0x05f2 */ kOpcDecEntry,
@@ -6767,8 +6410,7 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x06a9 */ kOpcDecEntry,
     /* 0x06aa */ kOpcDecEntry,
     /* 0x06ab */ kOpcDecEntry,
-    /* 0x06ac */ {.fn = &fBox::execCvtstS, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTST_S" },
+    /* 0x06ac */ { &fBox::execCvtstS, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTST_S" },
     /* 0x06ad */ kOpcDecEntry,
     /* 0x06ae */ kOpcDecEntry,
     /* 0x06af */ kOpcDecEntry,
@@ -6852,14 +6494,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x06fd */ kOpcDecEntry,
     /* 0x06fe */ kOpcDecEntry,
     /* 0x06ff */ kOpcDecEntry,
-    /* 0x0700 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SUIC" },
-    /* 0x0701 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SUIC" },
-    /* 0x0702 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SUIC" },
-    /* 0x0703 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SUIC" },
+    /* 0x0700 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SUIC" },
+    /* 0x0701 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SUIC" },
+    /* 0x0702 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SUIC" },
+    /* 0x0703 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SUIC" },
     /* 0x0704 */ kOpcDecEntry,
     /* 0x0705 */ kOpcDecEntry,
     /* 0x0706 */ kOpcDecEntry,
@@ -6888,14 +6526,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x071d */ kOpcDecEntry,
     /* 0x071e */ kOpcDecEntry,
     /* 0x071f */ kOpcDecEntry,
-    /* 0x0720 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SUIC" },
-    /* 0x0721 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SUIC" },
-    /* 0x0722 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SUIC" },
-    /* 0x0723 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SUIC" },
+    /* 0x0720 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SUIC" },
+    /* 0x0721 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SUIC" },
+    /* 0x0722 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SUIC" },
+    /* 0x0723 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SUIC" },
     /* 0x0724 */ kOpcDecEntry,
     /* 0x0725 */ kOpcDecEntry,
     /* 0x0726 */ kOpcDecEntry,
@@ -6904,12 +6538,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0729 */ kOpcDecEntry,
     /* 0x072a */ kOpcDecEntry,
     /* 0x072b */ kOpcDecEntry,
-    /* 0x072c */ {.fn = &fBox::execCvttsSuic, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SUIC" },
+    /* 0x072c */ { &fBox::execCvttsSuic, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SUIC" },
     /* 0x072d */ kOpcDecEntry,
     /* 0x072e */ kOpcDecEntry,
-    /* 0x072f */ {.fn = &fBox::execCvttqSvic, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SVIC" },
+    /* 0x072f */ { &fBox::execCvttqSvic, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SVIC" },
     /* 0x0730 */ kOpcDecEntry,
     /* 0x0731 */ kOpcDecEntry,
     /* 0x0732 */ kOpcDecEntry,
@@ -6922,20 +6554,14 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0739 */ kOpcDecEntry,
     /* 0x073a */ kOpcDecEntry,
     /* 0x073b */ kOpcDecEntry,
-    /* 0x073c */ {.fn = &fBox::execCvtqsSuic, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS_SUIC" },
+    /* 0x073c */ { &fBox::execCvtqsSuic, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS_SUIC" },
     /* 0x073d */ kOpcDecEntry,
-    /* 0x073e */ {.fn = &fBox::execCvtqtSuic, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT_SUIC" },
+    /* 0x073e */ { &fBox::execCvtqtSuic, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT_SUIC" },
     /* 0x073f */ kOpcDecEntry,
-    /* 0x0740 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SUIM" },
-    /* 0x0741 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SUIM" },
-    /* 0x0742 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SUIM" },
-    /* 0x0743 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SUIM" },
+    /* 0x0740 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SUIM" },
+    /* 0x0741 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SUIM" },
+    /* 0x0742 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SUIM" },
+    /* 0x0743 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SUIM" },
     /* 0x0744 */ kOpcDecEntry,
     /* 0x0745 */ kOpcDecEntry,
     /* 0x0746 */ kOpcDecEntry,
@@ -6964,14 +6590,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x075d */ kOpcDecEntry,
     /* 0x075e */ kOpcDecEntry,
     /* 0x075f */ kOpcDecEntry,
-    /* 0x0760 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SUIM" },
-    /* 0x0761 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SUIM" },
-    /* 0x0762 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SUIM" },
-    /* 0x0763 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SUIM" },
+    /* 0x0760 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SUIM" },
+    /* 0x0761 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SUIM" },
+    /* 0x0762 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SUIM" },
+    /* 0x0763 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SUIM" },
     /* 0x0764 */ kOpcDecEntry,
     /* 0x0765 */ kOpcDecEntry,
     /* 0x0766 */ kOpcDecEntry,
@@ -6980,12 +6602,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0769 */ kOpcDecEntry,
     /* 0x076a */ kOpcDecEntry,
     /* 0x076b */ kOpcDecEntry,
-    /* 0x076c */ {.fn = &fBox::execCvttsSuim, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SUIM" },
+    /* 0x076c */ { &fBox::execCvttsSuim, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SUIM" },
     /* 0x076d */ kOpcDecEntry,
     /* 0x076e */ kOpcDecEntry,
-    /* 0x076f */ {.fn = &fBox::execCvttqSvim, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SVIM" },
+    /* 0x076f */ { &fBox::execCvttqSvim, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SVIM" },
     /* 0x0770 */ kOpcDecEntry,
     /* 0x0771 */ kOpcDecEntry,
     /* 0x0772 */ kOpcDecEntry,
@@ -6998,20 +6618,14 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x0779 */ kOpcDecEntry,
     /* 0x077a */ kOpcDecEntry,
     /* 0x077b */ kOpcDecEntry,
-    /* 0x077c */ {.fn = &fBox::execCvtqsSuim, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS_SUIM" },
+    /* 0x077c */ { &fBox::execCvtqsSuim, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS_SUIM" },
     /* 0x077d */ kOpcDecEntry,
-    /* 0x077e */ {.fn = &fBox::execCvtqtSuim, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT_SUIM" },
+    /* 0x077e */ { &fBox::execCvtqtSuim, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT_SUIM" },
     /* 0x077f */ kOpcDecEntry,
-    /* 0x0780 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SUI" },
-    /* 0x0781 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SUI" },
-    /* 0x0782 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SUI" },
-    /* 0x0783 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SUI" },
+    /* 0x0780 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SUI" },
+    /* 0x0781 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SUI" },
+    /* 0x0782 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SUI" },
+    /* 0x0783 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SUI" },
     /* 0x0784 */ kOpcDecEntry,
     /* 0x0785 */ kOpcDecEntry,
     /* 0x0786 */ kOpcDecEntry,
@@ -7040,14 +6654,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x079d */ kOpcDecEntry,
     /* 0x079e */ kOpcDecEntry,
     /* 0x079f */ kOpcDecEntry,
-    /* 0x07a0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SUI" },
-    /* 0x07a1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SUI" },
-    /* 0x07a2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SUI" },
-    /* 0x07a3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SUI" },
+    /* 0x07a0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SUI" },
+    /* 0x07a1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SUI" },
+    /* 0x07a2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SUI" },
+    /* 0x07a3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SUI" },
     /* 0x07a4 */ kOpcDecEntry,
     /* 0x07a5 */ kOpcDecEntry,
     /* 0x07a6 */ kOpcDecEntry,
@@ -7056,12 +6666,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x07a9 */ kOpcDecEntry,
     /* 0x07aa */ kOpcDecEntry,
     /* 0x07ab */ kOpcDecEntry,
-    /* 0x07ac */ {.fn = &fBox::execCvttsSui, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SUI" },
+    /* 0x07ac */ { &fBox::execCvttsSui, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SUI" },
     /* 0x07ad */ kOpcDecEntry,
     /* 0x07ae */ kOpcDecEntry,
-    /* 0x07af */ {.fn = &fBox::execCvttqSvi, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SVI" },
+    /* 0x07af */ { &fBox::execCvttqSvi, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SVI" },
     /* 0x07b0 */ kOpcDecEntry,
     /* 0x07b1 */ kOpcDecEntry,
     /* 0x07b2 */ kOpcDecEntry,
@@ -7074,20 +6682,14 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x07b9 */ kOpcDecEntry,
     /* 0x07ba */ kOpcDecEntry,
     /* 0x07bb */ kOpcDecEntry,
-    /* 0x07bc */ {.fn = &fBox::execCvtqsSui, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS_SUI" },
+    /* 0x07bc */ { &fBox::execCvtqsSui, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS_SUI" },
     /* 0x07bd */ kOpcDecEntry,
-    /* 0x07be */ {.fn = &fBox::execCvtqtSui, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT_SUI" },
+    /* 0x07be */ { &fBox::execCvtqtSui, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT_SUI" },
     /* 0x07bf */ kOpcDecEntry,
-    /* 0x07c0 */ {.fn = &fBox::execAdds, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDS_SUID" },
-    /* 0x07c1 */ {.fn = &fBox::execSubs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBS_SUID" },
-    /* 0x07c2 */ {.fn = &fBox::execMuls, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULS_SUID" },
-    /* 0x07c3 */ {.fn = &fBox::execDivs, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVS_SUID" },
+    /* 0x07c0 */ { &fBox::execAdds, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDS_SUID" },
+    /* 0x07c1 */ { &fBox::execSubs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBS_SUID" },
+    /* 0x07c2 */ { &fBox::execMuls, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULS_SUID" },
+    /* 0x07c3 */ { &fBox::execDivs, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVS_SUID" },
     /* 0x07c4 */ kOpcDecEntry,
     /* 0x07c5 */ kOpcDecEntry,
     /* 0x07c6 */ kOpcDecEntry,
@@ -7116,14 +6718,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x07dd */ kOpcDecEntry,
     /* 0x07de */ kOpcDecEntry,
     /* 0x07df */ kOpcDecEntry,
-    /* 0x07e0 */ {.fn = &fBox::execAddt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "ADDT_SUID" },
-    /* 0x07e1 */ {.fn = &fBox::execSubt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "SUBT_SUID" },
-    /* 0x07e2 */ {.fn = &fBox::execMult, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "MULT_SUID" },
-    /* 0x07e3 */ {.fn = &fBox::execDivt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "DIVT_SUID" },
+    /* 0x07e0 */ { &fBox::execAddt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "ADDT_SUID" },
+    /* 0x07e1 */ { &fBox::execSubt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "SUBT_SUID" },
+    /* 0x07e2 */ { &fBox::execMult, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "MULT_SUID" },
+    /* 0x07e3 */ { &fBox::execDivt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "DIVT_SUID" },
     /* 0x07e4 */ kOpcDecEntry,
     /* 0x07e5 */ kOpcDecEntry,
     /* 0x07e6 */ kOpcDecEntry,
@@ -7132,12 +6730,10 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x07e9 */ kOpcDecEntry,
     /* 0x07ea */ kOpcDecEntry,
     /* 0x07eb */ kOpcDecEntry,
-    /* 0x07ec */ {.fn = &fBox::execCvttsSuid, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTS_SUID" },
+    /* 0x07ec */ { &fBox::execCvttsSuid, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTS_SUID" },
     /* 0x07ed */ kOpcDecEntry,
     /* 0x07ee */ kOpcDecEntry,
-    /* 0x07ef */ {.fn = &fBox::execCvttqSvid, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTTQ_SVID" },
+    /* 0x07ef */ { &fBox::execCvttqSvid, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTTQ_SVID" },
     /* 0x07f0 */ kOpcDecEntry,
     /* 0x07f1 */ kOpcDecEntry,
     /* 0x07f2 */ kOpcDecEntry,
@@ -7150,11 +6746,9 @@ GrainEntry const g_fltIeeeSubTable[2048] = {
     /* 0x07f9 */ kOpcDecEntry,
     /* 0x07fa */ kOpcDecEntry,
     /* 0x07fb */ kOpcDecEntry,
-    /* 0x07fc */ {.fn = &fBox::execCvtqsSuid, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQS_SUID" },
+    /* 0x07fc */ { &fBox::execCvtqsSuid, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQS_SUID" },
     /* 0x07fd */ kOpcDecEntry,
-    /* 0x07fe */ {.fn = &fBox::execCvtqtSuid, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap,
-        .box = Box::Fbox, .mnemonic = "CVTQT_SUID" },
+    /* 0x07fe */ { &fBox::execCvtqtSuid, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpTrap, Box::Fbox, "CVTQT_SUID" },
     /* 0x07ff */ kOpcDecEntry,
 };
 
@@ -7178,8 +6772,7 @@ GrainEntry const g_fltLogicalSubTable[128] = {
     /* 0x000d */ kOpcDecEntry,
     /* 0x000e */ kOpcDecEntry,
     /* 0x000f */ kOpcDecEntry,
-    /* 0x0010 */ {.fn = &fBox::execCvtlq, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "CVTLQ" },
+    /* 0x0010 */ { &fBox::execCvtlq, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "CVTLQ" },
     /* 0x0011 */ kOpcDecEntry,
     /* 0x0012 */ kOpcDecEntry,
     /* 0x0013 */ kOpcDecEntry,
@@ -7195,35 +6788,23 @@ GrainEntry const g_fltLogicalSubTable[128] = {
     /* 0x001d */ kOpcDecEntry,
     /* 0x001e */ kOpcDecEntry,
     /* 0x001f */ kOpcDecEntry,
-    /* 0x0020 */ {.fn = &fBox::execCpys, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "CPYS" },
-    /* 0x0021 */ {.fn = &fBox::execCpysn, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "CPYSN" },
-    /* 0x0022 */ {.fn = &fBox::execCpyse, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "CPYSE" },
+    /* 0x0020 */ { &fBox::execCpys, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "CPYS" },
+    /* 0x0021 */ { &fBox::execCpysn, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "CPYSN" },
+    /* 0x0022 */ { &fBox::execCpyse, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "CPYSE" },
     /* 0x0023 */ kOpcDecEntry,
-    /* 0x0024 */ {.fn = &fBox::execMtFpcr, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_FpcrWrite,
-        .box = Box::Fbox, .mnemonic = "MT_FPCR" },
-    /* 0x0025 */ {.fn = &fBox::execMfFpcr, .semFlags = GrainSem::S_FpFormat | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpcrRead,
-        .box = Box::Fbox, .mnemonic = "MF_FPCR" },
+    /* 0x0024 */ { &fBox::execMtFpcr, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_FpcrWrite, Box::Fbox, "MT_FPCR" },
+    /* 0x0025 */ { &fBox::execMfFpcr, GrainSem::S_FpFormat | GrainSem::S_WritesRc | GrainSem::S_WritesFp | GrainSem::S_FpcrRead, Box::Fbox, "MF_FPCR" },
     /* 0x0026 */ kOpcDecEntry,
     /* 0x0027 */ kOpcDecEntry,
     /* 0x0028 */ kOpcDecEntry,
     /* 0x0029 */ kOpcDecEntry,
-    /* 0x002a */ {.fn = &fBox::execFcmoveq, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "FCMOVEQ" },
-    /* 0x002b */ {.fn = &fBox::execFcmovne, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "FCMOVNE" },
-    /* 0x002c */ {.fn = &fBox::execFcmovlt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "FCMOVLT" },
-    /* 0x002d */ {.fn = &fBox::execFcmovge, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "FCMOVGE" },
-    /* 0x002e */ {.fn = &fBox::execFcmovle, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "FCMOVLE" },
-    /* 0x002f */ {.fn = &fBox::execFcmovgt, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "FCMOVGT" },
-    /* 0x0030 */ {.fn = &fBox::execCvtql, .semFlags = GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp,
-        .box = Box::Fbox, .mnemonic = "CVTQL" },
+    /* 0x002a */ { &fBox::execFcmoveq, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "FCMOVEQ" },
+    /* 0x002b */ { &fBox::execFcmovne, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "FCMOVNE" },
+    /* 0x002c */ { &fBox::execFcmovlt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "FCMOVLT" },
+    /* 0x002d */ { &fBox::execFcmovge, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "FCMOVGE" },
+    /* 0x002e */ { &fBox::execFcmovle, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "FCMOVLE" },
+    /* 0x002f */ { &fBox::execFcmovgt, GrainSem::S_FpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "FCMOVGT" },
+    /* 0x0030 */ { &fBox::execCvtql, GrainSem::S_FpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesFp, Box::Fbox, "CVTQL" },
     /* 0x0031 */ kOpcDecEntry,
     /* 0x0032 */ kOpcDecEntry,
     /* 0x0033 */ kOpcDecEntry,
@@ -7309,24 +6890,18 @@ GrainEntry const g_fltLogicalSubTable[128] = {
 // JmpClass sub-table: 4 entries, 4 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_jmpClassSubTable[4] = {
-    /* 0x0000 */ {.fn = &iBox::execJmp, .semFlags = GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect,
-        .box = Box::Ibox, .mnemonic = "JMP" },
-    /* 0x0001 */ {.fn = &iBox::execJsr, .semFlags = GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect | GrainSem::S_CallBased,
-        .box = Box::Ibox, .mnemonic = "JSR" },
-    /* 0x0002 */ {.fn = &iBox::execRet, .semFlags = GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect | GrainSem::S_RetBased,
-        .box = Box::Ibox, .mnemonic = "RET" },
-    /* 0x0003 */ {.fn = &iBox::execJsrCoroutine, .semFlags = GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect | GrainSem::S_CallBased | GrainSem::S_RetBased,
-        .box = Box::Ibox, .mnemonic = "JSR_COROUTINE" },
+    /* 0x0000 */ { &iBox::execJmp, GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect, Box::Ibox, "JMP" },
+    /* 0x0001 */ { &iBox::execJsr, GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect | GrainSem::S_CallBased, Box::Ibox, "JSR" },
+    /* 0x0002 */ { &iBox::execRet, GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect | GrainSem::S_RetBased, Box::Ibox, "RET" },
+    /* 0x0003 */ { &iBox::execJsrCoroutine, GrainSem::S_JmpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Indirect | GrainSem::S_CallBased | GrainSem::S_RetBased, Box::Ibox, "JSR_COROUTINE" },
 };
 
 // ---------------------------------------------------------------------------
 // FpTiExt sub-table: 128 entries, 19 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_fpTiExtSubTable[128] = {
-    /* 0x0000 */ {.fn = &eBox::execSextb, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "SEXTB" },
-    /* 0x0001 */ {.fn = &eBox::execSextw, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "SEXTW" },
+    /* 0x0000 */ { &eBox::execSextb, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SEXTB" },
+    /* 0x0001 */ { &eBox::execSextw, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SEXTW" },
     /* 0x0002 */ kOpcDecEntry,
     /* 0x0003 */ kOpcDecEntry,
     /* 0x0004 */ kOpcDecEntry,
@@ -7373,38 +6948,22 @@ GrainEntry const g_fpTiExtSubTable[128] = {
     /* 0x002d */ kOpcDecEntry,
     /* 0x002e */ kOpcDecEntry,
     /* 0x002f */ kOpcDecEntry,
-    /* 0x0030 */ {.fn = &eBox::execCtpop, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CTPOP" },
-    /* 0x0031 */ {.fn = &eBox::execPerr, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "PERR" },
-    /* 0x0032 */ {.fn = &eBox::execCtlz, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CTLZ" },
-    /* 0x0033 */ {.fn = &eBox::execCttz, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "CTTZ" },
-    /* 0x0034 */ {.fn = &eBox::execUnpkbw, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "UNPKBW" },
-    /* 0x0035 */ {.fn = &eBox::execUnpkbl, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "UNPKBL" },
-    /* 0x0036 */ {.fn = &eBox::execPkwb, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "PKWB" },
-    /* 0x0037 */ {.fn = &eBox::execPklb, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "PKLB" },
-    /* 0x0038 */ {.fn = &eBox::execMinsb8, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MINSB8" },
-    /* 0x0039 */ {.fn = &eBox::execMinsw4, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MINSW4" },
-    /* 0x003a */ {.fn = &eBox::execMinub8, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MINUB8" },
-    /* 0x003b */ {.fn = &eBox::execMinuw4, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MINUW4" },
-    /* 0x003c */ {.fn = &eBox::execMaxub8, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MAXUB8" },
-    /* 0x003d */ {.fn = &eBox::execMaxuw4, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MAXUW4" },
-    /* 0x003e */ {.fn = &eBox::execMaxsb8, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MAXSB8" },
-    /* 0x003f */ {.fn = &eBox::execMaxsw4, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "MAXSW4" },
+    /* 0x0030 */ { &eBox::execCtpop, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CTPOP" },
+    /* 0x0031 */ { &eBox::execPerr, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "PERR" },
+    /* 0x0032 */ { &eBox::execCtlz, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CTLZ" },
+    /* 0x0033 */ { &eBox::execCttz, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CTTZ" },
+    /* 0x0034 */ { &eBox::execUnpkbw, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "UNPKBW" },
+    /* 0x0035 */ { &eBox::execUnpkbl, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "UNPKBL" },
+    /* 0x0036 */ { &eBox::execPkwb, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "PKWB" },
+    /* 0x0037 */ { &eBox::execPklb, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "PKLB" },
+    /* 0x0038 */ { &eBox::execMinsb8, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MINSB8" },
+    /* 0x0039 */ { &eBox::execMinsw4, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MINSW4" },
+    /* 0x003a */ { &eBox::execMinub8, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MINUB8" },
+    /* 0x003b */ { &eBox::execMinuw4, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MINUW4" },
+    /* 0x003c */ { &eBox::execMaxub8, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MAXUB8" },
+    /* 0x003d */ { &eBox::execMaxuw4, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MAXUW4" },
+    /* 0x003e */ { &eBox::execMaxsb8, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MAXSB8" },
+    /* 0x003f */ { &eBox::execMaxsw4, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MAXSW4" },
     /* 0x0040 */ kOpcDecEntry,
     /* 0x0041 */ kOpcDecEntry,
     /* 0x0042 */ kOpcDecEntry,
@@ -7453,8 +7012,7 @@ GrainEntry const g_fpTiExtSubTable[128] = {
     /* 0x006d */ kOpcDecEntry,
     /* 0x006e */ kOpcDecEntry,
     /* 0x006f */ kOpcDecEntry,
-    /* 0x0070 */ {.fn = &eBox::execFtoit, .semFlags = GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesInt,
-        .box = Box::Ebox, .mnemonic = "FTOIT" },
+    /* 0x0070 */ { &eBox::execFtoit, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "FTOIT" },
     /* 0x0071 */ kOpcDecEntry,
     /* 0x0072 */ kOpcDecEntry,
     /* 0x0073 */ kOpcDecEntry,
@@ -7478,48 +7036,51 @@ GrainEntry const g_fpTiExtSubTable[128] = {
 GrainEntry const* lookupMisc(uint32_t func) noexcept {
     switch (func) {
         case 0x0000: {
-            static GrainEntry const e = {.fn = &cBox::execTrapb, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_TrapBarrier,
-                .box = Box::Cbox, .mnemonic = "TRAPB" };
+            static GrainEntry const e = { &cBox::execTrapb, GrainSem::S_MiscFormat | GrainSem::S_TrapBarrier, Box::Cbox, "TRAPB" };
             return &e;
         }
         case 0x0400: {
-            static GrainEntry const e = {.fn = &cBox::execExcb, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_ExcBarrier,
-                .box = Box::Cbox, .mnemonic = "EXCB" };
+            static GrainEntry const e = { &cBox::execExcb, GrainSem::S_MiscFormat | GrainSem::S_ExcBarrier, Box::Cbox, "EXCB" };
             return &e;
         }
         case 0x4000: {
-            static GrainEntry const e = {.fn = &cBox::execMb, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_Mb,
-                .box = Box::Cbox, .mnemonic = "MB" };
+            static GrainEntry const e = { &cBox::execMb, GrainSem::S_MiscFormat | GrainSem::S_Mb, Box::Cbox, "MB" };
             return &e;
         }
         case 0x4400: {
-            static GrainEntry const e = {.fn = &cBox::execWmb, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_Wmb,
-                .box = Box::Cbox, .mnemonic = "WMB" };
+            static GrainEntry const e = { &cBox::execWmb, GrainSem::S_MiscFormat | GrainSem::S_Wmb, Box::Cbox, "WMB" };
             return &e;
         }
         case 0x8000: {
-            static GrainEntry const e = {.fn = &mBox::execFetch, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_PrefetchOnly,
-                .box = Box::Mbox, .mnemonic = "FETCH" };
+            static GrainEntry const e = { &mBox::execFetch, GrainSem::S_MiscFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_PrefetchOnly, Box::Mbox, "FETCH" };
+            return &e;
+        }
+        case 0xa000: {
+            static GrainEntry const e = { &mBox::execFetch, GrainSem::S_MiscFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_PrefetchOnly, Box::Mbox, "FETCH_M" };
             return &e;
         }
         case 0xc000: {
-            static GrainEntry const e = {.fn = &eBox::execRpcc, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_RpccLike | GrainSem::S_NoTrace,
-                .box = Box::Ebox, .mnemonic = "RPCC" };
+            static GrainEntry const e = { &eBox::execRpcc, GrainSem::S_MiscFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_RpccLike | GrainSem::S_NoTrace, Box::Ebox, "RPCC" };
             return &e;
         }
         case 0xe000: {
-            static GrainEntry const e = {.fn = &eBox::execRc, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_NoTrace,
-                .box = Box::Ebox, .mnemonic = "RC" };
+            static GrainEntry const e = { &eBox::execRc, GrainSem::S_MiscFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_NoTrace, Box::Ebox, "RC" };
             return &e;
         }
         case 0xe800: {
-            static GrainEntry const e = {.fn = &cBox::execEcb, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_PrefetchOnly,
-                .box = Box::Cbox, .mnemonic = "ECB" };
+            static GrainEntry const e = { &cBox::execEcb, GrainSem::S_MiscFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_PrefetchOnly, Box::Cbox, "ECB" };
             return &e;
         }
         case 0xf000: {
-            static GrainEntry const e = {.fn = &eBox::execRs, .semFlags = GrainSem::S_MiscFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_NoTrace,
-                .box = Box::Ebox, .mnemonic = "RS" };
+            static GrainEntry const e = { &eBox::execRs, GrainSem::S_MiscFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_NoTrace, Box::Ebox, "RS" };
+            return &e;
+        }
+        case 0xf800: {
+            static GrainEntry const e = { &mBox::execFetch, GrainSem::S_MiscFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_PrefetchOnly, Box::Mbox, "WH64" };
+            return &e;
+        }
+        case 0xfc00: {
+            static GrainEntry const e = { &mBox::execFetch, GrainSem::S_MiscFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_PrefetchOnly, Box::Mbox, "WH64EN" };
             return &e;
         }
         default: return &kOpcDecEntry;
@@ -7532,179 +7093,144 @@ GrainEntry const* lookupMisc(uint32_t func) noexcept {
 GrainEntry const* lookupPalTru64(uint32_t func) noexcept {
     switch (func) {
         case 0x0000: {
-            static GrainEntry const e = {.fn = &palBox::execHalt, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "HALT" };
+            static GrainEntry const e = { &palBox::execHalt, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "HALT" };
             return &e;
         }
         case 0x0001: {
-            static GrainEntry const e = {.fn = &palBox::execCflush, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CFLUSH" };
+            static GrainEntry const e = { &palBox::execCflush, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CFLUSH" };
             return &e;
         }
         case 0x0002: {
-            static GrainEntry const e = {.fn = &palBox::execDraina, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "DRAINA" };
+            static GrainEntry const e = { &palBox::execDraina, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "DRAINA" };
             return &e;
         }
         case 0x0009: {
-            static GrainEntry const e = {.fn = &palBox::execCserve, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CSERVE" };
+            static GrainEntry const e = { &palBox::execCserve, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CSERVE" };
             return &e;
         }
         case 0x000a: {
-            static GrainEntry const e = {.fn = &palBox::execSwppal, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "SWPPAL" };
+            static GrainEntry const e = { &palBox::execSwppal, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "SWPPAL" };
             return &e;
         }
         case 0x000d: {
-            static GrainEntry const e = {.fn = &palBox::execMtprIpir, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MTPR_IPIR" };
+            static GrainEntry const e = { &palBox::execMtprIpir, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MTPR_IPIR" };
             return &e;
         }
         case 0x0010: {
-            static GrainEntry const e = {.fn = &palBox::execMfprMces, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_MCES" };
+            static GrainEntry const e = { &palBox::execMfprMces, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_MCES" };
             return &e;
         }
         case 0x0011: {
-            static GrainEntry const e = {.fn = &palBox::execMtprMces, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MTPR_MCES" };
+            static GrainEntry const e = { &palBox::execMtprMces, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MTPR_MCES" };
             return &e;
         }
         case 0x002b: {
-            static GrainEntry const e = {.fn = &palBox::execMtprPerfmon, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MTPR_PERFMON" };
+            static GrainEntry const e = { &palBox::execMtprPerfmon, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MTPR_PERFMON" };
             return &e;
         }
         case 0x002d: {
-            static GrainEntry const e = {.fn = &palBox::execWrvptptr_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRVPTPTR" };
+            static GrainEntry const e = { &palBox::execWrvptptr_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "WRVPTPTR" };
             return &e;
         }
         case 0x002e: {
-            static GrainEntry const e = {.fn = &palBox::execMtprDatfx, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_DATFX" };
+            static GrainEntry const e = { &palBox::execMtprDatfx, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms, Box::PalBox, "MTPR_DATFX" };
             return &e;
         }
         case 0x0030: {
-            static GrainEntry const e = {.fn = &palBox::execMfprVirbnd, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_VIRBND" };
+            static GrainEntry const e = { &palBox::execMfprVirbnd, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_VIRBND" };
             return &e;
         }
         case 0x0031: {
-            static GrainEntry const e = {.fn = &palBox::execWrval_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRVAL" };
+            static GrainEntry const e = { &palBox::execWrval_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "WRVAL" };
             return &e;
         }
         case 0x0032: {
-            static GrainEntry const e = {.fn = &palBox::execMfprSysptbr, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_SYSPTBR" };
+            static GrainEntry const e = { &palBox::execMfprSysptbr, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_SYSPTBR" };
             return &e;
         }
         case 0x0033: {
-            static GrainEntry const e = {.fn = &palBox::execTbi_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "TBI" };
+            static GrainEntry const e = { &palBox::execTbi_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "TBI" };
             return &e;
         }
         case 0x0034: {
-            static GrainEntry const e = {.fn = &palBox::execWrent_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRENT" };
+            static GrainEntry const e = { &palBox::execWrent_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "WRENT" };
             return &e;
         }
         case 0x0035: {
-            static GrainEntry const e = {.fn = &palBox::execSwpipl_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "SWPIPL" };
+            static GrainEntry const e = { &palBox::execSwpipl_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "SWPIPL" };
             return &e;
         }
         case 0x0036: {
-            static GrainEntry const e = {.fn = &palBox::execRdps_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "RDPS" };
+            static GrainEntry const e = { &palBox::execRdps_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "RDPS" };
             return &e;
         }
         case 0x0037: {
-            static GrainEntry const e = {.fn = &palBox::execWrkgp_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRKGP" };
+            static GrainEntry const e = { &palBox::execWrkgp_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "WRKGP" };
             return &e;
         }
         case 0x0038: {
-            static GrainEntry const e = {.fn = &palBox::execWrusp_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRUSP" };
+            static GrainEntry const e = { &palBox::execWrusp_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "WRUSP" };
             return &e;
         }
         case 0x0039: {
-            static GrainEntry const e = {.fn = &palBox::execWrperfmon_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRPERFMON" };
+            static GrainEntry const e = { &palBox::execWrperfmon_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "WRPERFMON" };
             return &e;
         }
         case 0x003a: {
-            static GrainEntry const e = {.fn = &palBox::execRdusp_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "RDUSP" };
+            static GrainEntry const e = { &palBox::execRdusp_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "RDUSP" };
             return &e;
         }
         case 0x003c: {
-            static GrainEntry const e = {.fn = &palBox::execWhami_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WHAMI" };
+            static GrainEntry const e = { &palBox::execWhami_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "WHAMI" };
             return &e;
         }
         case 0x003d: {
-            static GrainEntry const e = {.fn = &palBox::execRetsys_tru64, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "RETSYS" };
+            static GrainEntry const e = { &palBox::execRetsys_tru64, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalLinux, Box::PalBox, "RETSYS" };
             return &e;
         }
         case 0x003e: {
-            static GrainEntry const e = {.fn = &palBox::execWtint, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WTINT" };
+            static GrainEntry const e = { &palBox::execWtint, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "WTINT" };
             return &e;
         }
         case 0x003f: {
-            static GrainEntry const e = {.fn = &palBox::execMfprWhami, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_WHAMI" };
+            static GrainEntry const e = { &palBox::execMfprWhami, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_WHAMI" };
             return &e;
         }
         case 0x0080: {
-            static GrainEntry const e = {.fn = &palBox::execBpt, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "BPT" };
+            static GrainEntry const e = { &palBox::execBpt, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "BPT" };
             return &e;
         }
         case 0x0083: {
-            static GrainEntry const e = {.fn = &palBox::execChmk, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CHMK" };
+            static GrainEntry const e = { &palBox::execChmk, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CHMK" };
             return &e;
         }
         case 0x0086: {
-            static GrainEntry const e = {.fn = &palBox::execImb, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "IMB" };
+            static GrainEntry const e = { &palBox::execImb, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "IMB" };
             return &e;
         }
         case 0x0092: {
-            static GrainEntry const e = {.fn = &palBox::execRei, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REI" };
+            static GrainEntry const e = { &palBox::execRei, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms, Box::PalBox, "REI" };
             return &e;
         }
         case 0x009e: {
-            static GrainEntry const e = {.fn = &palBox::execReadUnq, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "READ_UNQ" };
+            static GrainEntry const e = { &palBox::execReadUnq, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "READ_UNQ" };
             return &e;
         }
         case 0x009f: {
-            static GrainEntry const e = {.fn = &palBox::execWriteUnq, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRITE_UNQ" };
+            static GrainEntry const e = { &palBox::execWriteUnq, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "WRITE_UNQ" };
             return &e;
         }
         case 0x00aa: {
-            static GrainEntry const e = {.fn = &palBox::execGentrap, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "GENTRAP" };
+            static GrainEntry const e = { &palBox::execGentrap, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "GENTRAP" };
             return &e;
         }
         case 0x00ae: {
-            static GrainEntry const e = {.fn = &palBox::execClrfen, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CLRFEN" };
+            static GrainEntry const e = { &palBox::execClrfen, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CLRFEN" };
             return &e;
         }
         default: {
             // Synthetic CALL_PAL dispatcher (handwritten.tsv): diverts unhandled function codes into PALcode at palBase + vector_offset per HRM 6.8.1.
-            static GrainEntry const e = {.fn = &palBox::execCallPalDispatch, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64,
-                .box = Box::PalBox, .mnemonic = "CALL_PAL" };
+            static GrainEntry const e = { &palBox::execCallPalDispatch, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64, Box::PalBox, "CALL_PAL" };
             return &e;
         }
     }
@@ -7716,469 +7242,376 @@ GrainEntry const* lookupPalTru64(uint32_t func) noexcept {
 GrainEntry const* lookupPalVms(uint32_t func) noexcept {
     switch (func) {
         case 0x0000: {
-            static GrainEntry const e = {.fn = &palBox::execHalt, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "HALT" };
+            static GrainEntry const e = { &palBox::execHalt, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "HALT" };
             return &e;
         }
         case 0x0001: {
-            static GrainEntry const e = {.fn = &palBox::execCflush, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CFLUSH" };
+            static GrainEntry const e = { &palBox::execCflush, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CFLUSH" };
             return &e;
         }
         case 0x0002: {
-            static GrainEntry const e = {.fn = &palBox::execDraina, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "DRAINA" };
+            static GrainEntry const e = { &palBox::execDraina, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "DRAINA" };
             return &e;
         }
         case 0x0003: {
-            static GrainEntry const e = {.fn = &palBox::execLdqp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "LDQP" };
+            static GrainEntry const e = { &palBox::execLdqp_vms, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms, Box::PalBox, "LDQP" };
             return &e;
         }
         case 0x0004: {
-            static GrainEntry const e = {.fn = &palBox::execStqp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "STQP" };
+            static GrainEntry const e = { &palBox::execStqp_vms, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_PalVms, Box::PalBox, "STQP" };
             return &e;
         }
         case 0x0005: {
-            static GrainEntry const e = {.fn = &palBox::execSwpctx_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "SWPCTX" };
+            static GrainEntry const e = { &palBox::execSwpctx_vms, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms, Box::PalBox, "SWPCTX" };
             return &e;
         }
         case 0x0006: {
-            static GrainEntry const e = {.fn = &palBox::execMfprAsn_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_ASN" };
+            static GrainEntry const e = { &palBox::execMfprAsn_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_ASN" };
             return &e;
         }
         case 0x0007: {
-            static GrainEntry const e = {.fn = &palBox::execMtprAsten_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_ASTEN" };
+            static GrainEntry const e = { &palBox::execMtprAsten_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_ASTEN" };
             return &e;
         }
         case 0x0008: {
-            static GrainEntry const e = {.fn = &palBox::execMtprAstsr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_ASTSR" };
+            static GrainEntry const e = { &palBox::execMtprAstsr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_ASTSR" };
             return &e;
         }
         case 0x0009: {
-            static GrainEntry const e = {.fn = &palBox::execCserve, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CSERVE" };
+            static GrainEntry const e = { &palBox::execCserve, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CSERVE" };
             return &e;
         }
         case 0x000a: {
-            static GrainEntry const e = {.fn = &palBox::execSwppal, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "SWPPAL" };
+            static GrainEntry const e = { &palBox::execSwppal, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "SWPPAL" };
             return &e;
         }
         case 0x000b: {
-            static GrainEntry const e = {.fn = &palBox::execMfprFen_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_FEN" };
+            static GrainEntry const e = { &palBox::execMfprFen_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_FEN" };
             return &e;
         }
         case 0x000c: {
-            static GrainEntry const e = {.fn = &palBox::execMtprFen_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_FEN" };
+            static GrainEntry const e = { &palBox::execMtprFen_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_FEN" };
             return &e;
         }
         case 0x000d: {
-            static GrainEntry const e = {.fn = &palBox::execMtprIpir, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MTPR_IPIR" };
+            static GrainEntry const e = { &palBox::execMtprIpir, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MTPR_IPIR" };
             return &e;
         }
         case 0x000e: {
-            static GrainEntry const e = {.fn = &palBox::execMfprIpl_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_IPL" };
+            static GrainEntry const e = { &palBox::execMfprIpl_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_IPL" };
             return &e;
         }
         case 0x000f: {
-            static GrainEntry const e = {.fn = &palBox::execMtprIpl_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_IPL" };
+            static GrainEntry const e = { &palBox::execMtprIpl_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_IPL" };
             return &e;
         }
         case 0x0010: {
-            static GrainEntry const e = {.fn = &palBox::execMfprMces, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_MCES" };
+            static GrainEntry const e = { &palBox::execMfprMces, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_MCES" };
             return &e;
         }
         case 0x0011: {
-            static GrainEntry const e = {.fn = &palBox::execMtprMces, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MTPR_MCES" };
+            static GrainEntry const e = { &palBox::execMtprMces, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MTPR_MCES" };
             return &e;
         }
         case 0x0012: {
-            static GrainEntry const e = {.fn = &palBox::execMfprPcbb_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_PCBB" };
+            static GrainEntry const e = { &palBox::execMfprPcbb_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_PCBB" };
             return &e;
         }
         case 0x0013: {
-            static GrainEntry const e = {.fn = &palBox::execMfprPrbr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_PRBR" };
+            static GrainEntry const e = { &palBox::execMfprPrbr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_PRBR" };
             return &e;
         }
         case 0x0014: {
-            static GrainEntry const e = {.fn = &palBox::execMtprPrbr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_PRBR" };
+            static GrainEntry const e = { &palBox::execMtprPrbr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_PRBR" };
             return &e;
         }
         case 0x0015: {
-            static GrainEntry const e = {.fn = &palBox::execMfprPtbr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_PTBR" };
+            static GrainEntry const e = { &palBox::execMfprPtbr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_PTBR" };
             return &e;
         }
         case 0x0016: {
-            static GrainEntry const e = {.fn = &palBox::execMfprScbb_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_SCBB" };
+            static GrainEntry const e = { &palBox::execMfprScbb_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms, Box::PalBox, "MFPR_SCBB" };
             return &e;
         }
         case 0x0017: {
-            static GrainEntry const e = {.fn = &palBox::execMtprScbb_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_SCBB" };
+            static GrainEntry const e = { &palBox::execMtprScbb_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_PalVms, Box::PalBox, "MTPR_SCBB" };
             return &e;
         }
         case 0x0018: {
-            static GrainEntry const e = {.fn = &palBox::execMtprSirr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_SIRR" };
+            static GrainEntry const e = { &palBox::execMtprSirr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_SIRR" };
             return &e;
         }
         case 0x0019: {
-            static GrainEntry const e = {.fn = &palBox::execMfprSisr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_SISR" };
+            static GrainEntry const e = { &palBox::execMfprSisr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_SISR" };
             return &e;
         }
         case 0x001a: {
-            static GrainEntry const e = {.fn = &palBox::execMfprTbchk_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_TBCHK" };
+            static GrainEntry const e = { &palBox::execMfprTbchk_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_TBCHK" };
             return &e;
         }
         case 0x001b: {
-            static GrainEntry const e = {.fn = &palBox::execMtprTbia_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_TBIA" };
+            static GrainEntry const e = { &palBox::execMtprTbia_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_TBIA" };
             return &e;
         }
         case 0x001c: {
-            static GrainEntry const e = {.fn = &palBox::execMtprTbiap_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_TBIAP" };
+            static GrainEntry const e = { &palBox::execMtprTbiap_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_TBIAP" };
             return &e;
         }
         case 0x001d: {
-            static GrainEntry const e = {.fn = &palBox::execMtprTbis_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_TBIS" };
+            static GrainEntry const e = { &palBox::execMtprTbis_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_TBIS" };
             return &e;
         }
         case 0x001e: {
-            static GrainEntry const e = {.fn = &palBox::execMfprEsp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_ESP" };
+            static GrainEntry const e = { &palBox::execMfprEsp_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_ESP" };
             return &e;
         }
         case 0x001f: {
-            static GrainEntry const e = {.fn = &palBox::execMtprEsp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_ESP" };
+            static GrainEntry const e = { &palBox::execMtprEsp_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_ESP" };
             return &e;
         }
         case 0x0020: {
-            static GrainEntry const e = {.fn = &palBox::execMfprSsp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_SSP" };
+            static GrainEntry const e = { &palBox::execMfprSsp_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_SSP" };
             return &e;
         }
         case 0x0021: {
-            static GrainEntry const e = {.fn = &palBox::execMtprSsp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_SSP" };
+            static GrainEntry const e = { &palBox::execMtprSsp_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_SSP" };
             return &e;
         }
         case 0x0022: {
-            static GrainEntry const e = {.fn = &palBox::execMfprUsp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_USP" };
+            static GrainEntry const e = { &palBox::execMfprUsp_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_USP" };
             return &e;
         }
         case 0x0023: {
-            static GrainEntry const e = {.fn = &palBox::execMtprUsp_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_USP" };
+            static GrainEntry const e = { &palBox::execMtprUsp_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_USP" };
             return &e;
         }
         case 0x0024: {
-            static GrainEntry const e = {.fn = &palBox::execMtprTbisd_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_TBISD" };
+            static GrainEntry const e = { &palBox::execMtprTbisd_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_TBISD" };
             return &e;
         }
         case 0x0025: {
-            static GrainEntry const e = {.fn = &palBox::execMtprTbisi_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_TBISI" };
+            static GrainEntry const e = { &palBox::execMtprTbisi_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MTPR_TBISI" };
             return &e;
         }
         case 0x0026: {
-            static GrainEntry const e = {.fn = &palBox::execMfprAsten_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_ASTEN" };
+            static GrainEntry const e = { &palBox::execMfprAsten_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_ASTEN" };
             return &e;
         }
         case 0x0027: {
-            static GrainEntry const e = {.fn = &palBox::execMfprAstsr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_ASTSR" };
+            static GrainEntry const e = { &palBox::execMfprAstsr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "MFPR_ASTSR" };
             return &e;
         }
         case 0x0029: {
-            static GrainEntry const e = {.fn = &palBox::execMfprVptb_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MFPR_VPTB" };
+            static GrainEntry const e = { &palBox::execMfprVptb_vms, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalVms, Box::PalBox, "MFPR_VPTB" };
             return &e;
         }
         case 0x002a: {
-            static GrainEntry const e = {.fn = &palBox::execMtprVptb_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_VPTB" };
+            static GrainEntry const e = { &palBox::execMtprVptb_vms, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_PalVms, Box::PalBox, "MTPR_VPTB" };
             return &e;
         }
         case 0x002b: {
-            static GrainEntry const e = {.fn = &palBox::execMtprPerfmon, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MTPR_PERFMON" };
+            static GrainEntry const e = { &palBox::execMtprPerfmon, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MTPR_PERFMON" };
             return &e;
         }
         case 0x002e: {
-            static GrainEntry const e = {.fn = &palBox::execMtprDatfx, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "MTPR_DATFX" };
+            static GrainEntry const e = { &palBox::execMtprDatfx, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms, Box::PalBox, "MTPR_DATFX" };
             return &e;
         }
         case 0x0030: {
-            static GrainEntry const e = {.fn = &palBox::execMfprVirbnd, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_VIRBND" };
+            static GrainEntry const e = { &palBox::execMfprVirbnd, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_VIRBND" };
             return &e;
         }
         case 0x0032: {
-            static GrainEntry const e = {.fn = &palBox::execMfprSysptbr, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_SYSPTBR" };
+            static GrainEntry const e = { &palBox::execMfprSysptbr, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_SYSPTBR" };
             return &e;
         }
         case 0x003e: {
-            static GrainEntry const e = {.fn = &palBox::execWtint, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WTINT" };
+            static GrainEntry const e = { &palBox::execWtint, GrainSem::S_PalFormat | GrainSem::S_PalIntrinsic | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "WTINT" };
             return &e;
         }
         case 0x003f: {
-            static GrainEntry const e = {.fn = &palBox::execMfprWhami, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "MFPR_WHAMI" };
+            static GrainEntry const e = { &palBox::execMfprWhami, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "MFPR_WHAMI" };
             return &e;
         }
         case 0x0080: {
-            static GrainEntry const e = {.fn = &palBox::execBpt, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "BPT" };
+            static GrainEntry const e = { &palBox::execBpt, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "BPT" };
             return &e;
         }
         case 0x0081: {
-            static GrainEntry const e = {.fn = &palBox::execBugchk_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "BUGCHK" };
+            static GrainEntry const e = { &palBox::execBugchk_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "BUGCHK" };
             return &e;
         }
         case 0x0082: {
-            static GrainEntry const e = {.fn = &palBox::execChme_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "CHME" };
+            static GrainEntry const e = { &palBox::execChme_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "CHME" };
             return &e;
         }
         case 0x0083: {
-            static GrainEntry const e = {.fn = &palBox::execChmk, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CHMK" };
+            static GrainEntry const e = { &palBox::execChmk, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CHMK" };
             return &e;
         }
         case 0x0084: {
-            static GrainEntry const e = {.fn = &palBox::execChms_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "CHMS" };
+            static GrainEntry const e = { &palBox::execChms_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "CHMS" };
             return &e;
         }
         case 0x0085: {
-            static GrainEntry const e = {.fn = &palBox::execChmu_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "CHMU" };
+            static GrainEntry const e = { &palBox::execChmu_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "CHMU" };
             return &e;
         }
         case 0x0086: {
-            static GrainEntry const e = {.fn = &palBox::execImb, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "IMB" };
+            static GrainEntry const e = { &palBox::execImb, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "IMB" };
             return &e;
         }
         case 0x0087: {
-            static GrainEntry const e = {.fn = &palBox::execInsqhil_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQHIL" };
+            static GrainEntry const e = { &palBox::execInsqhil_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQHIL" };
             return &e;
         }
         case 0x0088: {
-            static GrainEntry const e = {.fn = &palBox::execInsqtil_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQTIL" };
+            static GrainEntry const e = { &palBox::execInsqtil_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQTIL" };
             return &e;
         }
         case 0x0089: {
-            static GrainEntry const e = {.fn = &palBox::execInsqhiq_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQHIQ" };
+            static GrainEntry const e = { &palBox::execInsqhiq_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQHIQ" };
             return &e;
         }
         case 0x008a: {
-            static GrainEntry const e = {.fn = &palBox::execInsqtiq_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQTIQ" };
+            static GrainEntry const e = { &palBox::execInsqtiq_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQTIQ" };
             return &e;
         }
         case 0x008b: {
-            static GrainEntry const e = {.fn = &palBox::execInsquel_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQUEL" };
+            static GrainEntry const e = { &palBox::execInsquel_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQUEL" };
             return &e;
         }
         case 0x008c: {
-            static GrainEntry const e = {.fn = &palBox::execInsqueq_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQUEQ" };
+            static GrainEntry const e = { &palBox::execInsqueq_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQUEQ" };
             return &e;
         }
         case 0x008d: {
-            static GrainEntry const e = {.fn = &palBox::execInsquelD_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQUEL_D" };
+            static GrainEntry const e = { &palBox::execInsquelD_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQUEL_D" };
             return &e;
         }
         case 0x008e: {
-            static GrainEntry const e = {.fn = &palBox::execInsqueqD_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQUEQ_D" };
+            static GrainEntry const e = { &palBox::execInsqueqD_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQUEQ_D" };
             return &e;
         }
         case 0x008f: {
-            static GrainEntry const e = {.fn = &palBox::execProber_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "PROBER" };
+            static GrainEntry const e = { &palBox::execProber_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "PROBER" };
             return &e;
         }
         case 0x0090: {
-            static GrainEntry const e = {.fn = &palBox::execProbew_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "PROBEW" };
+            static GrainEntry const e = { &palBox::execProbew_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "PROBEW" };
             return &e;
         }
         case 0x0091: {
-            static GrainEntry const e = {.fn = &palBox::execRdPs_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "RD_PS" };
+            static GrainEntry const e = { &palBox::execRdPs_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "RD_PS" };
             return &e;
         }
         case 0x0092: {
-            static GrainEntry const e = {.fn = &palBox::execRei, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REI" };
+            static GrainEntry const e = { &palBox::execRei, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms, Box::PalBox, "REI" };
             return &e;
         }
         case 0x0093: {
-            static GrainEntry const e = {.fn = &palBox::execRemqhil_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQHIL" };
+            static GrainEntry const e = { &palBox::execRemqhil_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQHIL" };
             return &e;
         }
         case 0x0094: {
-            static GrainEntry const e = {.fn = &palBox::execRemqtil_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQTIL" };
+            static GrainEntry const e = { &palBox::execRemqtil_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQTIL" };
             return &e;
         }
         case 0x0095: {
-            static GrainEntry const e = {.fn = &palBox::execRemqhiq_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQHIQ" };
+            static GrainEntry const e = { &palBox::execRemqhiq_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQHIQ" };
             return &e;
         }
         case 0x0096: {
-            static GrainEntry const e = {.fn = &palBox::execRemqtiq_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQTIQ" };
+            static GrainEntry const e = { &palBox::execRemqtiq_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQTIQ" };
             return &e;
         }
         case 0x0097: {
-            static GrainEntry const e = {.fn = &palBox::execRemquel_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQUEL" };
+            static GrainEntry const e = { &palBox::execRemquel_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQUEL" };
             return &e;
         }
         case 0x0098: {
-            static GrainEntry const e = {.fn = &palBox::execRemqueq_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQUEQ" };
+            static GrainEntry const e = { &palBox::execRemqueq_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQUEQ" };
             return &e;
         }
         case 0x0099: {
-            static GrainEntry const e = {.fn = &palBox::execRemquelD_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQUEL_D" };
+            static GrainEntry const e = { &palBox::execRemquelD_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQUEL_D" };
             return &e;
         }
         case 0x009a: {
-            static GrainEntry const e = {.fn = &palBox::execRemqueqD_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQUEQ_D" };
+            static GrainEntry const e = { &palBox::execRemqueqD_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQUEQ_D" };
             return &e;
         }
         case 0x009b: {
-            static GrainEntry const e = {.fn = &palBox::execSwasten_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "SWASTEN" };
+            static GrainEntry const e = { &palBox::execSwasten_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "SWASTEN" };
             return &e;
         }
         case 0x009c: {
-            static GrainEntry const e = {.fn = &palBox::execWrPsSw_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "WR_PS_SW" };
+            static GrainEntry const e = { &palBox::execWrPsSw_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "WR_PS_SW" };
             return &e;
         }
         case 0x009d: {
-            static GrainEntry const e = {.fn = &palBox::execRscc_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "RSCC" };
+            static GrainEntry const e = { &palBox::execRscc_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "RSCC" };
             return &e;
         }
         case 0x009e: {
-            static GrainEntry const e = {.fn = &palBox::execReadUnq, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "READ_UNQ" };
+            static GrainEntry const e = { &palBox::execReadUnq, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "READ_UNQ" };
             return &e;
         }
         case 0x009f: {
-            static GrainEntry const e = {.fn = &palBox::execWriteUnq, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "WRITE_UNQ" };
+            static GrainEntry const e = { &palBox::execWriteUnq, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "WRITE_UNQ" };
             return &e;
         }
         case 0x00a0: {
-            static GrainEntry const e = {.fn = &palBox::execAmovrr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "AMOVRR" };
+            static GrainEntry const e = { &palBox::execAmovrr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "AMOVRR" };
             return &e;
         }
         case 0x00a1: {
-            static GrainEntry const e = {.fn = &palBox::execAmovrm_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "AMOVRM" };
+            static GrainEntry const e = { &palBox::execAmovrm_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "AMOVRM" };
             return &e;
         }
         case 0x00a2: {
-            static GrainEntry const e = {.fn = &palBox::execInsqhilr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQHILR" };
+            static GrainEntry const e = { &palBox::execInsqhilr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQHILR" };
             return &e;
         }
         case 0x00a3: {
-            static GrainEntry const e = {.fn = &palBox::execInsqtilr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQTILR" };
+            static GrainEntry const e = { &palBox::execInsqtilr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQTILR" };
             return &e;
         }
         case 0x00a4: {
-            static GrainEntry const e = {.fn = &palBox::execInsqhiqr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQHIQR" };
+            static GrainEntry const e = { &palBox::execInsqhiqr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQHIQR" };
             return &e;
         }
         case 0x00a5: {
-            static GrainEntry const e = {.fn = &palBox::execInsqtiqr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "INSQTIQR" };
+            static GrainEntry const e = { &palBox::execInsqtiqr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "INSQTIQR" };
             return &e;
         }
         case 0x00a6: {
-            static GrainEntry const e = {.fn = &palBox::execRemqhilr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQHILR" };
+            static GrainEntry const e = { &palBox::execRemqhilr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQHILR" };
             return &e;
         }
         case 0x00a7: {
-            static GrainEntry const e = {.fn = &palBox::execRemqtilr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQTILR" };
+            static GrainEntry const e = { &palBox::execRemqtilr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQTILR" };
             return &e;
         }
         case 0x00a8: {
-            static GrainEntry const e = {.fn = &palBox::execRemqhiqr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQHIQR" };
+            static GrainEntry const e = { &palBox::execRemqhiqr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQHIQR" };
             return &e;
         }
         case 0x00a9: {
-            static GrainEntry const e = {.fn = &palBox::execRemqtiqr_vms, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "REMQTIQR" };
+            static GrainEntry const e = { &palBox::execRemqtiqr_vms, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "REMQTIQR" };
             return &e;
         }
         case 0x00aa: {
-            static GrainEntry const e = {.fn = &palBox::execGentrap, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "GENTRAP" };
+            static GrainEntry const e = { &palBox::execGentrap, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "GENTRAP" };
             return &e;
         }
         case 0x00ae: {
-            static GrainEntry const e = {.fn = &palBox::execClrfen, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux,
-                .box = Box::PalBox, .mnemonic = "CLRFEN" };
+            static GrainEntry const e = { &palBox::execClrfen, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalTru64 | GrainSem::S_PalVms | GrainSem::S_PalLinux, Box::PalBox, "CLRFEN" };
             return &e;
         }
         default: {
             // Synthetic CALL_PAL dispatcher (handwritten.tsv): diverts unhandled function codes into PALcode at palBase + vector_offset per HRM 6.8.1.
-            static GrainEntry const e = {.fn = &palBox::execCallPalDispatch, .semFlags = GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms,
-                .box = Box::PalBox, .mnemonic = "CALL_PAL" };
+            static GrainEntry const e = { &palBox::execCallPalDispatch, GrainSem::S_PalFormat | GrainSem::S_PalEntry | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_PalVms, Box::PalBox, "CALL_PAL" };
             return &e;
         }
     }
@@ -8188,179 +7621,70 @@ GrainEntry const* lookupPalVms(uint32_t func) noexcept {
 // Primary opcode table (64 entries, indexed by primary opcode [31:26])
 // ---------------------------------------------------------------------------
 PrimaryEntry const g_primaryTable[64] = {
-    /* 0x00 */ {.kind = DispatchKind::Pal, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "CALL_PAL" },
-    /* 0x01 */ {.kind = DispatchKind::Reserved, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "OPC01" },
-    /* 0x02 */ {.kind = DispatchKind::Reserved, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "OPC02" },
-    /* 0x03 */ {.kind = DispatchKind::Reserved, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "OPC03" },
-    /* 0x04 */ {.kind = DispatchKind::Reserved, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "OPC04" },
-    /* 0x05 */ {.kind = DispatchKind::Reserved, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "OPC05" },
-    /* 0x06 */ {.kind = DispatchKind::Reserved, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "OPC06" },
-    /* 0x07 */ {.kind = DispatchKind::Reserved, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "OPC07" },
-    /* 0x08 */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLda, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt,
-            .box = Box::Mbox, .mnemonic = "LDA" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDA" },
-    /* 0x09 */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdah, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt,
-            .box = Box::Mbox, .mnemonic = "LDAH" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDAH" },
-    /* 0x0a */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdbu, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "LDBU" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDBU" },
-    /* 0x0b */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdqU, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "LDQ_U" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDQ_U" },
-    /* 0x0c */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdwu, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "LDWU" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDWU" },
-    /* 0x0d */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execStw, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "STW" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STW" },
-    /* 0x0e */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execStb, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "STB" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STB" },
-    /* 0x0f */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execStqU, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "STQ_U" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STQ_U" },
-    /* 0x10 */ {.kind = DispatchKind::IntArith, .direct = kOpcDecEntry, .subTable = g_intArithSubTable,
-        .subTableLen = 128, .mnemonic = "IntArith" },
-    /* 0x11 */ {.kind = DispatchKind::IntLogical, .direct = kOpcDecEntry, .subTable = g_intLogicalSubTable,
-        .subTableLen = 128, .mnemonic = "IntLogical" },
-    /* 0x12 */ {.kind = DispatchKind::IntShift, .direct = kOpcDecEntry, .subTable = g_intShiftSubTable,
-        .subTableLen = 128, .mnemonic = "IntShift" },
-    /* 0x13 */ {.kind = DispatchKind::IntMul, .direct = kOpcDecEntry, .subTable = g_intMulSubTable, .subTableLen = 128,
-        .mnemonic = "IntMul" },
-    /* 0x14 */ {.kind = DispatchKind::ItFp, .direct = kOpcDecEntry, .subTable = g_itFpSubTable, .subTableLen = 2048,
-        .mnemonic = "ItFp" },
-    /* 0x15 */ {.kind = DispatchKind::FltVax, .direct = kOpcDecEntry, .subTable = g_fltVaxSubTable, .subTableLen = 2048,
-        .mnemonic = "FltVax" },
-    /* 0x16 */ {.kind = DispatchKind::FltIeee, .direct = kOpcDecEntry, .subTable = g_fltIeeeSubTable,
-        .subTableLen = 2048, .mnemonic = "FltIeee" },
-    /* 0x17 */ {.kind = DispatchKind::FltLogical, .direct = kOpcDecEntry, .subTable = g_fltLogicalSubTable,
-        .subTableLen = 128, .mnemonic = "FltLogical" },
-    /* 0x18 */ {.kind = DispatchKind::Misc, .direct = kOpcDecEntry, .subTable = nullptr, .subTableLen = 0,
-        .mnemonic = "MISC" },
-    /* 0x19 */ {.kind = DispatchKind::HwMfpr, .direct = {.fn = &palBox::execHwMfpr, .semFlags = GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_IprRead | GrainSem::S_WritesRa | GrainSem::S_WritesInt,
-            .box = Box::PalBox, .mnemonic = "HW_MFPR" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "HW_MFPR" },
-    /* 0x1a */ {.kind = DispatchKind::JmpClass, .direct = kOpcDecEntry, .subTable = g_jmpClassSubTable, .subTableLen = 4,
-        .mnemonic = "JmpClass" },
-    /* 0x1b */ {.kind = DispatchKind::HwLd, .direct = {.fn = &mBox::execHwLd, .semFlags = GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_Load | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt,
-            .box = Box::Mbox, .mnemonic = "HW_LD" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "HW_LD" },
-    /* 0x1c */ {.kind = DispatchKind::FpTiExt, .direct = kOpcDecEntry, .subTable = g_fpTiExtSubTable, .subTableLen = 128,
-        .mnemonic = "FpTiExt" },
-    /* 0x1d */ {.kind = DispatchKind::HwMtpr, .direct = {.fn = &palBox::execHwMtpr, .semFlags = GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_IprWrite | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt,
-            .box = Box::PalBox, .mnemonic = "HW_MTPR" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "HW_MTPR" },
-    /* 0x1e */ {.kind = DispatchKind::HwRei, .direct = {.fn = &palBox::execHwRei, .semFlags = GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_PalExit | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_NoTrace,
-            .box = Box::PalBox, .mnemonic = "HW_REI" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "HW_REI" },
-    /* 0x1f */ {.kind = DispatchKind::HwSt, .direct = {.fn = &mBox::execHwSt, .semFlags = GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_Store | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt,
-            .box = Box::Mbox, .mnemonic = "HW_ST" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "HW_ST" },
-    /* 0x20 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execLdf, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load | GrainSem::S_VaxFp,
-            .box = Box::Fbox, .mnemonic = "LDF" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDF" },
-    /* 0x21 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execLdg, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load | GrainSem::S_VaxFp,
-            .box = Box::Fbox, .mnemonic = "LDG" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDG" },
-    /* 0x22 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execLds, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load,
-            .box = Box::Fbox, .mnemonic = "LDS" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDS" },
-    /* 0x23 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execLdt, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load,
-            .box = Box::Fbox, .mnemonic = "LDT" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDT" },
-    /* 0x24 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execStf, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_VaxFp,
-            .box = Box::Fbox, .mnemonic = "STF" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STF" },
-    /* 0x25 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execStg, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_VaxFp,
-            .box = Box::Fbox, .mnemonic = "STG" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STG" },
-    /* 0x26 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execSts, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store,
-            .box = Box::Fbox, .mnemonic = "STS" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STS" },
-    /* 0x27 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execStt, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store,
-            .box = Box::Fbox, .mnemonic = "STT" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STT" },
-    /* 0x28 */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdl, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "LDL" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDL" },
-    /* 0x29 */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdq, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "LDQ" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDQ" },
-    /* 0x2a */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdlL, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Locked | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "LDL_L" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDL_L" },
-    /* 0x2b */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execLdqL, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Locked | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "LDQ_L" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "LDQ_L" },
-    /* 0x2c */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execStl, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "STL" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STL" },
-    /* 0x2d */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execStq, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "STQ" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STQ" },
-    /* 0x2e */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execStlC, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_Store | GrainSem::S_Locked | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "STL_C" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STL_C" },
-    /* 0x2f */ {.kind = DispatchKind::Direct, .direct = {.fn = &mBox::execStqC, .semFlags = GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_Store | GrainSem::S_Locked | GrainSem::S_Cacheable,
-            .box = Box::Mbox, .mnemonic = "STQ_C" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "STQ_C" },
-    /* 0x30 */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBr, .semFlags = GrainSem::S_BraFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Branch | GrainSem::S_CallBased,
-            .box = Box::Ibox, .mnemonic = "BR" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BR" },
-    /* 0x31 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execFbeq, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Fbox, .mnemonic = "FBEQ" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "FBEQ" },
-    /* 0x32 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execFblt, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Fbox, .mnemonic = "FBLT" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "FBLT" },
-    /* 0x33 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execFble, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Fbox, .mnemonic = "FBLE" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "FBLE" },
-    /* 0x34 */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBsr, .semFlags = GrainSem::S_BraFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Branch | GrainSem::S_CallBased,
-            .box = Box::Ibox, .mnemonic = "BSR" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BSR" },
-    /* 0x35 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execFbne, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Fbox, .mnemonic = "FBNE" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "FBNE" },
-    /* 0x36 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execFbge, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Fbox, .mnemonic = "FBGE" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "FBGE" },
-    /* 0x37 */ {.kind = DispatchKind::Direct, .direct = {.fn = &fBox::execFbgt, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Fbox, .mnemonic = "FBGT" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "FBGT" },
-    /* 0x38 */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBlbc, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BLBC" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BLBC" },
-    /* 0x39 */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBeq, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BEQ" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BEQ" },
-    /* 0x3a */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBlt, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BLT" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BLT" },
-    /* 0x3b */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBle, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BLE" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BLE" },
-    /* 0x3c */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBlbs, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BLBS" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BLBS" },
-    /* 0x3d */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBne, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BNE" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BNE" },
-    /* 0x3e */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBge, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BGE" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BGE" },
-    /* 0x3f */ {.kind = DispatchKind::Direct, .direct = {.fn = &iBox::execBgt, .semFlags = GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch,
-            .box = Box::Ibox, .mnemonic = "BGT" },
-        .subTable = nullptr, .subTableLen = 0, .mnemonic = "BGT" },
+    /* 0x00 */ { DispatchKind::Pal, kOpcDecEntry, nullptr, 0, "CALL_PAL" },
+    /* 0x01 */ { DispatchKind::Reserved, kOpcDecEntry, nullptr, 0, "OPC01" },
+    /* 0x02 */ { DispatchKind::Reserved, kOpcDecEntry, nullptr, 0, "OPC02" },
+    /* 0x03 */ { DispatchKind::Reserved, kOpcDecEntry, nullptr, 0, "OPC03" },
+    /* 0x04 */ { DispatchKind::Reserved, kOpcDecEntry, nullptr, 0, "OPC04" },
+    /* 0x05 */ { DispatchKind::Reserved, kOpcDecEntry, nullptr, 0, "OPC05" },
+    /* 0x06 */ { DispatchKind::Reserved, kOpcDecEntry, nullptr, 0, "OPC06" },
+    /* 0x07 */ { DispatchKind::Reserved, kOpcDecEntry, nullptr, 0, "OPC07" },
+    /* 0x08 */ { DispatchKind::Direct, { &mBox::execLda, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt, Box::Mbox, "LDA" }, nullptr, 0, "LDA" },
+    /* 0x09 */ { DispatchKind::Direct, { &mBox::execLdah, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt, Box::Mbox, "LDAH" }, nullptr, 0, "LDAH" },
+    /* 0x0a */ { DispatchKind::Direct, { &mBox::execLdbu, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable, Box::Mbox, "LDBU" }, nullptr, 0, "LDBU" },
+    /* 0x0b */ { DispatchKind::Direct, { &mBox::execLdqU, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable, Box::Mbox, "LDQ_U" }, nullptr, 0, "LDQ_U" },
+    /* 0x0c */ { DispatchKind::Direct, { &mBox::execLdwu, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable, Box::Mbox, "LDWU" }, nullptr, 0, "LDWU" },
+    /* 0x0d */ { DispatchKind::Direct, { &mBox::execStw, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable, Box::Mbox, "STW" }, nullptr, 0, "STW" },
+    /* 0x0e */ { DispatchKind::Direct, { &mBox::execStb, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable, Box::Mbox, "STB" }, nullptr, 0, "STB" },
+    /* 0x0f */ { DispatchKind::Direct, { &mBox::execStqU, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable, Box::Mbox, "STQ_U" }, nullptr, 0, "STQ_U" },
+    /* 0x10 */ { DispatchKind::IntArith, kOpcDecEntry, g_intArithSubTable, 128, "IntArith" },
+    /* 0x11 */ { DispatchKind::IntLogical, kOpcDecEntry, g_intLogicalSubTable, 128, "IntLogical" },
+    /* 0x12 */ { DispatchKind::IntShift, kOpcDecEntry, g_intShiftSubTable, 128, "IntShift" },
+    /* 0x13 */ { DispatchKind::IntMul, kOpcDecEntry, g_intMulSubTable, 128, "IntMul" },
+    /* 0x14 */ { DispatchKind::ItFp, kOpcDecEntry, g_itFpSubTable, 2048, "ItFp" },
+    /* 0x15 */ { DispatchKind::FltVax, kOpcDecEntry, g_fltVaxSubTable, 2048, "FltVax" },
+    /* 0x16 */ { DispatchKind::FltIeee, kOpcDecEntry, g_fltIeeeSubTable, 2048, "FltIeee" },
+    /* 0x17 */ { DispatchKind::FltLogical, kOpcDecEntry, g_fltLogicalSubTable, 128, "FltLogical" },
+    /* 0x18 */ { DispatchKind::Misc, kOpcDecEntry, nullptr, 0, "MISC" },
+    /* 0x19 */ { DispatchKind::HwMfpr, { &palBox::execHwMfpr, GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_IprRead | GrainSem::S_WritesRa | GrainSem::S_WritesInt, Box::PalBox, "HW_MFPR" }, nullptr, 0, "HW_MFPR" },
+    /* 0x1a */ { DispatchKind::JmpClass, kOpcDecEntry, g_jmpClassSubTable, 4, "JmpClass" },
+    /* 0x1b */ { DispatchKind::HwLd, { &mBox::execHwLd, GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_Load | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt, Box::Mbox, "HW_LD" }, nullptr, 0, "HW_LD" },
+    /* 0x1c */ { DispatchKind::FpTiExt, kOpcDecEntry, g_fpTiExtSubTable, 128, "FpTiExt" },
+    /* 0x1d */ { DispatchKind::HwMtpr, { &palBox::execHwMtpr, GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_IprWrite | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt, Box::PalBox, "HW_MTPR" }, nullptr, 0, "HW_MTPR" },
+    /* 0x1e */ { DispatchKind::HwRei, { &palBox::execHwRei, GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_PalExit | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_NoTrace, Box::PalBox, "HW_REI" }, nullptr, 0, "HW_REI" },
+    /* 0x1f */ { DispatchKind::HwSt, { &mBox::execHwSt, GrainSem::S_HwFormat | GrainSem::S_Privileged | GrainSem::S_Store | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt, Box::Mbox, "HW_ST" }, nullptr, 0, "HW_ST" },
+    /* 0x20 */ { DispatchKind::Direct, { &fBox::execLdf, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load | GrainSem::S_VaxFp, Box::Fbox, "LDF" }, nullptr, 0, "LDF" },
+    /* 0x21 */ { DispatchKind::Direct, { &fBox::execLdg, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load | GrainSem::S_VaxFp, Box::Fbox, "LDG" }, nullptr, 0, "LDG" },
+    /* 0x22 */ { DispatchKind::Direct, { &fBox::execLds, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load, Box::Fbox, "LDS" }, nullptr, 0, "LDS" },
+    /* 0x23 */ { DispatchKind::Direct, { &fBox::execLdt, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesFp | GrainSem::S_Load, Box::Fbox, "LDT" }, nullptr, 0, "LDT" },
+    /* 0x24 */ { DispatchKind::Direct, { &fBox::execStf, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_VaxFp, Box::Fbox, "STF" }, nullptr, 0, "STF" },
+    /* 0x25 */ { DispatchKind::Direct, { &fBox::execStg, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_VaxFp, Box::Fbox, "STG" }, nullptr, 0, "STG" },
+    /* 0x26 */ { DispatchKind::Direct, { &fBox::execSts, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store, Box::Fbox, "STS" }, nullptr, 0, "STS" },
+    /* 0x27 */ { DispatchKind::Direct, { &fBox::execStt, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsFp | GrainSem::S_ReadsInt | GrainSem::S_Store, Box::Fbox, "STT" }, nullptr, 0, "STT" },
+    /* 0x28 */ { DispatchKind::Direct, { &mBox::execLdl, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable, Box::Mbox, "LDL" }, nullptr, 0, "LDL" },
+    /* 0x29 */ { DispatchKind::Direct, { &mBox::execLdq, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Cacheable, Box::Mbox, "LDQ" }, nullptr, 0, "LDQ" },
+    /* 0x2a */ { DispatchKind::Direct, { &mBox::execLdlL, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Locked | GrainSem::S_Cacheable, Box::Mbox, "LDL_L" }, nullptr, 0, "LDL_L" },
+    /* 0x2b */ { DispatchKind::Direct, { &mBox::execLdqL, GrainSem::S_MemFormat | GrainSem::S_ReadsRb | GrainSem::S_WritesRa | GrainSem::S_ReadsInt | GrainSem::S_WritesInt | GrainSem::S_Load | GrainSem::S_Locked | GrainSem::S_Cacheable, Box::Mbox, "LDQ_L" }, nullptr, 0, "LDQ_L" },
+    /* 0x2c */ { DispatchKind::Direct, { &mBox::execStl, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable, Box::Mbox, "STL" }, nullptr, 0, "STL" },
+    /* 0x2d */ { DispatchKind::Direct, { &mBox::execStq, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_Store | GrainSem::S_Cacheable, Box::Mbox, "STQ" }, nullptr, 0, "STQ" },
+    /* 0x2e */ { DispatchKind::Direct, { &mBox::execStlC, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_Store | GrainSem::S_Locked | GrainSem::S_Cacheable, Box::Mbox, "STL_C" }, nullptr, 0, "STL_C" },
+    /* 0x2f */ { DispatchKind::Direct, { &mBox::execStqC, GrainSem::S_MemFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_Store | GrainSem::S_Locked | GrainSem::S_Cacheable, Box::Mbox, "STQ_C" }, nullptr, 0, "STQ_C" },
+    /* 0x30 */ { DispatchKind::Direct, { &iBox::execBr, GrainSem::S_BraFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Branch | GrainSem::S_CallBased, Box::Ibox, "BR" }, nullptr, 0, "BR" },
+    /* 0x31 */ { DispatchKind::Direct, { &fBox::execFbeq, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Fbox, "FBEQ" }, nullptr, 0, "FBEQ" },
+    /* 0x32 */ { DispatchKind::Direct, { &fBox::execFblt, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Fbox, "FBLT" }, nullptr, 0, "FBLT" },
+    /* 0x33 */ { DispatchKind::Direct, { &fBox::execFble, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Fbox, "FBLE" }, nullptr, 0, "FBLE" },
+    /* 0x34 */ { DispatchKind::Direct, { &iBox::execBsr, GrainSem::S_BraFormat | GrainSem::S_WritesRa | GrainSem::S_WritesInt | GrainSem::S_ChangesPC | GrainSem::S_Uncond | GrainSem::S_Branch | GrainSem::S_CallBased, Box::Ibox, "BSR" }, nullptr, 0, "BSR" },
+    /* 0x35 */ { DispatchKind::Direct, { &fBox::execFbne, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Fbox, "FBNE" }, nullptr, 0, "FBNE" },
+    /* 0x36 */ { DispatchKind::Direct, { &fBox::execFbge, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Fbox, "FBGE" }, nullptr, 0, "FBGE" },
+    /* 0x37 */ { DispatchKind::Direct, { &fBox::execFbgt, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Fbox, "FBGT" }, nullptr, 0, "FBGT" },
+    /* 0x38 */ { DispatchKind::Direct, { &iBox::execBlbc, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BLBC" }, nullptr, 0, "BLBC" },
+    /* 0x39 */ { DispatchKind::Direct, { &iBox::execBeq, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BEQ" }, nullptr, 0, "BEQ" },
+    /* 0x3a */ { DispatchKind::Direct, { &iBox::execBlt, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BLT" }, nullptr, 0, "BLT" },
+    /* 0x3b */ { DispatchKind::Direct, { &iBox::execBle, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BLE" }, nullptr, 0, "BLE" },
+    /* 0x3c */ { DispatchKind::Direct, { &iBox::execBlbs, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BLBS" }, nullptr, 0, "BLBS" },
+    /* 0x3d */ { DispatchKind::Direct, { &iBox::execBne, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BNE" }, nullptr, 0, "BNE" },
+    /* 0x3e */ { DispatchKind::Direct, { &iBox::execBge, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BGE" }, nullptr, 0, "BGE" },
+    /* 0x3f */ { DispatchKind::Direct, { &iBox::execBgt, GrainSem::S_BraFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsInt | GrainSem::S_ChangesPC | GrainSem::S_Branch, Box::Ibox, "BGT" }, nullptr, 0, "BGT" },
 };
 
 // ---------------------------------------------------------------------------

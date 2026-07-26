@@ -4,6 +4,15 @@
 * text=auto
 
 ###############################################################################
+# Shell scripts must check out with LF on every platform (architecture guard).
+# The tree is edited on Windows (CRLF); a CRLF shebang makes `#!/usr/bin/env
+# bash` fail on macOS/Linux with `env: bash\r: No such file or directory`, so
+# the build/run scripts would not launch there.  Forcing eol=lf keeps them
+# runnable on Mac + Linux while Git Bash on Windows runs LF scripts fine.
+###############################################################################
+*.sh text eol=lf
+
+###############################################################################
 # Binary file types -- never normalize line endings or attempt text diffs.
 ###############################################################################
 *.exe     binary

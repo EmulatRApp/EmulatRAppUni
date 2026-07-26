@@ -567,6 +567,10 @@ set(EMULATR_TEST_SOURCES
     tests/chipsetLib/test_flashrom.cpp
     # 2026-06-21: TIG per-CPU CPU-START latch (secondary-CPU bring-up)
     tests/chipsetLib/test_tsunami_tig.cpp
+    # 2026-07-24: S1 seam (JRN-SCSI-002 G-B/G-A) -- BAR rebind + bulk DMA
+    tests/chipsetLib/test_pci_bar_rebind.cpp
+    # 2026-07-24: JRN-SCSI-001 P2 -- NCR 53C810 SCRIPTS engine + disk target
+    tests/deviceLib/test_ncr53c810.cpp
     tests/systemLib/test_firmwareloader.cpp
     tests/systemLib/test_srmloader.cpp
     tests/systemLib/test_machine.cpp
@@ -923,26 +927,35 @@ add_custom_command(TARGET Emulatr POST_BUILD
 )
 
 # ----------------------------------------------------------------------------
-# Auxiliary authoring tools -- PlatformEditor (manifest editor)  (2026-07-18)
+# Auxiliary authoring tools -- PlatformEditor (manifest editor)  (2026-07-18,
+# relocated 2026-07-25)
 # ----------------------------------------------------------------------------
-# SSOT for tool development is the SOURCE dir tools/Editors/PlatformEditor,
-# where Editors/ is a source-side GROUPING level and PlatformEditor is the
-# tool.  The run-directory copy is a staged, disposable mirror on the same
-# footing as config/, firmware/, and the manifests -- never authored by hand.
-# The group level is COLLAPSED in the run layout: the tool stages to
-# <run-dir>/tools/PlatformEditor/ (not tools/Editors/PlatformEditor/), so the
-# runtime tree carries no source-organization artifact.
+# SSOT for tool development is the SOURCE dir editors/PlatformEditor (moved
+# from tools/Editors/PlatformEditor 2026-07-25: editors/ is a top-level
+# sibling of tests/, matching the Emulatr_tests placement).  The
+# run-directory copy is a staged, disposable mirror on the same footing as
+# config/, firmware/, and the manifests -- never authored by hand.  The tool
+# stages to <run-dir>/editors/ (2026-07-25, user direction: the run layout is
+# <config>/editors, NOT <config>/tools/...), so the whole editor payload --
+# platedit_qt[.exe], platedit_tui[.exe], schema/, catalog/, webui/ and the Qt
+# runtime -- sits in ONE self-contained directory whose name mirrors the
+# source-side top-level editors/ (sibling of tests/).
 #
 # (1) webui staging is UNCONDITIONAL.  The mockup is static data that must sit
-#     under <run-dir>/tools/PlatformEditor/webui at run time, mirroring the
+#     under <run-dir>/editors/webui at run time, mirroring the
 #     firmware/config/manifest staging above.  copy_directory creates the
-#     intermediate tools/PlatformEditor/ levels and the destination tree; it
+#     intermediate editors/ level and the destination tree; it
 #     re-copies every build (cheap for a small mockup -- cmake_minimum_required
 #     is 3.16, so copy_directory_if_different (3.26+) is not available here).
 #
-# (2) Building the C++ editor itself is OPT-IN via EMULATR_BUILD_EDITORS
-#     (default OFF): it is not part of the emulator and stays out of do-no-harm
-#     builds.  Enable with -DEMULATR_BUILD_EDITORS=ON.
+# (2) The C++ editor builds WITH the emulator by default (2026-07-25, user
+#     direction): the sub-project is included unconditionally and its binaries
+#     land BESIDE Emulatr[.exe] in <config>/editors -- <root>/<Config>/editors
+#     on the MSVC in-source build (which build_emulatr.sh mirrors into
+#     out/build/<config>/editors) and out/build/<config>/editors on Ninja.  The
+#     Qt Widgets frontend (platedit_qt) is itself gated inside the sub-project
+#     on find_package(Qt6 Widgets QUIET), so a Qt-less environment still builds
+#     the core + TUI.  Disable entirely with -DEMULATR_SKIP_EDITORS=ON.
 #
 # NOTE: copy_directory carries whatever the source webui/ dir holds, including
 #       any macOS AppleDouble (._*) sidecars -- strip those from source before
@@ -950,9 +963,9 @@ add_custom_command(TARGET Emulatr POST_BUILD
 # ----------------------------------------------------------------------------
 add_custom_command(TARGET Emulatr POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/tools/Editors/PlatformEditor/webui"
-            "$<TARGET_FILE_DIR:Emulatr>/tools/PlatformEditor/webui"
-    COMMENT "[Emulatr] stage PlatformEditor webui -> tools/PlatformEditor/webui"
+            "${CMAKE_CURRENT_SOURCE_DIR}/editors/PlatformEditor/webui"
+            "$<TARGET_FILE_DIR:Emulatr>/editors/webui"
+    COMMENT "[Emulatr] stage PlatformEditor webui -> editors/webui"
     VERBATIM
 )
 
@@ -974,33 +987,40 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../H&M/HMDocs/EmulatRGuide.pdf")
     )
 endif()
 
-option(EMULATR_BUILD_EDITORS
-       "Build the PlatformEditor manifest authoring/validation tool (auxiliary)"
-       OFF)
-
-if(EMULATR_BUILD_EDITORS)
+# PlatformEditor builds WITH the emulator (2026-07-25, user direction).
+# UNCONDITIONAL include (not an option): the 2026-07-18 EMULATR_BUILD_EDITORS
+# option left OFF in existing caches, silently skipping the sub-project on
+# reconfigure -- an option default can never override a stale cache value.
+# Opt out (e.g. a minimal CI lane) with -DEMULATR_SKIP_EDITORS=ON; that fresh
+# name carries no cache history.
+if(NOT EMULATR_SKIP_EDITORS)
     # PlatformEditor ships its own self-contained CMakeLists (Qt-free core +
-    # doctest gates + TUI/Qt) at tools/Editors/PlatformEditor/CMakeLists.txt.
+    # doctest gates + TUI + Qt Widgets) at editors/PlatformEditor/CMakeLists.txt.
     # That sub-file is SSOT-side development and is edited THERE, not here.
-    # Before enabling this it still needs, on the source side: (a) an MSVC guard
-    # around its -Wall -Wextra flags, (b) namespaced test-target names
-    # (roundtrip_test -> platedit_roundtrip_test, etc.) to avoid collisions, and
-    # (c) its PLATEDIT_MANIFEST_DIR pointed at the real manifest corpus.
-    add_subdirectory(tools/Editors/PlatformEditor)
+    # The 2026-07-18 enable-gates are satisfied (2026-07-25): (a) MSVC guard on
+    # warning flags, (b) test targets namespaced platedit_*, (c)
+    # PLATEDIT_MANIFEST_DIR defaults to this source root (the manifest corpus).
+    # enable_testing() at root scope so `ctest -R platedit` works from the
+    # build root (the sub-project's add_test registrations are included).
+    enable_testing()
+    add_subdirectory(editors/PlatformEditor)
 
-    # TODO(platedit-stage): stage the built Qt editor binary into
-    #   <run-dir>/tools/PlatformEditor/ (collapsed path), mirroring the webui
-    #   copy above, plus the Qt runtime deploy on Windows.  Deferred: the Qt GUI
-    #   target does not exist yet, so $<TARGET_FILE:...> has nothing to point at.
-    #   Lands WITH the first Qt-target ticket (spec T-14).  Shape once the
-    #   target (e.g. platedit_gui) exists:
-    #
-    #   add_custom_command(TARGET platedit_gui POST_BUILD
-    #       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    #               $<TARGET_FILE:platedit_gui>
-    #               "$<TARGET_FILE_DIR:Emulatr>/tools/PlatformEditor/$<TARGET_FILE_NAME:platedit_gui>"
-    #       COMMENT "[Emulatr] stage PlatformEditor binary -> tools/PlatformEditor/"
-    #       VERBATIM)
+    # build_emulatr.sh drives `--target Emulatr`; hang the editor targets off
+    # Emulatr so the standard build produces them without a script change.
+    if(TARGET platedit_tui)
+        add_dependencies(Emulatr platedit_tui)
+    endif()
+    if(TARGET platedit_qt)
+        add_dependencies(Emulatr platedit_qt)
+    endif()
+
+    # NOTE(2026-07-25): the editor BINARIES need no staging copy.  The
+    # sub-project points RUNTIME_OUTPUT_DIRECTORY at
+    # $<TARGET_FILE_DIR:Emulatr>/editors, so platedit_qt / platedit_tui LINK
+    # straight into the run layout (<config>/editors) and the sub-project's own
+    # POST_BUILD steps drop schema/, catalog/ and the Qt DLLs beside them.
+    # Supersedes TODO(platedit-stage) (2026-07-18), which assumed a copy out of
+    # a separate editor build dir.
 endif()
 
 
@@ -1038,6 +1058,16 @@ if(WIN32)
             VERBATIM
         )
         message(STATUS "Qt deployment configured: ${WINDEPLOYQT_EXECUTABLE}")
+
+        # NOTE(2026-07-25): the matching windeployqt step for the PlatformEditor
+        # GUI does NOT live here.  add_custom_command(TARGET <t> POST_BUILD ...)
+        # is only legal in the directory that created <t>, and platedit_qt is
+        # created by editors/PlatformEditor/CMakeLists.txt -- attaching it from
+        # this scope is a hard configure error ("TARGET 'platedit_qt' was not
+        # created in this directory").  That sub-project owns its own deploy
+        # step (it resolves windeployqt from the Qt6 package it already found,
+        # honouring WINDEPLOYQT_EXECUTABLE when the operator overrides it), which
+        # also keeps the editor deployable when built standalone.
     else()
         message(WARNING
             "windeployqt not found at '${WINDEPLOYQT_EXECUTABLE}' -- "

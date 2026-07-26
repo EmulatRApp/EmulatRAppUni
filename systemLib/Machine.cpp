@@ -522,6 +522,30 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
                     h = m_chipset.pciHandlerForModel(e.modelName);
                     if (h) {
                         ++wiredNamed;
+                        // Manifest-driven INTx wiring (JRN-SCSI-003): push the
+                        // declared interrupt_pin into the device's config space
+                        // (the console indexes its routing by the 0x3D read)
+                        // and resolve slot x pin -> DRIR bit via the manifest's
+                        // board table.  No table / unrouted -> warn loud, the
+                        // chipset drops asserts rather than lighting a wrong
+                        // bit.  S3 generalizes to every option-card model.
+                        if (e.modelName == "ncr53c810") {
+                            m_chipset.setScsiInterruptPin(e.interruptPin);
+                            int const drir = mr.manifest.intxDrirBit(
+                                e.slot, e.interruptPin);
+                            m_chipset.setScsiIntxRouting(drir);
+                            if (drir < 0)
+                                spdlog::warn("PCI manifest: '{}' slot {} pin {} "
+                                             "has no pci_irq_table_hose0 route "
+                                             "-- INTx will be dropped",
+                                             e.name, int(e.slot),
+                                             int(e.interruptPin));
+                            else
+                                spdlog::info("PCI manifest: '{}' INTx routed "
+                                             "slot {} pin {} -> DRIR {}",
+                                             e.name, int(e.slot),
+                                             int(e.interruptPin), drir);
+                        }
                     } else {
                         spdlog::warn("PCI manifest: '{}' at {:02d}.{} declares model "
                                      "'{}' with no behavioral handler -- presenting a "
@@ -653,9 +677,12 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
             for (StorageTarget const& st : dev.storage) {
                 if (!st.enabled) continue;        // disabled target: not wired
                 if (st.type != StorageType::AtaDisk &&
-                    st.type != StorageType::AtapiCdrom) continue;
-                bool const isDisk = (st.type == StorageType::AtaDisk);
-                char const* const what = isDisk ? "ATA disk" : "ATAPI CD";
+                    st.type != StorageType::AtapiCdrom &&
+                    st.type != StorageType::ScsiDisk) continue;
+                bool const isScsi = (st.type == StorageType::ScsiDisk); // JRN-SCSI-001
+                bool const isDisk = (st.type == StorageType::AtaDisk) || isScsi;
+                char const* const what = isScsi ? "SCSI disk"
+                                       : isDisk ? "ATA disk" : "ATAPI CD";
                 bool const isHost  = (st.media_kind == "host");
 
                 // Resolve a file media path against [Storage] diskDir.  A host
@@ -694,16 +721,20 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
                                  err, int(st.channel), int(st.unit));
                     continue;
                 }
-                bool const ok = isDisk
-                    ? m_chipset.setDiskMedia(st.channel, st.unit, std::move(media))
-                    : m_chipset.setCdMedia(std::move(media));
+                bool const ok = isScsi
+                    ? m_chipset.setScsiDiskMedia(st.unit, std::move(media))
+                    : isDisk
+                        ? m_chipset.setDiskMedia(st.channel, st.unit, std::move(media))
+                        : m_chipset.setCdMedia(std::move(media));
                 if (ok)
-                    spdlog::info("Storage: attached {} '{}' to IDE ch{} unit{}",
-                                 what, mediaSpec, int(st.channel), int(st.unit));
+                    spdlog::info("Storage: attached {} '{}' to {} ch{} unit{}",
+                                 what, mediaSpec, isScsi ? "SCSI" : "IDE",
+                                 int(st.channel), int(st.unit));
                 else
                     spdlog::warn("Storage: {} '{}' attach rejected; "
-                                 "IDE ch{} unit{} left empty",
-                                 what, mediaSpec, int(st.channel), int(st.unit));
+                                 "{} ch{} unit{} left empty",
+                                 what, mediaSpec, isScsi ? "SCSI" : "IDE",
+                                 int(st.channel), int(st.unit));
             }
         }
     }

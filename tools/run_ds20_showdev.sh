@@ -54,11 +54,22 @@ NEWEST=0
 for cand in "RelWithDebInfo" "out/build/relwithdebinfo" "Release" \
             "out/build/release" "out/build/cli" "Debug"; do
     d="$PROJ/$cand"
-    { [[ -x "$d/Emulatr.exe" ]] || [[ -x "$d/Emulatr" ]]; } || continue
+    # Stat whichever binary actually exists (Windows Emulatr.exe vs POSIX
+    # Emulatr) with a portable mtime: GNU `stat -c %Y` first, then BSD/macOS
+    # `stat -f %m`.  ORDER MATTERS (fixed 2026-07-24): on GNU/Git-Bash stat,
+    # `-f` means --file-system, which PRINTS a "File: ..." block to stdout
+    # while EXITING NONZERO on the stray '%m' operand -- so the || fallback
+    # ALSO ran and m captured multi-line junk, killing `(( m >= NEWEST ))`
+    # under set -u ("File: unbound variable").  GNU-first avoids that; on
+    # macOS `stat -c` fails cleanly with no stdout and falls through to BSD.
+    # Belt-and-braces: reject any non-numeric capture.
+    exe="$d/Emulatr.exe"; [[ -x "$exe" ]] || exe="$d/Emulatr"
+    [[ -x "$exe" ]]                           || continue
     [[ -f "$d/firmware/ds20_v7_3.exe" ]]      || continue
     [[ -f "$d/ds20_v7_3_platform.json" ]]     || continue
-    m=$(stat -c '%Y' "$d/Emulatr.exe" 2>/dev/null || echo 0)
-    if (( m > NEWEST )); then NEWEST=$m; RUN_DIR="$d"; fi
+    m=$(stat -c '%Y' "$exe" 2>/dev/null || stat -f '%m' "$exe" 2>/dev/null || echo 0)
+    [[ "$m" =~ ^[0-9]+$ ]] || m=0
+    if (( m >= NEWEST )); then NEWEST=$m; RUN_DIR="$d"; fi
 done
 # Pin override: RUN_DIR_OVERRIDE=<dir> forces a specific build dir, bypassing the
 # newest-exe auto-pick.  Use when your MSVC/Qt build target is NOT the dir the
@@ -72,16 +83,25 @@ fi
 [[ -n "$RUN_DIR" ]] || { echo "FATAL: no run dir with Emulatr.exe + ds20 firmware + ds20 manifest under $PROJ"; exit 1; }
 cd "$RUN_DIR"
 
-# binary: Windows emits Emulatr.exe, POSIX a bare Emulatr -- prefer .exe so the
-# Windows production path is unchanged, then fall back to the mac/Linux build.
-if   [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
-elif [ -x "./Emulatr"     ]; then EXE="./Emulatr"
-else echo "FATAL: no Emulatr(.exe) in $RUN_DIR"; exit 1; fi
+# binary: Windows emits Emulatr.exe, POSIX a bare Emulatr.  Pick by HOST, not by
+# a fixed .exe-first order: a build dir can hold BOTH a native Emulatr (Mach-O)
+# and a stale cross-built Emulatr.exe (PE), and on Mac running the PE gives exit
+# 126 "cannot execute binary file".  So on Windows prefer .exe; elsewhere prefer
+# the native binary, each falling back to the other only if its own is absent.
+if [ "$EMU_HOST" = "win" ]; then
+    if   [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
+    elif [ -x "./Emulatr"     ]; then EXE="./Emulatr"
+    else echo "FATAL: no Emulatr(.exe) in $RUN_DIR"; exit 1; fi
+else
+    if   [ -x "./Emulatr"     ]; then EXE="./Emulatr"
+    elif [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
+    else echo "FATAL: no Emulatr in $RUN_DIR"; exit 1; fi
+fi
 FW="firmware/ds20_v7_3.exe"
 INI="config/Emulatr.ini"
 MANIFEST="ds20_v7_3_platform.json"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
-MAXCYC="${MAXCYC:-2000000000}"
+MAXCYC="${MAXCYC:-999000000000}"
 ATTACH_DISK="${ATTACH_DISK:-1}"
 LOG="run_ds20_showdev_$(date +%Y%m%d_%H%M%S).log"
 

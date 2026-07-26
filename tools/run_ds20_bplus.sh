@@ -21,12 +21,30 @@
 #                              PAL-temp memory copies PT__VPTB(+0x0)/PT__PTBR(+0x8)
 #                              the guest DTBM_DOUBLE_3 self-test reads.
 #
-#   Usage:   ./tools/run_ds20_bplus.sh            (all showdev args pass through)
-#     e.g.:  ATTACH_DISK=0 ./tools/run_ds20_bplus.sh
+#   Usage:   ./tools/run_ds20_bplus.sh [maxcycles] [showdev args...]
+#     e.g.:  ./tools/run_ds20_bplus.sh 2000000000       (cap at 2e9 guest cyc)
+#            ATTACH_DISK=0 ./tools/run_ds20_bplus.sh     (no cap; all args pass through)
+#            MAXCYC=5e8 ./tools/run_ds20_bplus.sh        (env form still works)
+#
+# maxcycles: an OPTIONAL first positional argument -- if it is an integer it sets
+# MAXCYC (the --max-cycles cap that run_ds20_showdev.sh applies) and is consumed
+# here; anything else is left untouched and passes through to showdev.  A MAXCYC
+# already set in the environment wins over the positional (pre-set to override).
 #
 # Override any knob by pre-setting it in the environment before calling.
 # ============================================================================
 set -euo pipefail
+
+# ---- optional first positional arg: maxcycles -------------------------------
+# If arg 1 is a plain integer, treat it as the guest-cycle cap and forward it to
+# run_ds20_showdev.sh via MAXCYC (its documented knob).  An env-provided MAXCYC
+# takes precedence and leaves the positional in place for showdev to see.
+if [[ $# -ge 1 && "$1" =~ ^[0-9]+$ ]]; then
+    if [[ -z "${MAXCYC:-}" ]]; then
+        export MAXCYC="$1"
+    fi
+    shift
+fi
 
 export EMULATR_2D_NOOP="${EMULATR_2D_NOOP:-1}"
 export EMULATR_DELAYWARP="${EMULATR_DELAYWARP:-1}"
@@ -97,6 +115,7 @@ export EMULATR_FAULT_CYCHI="${EMULATR_FAULT_CYCHI:-2300000000}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "run_ds20_bplus: faithful-exec stack ->"
+echo "  MAXCYC=${MAXCYC:-<default 999e9>}  [guest-cycle cap -> showdev --max-cycles]"
 echo "  EMULATR_2D_NOOP=$EMULATR_2D_NOOP"
 echo "  EMULATR_DELAYWARP=$EMULATR_DELAYWARP"
 echo "  EMULATR_CSERVE_START_MODE=$EMULATR_CSERVE_START_MODE"
