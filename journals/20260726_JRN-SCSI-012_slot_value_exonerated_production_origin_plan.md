@@ -86,6 +86,50 @@ ASCII(128) only.  Hex radix.
   snapshot pair, tonight's slot6 CRB capture.
 
 --------------------------------------------------------------------------------
+## 5. SAME-NIGHT ADDENDUM -- S1/S2 executed from the snapshot; Sec 2's
+##    "runtime-built" inference is CORRECTED; the wall has a door
+
+  5.1 STREAM IS STATIC.  The pattern stream at VA 0x20099216 (records
+      85f1/85f3 + ptr fffcaXXX, byte-exact vs the JRN-VMB-021 transcript)
+      is PRESENT in the failing-era snapshot -- a state in which APB
+      never executed one instruction.  It ships in APB.EXE.  Sec 2's
+      runtime-built argument is WITHDRAWN for the stream itself.
+  5.2 PRODUCTIONS ARE GENERIC.  No literal "IDE 0 105" / "SCSI 0 8"
+      text exists in the image+heap range; 85f3 is a generic NUMBER
+      token -- VMB-021's per-field values were the INPUT's, not the
+      pattern's.  The probe pass fails BY DESIGN (bit-10); the accept
+      pass is a SECOND INVOCATION that never occurs on EmulatR.
+  5.3 POINTER BASE SOLVED: record-relative (VA_of_record + signed32).
+      Targets land in static image data 0x200635xx -- regular
+      descriptor-shaped operand records.
+  5.4 THE CTX IS A STATIC DISPATCH TABLE.  VA 0x20063820 (walk arg a3)
+      holds code pointers: +0x8 = 0x2000e9d0 (adjacent to the walk
+      entry), later 0x20071270, 0x20007470...  This is the indirect-call
+      mechanism -- and why --find-bsr 0x2000e974 finds ZERO static call
+      sites.  Static call-site hunting is a dead end; a RETIRE TRACE is
+      the correct instrument (architect's proposal, adopted).
+  5.5 PLAN REVISION -> T-series (supersedes Sec 3 S1-S4):
+      T1  full-APB retire trace, cold boot to NOIOVEC:
+            EMULATR_NO_AUTOLOAD=1 EMULATR_2D_NOOP=1
+            EMULATR_DIAG_PCLO=0x20000000 EMULATR_DIAG_PCHI=0x20099400
+            EMULATR_DIAG_CAP=5000000
+          then offline ASM reconstruction (alpha_disasm/analyze_retire_
+          trace): count walk invocations, and name THE BRANCH after the
+          failed probe that chooses message-emit over the accept
+          invocation.  THE deliverable.
+      T2  decode the operand records at 0x200635xx (record-relative
+          base per 5.3) -> full production grammar.
+      T3  enumerate the 0x20063820 dispatch table statically; find the
+          accept-pass handler (expect ties to the 0x20097200+ region).
+      T4  fold T1-T3: the deciding compare's data source (ctx field /
+          GCT / HWRPB) -> EmulatR fix or the exact AXPBox question.
+      T5  AXPBox comparative only if T1-T4 stall (JRN-SCSI-005 Sec 5
+          harness).
+      Hygiene every run: NO_AUTOLOAD (auto_halt_* now in run-dir
+      snapshots/), 2D_NOOP, ONE console client, slot-8 baseline
+      manifest.
+
+--------------------------------------------------------------------------------
 ## 4. Files touched
 
   - out/build/relwithdebinfo/ds20_v7_3_platform.SLOT6.json  NEW (run-dir
