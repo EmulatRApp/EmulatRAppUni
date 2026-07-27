@@ -207,33 +207,32 @@ auto extql(uint64_t value, uint64_t offset) noexcept -> uint64_t
     return value >> (bytePos * 8);
 }
 
+// EXTxH shift amount is byte_loc<5:0> (AARM Sec 4.6.1): 64 - 8*Rbv<2:0>
+// TRUNCATED TO SIX BITS, so Rbv<2:0>=0 gives shift 64 & 63 = 0 -- the value
+// passes through (masked to the extract width), it is NOT zeroed.  The
+// pre-BWX signed-byte-load idiom (LDQ_U; EXTQH rb=X+1; SRA #56) depends on
+// this for chars at X == 7 (mod 8); the earlier bytePos==0 -> 0 special
+// case made every such guest byte read yield NUL (%APB-F-NOIOVEC root
+// cause, JRN-SCSI-020).
+
 AXP_ALWAYS_INLINE
 auto extwh(uint64_t value, uint64_t offset) noexcept -> uint64_t
 {
-    const int bytePos = static_cast<int>(offset & 0x7);
-    if (bytePos == 0) return 0;
-    const int shift = (8 - bytePos) * 8;
-    if (shift >= 64) return 0;
+    const int shift = ((8 - static_cast<int>(offset & 0x7)) * 8) & 63;
     return (value << shift) & 0xFFFFULL;
 }
 
 AXP_ALWAYS_INLINE
 auto extlh(uint64_t value, uint64_t offset) noexcept -> uint64_t
 {
-    const int bytePos = static_cast<int>(offset & 0x7);
-    if (bytePos == 0) return 0;
-    const int shift = (8 - bytePos) * 8;
-    if (shift >= 64) return 0;
+    const int shift = ((8 - static_cast<int>(offset & 0x7)) * 8) & 63;
     return (value << shift) & 0xFFFFFFFFULL;
 }
 
 AXP_ALWAYS_INLINE
 auto extqh(uint64_t value, uint64_t offset) noexcept -> uint64_t
 {
-    const int bytePos = static_cast<int>(offset & 0x7);
-    if (bytePos == 0) return 0;
-    const int shift = (8 - bytePos) * 8;
-    if (shift >= 64) return 0;
+    const int shift = ((8 - static_cast<int>(offset & 0x7)) * 8) & 63;
     return value << shift;
 }
 

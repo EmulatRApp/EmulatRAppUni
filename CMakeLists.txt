@@ -548,6 +548,7 @@ set(EMULATR_TEST_SOURCES
     tests/cBoxLib/test_cacheops.cpp
     tests/palBoxLib/test_palentries.cpp
     tests/coreLib/test_iprfields.cpp
+    tests/coreLib/test_byteops.cpp
     tests/fBoxLib/test_float.cpp
     tests/memoryLib/test_guestmemory.cpp
     tests/pipelineLib/test_memdrainer.cpp

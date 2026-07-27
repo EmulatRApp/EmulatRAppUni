@@ -639,6 +639,18 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-021_extxh_fix_landed_noiovec_dead.md` --
+  **NOIOVEC ARC CLOSED**: EXTxH fix applied (architect-approved) --
+  extwh/extlh/extqh now use the AARM byte_loc<5:0> shift; new
+  tests/coreLib/test_byteops.cpp locks all 8 offsets + both idioms.
+  V1 7/7, V3 492/495 (3 pre-existing drift only), V2: %APB-F-NOIOVEC
+  GONE; APB accepts, does post-accept console I/O (18x CSERVE func 70),
+  runs ~7.9s past the bootstrap jump, then NEW WALL: halt code 10
+  (decimal, outside the 1..7 PAL table = software-posted) @ PC 0x2a000.
+  NEXT (L2): N1 identify code at 0x2a000 (SYSBOOT?); N2 DIAG window on
+  the pre-halt cycles; N3 decode the func-70 conversation.  Re-test
+  OTHER old anomalies on the fixed binary (EXTxH corrupted every
+  aligned-Rb H-idiom byte read guest-wide).  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-020_L1_ROOT_CAUSE_extxh_aligned_case.md` --
   **L1 ROOT CAUSE NAMED**: coreLib/alpha_int_byteops.h extwh/extlh/extqh
   return 0 for Rbv<2:0>=0; AARM Sec 4.6.1 (alpha_arch_ref.txt:9193)
