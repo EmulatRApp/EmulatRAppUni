@@ -974,8 +974,8 @@ TEST_CASE("palBox::execMtprVptb_vms -- updates cpu.vptb, both IPRs, AND PT__VPTB
     // PHYSICAL, like the .mar's hw_stq/p.  Without S_PhysAddr the Mbox walks
     // p_temp as a VA, the store double-misses, and the machine halts 0x0A at
     // the MTPR site -- the failure mode seen on this fix's first cut.
-    CHECK((r.semFlags & GrainSem::S_PhysAddr) != 0);
-    CHECK((r.semFlags & GrainSem::S_Store) != 0);
+    CHECK(static_cast<uint64_t>(r.semFlags & GrainSem::S_PhysAddr) != 0u);
+    CHECK(static_cast<uint64_t>(r.semFlags & GrainSem::S_Store) != 0u);
 }
 
 TEST_CASE("palBox::execMtprVptb_vms -- an unusable p_temp FAULTS, never skips")

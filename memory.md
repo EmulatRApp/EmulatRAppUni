@@ -639,6 +639,27 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-027_io_stack_exonerated_loader_anchor.md` --
+  NEXT SESSION STARTS HERE.  One-line brief: retire window UPSTREAM of
+  pc 0x42790, three stages, ground truth in hand.  %SYSBOOT-F-LDFAIL
+  decodes (architect, on real VMS) as %LOADER-E-BADIMGOFF -- facility
+  0x13 = LOADER, so the bytes ARRIVE and do not parse.  THE WHOLE I/O
+  STACK IS EXONERATED BY EVIDENCE: payload 68/68 FNV-matched vs
+  dka0.vdisk (an image Charon boots into OpenVMS), DMA tiling 47/47
+  exact cover with contiguous guest PAs, zero padding in the SYSBOOT
+  window, and geometry closed by the driver's OWN block descriptor
+  (0x000200).  Anchor captured by VALUE (addresses are not invariant,
+  0x0013809A is): pc 0x42790 `LDQ r0,-0x10(r27)` LOADS the status from
+  a linkage cell; 0x5ff0c/0x5e0bc/0xd150 just copy it up the return
+  chain.  Verdict rule for the trace: ISD fields match the image but
+  the compare fails -> 32-bit canonicalization lane (LDL/ADDL), EXTxH's
+  genre; fields differ -> corruption upstream in memory.  Host-side
+  ground truth: image header at LBA 697408 (EIHD maj 3, ISDOFF 296;
+  EISDs +296/+332/+368, VBNs 2176/138/74).  ALSO: 3 instrument defects
+  fixed (VACTL cap, WREG ignored DIAG_CYCLO, cmdTrace blind to data-OUT
+  payloads) + the rule that a POST-HALT snapshot's page tables are the
+  CONSOLE's, never valid for OS-era VAs.  Tools: scsi_read_diff.py,
+  N810 trace w/ LBA+FNV+CDB, N810-MOVE tiling probe.  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-026_vptb_desync_fixed_halt10_closed.md` --
   **HALT-10 CLOSED; DS20 NOW REACHES SYSBOOT.**  Root cause:
   execMtprVptb_vms shadowed EV6_VMS_CALLPAL.MAR:1524 INCOMPLETELY -- it
@@ -934,3 +955,17 @@ dispatch matches them (silent PAL corruption otherwise).
 
 The `journals/` directory holds the full dated record (boot-bringup blow-by-blow,
 retracted theories, EOD handoffs) that this file deliberately compresses.
+
+EmulatR Version should match Help & Manual Version.  We should create a scaffold that when we generate - publish documentation, 
+it updates a C++ header that is included in the build. 
+One version, one source of truth. The emulatr-doc-release skill already maintains versionbuild in 
+the H&M .hmxp project file as the documentation's version authority. If the UART banner ("Alpha Emulator Console V4.0-0") carries 
+its own hardcoded string, that's two owners for one fact — the exact pattern the SSOT rules exist to prevent, same family as the 
+kSnapshotExtension single-constant rename on the housekeeping list. 
+The clean shape: 
+one kEmulatrVersion constant (or a build-time-generated version header) that the UART banner, 
+--version output, log headers, and any About surface all consume; 
+the release workflow then bumps one place and the H&M versionbuild tracks it (or is generated from it) at release time. 
+Also worth deciding while you're in there: the banner says V4.0-0 while the active tree is 
+V5 — per the file-naming convention the version lives in headers and trees, not names, but a user-facing banner 
+claiming V4 from a V5 build is a real mismatch, not a naming-convention question.
