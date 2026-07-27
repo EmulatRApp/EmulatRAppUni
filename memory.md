@@ -639,6 +639,19 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-022_halt10_va_form_dtbm_double3.md` -- N1
+  DONE: halt-10 @ 0x2a000 decoded.  The code is OS-bootstrap (SYSBOOT
+  territory: HWRPB re-checksum to +0x120=hwrpb$Q_CHKSUM), its epilogue
+  cut at the page boundary.  Post-halt snapshot ptwalk: PTE for 0x2a000
+  is VALID (PFN 0x36d, KRE, no FOE) and the missing code IS there --
+  guest exonerated.  Halt 10 = VMS PAL DTBM_DOUBLE_3 rev-1.60 self-check
+  crash1 (EV6_VMS_PAL.MAR ~1125): formatted-PTE-VA<63:33> != PT__VPTB.
+  Chain: ITB miss -> PTE hw_ld/v double-miss -> check fails -> halt 0x0A.
+  PRIME SUSPECT: EmulatR IVA_FORM/VA_FORM 43-vs-48-bit mode (VPTB =
+  0x2_0000_0000, bit 33: 48-bit form drops it) -- the pre-named
+  Ev6Translator-harvest gap.  NEXT: N2a static read of IVA_FORM impl vs
+  HRM; N2b DIAG on palBase+0x300 window + WREG r26; N2c re-run V2.
+  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-021_extxh_fix_landed_noiovec_dead.md` --
   **NOIOVEC ARC CLOSED**: EXTxH fix applied (architect-approved) --
   extwh/extlh/extqh now use the AARM byte_loc<5:0> shift; new
