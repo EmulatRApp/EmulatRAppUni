@@ -24,6 +24,7 @@
 #include "doctest.h"
 
 #include "coreLib/alpha_int_byteops.h"
+#include "coreLib/IprFields.h"      // computeVaForm / iCtlVptb (VPTB cluster)
 
 #include <cstdint>
 #include <ostream>          // doctest forward-declares basic_ostream
@@ -224,6 +225,56 @@ TEST_CASE("byteops: ZAP/ZAPNOT lane selection (header-comment examples)")
     CHECK(zapnot(0x0123456789ABCDEFULL, 0x3C) == 0x00004567'89AB0000ULL);
     CHECK((zap(0x0123456789ABCDEFULL, 0x3C)
            | zapnot(0x0123456789ABCDEFULL, 0x3C)) == 0x0123456789ABCDEFULL);
+}
+
+// ============================================================================
+// VPTB / VA_FORM cluster (JRN-SCSI-026).  The OpenVMS base 0xFFFFFEFC00000000
+// exercises, in ONE value: the I_CTL 47:30 store width, its SEXT-from-47 read
+// (HRM Fig 5-22), and all three VA_FORM mode compositions (Figs 5-5/5-6/5-7).
+// This is the value OpenVMS arms on every boot, so it is the shape that
+// matters -- a mask/width regression here re-opens the halt-10 wall.
+// ============================================================================
+
+TEST_CASE("vptb: I_CTL 47:30 store + SEXT read round-trips the VMS base")
+{
+    constexpr uint64_t kVmsVptb = 0xFFFFFEFC00000000ULL;
+    // The leaf stores only bits 47:30 (architectural field width); the read
+    // path re-derives 63:48 by sign-extending bit 47 -- lossless for canonical
+    // addresses, which is why EmulatR's narrower store matches the .mar's
+    // wider `bis` in effect.
+    uint64_t const iCtl = (0x00340007ULL & ~coreLib::kICtlVptbLowMask)
+                        | (kVmsVptb & coreLib::kICtlVptbLowMask);
+    CHECK((iCtl & 0xFFFFULL) == 0x0007ULL);                 // control bits kept
+    CHECK(coreLib::iCtlVptb(iCtl) == kVmsVptb);             // SEXT round-trip
+    CHECK(coreLib::iCtlVptb(iCtl & ~(uint64_t{1} << 47))
+              != kVmsVptb);                                  // bit 47 is the sign
+}
+
+TEST_CASE("vptb: VA_FORM compositions for the VMS base (HRM Figs 5-5/6/7)")
+{
+    constexpr uint64_t kVmsVptb = 0xFFFFFEFC00000000ULL;
+    constexpr uint64_t kVa      = 0x0000000000029A70ULL;    // the halt-10 VA
+    // Fig 5-5 (43-bit, VA_48=0, VA_FORM_32=0): VPTB[63:33] : VA[42:13].
+    CHECK(coreLib::computeVaForm(kVmsVptb, kVa, false, false)
+          == ((kVmsVptb & 0xFFFFFFFE00000000ULL)
+              | ((kVa >> 10) & 0x00000001FFFFFFF8ULL)));
+    // Fig 5-6 (48-bit): VPTB[63:43] : SEXT(VA[47])<42:38> : VA[47:13].
+    CHECK(coreLib::computeVaForm(kVmsVptb, kVa, false, true)
+          == ((kVmsVptb & 0xFFFFF80000000000ULL)
+              | ((kVa >> 10) & 0x0000003FFFFFFFF8ULL)));
+    // Fig 5-7 (NT 32-bit): VPTB[63:30] : VA[31:13].
+    CHECK(coreLib::computeVaForm(kVmsVptb, kVa, true, false)
+          == ((kVmsVptb & 0xFFFFFFFFC0000000ULL)
+              | ((kVa >> 10) & 0x00003FFFF8ULL)));
+    // The mode splits must DIFFER for this base -- the 48-bit form drops the
+    // VPTB bits the 43-bit form keeps, which is the failure shape that first
+    // put VA_FORM under suspicion (JRN-SCSI-022).
+    CHECK(coreLib::computeVaForm(kVmsVptb, kVa, false, false)
+          != coreLib::computeVaForm(kVmsVptb, kVa, false, true));
+    // And a VPTB-bearing form must never produce a bare offset (the
+    // signature logged at the wall: formatted VA with no VPTB at all).
+    CHECK(coreLib::computeVaForm(kVmsVptb, kVa, false, false) > 0xFFFFFFFFULL);
+    CHECK(coreLib::computeVaForm(0, kVa, false, false) < 0x100000ULL);
 }
 
 TEST_CASE("byteops: INSxH/MSKxH aligned cases keep their AARM semantics")

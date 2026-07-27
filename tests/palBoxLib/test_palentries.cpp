@@ -29,6 +29,7 @@
 #include "coreLib/CpuState.h"
 #include "coreLib/ExecCtx.h"
 #include "coreLib/InstructionGrain.h"
+#include "coreLib/IprFields.h"      // iCtlVptb / kVaCtlVptbMask (VPTB contract)
 
 #include "grainFactoryLib/generated/SemanticFlagsEnum.h"
 #include "grainFactoryLib/generated/GrainsForward.h"
@@ -936,11 +937,21 @@ TEST_CASE("palBox::execMfprVptb_vms -- returns 0 when cpu.vptb is unset")
     CHECK(r.regWriteValue == 0u);
 }
 
-TEST_CASE("palBox::execMtprVptb_vms -- stores R16 into cpu.vptb")
+// JRN-SCSI-026: MTPR_VPTB has THREE side effects in EV6_VMS_CALLPAL.MAR
+// (:1524-1545) -- cpu.vptb/VA_CTL/I_CTL updates AND the PT__VPTB(p_temp)
+// memory store at PAL-temp offset 0x0 (EV6_PAL_TEMPS.MAR:33).  The guest's own
+// DTBM_DOUBLE_3 self-check reads that CELL and compares it against the
+// IPR-formatted PTE address; updating only the IPRs desyncs the two and halts
+// the machine with code 0x0A the first time an OS arms its own VPTB.  These
+// cases pin ALL THREE so the desync cannot be reintroduced.
+TEST_CASE("palBox::execMtprVptb_vms -- updates cpu.vptb, both IPRs, AND PT__VPTB")
 {
     InstructionGrain g = makePalGrain(0x2A, kVptbWriteFlags, &palBox::execMtprVptb_vms);
     CpuState cpu{};
-    cpu.intReg[16] = 0x1234567800000000ULL;   // R16 (a0) is the standard CALL_PAL arg
+    // OpenVMS arms this exact base every boot (JRN-SCSI-026 A2 capture:
+    // R16=0xfffffefc00000000 from the OS bootstrap at pc 0x29dc4).
+    cpu.intReg[16]    = 0xFFFFFEFC00000000ULL;
+    cpu.intShadow[5]  = 0x7000ULL;            // p_temp = PAL-bank r21
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
@@ -949,7 +960,40 @@ TEST_CASE("palBox::execMtprVptb_vms -- stores R16 into cpu.vptb")
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == kNoRegWrite);     // MTPR doesn't commit a regfile slot
     CHECK_FALSE(r.divert);
-    CHECK(cpu.vptb == 0x1234567800000000ULL);
+    CHECK(cpu.vptb == 0xFFFFFEFC00000000ULL);
+    // IPR halves (the 2026-07-19 fix).
+    CHECK((cpu.va_ctl & coreLib::kVaCtlVptbMask) == 0xFFFFFEFC00000000ULL);
+    CHECK(coreLib::iCtlVptb(cpu.i_ctl) == 0xFFFFFEFC00000000ULL);
+    // THE MEMORY HALF (the 2026-07-26 fix): a deferred quadword store of the
+    // RAW R16 to p_temp+0x0.  Without it the cell keeps the console-era base
+    // and DTBM_DOUBLE_3 crashes -- the halt-10 wall.
+    CHECK(r.memIsStore);
+    CHECK(r.memSize == 8);
+    CHECK(r.memAddr == 0x7000ULL);
+    CHECK(r.memData == 0xFFFFFEFC00000000ULL);
+    // PHYSICAL, like the .mar's hw_stq/p.  Without S_PhysAddr the Mbox walks
+    // p_temp as a VA, the store double-misses, and the machine halts 0x0A at
+    // the MTPR site -- the failure mode seen on this fix's first cut.
+    CHECK((r.semFlags & GrainSem::S_PhysAddr) != 0);
+    CHECK((r.semFlags & GrainSem::S_Store) != 0);
+}
+
+TEST_CASE("palBox::execMtprVptb_vms -- an unusable p_temp FAULTS, never skips")
+{
+    // Hard-stop-over-silent-degradation: a skipped PT__VPTB store recreates the
+    // JRN-SCSI-026 desync under a different precondition, so an out-of-range
+    // p_temp must fault loudly rather than leave the cell stale.
+    InstructionGrain g = makePalGrain(0x2A, kVptbWriteFlags, &palBox::execMtprVptb_vms);
+    CpuState cpu{};
+    cpu.intReg[16]   = 0xFFFFFEFC00000000ULL;
+    cpu.intShadow[5] = 0x0ULL;                // no PAL temps installed
+    ExecCtx ctx{};
+    ctx.cpu = &cpu;
+
+    BoxResult r = palBox::execMtprVptb_vms(g, ctx);
+
+    CHECK(r.faultCode != kNoFault);
+    CHECK_FALSE(r.memIsStore);
 }
 
 TEST_CASE("palBox::execMtprVptb_vms -> execMfprVptb_vms -- round-trips via cpu.vptb")

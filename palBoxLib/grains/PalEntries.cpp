@@ -1540,6 +1540,56 @@ auto execMtprVptb_vms([[maybe_unused]] InstructionGrain const& g,
                   | (newVptb & coreLib::kVaCtlVptbMask);
     c.cpu->i_ctl  = (c.cpu->i_ctl & ~coreLib::kICtlVptbLowMask)
                   | (newVptb & coreLib::kICtlVptbLowMask);
+
+    // COMPLETING FIX (2026-07-26, JRN-SCSI-026): the 07-19 fix above added the
+    // two IPR merges but stopped ONE STORE SHORT of the .mar routine.  The real
+    // MTPR_VPTB (EV6_VMS_CALLPAL.MAR :1524-1534) has THREE side effects:
+    //     hw_stq/p r16, PT__VPTB(p_temp)   ; <-- the memory copy, was MISSING
+    //     bis p7,r16 -> EV6_MTPR VA_CTL
+    //     merge -> hw_mtpr <EV6__I_CTL ! ^x20>
+    // PT__VPTB = ^x0 off p_temp (EV6_PAL_TEMPS.MAR :33).  The guest's OWN
+    // miss handlers read that CELL, not the IPRs: DTBM_DOUBLE_3's rev-1.60
+    // self-check (EV6_VMS_PAL.MAR ~1115) compares the IPR-formatted PTE VA
+    // <63:33> against PT__VPTB and halts 0x0A on mismatch.  Updating only the
+    // IPRs therefore DESYNCS the two the instant the OS arms its own VPTB
+    // (OpenVMS: 0xFFFFFEFC_00000000), which is the halt-10 wall at PC 0x2a000.
+    // Console-era boots never tripped it because the console never calls this
+    // leaf -- hence JRN-VMB-010's "dead code" verdict, correct in ITS scope.
+    // Value is RAW R16 (the .mar stores r16 unshifted; its "<29:0> cleared"
+    // note is the CALLER's convention).  ONE quadword -- within the leaf's
+    // single-memory-effect budget, using the deferred memEffect fields so the
+    // store retires through the normal Mbox path.
+    // p_temp = PAL-bank r21 (ev6_alpha_defs.mar:38) -> intShadow[5].
+    // The .mar uses hw_stq/p -- a PHYSICAL store.  The memEffect MUST carry
+    // S_PhysAddr (as execStqp :1466 does) or the Mbox translates p_temp as a
+    // VIRTUAL address: VA 0x7000 is unmapped, the store DTB-misses, the VPTE
+    // walk double-misses, and DTBM_DOUBLE_3 halts 0x0A *at this instruction*.
+    // (Observed exactly that on the first cut of this fix: the wall moved from
+    // PC 0x2a000 to PC 0x29dc4, the MTPR_VPTB call site itself.)
+    uint64_t const pTempBase = c.cpu->intShadow[5] & ~uint64_t{7};
+    if (pTempBase >= 0x1000ull && pTempBase < 0x8000ull) {
+        r.semFlags   = r.semFlags
+                     | grainFactory::GrainSem::S_PhysAddr
+                     | grainFactory::GrainSem::S_Store;
+        r.memAddr    = static_cast<coreLib::PAType>(pTempBase + 0x0); // PT__VPTB
+        r.memData    = newVptb;
+        r.memSize    = 8;
+        r.memIsStore = true;
+    } else {
+        // HARD STOP, never a silent skip: a skipped store recreates exactly
+        // this desync under a different precondition (architect's A3 ruling).
+        // Fault here so the halt carries the encoding + p_temp in the lookback
+        // ring rather than corrupting the guest's page-table view silently.
+        std::fprintf(stderr,
+            "MTPR_VPTB: FATAL -- p_temp candidate 0x%llx (intShadow[5]) outside "
+            "[0x1000,0x8000); refusing to desync PT__VPTB from the IPRs "
+            "(JRN-SCSI-026).  pc=0x%llx R16=0x%llx\n",
+            static_cast<unsigned long long>(pTempBase),
+            static_cast<unsigned long long>(g.pc),
+            static_cast<unsigned long long>(newVptb));
+        std::fflush(stderr);
+        r.faultCode = coreLib::kFaultUnimplemented;
+    }
 #if EMULATR_BRINGUP_PROBES
     // 2026-07-08: VPTB-write probe (env EMULATR_VPTB_DIAG).  ES40 SCB null-vector
     // hunt (task #29): MTPR_VPTB deposits R16 into cpu.vptb, but VA_FORM reads
@@ -1805,6 +1855,46 @@ auto execSwpctxVms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxR
     using deviceLib::hwrpb::Hwpcb;
     using deviceLib::hwrpb::loadCpuFromHwpcb;
     using deviceLib::hwrpb::storeCpuToHwpcb;
+
+#if EMULATR_BRINGUP_PROBES
+    // PT__PTBR DESYNC SENSOR (2026-07-26, JRN-SCSI-026 A4 row 1; env
+    // EMULATR_PTBR_DIAG).  Sibling of the VPTB sensor that cracked the halt-10
+    // arc.  The .mar SWPCTX (EV6_VMS_CALLPAL.MAR:430) stores PT__PTBR(p_temp)
+    // = PFN<<13, and the guest's OWN TB-miss handlers read THAT CELL as the
+    // page-table walk root (EV6_VMS_PAL.MAR:1107/1166/1505/1778).  This leaf
+    // maintains cpu.ptbr -- which has NO functional consumer in EmulatR (only
+    // diag printfs) -- so if the cell and the leaf disagree the guest walks a
+    // stale page table exactly as it walked a stale VPTB.  Logs both sides so
+    // "is this live on the current path" is answered by the boot we already
+    // have to run, at zero extra runs.
+    {
+        static bool const s_ptbrDiag = (std::getenv("EMULATR_PTBR_DIAG") != nullptr);
+        if (s_ptbrDiag) {
+            static unsigned long s_n = 0;
+            if (s_n < 256) { ++s_n;
+                uint64_t const pTempBase = c.cpu->intShadow[5] & ~uint64_t{7};
+                uint64_t cellPtbr = 0;
+                bool const pTempOk = (pTempBase >= 0x1000ull && pTempBase < 0x8000ull);
+                if (pTempOk && c.memory != nullptr) {
+                    (void)c.memory->read8(
+                        static_cast<coreLib::PAType>(pTempBase + 0x8), cellPtbr);
+                }
+                std::fprintf(stderr,
+                    "PTBR-DIAG[swpctx] cyc=%llu pc=0x%llx newPcbb=0x%llx "
+                    "cpu.ptbr=0x%llx (<<13=0x%llx) PT__PTBR=0x%llx p_temp=0x%llx%s\n",
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<unsigned long long>(c.cpu->intReg[16]),
+                    static_cast<unsigned long long>(c.cpu->ptbr),
+                    static_cast<unsigned long long>(c.cpu->ptbr << 13),
+                    static_cast<unsigned long long>(cellPtbr),
+                    static_cast<unsigned long long>(pTempBase),
+                    pTempOk ? "" : "  [p_temp UNUSABLE]");
+                std::fflush(stderr);
+            }
+        }
+    }
+#endif
 
     // Step 1 -- capture old PTBR (R0 return) BEFORE any state change.
     uint64_t const oldPtbr = c.cpu->ptbr;
@@ -2451,9 +2541,18 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     // base is ever established (I_CTL[VA_48] also selects DTBM_DOUBLE_3 vs _4).
     if (sel == coreLib::HW_VA_CTL || sel == coreLib::HW_I_CTL) {
         static bool const s_vaDiag = (std::getenv("EMULATR_VACTL_DIAG") != nullptr);
+        // 2026-07-26 (JRN-SCSI-025): the fixed 128 cap filled during console
+        // init (~cyc 1.18e9), a billion cycles before the halt-10 wall, so the
+        // late OS-era writes -- the ones that decide whether I_CTL's VPTB is
+        // ever re-installed after sys__enter_console strips it -- were never
+        // visible.  Cap is now EMULATR_VACTL_DIAG_N (default 128).
+        static unsigned long const s_vaCap = [] {
+            char const* const e = std::getenv("EMULATR_VACTL_DIAG_N");
+            return e ? std::strtoul(e, nullptr, 0) : 128ul;
+        }();
         if (s_vaDiag) {
             static unsigned long s_vaN = 0;
-            if (s_vaN < 128) { ++s_vaN;
+            if (s_vaN < s_vaCap) { ++s_vaN;
                 bool const isVaCtl = (sel == coreLib::HW_VA_CTL);
                 bool const va48    = isVaCtl ? coreLib::vaCtlIsVa48(c.opB)
                                              : coreLib::iCtlIsVa48(c.opB);
