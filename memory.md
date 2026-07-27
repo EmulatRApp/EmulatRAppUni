@@ -12,7 +12,55 @@ drill into journals only as needed.
 
 # EmulatR -- Project Memory
 
-## -1. LATEST (2026-07-25): SCSI live gate PASSED; NOIOVEC is PROTOCOL-INDEPENDENT
+## -1. LATEST (2026-07-27): LDFAIL mechanism decoded to the walk bound;
+##     digest + all leaf-side semantics EXONERATED (JRN-SCSI-029/-030)
+
+- **FRONTIER: `%SYSBOOT-F-LDFAIL / %LOADER-E-BADIMGOFF` on
+  SYS$PUBLIC_VECTORS.EXE (`b dka0 -fl 0`, DS20).**  MECHANISM FULLY
+  DECODED: SYSBOOT's offset translator (VA 0x421c0, PDSC 0x3330, its
+  BADIMGOFF literal at VA 0x3320) walks a sub-table INSIDE the loaded
+  symbol vector (symvec+0x58): pair 0 translates offset 0x4000 (valid);
+  the image bytes after pair 0 are 0x66666666 fill (NOT zero-terminated);
+  the walk bound `CMPLE r4,r25` at VA 0x42af0 decides success (stop
+  after pair 0 = Charon) vs BADIMGOFF (step into fill = EmulatR).
+  **RESIDUAL = provenance of r25's last write before the loop** -- if it
+  is guest state derived from the machine/PAL environment, that
+  divergence is the root cause.  ONE static decode remains
+  (VA 0x421c0..0x42af0, every write to r25); JRN-SCSI-030 Sec 6.
+- **EXONERATED BY MEASUREMENT (do not re-chase):** the loaded-range
+  digest (r18=0x14730; 20-byte entries at +0x4c stride 0x14; ALL
+  entries correct incl. section 2 -> entry[4] base 0x8cc9a000 size
+  0x400 vbn 86 [0xc000,0xffff]); the classifier gate (flag-bit classes
+  bit11+7/bit7/bit6 -> entries 0/1/4, all fired right); the in-memory
+  symbol vector (byte-identical to file); EXTLL/EXTLH/EXTBL lanes
+  (EXERCISED on this path, outputs correct); MEM-drainer LDL sext +
+  commit gate (F-8).  **Leaf-side suspect space for this wall is
+  formally EMPTY: what remains is guest-logic vs guest-state.**
+- **Ground truth (Charon, real VMS V8.3 "AlphaServer DS20"):** dka0.vdisk
+  is RAW; PV = LBN 697408 x160 blocks, SYSBOOT = LBN 350816 x1184, both
+  contiguous (DUMP/HEADER, `journals/diags/Image Analysis.txt`).  PV
+  section map (029 Sec 2 CORRECTS 028): [0]0x0/0x2800/vbn2,
+  HOLE 0x2800-0x3fff, [1]0x4000/0x8000/vbn22, [2]0xc000/0x400/vbn86.
+- **Instrument landed (branch worktree-snappc-cyclo-gate, PR open):**
+  `--snapshot-pc-cyclo` / EMULATR_SNAPPC_CYCLO = retire-cycle floor for
+  snapshot-on-pc (era gate; console straight-line pass at cyc 1.174e9
+  eats ungated low-VA triggers); fire line now logs ptbr/palBase/r29 so
+  captures SELF-CERTIFY era.  Era-certified captures of record:
+  predig_verdict4_cyc2053183936 (at outer status test, R0=0x13809A
+  live; CpuState intReg at blob+0x12c, payload PA0 at file 0x3df4) and
+  predig_oemsnap_cyc2381544638 (SYSBOOT> prompt; CAUTION: newest by
+  mtime -- autoload restores it and restored runs HANG in disk I/O,
+  device state not serialized).
+- `-fl 0,1` reaches the SYSBOOT> conversational prompt (early phase
+  healthy); CONTINUE reproduces LDFAIL.  The UART marker snapshot fires
+  from ANY era (typed text at SYSBOOT> triggers it).
+- Ledger species #5: "decoded the right code at the WRONG function"
+  (the 0x61654 resolver -- internally correct decode, not on the
+  failing path) -- first miss caught BY an instrument (R27 discriminant).
+  Also: worktree builds MUST inherit the parent tree's EMULATR_* cmake
+  options (bare configure flipped EMULATR_IRQDIAG on -> 2GB spam run).
+
+## -1b. 2026-07-25: SCSI live gate PASSED; NOIOVEC is PROTOCOL-INDEPENDENT
 
 - **JRN-SCSI-003 P1/P2 acceptance PASSED live:** DS20 `show config` shows
   "NCR 53C810" at slot 8; `show dev` shows pka0.7.0.8.0 + dka0..dka600 (7
