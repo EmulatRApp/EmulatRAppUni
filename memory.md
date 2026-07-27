@@ -639,6 +639,29 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260727_JRN-SCSI-028_dma_window_and_cache_exonerated_HANDOFF.md`
+  -- **READ FIRST ON RESUME.**  Architect's DMA hypothesis tested, both
+  halves NEGATIVE: (a) scatter-gather windows are NEVER enabled on this
+  path -- every WSBA write across a full boot has SG=0, only window 1 is
+  live (0xffffffff80000001, direct-mapped 1GB), zero sg=1 translations;
+  direct-mapped xlate is correct (pci 0xbff42380 -> pa 0x3ff42380).
+  (b) cached bytes are structurally impossible -- there is NO d-cache
+  model; MB/WMB/ECB are one-line no-ops and both CPU loads and DMA
+  writes go straight to GuestMemory.  THE GAP THAT IS REAL: translateDma
+  ToPa returns the PCI address UNTRANSLATED when a window has WSBA<1>
+  (SG) set -- harmless for VMS/DS20, fatal for any guest that uses SG;
+  the 21272 algorithm (HRM 10.1.4.3 + Fig 8-4: 8KB pages, PTE<0>=V,
+  PTE<22:1>=page<34:13>, PTE addr = TBA<34:n>:ad<m:13>) is documented
+  in-code beside the TODO.  CHIPSET PROVENANCE: Titan 21274 = DS15/DS25/
+  ES45; the DS20 is Tsunami/Typhoon 21272 -- use
+  tsunami_typhoon_21272_hrm.txt, NOT Titan21274_CsrSpec.h.  With this
+  the I/O stack is verified at EVERY hop (file->payload->HBA->tiling->
+  PCI xlate->memory) and %SYSBOOT-F-LDFAIL / %LOADER-E-BADIMGOFF STILL
+  survives it.  NO VALID ANCHOR EXISTS -- 0x42790 is retracted; next
+  instruments are N1 (walk back from the console PUTS that emits the
+  LDFAIL text, crb_conversation_decode.py) or N2 (snapshot DURING
+  SYSBOOT so the page tables are the OS's).  LIVE FRONTIER.
+
 - `journals/20260726_JRN-SCSI-027_io_stack_exonerated_loader_anchor.md` --
   NEXT SESSION STARTS HERE -- but READ Sec 5b FIRST: the 0x42790 anchor
   is RETRACTED (07-27), with the "r18 section table" and the "partial
