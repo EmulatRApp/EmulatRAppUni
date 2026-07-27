@@ -509,6 +509,24 @@ int main(int argc, char* argv[])
     // keeps the predig mtime-newest for autoload).  Two+ PCs = multi-PC
     // mint run: each fires once, distinct predig per PC, auto-save left to
     // --autosnapshot off.  Lets one cold boot capture several entry points.
+    // Era gate for the triggers (JRN-SCSI-029): CLI --snapshot-pc-cyclo
+    // wins; EMULATR_SNAPPC_CYCLO is the env fallback.  Applied before
+    // arming so the floor covers single- and multi-PC forms alike.
+    {
+        uint64_t floorCyc = opts.snapshotOnPcCycleFloor;
+        if (floorCyc == 0) {
+            if (char const* env = std::getenv("EMULATR_SNAPPC_CYCLO")) {
+                floorCyc = std::strtoull(env, nullptr, 0);
+            }
+        }
+        if (floorCyc != 0) {
+            mach.setSnapshotPcCycleFloor(floorCyc);
+            std::fprintf(stderr,
+                         "Machine: snapshot-on-pc cycle floor = %llu\n",
+                         static_cast<unsigned long long>(floorCyc));
+            std::fflush(stderr);
+        }
+    }
     if (opts.snapshotOnPcs.size() == 1) {
         mach.armSnapshotOnPc(opts.snapshotOnPcs[0], opts.snapshotNameTag);
         std::fprintf(stderr,

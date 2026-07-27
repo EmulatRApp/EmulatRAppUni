@@ -114,6 +114,7 @@ AppOptions AppOptions::parse(int argc, char* argv[])
             || flag == "--max-cycles"
             || flag == "--trace"
             || flag == "--snapshot-on-pc"
+            || flag == "--snapshot-pc-cyclo"
             || flag == "--snapshot-name-tag"
             || flag == "--autosnapshot"
             || flag == "--inject-interrupt-at-cycle"
@@ -205,6 +206,19 @@ AppOptions AppOptions::parse(int argc, char* argv[])
                 opts.snapshotOnPcs.push_back(pcv);
                 if (comma == std::string_view::npos) break;
                 rest = rest.substr(comma + 1);
+            }
+        }
+        else if (flag == "--snapshot-pc-cyclo") {
+            // 2026-07-27 (JRN-SCSI-029): retire-cycle floor for the
+            // snapshot-on-pc triggers.  Below the floor a trigger PC does
+            // NOT match and is NOT consumed -- the era gate that keeps a
+            // console-era retire at a reused low VA from eating the
+            // one-shot meant for the OS era (five triggers lost to the
+            // console's straight-line pass at cyc 1.17e9 before this).
+            if (!parseUnsigned(value, opts.snapshotOnPcCycleFloor)) {
+                opts.parseError = std::string{"--snapshot-pc-cyclo: not a number ("}
+                                + std::string{value} + ")";
+                return opts;
             }
         }
         else if (flag == "--snapshot-name-tag") {
@@ -318,6 +332,10 @@ char const* AppOptions::helpText() noexcept
         "                              snapshot.  Env: EMULATR_NO_AUTOLOAD=1\n"
         "  --pal-mode             force palMode = true regardless of start-pa low bit\n"
         "  --trace    <dec,machine>  DEC listing + machine-parsable trace channels\n"
+        "  --snapshot-pc-cyclo <hex|dec>  retire-cycle floor for snapshot-on-pc:\n"
+        "                              below it trigger PCs neither match nor get\n"
+        "                              consumed (era gate for reused low VAs).\n"
+        "                              Env: EMULATR_SNAPPC_CYCLO (CLI wins).\n"
         "  --snapshot-on-pc <hex|dec>[,<hex|dec>...]  one-shot snapshot trigger(s);\n"
         "                              first retire at each PC writes a predig_*.axpsnap.\n"
         "                              ONE PC: legacy behavior -- also disables auto-save\n"

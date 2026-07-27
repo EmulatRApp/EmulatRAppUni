@@ -1599,7 +1599,7 @@ bool Machine::systemTick(uint64_t i) noexcept
         // 2026-06-06: list of one-shot triggers (multi-PC).  Cheap gate:
         // when none remain, a single compare; otherwise a short loop over
         // the (few) triggers, each matched against the retired PC.
-        if (m_snapTriggersRemaining > 0) {
+        if (m_snapTriggersRemaining > 0 && m_cpu.cycleCount >= m_snapPcCycleFloor) {
             for (SnapTrigger& trig : m_snapTriggers) {
                 if (trig.fired || trig.pc != m_cpu.pc) continue;
 
@@ -1620,11 +1620,21 @@ bool Machine::systemTick(uint64_t i) noexcept
                 SnapshotResult const sr =
                     systemLib::save(*this, m_snapshotDir / pname.str(), "predig");
 
+                // Regime discriminants on the fire line (JRN-SCSI-029):
+                // the cycle floor is the GATE, but the capture must SELF-
+                // CERTIFY its era on the artifact itself (0x42790 lesson,
+                // JRN-SCSI-028 Sec 5).  ptbr/palBase separate console-era
+                // from OS-era retires at reused low VAs; r29 (FP) is the
+                // frame anchor for reading the captured stack.
                 std::fprintf(stderr,
                              "Machine: predig snapshot fired at pc=0x%016llx "
-                             "cyc=%llu -> '%s' (success=%d bytes=%llu)\n",
+                             "cyc=%llu ptbr=0x%llx palBase=0x%llx "
+                             "r29=0x%016llx -> '%s' (success=%d bytes=%llu)\n",
                              static_cast<unsigned long long>(trig.pc),
                              static_cast<unsigned long long>(m_cpu.cycleCount),
+                             static_cast<unsigned long long>(m_cpu.ptbr),
+                             static_cast<unsigned long long>(m_cpu.palBase),
+                             static_cast<unsigned long long>(m_cpu.intReg[29]),
                              sr.path.c_str(),
                              sr.success ? 1 : 0,
                              static_cast<unsigned long long>(sr.bytesWritten));
