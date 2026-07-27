@@ -100,6 +100,8 @@ public:
         case ScsiOp::INQUIRY:         cmdInquiry(cmd);       return;
         case 0x1A: /* MODE SENSE(6) */  cmdModeSense(cmd, false); return;
         case ScsiOp::MODE_SENSE10:      cmdModeSense(cmd, true);  return;
+        case 0x15: /* MODE SELECT(6) */ cmdModeSelect(cmd, false); return;
+        case 0x55: /* MODE SELECT(10) */cmdModeSelect(cmd, true);  return;
         case ScsiOp::READ_CAPACITY10: cmdReadCapacity(cmd);  return;
         case ScsiOp::READ6:           cmdReadWrite(cmd, false, false); return;
         case ScsiOp::READ10:          cmdReadWrite(cmd, true,  false); return;
@@ -184,6 +186,73 @@ private:
             n = 16;
         }
         cmd.dataTransferred = copyOut(cmd, buf, n);
+        good(cmd);
+    }
+
+    // MODE SELECT(6)/(10) -- SCSI-2 8.2.8/8.2.9.  A data-OUT command: the
+    // initiator sends a parameter list (header + optional block descriptor +
+    // mode pages).  OpenVMS SYSBOOT issues MODE SELECT(6) while bringing the
+    // boot device up; without it the device answered ILLEGAL REQUEST and
+    // SYSBOOT gave up with %SYSBOOT-F-LDFAIL before ever reading a file
+    // (JRN-SCSI-026 Sec 7).
+    //
+    // This device has FIXED geometry backed by the media object, so there is
+    // nothing to reconfigure: the faithful answer is to VALIDATE the list and
+    // report GOOD, rejecting only a request that would actually change
+    // geometry (a block descriptor naming a different block length), which is
+    // the one field a target must not silently ignore -- the initiator would
+    // then compute every subsequent LBA against a size we are not using.
+    void cmdModeSelect(ScsiCommand& cmd, bool ten) noexcept
+    {
+        if (!hasMedia()) { check(cmd, ScsiSenseKey::NotReady, 0x3A, 0x00); return; }
+
+        // Parameter list length: CDB byte 4 (6-byte) or bytes 7..8 (10-byte).
+        uint32_t const listLen = ten
+            ? ((uint32_t(cmd.cdb[7]) << 8) | uint32_t(cmd.cdb[8]))
+            :   uint32_t(cmd.cdb[4]);
+        if (listLen == 0) { good(cmd); return; }   // legal: "no parameters"
+
+        // Only inspect what the initiator actually delivered.  NOTE this must
+        // come from dataBufferLength, NOT dataTransferred: handleCommand()
+        // zeroes dataTransferred on entry (it is the target's OUTPUT), so a
+        // data-out command reading it always sees 0.  (Caught by the tests
+        // below -- the first cut used dataTransferred and rejected every
+        // well-formed parameter list as truncated.)
+        uint32_t const avail = (listLen <= cmd.dataBufferLength)
+                             ? listLen
+                             : cmd.dataBufferLength;
+        uint32_t const hdr   = ten ? 8u : 4u;      // parameter list header size
+        if (cmd.dataBuffer == nullptr || avail < hdr) {
+            // Truncated list -- the initiator promised more than it sent.
+            check(cmd, ScsiSenseKey::IllegalRequest, 0x1A, 0x00); // param list len err
+            return;
+        }
+
+        // Block descriptor length lives at header byte 3 (6-byte) / 6..7 (10).
+        uint32_t const bdLen = ten
+            ? ((uint32_t(cmd.dataBuffer[6]) << 8) | uint32_t(cmd.dataBuffer[7]))
+            :   uint32_t(cmd.dataBuffer[3]);
+        if (bdLen >= 8 && avail >= hdr + 8) {
+            uint8_t const* bd = cmd.dataBuffer + hdr;
+            // Block descriptor bytes 5..7 = block length.  Zero means "keep
+            // current" (SCSI-2), which every sane initiator uses.
+            uint32_t const reqBs = (uint32_t(bd[5]) << 16)
+                                 | (uint32_t(bd[6]) << 8) | uint32_t(bd[7]);
+            uint32_t const curBs = m_media->blockSize();
+            if (reqBs != 0 && reqBs != curBs) {
+                std::fprintf(stderr,
+                    "VirtualDiskDevice: MODE SELECT(%u) requests block size %u, "
+                    "media is %u -- rejecting (INVALID FIELD IN PARAMETER LIST)\n",
+                    ten ? 10u : 6u, reqBs, curBs);
+                // 05/26/00 invalid field in parameter list.
+                check(cmd, ScsiSenseKey::IllegalRequest, 0x26, 0x00);
+                return;
+            }
+        }
+        // Mode pages: accepted and applied to nothing.  This target exposes no
+        // changeable parameters (its MODE SENSE returns header + block
+        // descriptor with zero pages), so there is no state to update and no
+        // page code that can be "unsupported" relative to what we advertise.
         good(cmd);
     }
 
