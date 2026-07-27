@@ -121,6 +121,111 @@ TEST_CASE("byteops: EXTxH non-aligned offsets are unchanged by the fix")
     CHECK(extwh(kPattern, 5) == 0x0ULL);       // AARM word example, X%8=5
 }
 
+TEST_CASE("byteops: full-file audit -- byte-lane reference model, all offsets")
+{
+    // F-1 follow-up (2026-07-26): independent lane-model sweep of every
+    // EXT/INS/MSK/ZAP helper.  The model works on byte arrays only -- no
+    // shifts -- so a shift-direction or lane-index bug in the header cannot
+    // be replicated here.  AARM Sec 4.6: an unaligned WIDTH-byte field at
+    // byte offset k spans lanes [k, k+W); the L part holds lanes below 8,
+    // the H part lanes 8..k+W-1 (register-relative).
+    const uint64_t vals[] = { kPattern, 0xFFFFFFFFFFFFFFFFULL,
+                              0x8000000000000001ULL, 0x00FF00FF00FF00FFULL };
+    auto lane = [](uint64_t v, int i) -> uint64_t { return (v >> (8 * i)) & 0xFF; };
+    for (uint64_t v : vals) {
+        for (int k = 0; k < 8; ++k) {
+            CAPTURE(v); CAPTURE(k);
+            for (int w : {1, 2, 4, 8}) {
+                // EXTxL: field bytes k.. -> lanes 0..; EXTxH: bytes from
+                // lane 8-k up, i.e. the part of the field in the NEXT QW.
+                uint64_t extL = 0, extH = 0, insL = 0, insH = 0;
+                for (int b = 0; b < w; ++b) {
+                    if (k + b < 8) {
+                        extL |= lane(v, k + b) << (8 * b);
+                        insL |= lane(v, b) << (8 * (k + b));
+                    } else {
+                        extH |= lane(v, (k + b) & 7) << (8 * b);
+                        insH |= lane(v, b) << (8 * ((k + b) & 7));
+                    }
+                }
+                if (k == 0) {
+                    // AARM 4.6.1: EXTxH shifts left by (64-8*Rbv<2:0>)<5:0>
+                    // -- at Rbv=0 that is a shift of ZERO (pass-through +
+                    // width mask), NOT the empty spill set.  This is the
+                    // aligned-Rb case the JRN-SCSI-020 fix restored; the
+                    // signed byte-load idiom (k=7 case above) depends on it.
+                    extH = (w == 8) ? v
+                         : v & ((uint64_t{1} << (8 * w)) - 1);
+                }
+                switch (w) {
+                case 1:
+                    CHECK(extbl(v, static_cast<uint64_t>(k)) == extL);
+                    CHECK(insbl(v, static_cast<uint64_t>(k)) == insL);
+                    break;
+                case 2:
+                    CHECK(extwl(v, static_cast<uint64_t>(k)) == extL);
+                    CHECK(extwh(v, static_cast<uint64_t>(k)) == extH);
+                    CHECK(inswl(v, static_cast<uint64_t>(k)) == insL);
+                    CHECK(inswh(v, static_cast<uint64_t>(k)) == insH);
+                    break;
+                case 4:
+                    CHECK(extll(v, static_cast<uint64_t>(k)) == extL);
+                    CHECK(extlh(v, static_cast<uint64_t>(k)) == extH);
+                    CHECK(insll(v, static_cast<uint64_t>(k)) == insL);
+                    CHECK(inslh(v, static_cast<uint64_t>(k)) == insH);
+                    break;
+                case 8:
+                    CHECK(extql(v, static_cast<uint64_t>(k)) == extL);
+                    CHECK(extqh(v, static_cast<uint64_t>(k)) == extH);
+                    CHECK(insql(v, static_cast<uint64_t>(k)) == insL);
+                    CHECK(insqh(v, static_cast<uint64_t>(k)) == insH);
+                    break;
+                }
+            }
+            // MSKxL zeroes lanes [k, k+W) clipped to the QW; MSKxH zeroes the
+            // spill lanes [0, k+W-8).
+            for (int w : {1, 2, 4, 8}) {
+                uint64_t mskL = 0, mskH = 0;
+                for (int i = 0; i < 8; ++i) {
+                    const bool inLowSpan  = (i >= k) && (i < k + w);
+                    const bool inHighSpan = (i < k + w - 8);
+                    if (!inLowSpan)  mskL |= lane(v, i) << (8 * i);
+                    if (!inHighSpan) mskH |= lane(v, i) << (8 * i);
+                }
+                switch (w) {
+                case 1: CHECK(mskbl(v, static_cast<uint64_t>(k)) == mskL); break;
+                case 2: CHECK(mskwl(v, static_cast<uint64_t>(k)) == mskL);
+                        CHECK(mskwh(v, static_cast<uint64_t>(k)) == mskH); break;
+                case 4: CHECK(mskll(v, static_cast<uint64_t>(k)) == mskL);
+                        CHECK(msklh(v, static_cast<uint64_t>(k)) == mskH); break;
+                case 8: CHECK(mskql(v, static_cast<uint64_t>(k)) == mskL);
+                        CHECK(mskqh(v, static_cast<uint64_t>(k)) == mskH); break;
+                }
+            }
+        }
+        // ZAP/ZAPNOT: every 8-bit mask, lane model.
+        for (unsigned m = 0; m < 256; ++m) {
+            uint64_t z = 0, zn = 0;
+            for (int i = 0; i < 8; ++i) {
+                if (m & (1u << i)) zn |= lane(v, i) << (8 * i);
+                else               z  |= lane(v, i) << (8 * i);
+            }
+            CHECK(zap(v, m) == z);
+            CHECK(zapnot(v, m) == zn);
+        }
+    }
+}
+
+TEST_CASE("byteops: ZAP/ZAPNOT lane selection (header-comment examples)")
+{
+    // F-1 (2026-07-26): the header's example values were wrong (the code was
+    // right).  Lane i = bits[8i+7:8i]; mask 0x3C selects lanes 2..5.
+    CHECK(zap(0x0123456789ABCDEFULL, 0x3C)    == 0x01230000'0000CDEFULL);
+    CHECK(zapnot(0x0123456789ABCDEFULL, 0x3C) == 0x00004567'89AB0000ULL);
+    CHECK((zap(0x0123456789ABCDEFULL, 0x3C)
+           | zapnot(0x0123456789ABCDEFULL, 0x3C)) == 0x0123456789ABCDEFULL);
+}
+
 TEST_CASE("byteops: INSxH/MSKxH aligned cases keep their AARM semantics")
 {
     // Audited correct in JRN-SCSI-020 (BYTE_ZAP mask empty at Rbv=0 for
