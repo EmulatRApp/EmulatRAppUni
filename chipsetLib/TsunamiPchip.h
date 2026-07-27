@@ -455,6 +455,49 @@ public:
     // scatter-gather map walk (SG=1) is still TODO.  Returns the input
     // unchanged if no enabled window matches (caller reads it as a raw PA).
     // ========================================================================
+#if defined(EMULATR_BRINGUP_PROBES)
+    // ------------------------------------------------------------------------
+    // WSBA-write probe (2026-07-27, JRN-SCSI-028; env EMULATR_PCHIP_WIN_PROBE,
+    // falls back to EMULATR_TULIP_TRACE).  Two-tier per house rule: compile
+    // guard outside, runtime env key inside (the ITBPROBE shape).
+    //
+    // WHY EVERY write, not a one-shot dump: dumpWindowsOnce() reports the
+    // CONSOLE-era window config, but the OS reprograms the Pchip when it takes
+    // over.  If VMS enables a SCATTER-GATHER window (WSBA<1>), every DMA after
+    // that point takes the untranslated `return pci` path in translateDmaToPa
+    // below -- correct bytes delivered to the WRONG physical pages, which is
+    // indistinguishable at the device layer from a healthy transfer (the
+    // payload and the SCRIPTS tiling both verify clean).  This probe is the
+    // only thing that would show it, so it must survive into the OS era.
+    //
+    // 21272 HRM Sec 10.1.4.3 / Fig 8-4 (the DS20 chipset -- Titan 21274 is the
+    // DS15/DS25/ES45 part and is NOT the authority here): an enabled SG window
+    // maps 8KB PCI pages through a PTE array at TBA; PTE<0> = valid,
+    // PTE<22:1> = system page address <34:13>, and PCI ad<12:0> passes through
+    // as the page offset.  PTE address = TBA<34:n>:ad<m:13> per the window-size
+    // table (1MB window -> 1KB PTE area, ... 1GB -> 1MB).
+    // ------------------------------------------------------------------------
+    static void wsbaWriteProbe(int idx, uint64_t value) noexcept
+    {
+        static bool const on = (std::getenv("EMULATR_PCHIP_WIN_PROBE") != nullptr)
+                            || (std::getenv("EMULATR_TULIP_TRACE") != nullptr);
+        if (!on) return;
+        std::fprintf(stderr,
+            "PCHIP-WSBA%d <- 0x%016llx  enable=%d SG=%d base<31:20>=0x%llx%s\n",
+            idx, static_cast<unsigned long long>(value),
+            int(value & 0x1ull), int((value >> 1) & 0x1ull),
+            static_cast<unsigned long long>(value & 0xFFF00000ull),
+            ((value & 0x3ull) == 0x3ull)
+                ? "   <== SG WINDOW ENABLED: DMA through here is UNTRANSLATED"
+                : "");
+        std::fflush(stderr);
+    }
+#else
+    // Release: the probe compiles to nothing.  The call sites stay unguarded
+    // so the write path reads the same in both configurations.
+    static void wsbaWriteProbe(int, uint64_t) noexcept {}
+#endif
+
     uint64_t translateDmaToPa(uint64_t pci) const noexcept {
         dumpWindowsOnce();
         for (int i = 0; i < 4; ++i) {
@@ -951,19 +994,19 @@ public:
         // ----------------------------------------------------------
         case Pchip::WSBA0:
             CSR_LOG_W("Pchip", "WSBA0", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[0] = value;
+            m_wsba[0] = value;  wsbaWriteProbe(0, value);
             break;
         case Pchip::WSBA1:
             CSR_LOG_W("Pchip", "WSBA1", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[1] = value;
+            m_wsba[1] = value;  wsbaWriteProbe(1, value);
             break;
         case Pchip::WSBA2:
             CSR_LOG_W("Pchip", "WSBA2", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[2] = value;
+            m_wsba[2] = value;  wsbaWriteProbe(2, value);
             break;
         case Pchip::WSBA3:
             CSR_LOG_W("Pchip", "WSBA3", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[3] = value;
+            m_wsba[3] = value;  wsbaWriteProbe(3, value);
             break;
         case Pchip::WSM0:
             CSR_LOG_W("Pchip", "WSM0", value, offset, cpuId, kPhaseBNoCycle);
@@ -1201,13 +1244,29 @@ private:
     }
     static void dmaTraceOnce(uint64_t pci, uint64_t pa, int win, bool sg) noexcept
     {
-        static bool const on = (std::getenv("EMULATR_TULIP_TRACE") != nullptr);
+        static bool const on = (std::getenv("EMULATR_TULIP_TRACE") != nullptr)
+                            || (std::getenv("EMULATR_PCHIP_WIN_PROBE") != nullptr);
         if (!on) return;
-        static int n = 0;
-        if (n++ < 8) {
-            std::fprintf(stderr, "PCHIP-DMA xlate pci=0x%llx -> pa=0x%llx win=%d sg=%d\n",
+        // 2026-07-27 (JRN-SCSI-028): the cap was a hard 8, so this trace only
+        // ever showed CONSOLE-era translations -- it was spent long before the
+        // OS reprogrammed the windows and long before SYSBOOT's image reads.
+        // That is the same starved-probe failure as EMULATR_VACTL_DIAG's fixed
+        // 128 and DIAG_WREG's missing cycle gate: a capped probe does not fail
+        // loudly, it answers a DIFFERENT question confidently.  Tunable via
+        // EMULATR_PCHIP_DMA_TRACE_N (default 8 -- existing recipes unchanged).
+        // An SG-window translation (sg=1) is ALWAYS logged regardless of the
+        // cap, because that single line is the whole question this probe
+        // exists to answer.
+        static long const cap = [] {
+            char const* const e = std::getenv("EMULATR_PCHIP_DMA_TRACE_N");
+            return e ? std::strtol(e, nullptr, 0) : 8L;
+        }();
+        static long n = 0;
+        if (n++ < cap || sg) {
+            std::fprintf(stderr, "PCHIP-DMA xlate pci=0x%llx -> pa=0x%llx win=%d sg=%d%s\n",
                 static_cast<unsigned long long>(pci),
-                static_cast<unsigned long long>(pa), win, sg ? 1 : 0);
+                static_cast<unsigned long long>(pa), win, sg ? 1 : 0,
+                sg ? "   <== UNTRANSLATED (SG map walk is TODO)" : "");
             std::fflush(stderr);
         }
     }
