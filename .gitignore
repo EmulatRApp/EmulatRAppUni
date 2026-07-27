@@ -187,8 +187,10 @@ firmware/
 redist/
 _to_delete/
 tools/_to_delete/
-# local agent/editor config
-.claude/
+# local agent/editor config (but SHARE .claude/skills/ -- versioned like
+# CLAUDE.md/memory.md so every machine gets them via git pull)
+.claude/*
+!.claude/skills/
 tools/Editors/.claude/
 # scratch / stray
 tools/axpbox_ptemp/
