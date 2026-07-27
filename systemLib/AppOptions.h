@@ -85,6 +85,10 @@ struct AppOptions
     // value preserves the legacy one-shot+disable-autos behavior; 2+ values
     // arm multi-PC triggers (pair with --autosnapshot off).
     std::vector<uint64_t> snapshotOnPcs;
+    // Retire-cycle floor for the snapshot-on-pc triggers (era gate,
+    // JRN-SCSI-029): 0 = no floor.  CLI --snapshot-pc-cyclo, env
+    // EMULATR_SNAPPC_CYCLO (CLI wins).
+    uint64_t snapshotOnPcCycleFloor = 0;
     std::string           snapshotNameTag;
 
     // 2026-06-05: mint-run controls (Spec_overnight_coldboot_mint_run).

@@ -354,6 +354,15 @@ public:
         ++m_snapTriggersRemaining;
     }
 
+    // 2026-07-27 (JRN-SCSI-029): retire-cycle floor for the snapshot-on-pc
+    // triggers.  Below the floor a trigger PC neither matches nor is
+    // consumed.  Era gate: low VAs are REUSED across decompressor /
+    // console / OS eras (JRN-SCSI-028 Sec 5), so a bare PC match can fire
+    // in the wrong era and waste the one-shot -- the console's straight-
+    // line pass at cyc ~1.17e9 ate five OS-era triggers before this gate
+    // existed.  0 = no floor (legacy behavior).
+    void setSnapshotPcCycleFloor(uint64_t cyc) noexcept { m_snapPcCycleFloor = cyc; }
+
     // True after at least one armed-PC trigger has fired in the current
     // run.  Cleared by armSnapshotOnPc.  Used by tests / post-run diags.
     bool armSnapshotFired() const noexcept { return m_anySnapFired; }
@@ -592,6 +601,7 @@ private:
     struct SnapTrigger { uint64_t pc; std::string tag; bool fired; };
     std::vector<SnapTrigger> m_snapTriggers;
     int                      m_snapTriggersRemaining  = 0;
+    uint64_t                 m_snapPcCycleFloor       = 0;
     bool                     m_anySnapFired           = false;
     bool                     m_snapDisableAutosOnFire = false;
 
