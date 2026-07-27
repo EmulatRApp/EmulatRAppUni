@@ -272,3 +272,93 @@ TEST_CASE("BAR rebind callbacks fire on 53C810 BAR re-program")
     CHECK(regs == 2);
     CHECK(unregs == 1);
 }
+
+// ============================================================================
+// MODE SELECT (JRN-SCSI-026 Sec 7 -> JRN-SCSI-027).  OpenVMS SYSBOOT issues
+// MODE SELECT(6) while bringing the boot device up; the device previously
+// answered ILLEGAL REQUEST (invalid opcode) and SYSBOOT gave up with
+// %SYSBOOT-F-LDFAIL before reading a single file byte.  These drive the
+// target directly (the SCRIPTS path is covered by the transactions above).
+// ============================================================================
+
+namespace {
+
+// Submit a CDB straight to a VirtualDiskDevice with an optional data-out
+// parameter list, mirroring what the HBA hands the target.
+scsi::ScsiCommand runCdb(scsi::VirtualDiskDevice& disk,
+                         uint8_t const* cdb, uint8_t cdbLen,
+                         uint8_t* buf = nullptr, uint32_t bufLen = 0)
+{
+    scsi::ScsiCommand cmd;
+    cmd.cdb              = cdb;
+    cmd.cdbLength        = cdbLen;
+    cmd.lun              = 0;
+    cmd.dataBuffer       = buf;
+    cmd.dataBufferLength = bufLen;        // data-out: what the initiator sent
+    disk.handleCommand(cmd);
+    return cmd;
+}
+
+} // namespace
+
+TEST_CASE("MODE SELECT(6) with no parameter list is accepted")
+{
+    Harness h;
+    uint8_t const cdb[6] = { 0x15, 0x10, 0, 0, 0x00, 0 };   // list length 0
+    scsi::ScsiCommand const r = runCdb(h.disk, cdb, 6);
+    CHECK(r.status == scsi::ScsiStatus::Good);
+}
+
+TEST_CASE("MODE SELECT(6) accepts a block descriptor that keeps the block size")
+{
+    Harness h;
+    uint8_t parm[12] = {};
+    parm[3] = 8;                       // block descriptor length
+    parm[4 + 5] = 0; parm[4 + 6] = 0x02; parm[4 + 7] = 0x00;   // 512 = media
+    uint8_t const cdb[6] = { 0x15, 0x10, 0, 0, 12, 0 };
+    scsi::ScsiCommand const r =
+        runCdb(h.disk, cdb, 6, parm, sizeof(parm));
+    CHECK(r.status == scsi::ScsiStatus::Good);
+
+    // "Keep current" (block length 0) is equally legal.
+    uint8_t parm0[12] = {};
+    parm0[3] = 8;
+    scsi::ScsiCommand const r0 =
+        runCdb(h.disk, cdb, 6, parm0, sizeof(parm0));
+    CHECK(r0.status == scsi::ScsiStatus::Good);
+}
+
+TEST_CASE("MODE SELECT(6) rejects a block size the media does not have")
+{
+    Harness h;
+    uint8_t parm[12] = {};
+    parm[3] = 8;
+    parm[4 + 5] = 0; parm[4 + 6] = 0x04; parm[4 + 7] = 0x00;   // 1024 != 512
+    uint8_t const cdb[6] = { 0x15, 0x10, 0, 0, 12, 0 };
+    scsi::ScsiCommand const r =
+        runCdb(h.disk, cdb, 6, parm, sizeof(parm));
+    // Silently ignoring this would make every later LBA a lie.
+    CHECK(r.status == scsi::ScsiStatus::CheckCondition);
+    CHECK(r.senseValid);
+}
+
+TEST_CASE("MODE SELECT(6) with a truncated parameter list reports a length error")
+{
+    Harness h;
+    uint8_t parm[12] = {};
+    uint8_t const cdb[6] = { 0x15, 0x10, 0, 0, 12, 0 };
+    // Initiator promised 12 bytes (CDB), but only 2 are available.
+    scsi::ScsiCommand const r = runCdb(h.disk, cdb, 6, parm, 2);
+    CHECK(r.status == scsi::ScsiStatus::CheckCondition);
+}
+
+TEST_CASE("MODE SELECT(10) shares the contract with the 6-byte form")
+{
+    Harness h;
+    uint8_t parm[16] = {};
+    parm[7] = 8;                       // block descriptor length (10-byte hdr)
+    uint8_t const cdb[10] = { 0x55, 0x10, 0, 0, 0, 0, 0, 0, 16, 0 };
+    scsi::ScsiCommand const r =
+        runCdb(h.disk, cdb, 10, parm, sizeof(parm));
+    CHECK(r.status == scsi::ScsiStatus::Good);
+}
