@@ -640,18 +640,30 @@ dispatch matches them (silent PAL corruption otherwise).
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
 - `journals/20260726_JRN-SCSI-027_io_stack_exonerated_loader_anchor.md` --
-  NEXT SESSION STARTS HERE.  One-line brief: retire window UPSTREAM of
-  pc 0x42790, three stages, ground truth in hand.  %SYSBOOT-F-LDFAIL
+  NEXT SESSION STARTS HERE -- but READ Sec 5b FIRST: the 0x42790 anchor
+  is RETRACTED (07-27), with the "r18 section table" and the "partial
+  populate" reading of 0xC000.  PA-WATCH killed all three: 0x14788 takes
+  ZERO OS-era stores (all 104 are decompressor output at cyc 6.8e6), and
+  0x42780 takes 60 OS-era stores (a data buffer) at an address where a
+  value probe saw an instruction retire in a DIFFERENT run.  Any next
+  anchor must evidence execution AND provenance in ONE run -- low memory
+  0x1xxxx-0x6xxxx is reused across decompressor/console/OS eras, so a PC
+  without its era is meaningless.  Suggested: snapshot DURING SYSBOOT
+  execution, or walk back from the console PUTS callback that emits the
+  LDFAIL text (crb_conversation_decode.py).  SURVIVES as POSITIVE
+  evidence: LDL sign-extension produced a correct architected sign-copy
+  (0xFFFFFFFF -> 0xFFFFFFFFFFFFFFFF) and r2 carried a canonical
+  0xFFFFFFFF80000000 S0 base -- the 32-bit canonicalization lanes are
+  sound on that path.  %SYSBOOT-F-LDFAIL
   decodes (architect, on real VMS) as %LOADER-E-BADIMGOFF -- facility
   0x13 = LOADER, so the bytes ARRIVE and do not parse.  THE WHOLE I/O
   STACK IS EXONERATED BY EVIDENCE: payload 68/68 FNV-matched vs
   dka0.vdisk (an image Charon boots into OpenVMS), DMA tiling 47/47
   exact cover with contiguous guest PAs, zero padding in the SYSBOOT
   window, and geometry closed by the driver's OWN block descriptor
-  (0x000200).  Anchor captured by VALUE (addresses are not invariant,
-  0x0013809A is): pc 0x42790 `LDQ r0,-0x10(r27)` LOADS the status from
-  a linkage cell; 0x5ff0c/0x5e0bc/0xd150 just copy it up the return
-  chain.  Verdict rule for the trace: ISD fields match the image but
+  (0x000200) -- that exoneration is UNTOUCHED by the retraction, resting
+  on comparison against a Charon-bootable image, not on any loader model.
+  Verdict rule once a valid anchor exists: ISD fields match the image but
   the compare fails -> 32-bit canonicalization lane (LDL/ADDL), EXTxH's
   genre; fields differ -> corruption upstream in memory.  Host-side
   ground truth: image header at LBA 697408 (EIHD maj 3, ISDOFF 296;
