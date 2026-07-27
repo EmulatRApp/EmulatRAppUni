@@ -639,6 +639,20 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-024_n3_enter_console_named_vaform_vptb0.md` --
+  N3 DONE + MAJOR CORRECTION: the 0x1333c clear = sys__enter_console
+  (EV6_VMS_PC264_PAL.MAR:4638), and the "unpaired" final clear is the
+  CRASH'S OWN halt path (trap__update_pcb_and_halt -> enter_console) --
+  post-check, innocent; snapshot PT__VPTB=0 was post-mortem.  -023's
+  VA_FORM exoneration WITHDRAWN: DIAG_WREG=4 on DTBM_DOUBLE_3 head shows
+  ALL 17818 formatted PTE VAs carry VPTB=0 (bare va>>10 offsets) while
+  PT__VPTB memory was correct -> the defect is cpu.va_ctl/i_ctl VPTB
+  fields empty in VM mode.  Real PAL re-installs VPTB every callback
+  exit via pal__restore_state MTPR of CNS__VA_CTL (= PT__VA_CTL |
+  PT__VPTB merged at save).  N4: DIAG window 0xe55c-0xe700 + WREG=0
+  shows the restored VA_CTL value -> decides dispatch-gap (annotated
+  IPR index forms like <I_CTL ! ^x20>) vs bad-saved-value.
+  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-023_pt_vptb_writer_watch.md` -- PA-WATCH
   0x7000: PT__VPTB is TOGGLED by the callback context swap -- 0x1333c
   (HW_MFPR IPR 0x1110; 42-bit mask; HW_ST r31 -> PT__VPTB) clears on
