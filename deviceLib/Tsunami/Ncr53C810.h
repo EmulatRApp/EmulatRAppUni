@@ -534,6 +534,27 @@ private:
                 std::fprintf(stderr, "Ncr53C810: data-in move %u > available "
                                      "%u -- padded (D1)\n", count, have);
             }
+            // JRN-SCSI-027 tiling probe: the last unverified I/O hop is
+            // HBA buffer -> guest RAM.  Target-side payloads are proven
+            // byte-exact (scsi_read_diff, 68/68), so if the image still does
+            // not parse the suspect is PLACEMENT: do the MOVEs for one command
+            // tile the guest buffer exactly once (no gap, overlap, repeat), and
+            // is `addr` a direct guest PHYSICAL address (m_dmaWrite pokes PA --
+            // there is no bus-master window translation in this model, a scoped
+            // gap now on the ledger with evidence attached)?
+#if defined(EMULATR_BRINGUP_PROBES)
+            // Two-tier per house rule (the ITBPROBE/DTBPROBE shape): compile
+            // guard outside so release builds carry zero cost AND zero strings;
+            // runtime env key inside so a diag build can flip probe configs
+            // without a rebuild.  Keyed to EMULATR_SCSI_MOVE_PROBE (falls back
+            // to the file's EMULATR_SCSI_TRACE so one env var lights both).
+            if (movesProbeOn()) {
+                std::fprintf(stderr,
+                    "N810-MOVE in  pa=0x%016llx count=%u dataPos=%u size=%zu\n",
+                    static_cast<unsigned long long>(addr), count,
+                    m_conn.dataPos, m_conn.data.size());
+            }
+#endif
             m_dmaWrite(addr, m_conn.data.data() + m_conn.dataPos, count);
             m_reg[kSFBR] = m_conn.data[m_conn.dataPos];
             m_conn.dataPos += count;
@@ -664,6 +685,20 @@ private:
         static bool const on = (std::getenv("EMULATR_SCSI_TRACE") != nullptr);
         return on;
     }
+#if defined(EMULATR_BRINGUP_PROBES)
+    // JRN-SCSI-027 DMA-tiling probe key (two-tier: this whole facility is
+    // compiled out of release; inside a diag build the env var selects it).
+    // HOUSEKEEPING (filed, not done here): this file's OLDER traces --
+    // traceOn()/trace()/cmdTrace() -- are runtime-gated ONLY and predate the
+    // compile-guard convention.  Bringing them into conformance is a separate
+    // sweep on purpose: mixing it into a diagnostics landing would muddy both.
+    static bool movesProbeOn() noexcept
+    {
+        static bool const on =
+            (std::getenv("EMULATR_SCSI_MOVE_PROBE") != nullptr) || traceOn();
+        return on;
+    }
+#endif
     static void trace(char const* msg) noexcept
     {
         if (!traceOn()) return;
@@ -682,13 +717,68 @@ private:
             std::fprintf(stderr, "N810-SCRIPT dsp=0x%08X w0=0x%08X w1=0x%08X "
                                  "phase=%u\n", dsp, w0, w1, m_conn.phase);
     }
+    // JRN-SCSI-027: the trace now carries the LBA/length the CDB asked for and
+    // a checksum of the payload the target actually returned, so a run log can
+    // be byte-diffed against the backing file host-side without a debugger.
+    // The %LOADER-E-BADIMGOFF wall says the bytes ARRIVE and do not parse, so
+    // the question is not "did the command succeed" (status/xfer already said
+    // yes) but "are these the RIGHT bytes for this LBA".
+    //   fnv = FNV-1a over the returned payload; first/last = the payload's
+    //   first and last 8 bytes, which localize a shift without dumping MB.
     void cmdTrace(scsi::ScsiCommand const& cmd) noexcept
     {
         if (!traceOn()) return;
-        std::fprintf(stderr, "N810-CMD id=%u lun=%u op=0x%02X len=%u -> "
-                             "status=%u xfer=%u\n",
-                     m_conn.targetId, cmd.lun, cmd.opcode(), cmd.cdbLength,
-                     static_cast<unsigned>(cmd.status), cmd.dataTransferred);
+        uint8_t const op = cmd.opcode();
+        // Decode LBA/count for the read/write family; -1 for everything else.
+        long long lba = -1; long long cnt = -1;
+        if (op == 0x28 || op == 0x2A) {            // READ(10) / WRITE(10)
+            lba = (long long)(((uint32_t)m_conn.cdb[2] << 24)
+                            | ((uint32_t)m_conn.cdb[3] << 16)
+                            | ((uint32_t)m_conn.cdb[4] << 8)
+                            |  (uint32_t)m_conn.cdb[5]);
+            cnt = (long long)(((uint32_t)m_conn.cdb[7] << 8) | m_conn.cdb[8]);
+        } else if (op == 0x08 || op == 0x0A) {     // READ(6) / WRITE(6)
+            lba = (long long)((((uint32_t)m_conn.cdb[1] & 0x1F) << 16)
+                            | ((uint32_t)m_conn.cdb[2] << 8)
+                            |  (uint32_t)m_conn.cdb[3]);
+            cnt = m_conn.cdb[4] ? m_conn.cdb[4] : 256;
+        }
+        uint64_t fnv = 1469598103934665603ull;     // FNV-1a 64 offset basis
+        // Data-OUT commands (MODE SELECT, WRITE) never set dataTransferred --
+        // that field is the target's data-IN output -- so fall back to the
+        // buffer the initiator actually delivered.  Without this the MODE
+        // SELECT parameter list logged as "-" and its block descriptor could
+        // not be read back from the run log.
+        uint32_t const n = cmd.dataTransferred
+                         ? cmd.dataTransferred
+                         : static_cast<uint32_t>(m_conn.data.size());
+        for (uint32_t i = 0; i < n && i < m_conn.data.size(); ++i) {
+            fnv ^= m_conn.data[i];
+            fnv *= 1099511628211ull;
+        }
+        char head[24] = "-", tail[24] = "-";
+        if (n >= 8 && m_conn.data.size() >= 8) {
+            std::snprintf(head, sizeof(head), "%02X%02X%02X%02X%02X%02X%02X%02X",
+                m_conn.data[0], m_conn.data[1], m_conn.data[2], m_conn.data[3],
+                m_conn.data[4], m_conn.data[5], m_conn.data[6], m_conn.data[7]);
+            size_t const e = (n <= m_conn.data.size() ? n : m_conn.data.size()) - 8;
+            std::snprintf(tail, sizeof(tail), "%02X%02X%02X%02X%02X%02X%02X%02X",
+                m_conn.data[e+0], m_conn.data[e+1], m_conn.data[e+2],
+                m_conn.data[e+3], m_conn.data[e+4], m_conn.data[e+5],
+                m_conn.data[e+6], m_conn.data[e+7]);
+        }
+        // Full CDB bytes: documents what the driver actually ASKED for (e.g.
+        // the MODE SELECT parameter-list length in byte 4) so implementations
+        // are probe-driven rather than guessed.
+        char cdbHex[3 * 16 + 1] = {};
+        for (uint8_t i = 0; i < cmd.cdbLength && i < 16; ++i)
+            std::snprintf(cdbHex + i * 3, 4, "%02X ", m_conn.cdb[i]);
+        std::fprintf(stderr,
+            "N810-CMD id=%u lun=%u op=0x%02X len=%u lba=%lld cnt=%lld -> "
+            "status=%u xfer=%u fnv=0x%016llx head=%s tail=%s cdb=[%s]\n",
+            m_conn.targetId, cmd.lun, op, cmd.cdbLength, lba, cnt,
+            static_cast<unsigned>(cmd.status), cmd.dataTransferred,
+            static_cast<unsigned long long>(fnv), head, tail, cdbHex);
     }
 
     static uint32_t le32(uint8_t const* p) noexcept

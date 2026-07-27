@@ -1303,7 +1303,16 @@ private:
                                 || (diagApc >= diagPcLo && diagApc <= diagPcHi);
             if (diagWReg >= 0 && diagWReg < 32 && !r.regWriteIsFp &&
                 r.regWriteIdx == static_cast<uint8_t>(diagWReg) &&
-                r.regWriteValue >= diagWMin && wregPcOk && diagWN < diagCap) {
+                r.regWriteValue >= diagWMin && wregPcOk
+                // 2026-07-26 (JRN-SCSI-027): the CYCLO/CYCHI window applied to
+                // the DIAG-PC path only, so a WREG probe could not be pinned to
+                // a late phase -- its cap filled during console init (~cyc
+                // 1.17e9) a BILLION cycles before the OS-era window it was
+                // aimed at, twice in one session.  Same gate, same semantics as
+                // the PC path above (defaults 0..~0 pass everything, so every
+                // existing DIAG_WREG recipe is unaffected).
+                && cpu.cycleCount >= diagCycLo && cpu.cycleCount <= diagCycHi
+                && diagWN < diagCap) {
                 ++diagWN;
                 std::fprintf(stderr,
                     "DIAG-WR: cyc=%llu pc=0x%llx enc=0x%08x R%d<=0x%llx\n",
