@@ -82,8 +82,9 @@ auto alignDown(uint64_t v, uint64_t align) noexcept -> uint64_t
 //
 // Each acts on bits[7:0] of mask; bits[63:8] are ignored.
 //
-// Example: zap(0x0123456789ABCDEF, 0x3C) == 0x01234500000000EF
-// Example: zapnot(0x0123456789ABCDEF, 0x3C) == 0x000089ABCDEF0000
+// Byte lane i = bits[8i+7:8i]; mask 0x3C selects lanes 2..5 (AB/89/67/45).
+// Example: zap(0x0123456789ABCDEF, 0x3C) == 0x01230000_0000CDEF
+// Example: zapnot(0x0123456789ABCDEF, 0x3C) == 0x00004567_89AB0000
 
 AXP_HOT AXP_ALWAYS_INLINE
 auto zap(uint64_t value, uint64_t mask) noexcept -> uint64_t
