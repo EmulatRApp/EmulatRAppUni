@@ -130,6 +130,66 @@ ASCII(128) only.  Hex radix.
   do NOT match -> corruption upstream of the arithmetic, and the hunt
   moves back into memory.
 
+--------------------------------------------------------------------------------
+## 5b. ADDENDUM 2026-07-27 -- THE 0x42790 ANCHOR IS RETRACTED.
+##     Three conclusions withdrawn; what survives is listed.
+
+  Follow-up windows over 0x42790 produced a coherent-looking story that
+  the assumption-free instrument then destroyed.  Recorded in full
+  because the retraction pattern is the lesson.
+
+  WHAT WAS SEEN (real, reproducible):
+    A five-iteration section-search loop at 0x423bc-0x4250c: each
+    iteration `LDL r4,<off>(r18)` (offsets 0x6c/0x94/0x58/0x80/0xbc/
+    0xa8), `CMPLT r2,r4,r3` -- SIGNED, not CMPULT -- `SUBQ r2,r4,r4`,
+    `BNE r3`.  Four fall through; the last branch enters 0x42790
+    `LDQ r0,-0x10(r27)` which loads 0x0013809A.  Operand values
+    (DIAG_WREG=4, cycle-gated): bounds -1, 0, -1, -1, 0xC000; and from
+    the SUBQ residues, r2 = 0xFFFFFFFF80000000 (the S0 base), derived
+    twice independently.
+
+  RETRACTION 1 -- "partial populate".  0xC000 does appear in the image
+    at EISD[2]+16, and I read that as one real descriptor field having
+    reached a half-built table.  COINCIDENCE: a 16-bit value in a small
+    search space.  PA-WATCH on 0x14788+0x68 shows the region receives
+    ZERO stores during the OS era -- all 104 stores land at cyc ~6.76e6
+    from pc 0x600938 (the DECOMPRESSOR), writing instruction words
+    (0x47ff041f = BIS r31,r31,r31).  The bounds are static decompressed
+    firmware content, not loader output.
+
+  RETRACTION 2 -- "the table at r18".  There is no loader-built section
+    table at 0x14788.  The consumer/producer framing built on it is void.
+
+  RETRACTION 3 -- the anchor itself.  PA-WATCH on 0x42780+0x20 shows 60
+    OS-era stores at cyc 1.9328e9 from pc 0x13687c (mostly zeros), i.e.
+    that address is used as a DATA BUFFER by OS-era code -- while the
+    value probe recorded an INSTRUCTION retiring at that PC in a
+    different run.  A stable code site cannot be both.  0x42790 is
+    therefore not established as the loader's failure return, and the
+    r0<=0x13809a hit may be a value coincidence rather than the status
+    materialization.
+
+  WHAT SURVIVES (measurement sound regardless of whose code it was):
+    - LDL SIGN-EXTENSION HEALTH CERTIFICATE: LDL loaded 0xFFFFFFFF and
+      produced 0xFFFFFFFFFFFFFFFF -- correct architected sign-copy -- on
+      the very path suspected of EXTxH's genre.  Positive evidence, not
+      mere non-conviction.
+    - r2 = 0xFFFFFFFF80000000 flows as a correctly canonicalized 64-bit
+      S0 base.  The 32-bit canonicalization lanes are demonstrably
+      producing architected values here.
+    - Sec 2's device-side exoneration is UNTOUCHED: it rests on direct
+      comparison against a Charon-bootable image, not on any loader model.
+
+  METHOD NOTE: the value anchor removed address assumptions but not
+  TEMPORAL ones -- a PC is only meaningful together with the era in
+  which it retired, and low memory is reused across eras (decompressor
+  output, console code, OS buffers all share 0x1xxxx-0x6xxxx).  Any
+  future anchor must be established in ONE run with both its execution
+  and its provenance evidenced, e.g. by a snapshot taken DURING SYSBOOT
+  execution, or by walking back from the console PUTS callback that
+  actually emits the LDFAIL text (tools/crb_conversation_decode.py
+  already reconstructs that conversation).
+
 ## 6. Files touched
 
   - deviceLib/Tsunami/Ncr53C810.h   trace: LBA/cnt + FNV payload
