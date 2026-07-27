@@ -108,6 +108,16 @@ def main():
             time.sleep(1); s.sendall(b'\r'); lfu += 1
             buf += b'<CR>'
             log('LFU load prompt -> <return> (#%d)' % lfu)
+        elif tailb.endswith(b'(ewa0),') and lfu < 10:
+            # THIRD LFU prompt (2026-07-26): after "Option firmware files were
+            # not found on CD or floppy" the firmware asks "please enter the
+            # device on which the files are located(ewa0)," -- a bare CR takes
+            # the default and moves on.  Without this the boot STALLS here
+            # forever (observed: an N5 run sat at this prompt ~40 min while the
+            # driver waited for a P00>>> that never came).
+            time.sleep(1); s.sendall(b'\r'); lfu += 1
+            buf += b'<CR>'
+            log('LFU option-firmware device prompt -> <return> (#%d)' % lfu)
         elif tailb.endswith(b'UPD>') and lfu < 10:
             time.sleep(1); s.sendall(b'exit\r'); lfu += 1
             buf += b'<exit>'

@@ -639,6 +639,41 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-026_vptb_desync_fixed_halt10_closed.md` --
+  **HALT-10 CLOSED; DS20 NOW REACHES SYSBOOT.**  Root cause:
+  execMtprVptb_vms shadowed EV6_VMS_CALLPAL.MAR:1524 INCOMPLETELY -- it
+  did the VA_CTL + I_CTL merges but NOT `hw_stq/p r16, PT__VPTB(p_temp)`
+  (PT__VPTB=^x0, EV6_PAL_TEMPS.MAR:33).  The guest's miss handlers +
+  DTBM_DOUBLE_3 self-check read that CELL while VA_FORM formats from the
+  IPRs -> guaranteed mismatch from the first OS MTPR_VPTB (pc 0x29dc4,
+  R16=0xFFFFFEFC_00000000).  FIX = deferred memEffect, raw R16, 8B, with
+  **S_PhysAddr|S_Store** (first cut omitted them -> Mbox translated
+  p_temp as a VA and the wall MOVED to PC 0x29dc4) + hard-fault guard on
+  bad p_temp.  V1 17 cases/2813 asserts, V3 497/500 (3 known drift), V2
+  boot: halt-10 GONE, now `%SYSBOOT-F-LDFAIL ... status=0013809A`
+  (reproduced 2x).  A4 AUDIT TABLE in Sec 5: PT__VPTB FIXED; PT__PTBR
+  CLEAN (EMULATR_PTBR_DIAG fired 0x -- execSwpctx not on path, SWPCTX
+  diverts to guest PAL); cpu.ptbr = LATENT TRAP (diag-only consumers,
+  reads 0 in OS era); S_PhysAddr = class rule; PT__VA_CTL source +
+  I_CTL width = documented residuals.  NEXT FRONTIER IS SCSI, not PAL:
+  SYSBOOT dies on `VirtualDiskDevice: UNSUPPORTED opcode 0x15` =
+  MODE SELECT(6) + `Ncr53C810 data-in 255 > available 36` -- it never
+  reaches the file read.  LIVE FRONTIER.
+- `journals/20260726_JRN-SCSI-025_n4_vptb_era_ends_at_console_entry.md` --
+  N4 DONE: the restore contract WORKS -- 228 writes install VPTB
+  0x2_0000_0000 into BOTH VA_CTL (0xe5fd) and I_CTL (0xe7c1); MTPR
+  dispatch and saved values are fine (suspects i/ii CLOSED).  The defect
+  is a VPTB ERA that ENDS: last VPTB write cyc 1.8522e9, immediately
+  followed by sys__enter_console (0x13351/0x13381: I_CTL vptb<-0,
+  VA_CTL<-0x2 va48=1) with NO paired restore -- then ~313M cycles and
+  thousands of writes ALL vptb=0, covering the whole OS era and the
+  0x2a000 fetch that walls.  Also: 4 GARBAGE I_CTL VPTB writes
+  (0xfffffefc...) at 0xdfd1/0xe001/0xe085/0xe091 right before the era
+  ends.  NEXT (N5): DIAG 0xdf00-0xe100 + 0x13300-0x13400 gated
+  CYCLO~1852246000 CYCHI~1852247200 -- names who calls that final
+  enter_console (EmulatR divert that skips the restore vs faithful
+  guest entry needing OS MTPR_VPTB).  Probe cap now tunable via
+  EMULATR_VACTL_DIAG_N.  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-024_n3_enter_console_named_vaform_vptb0.md` --
   N3 DONE + MAJOR CORRECTION: the 0x1333c clear = sys__enter_console
   (EV6_VMS_PC264_PAL.MAR:4638), and the "unpaired" final clear is the
