@@ -639,6 +639,16 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260726_JRN-SCSI-023_pt_vptb_writer_watch.md` -- PA-WATCH
+  0x7000: PT__VPTB is TOGGLED by the callback context swap -- 0x1333c
+  (HW_MFPR IPR 0x1110; 42-bit mask; HW_ST r31 -> PT__VPTB) clears on
+  callback ENTRY, 0xe558 restores 0x2_0000_0000 on EXIT (ra 0x62f6c).
+  The FINAL clear (cyc 1885776941, stale ra=0x24d9c = data) is UNPAIRED
+  -- no restore before the OS fetch at 0x2a000 -> crash1.  VA_FORM,
+  timer diverts, and the cpp-seed all exonerated.  N3: identify IPR
+  0x1110 + the 0x13300 routine; DIAG window 0x13300-0x13360 +
+  0xe540-0xe580 names the unpaired caller; then pick fix altitude.
+  LIVE FRONTIER.
 - `journals/20260726_JRN-SCSI-022_halt10_va_form_dtbm_double3.md` -- N1
   DONE: halt-10 @ 0x2a000 decoded.  The code is OS-bootstrap (SYSBOOT
   territory: HWRPB re-checksum to +0x120=hwrpb$Q_CHKSUM), its epilogue
