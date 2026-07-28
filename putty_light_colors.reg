@@ -1,0 +1,36 @@
+Windows Registry Editor Version 5.00
+
+; PuTTY readable color scheme: black text on soft off-white background
+; Applies to "Default Settings" (the template every new/unsaved session uses).
+;
+; Colour0 = Default Foreground        (normal text)
+; Colour1 = Default Bold Foreground   (bold text)
+; Colour2 = Default Background
+; Colour3 = Default Bold Background
+; Colour4 = Cursor Text
+; Colour5 = Cursor Colour
+
+[HKEY_CURRENT_USER\Software\SimonTatham\PuTTY\Sessions\Default%20Settings]
+"Colour0"="0,0,0"
+"Colour1"="0,0,0"
+"Colour2"="250,245,235"
+"Colour3"="250,245,235"
+"Colour4"="250,245,235"
+"Colour5"="0,0,0"
+; Brighten ANSI Blue so dark-blue guest output stays readable on light bg
+"Colour14"="60,60,220"
+"Colour15"="100,100,255"
+
+; --- To apply the same scheme to a SAVED session, copy the block above and
+; --- change the key path to the session name, URL-encoding spaces as %20.
+; --- Example for a session saved as "DS20 Console":
+;
+; [HKEY_CURRENT_USER\Software\SimonTatham\PuTTY\Sessions\DS20%20Console]
+; "Colour0"="0,0,0"
+; "Colour1"="0,0,0"
+; "Colour2"="250,245,235"
+; "Colour3"="250,245,235"
+; "Colour4"="250,245,235"
+; "Colour5"="0,0,0"
+; "Colour14"="60,60,220"
+; "Colour15"="100,100,255"

@@ -155,6 +155,16 @@ inline FpExecCtx vaxUnderflowEnabled() {
     return FpExecCtx{ FPVariant{ coreLib::FpRoundingMode::RoundToNearest,
                                  coreLib::FPTrapMode::Underflow, false }, 0 };
 }
+inline FpExecCtx vaxChopped() {
+    return FpExecCtx{ FPVariant{ coreLib::FpRoundingMode::RoundTowardZero,
+                                 coreLib::FPTrapMode::None, false }, 0 };
+}
+// /S-family (software completion): FPTrapMode::SU sets suppressUnderflow, so
+// FPVariant::hasSoftwareCompletion() is true -- the FV-8 dirty-zero mode key.
+inline FpExecCtx vaxSoftware() {
+    return FpExecCtx{ FPVariant{ coreLib::FpRoundingMode::RoundToNearest,
+                                 coreLib::FPTrapMode::SU, false }, 0 };
+}
 } // anonymous namespace
 
 TEST_CASE("VAX addsub: same-binade effective subtraction orders |a| >= |b| (FV-1)") {
@@ -203,4 +213,130 @@ TEST_CASE("VAX underflow is recorded when the qualifier enables it (FV-3)") {
     auto const rq = be.mulG(gMin, gMin, vaxNormal());
     CHECK(rq.bits == 0u);
     CHECK_FALSE(rq.exc.unf);    // default mode: flush silently
+}
+
+
+// ============================================================================
+// VAX audit batch 2 pins (FV-4 / FV-6 / FV-7 / FV-8, 2026-07-28).
+// ============================================================================
+
+TEST_CASE("VAX CMPG: top-binade G operands compare as numbers, not IEEE NaN (FV-4)") {
+    SoftFloatBackend be;
+    uint64_t const kTrue = 0x4000000000000000ULL;
+    // Register exp11 == 0x7FF is a VALID (huge) G value; read as an IEEE
+    // double it is NaN, so the old f64 quiet predicates returned unordered ->
+    // false for every relation.  AARM 4.10.7: comparisons are exact.
+    uint64_t const gTop = 0x7FF4000000000000ULL;
+    uint64_t const gOne = 0x4010000000000000ULL;   // G 1.0
+    CHECK(be.cmpG(FpCompare::Lt, gOne, gTop, vaxNormal()).bits == kTrue);
+    CHECK(be.cmpG(FpCompare::Eq, gTop, gTop, vaxNormal()).bits == kTrue);
+    CHECK(be.cmpG(FpCompare::Le, gTop, gOne, vaxNormal()).bits == 0u);
+    // Sign ordering: -huge < 1.0; and no INV for valid operands.
+    uint64_t const gNegTop = gTop | 0x8000000000000000ULL;
+    CHECK(be.cmpG(FpCompare::Lt, gNegTop, gOne, vaxNormal()).bits == kTrue);
+    CHECK_FALSE(be.cmpG(FpCompare::Eq, gTop, gOne, vaxNormal()).exc.inv);
+    // Zero orders between the signs.
+    CHECK(be.cmpG(FpCompare::Lt, gNegTop, 0u, vaxNormal()).bits == kTrue);
+    CHECK(be.cmpG(FpCompare::Lt, 0u, gOne, vaxNormal()).bits == kTrue);
+}
+
+TEST_CASE("VAX CMPG: reserved operand signals INV in every trap mode (FV-4/FV-8)") {
+    SoftFloatBackend be;
+    uint64_t const gResv = 0x8000000000000000ULL;  // sign=1, exp=0: reserved
+    uint64_t const gOne  = 0x4010000000000000ULL;
+    CHECK(be.cmpG(FpCompare::Eq, gResv, gOne, vaxNormal()).exc.inv);
+    CHECK(be.cmpG(FpCompare::Eq, gResv, gOne, vaxSoftware()).exc.inv);
+    CHECK(be.cmpG(FpCompare::Eq, gOne, gResv | 1u, vaxNormal()).exc.inv);
+}
+
+TEST_CASE("VAX dirty zero: INV in default mode, clean zero under /S (FV-8)") {
+    SoftFloatBackend be;
+    uint64_t const dirty = 0x0000000000000001ULL;  // exp=0, sign=0, frac!=0
+    uint64_t const gOne  = 0x4010000000000000ULL;  // G 1.0
+    uint64_t const kTrue = 0x4000000000000000ULL;
+    // Default trap mode: dirty zero raises INV (AARM 4.7.7.1 default mode:
+    // non-finite operand traps).
+    CHECK(be.addG(dirty, gOne, vaxNormal()).exc.inv);
+    CHECK(be.cmpG(FpCompare::Eq, dirty, 0u, vaxNormal()).exc.inv);
+    CHECK(be.cvtGQ(dirty, vaxNormal()).exc.inv);
+    // /S software completion: "a VAX dirty zero is treated as zero".
+    auto const s = be.addG(dirty, gOne, vaxSoftware());
+    CHECK_FALSE(s.exc.inv);
+    CHECK(s.bits == gOne);                          // 0 + 1.0 = 1.0
+    auto const sc = be.cmpG(FpCompare::Eq, dirty, 0u, vaxSoftware());
+    CHECK_FALSE(sc.exc.inv);
+    CHECK(sc.bits == kTrue);                        // dirty zero == true zero
+    auto const sq = be.cvtGQ(dirty, vaxSoftware());
+    CHECK_FALSE(sq.exc.inv);
+    CHECK(sq.bits == 0u);                           // exact 0, not a denormal
+}
+
+TEST_CASE("VAX CVTGF: F exponent window checked, Ovf/Unf recorded (FV-6)") {
+    SoftFloatBackend be;
+    // Register exp11 0x500 (1280) > F max 1151 -> overflow.
+    uint64_t const gHuge = 0x5000000000000000ULL;
+    CHECK(be.cvtGF(gHuge, vaxNormal()).exc.ovf);
+    // Register exp11 0x100 (256) < F min 897 -> flush to 0; Unf only with /U.
+    uint64_t const gTiny = 0x1000000000000000ULL;
+    auto const u = be.cvtGF(gTiny, vaxUnderflowEnabled());
+    CHECK(u.bits == 0u);
+    CHECK(u.exc.unf);
+    auto const uq = be.cvtGF(gTiny, vaxNormal());
+    CHECK(uq.bits == 0u);
+    CHECK_FALSE(uq.exc.unf);
+}
+
+TEST_CASE("VAX CVTGF: VAX half-up rounding at F precision; /C chops (FV-6)") {
+    SoftFloatBackend be;
+    // G 1.0 with fraction-field bit 28 set: exactly half an F LSB (F LSB is
+    // fraction bit 29).  VAX biased rounding takes the larger magnitude ->
+    // fraction bit 29 set.  IEEE ties-to-even (old roundFreg) would round back
+    // DOWN to 1.0 -- this vector discriminates the tie rule.  /C chops.
+    uint64_t const gHalf = 0x4010000010000000ULL;
+    CHECK(be.cvtGF(gHalf, vaxNormal()).bits  == 0x4010000020000000ULL);
+    CHECK(be.cvtGF(gHalf, vaxChopped()).bits == 0x4010000000000000ULL);
+}
+
+TEST_CASE("VAX CVTQF: rounds to F precision with VAX tie rule; /C chops (FV-6)") {
+    SoftFloatBackend be;
+    // q = 2^24 + 1: F holds 24 significant bits, so the +1 is exactly halfway
+    // between F(2^24) and F(2^24 + 2).  VAX half-up -> 2^24 + 2; RNE would
+    // give the even 2^24.  Register image of F(2^24+2): image-as-double is
+    // 4*(2^24+2) = 2^26*(1 + 2^-23) -> exp field 1049 (0x419), frac bit 29.
+    uint64_t const q = (1ULL << 24) + 1ULL;
+    CHECK(be.cvtQF(q, vaxNormal()).bits  == 0x4190000020000000ULL);
+    CHECK(be.cvtQF(q, vaxChopped()).bits == 0x4190000000000000ULL);   // 2^24
+}
+
+TEST_CASE("VAX CVTGQ overflow stores the true result's low 64 bits (FV-7)") {
+    SoftFloatBackend be;
+    // G image 0x4400000000000001 read as a double is 4*v with
+    //   4*v = 2^65 * (1 + 2^-52)   ->   v = 2^63 + 2^11.
+    // v is outside i64 (IOV) and an exact integer; AARM 4.7.7.9 stores
+    //   v mod 2^64 = 2^63 + 2^11 = 0x8000000000000800
+    // (the old SoftFloat path saturated to INT64_MAX = 0x7FFFFFFFFFFFFFFF).
+    uint64_t const gBig = 0x4400000000000001ULL;
+    auto const r = be.cvtGQ(gBig, vaxNormal());
+    CHECK(r.exc.iov);
+    CHECK(r.bits == 0x8000000000000800ULL);
+    // Negative mirror: -(2^63 + 2^11) mod 2^64 = 2^64 - 2^63 - 2^11
+    //   = 0x7FFFFFFFFFFFF800 (two's complement).
+    auto const n = be.cvtGQ(gBig | 0x8000000000000000ULL, vaxNormal());
+    CHECK(n.exc.iov);
+    CHECK(n.bits == 0x7FFFFFFFFFFFF800ULL);
+}
+
+TEST_CASE("IEEE CVTTQ overflow stores the true result's low 64 bits (FV-7)") {
+    SoftFloatBackend be;
+    // 2^63 (finite, exact integer): mod 2^64 = 0x8000000000000000.
+    auto const p = be.cvtTQ(kTwoPow63, rne());
+    CHECK(p.exc.iov);
+    CHECK(p.bits == 0x8000000000000000ULL);
+    // 2^64 + 2^12 (T image 0x43F0000000000001): mod 2^64 = 0x1000.
+    auto const q = be.cvtTQ(0x43F0000000000001ULL, rne());
+    CHECK(q.exc.iov);
+    CHECK(q.bits == 0x0000000000001000ULL);
+    // Non-finite operand: no true result exists; only the IOV mapping is
+    // pinned (the stored pattern stays SoftFloat's).
+    CHECK(be.cvtTQ(kQNaN, rne()).exc.iov);
 }

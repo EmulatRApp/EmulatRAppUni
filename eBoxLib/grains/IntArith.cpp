@@ -35,13 +35,61 @@
 #include "grainFactoryLib/generated/SemanticFlagsEnum.h"
 #include "fBoxLib/grains/FpFormat.h"   // convertS_/convertF_FloatingToRegister (ITOFx)
 
+#include <atomic>
 #include <cstdint>
+#include <cstdio>
 
 namespace eBox {
 
 using coreLib::BoxResult;
 using coreLib::ExecCtx;
 using coreLib::InstructionGrain;
+
+namespace {
+
+// ----------------------------------------------------------------------------
+// NAMED DEVIATION (int-ov-trap) -- IOV detected but NOT delivered.
+// ----------------------------------------------------------------------------
+// The /V integer forms (ADDL/V, SUBL/V, ADDQ/V, SUBQ/V, MULL/V, MULQ/V)
+// must signal an integer-overflow (IOV) arithmetic trap per AARM 4.4.
+// V5 has no arithmetic-trap delivery channel yet (BoxResult v1 cut; the
+// FP side likewise records FPCR sticky bits via foldFpcrExc but defers
+// trap DELIVERY), and integer IOV architecturally reports through
+// EXC_SUM<IOV> + the ARITH PAL entry -- neither of which is wired in
+// CpuState.  Folding integer IOV into the FPCR would be architecturally
+// wrong (FPCR is FP-only state), and inventing a fault code with no WB
+// routing would misdeliver.  So the /V leaves compute the exact stored
+// result (identical to the base form per the AARM: the truncated result
+// IS written), detect overflow exactly, and trace the undelivered trap
+// loudly here -- hard-stop-over-silent-degradation posture, same
+// throttle shape as GrainStubs::logUnimplementedStub.
+// TODO(int-ov-trap): when EXC_SUM + ARITH trap delivery land, replace
+// this trace with IOV recording + trap vectoring and drop the deviation.
+void noteIovNotDelivered(char const* mnem,
+                         InstructionGrain const& g,
+                         std::atomic<uint64_t>& counter) noexcept
+{
+    uint64_t const n = counter.fetch_add(1, std::memory_order_relaxed);
+    if (n < 8) {
+        std::fprintf(stderr,
+                     "IntArith: %s IOV detected pc=0x%016llx -- arithmetic "
+                     "trap NOT delivered (named deviation int-ov-trap, "
+                     "hit %llu)\n",
+                     mnem,
+                     static_cast<unsigned long long>(g.pc),
+                     static_cast<unsigned long long>(n));
+        std::fflush(stderr);
+    } else if ((n & 0xFFFFu) == 0) {
+        std::fprintf(stderr,
+                     "IntArith: %s IOV hit %llu times "
+                     "(loud-stderr muted past 8)\n",
+                     mnem,
+                     static_cast<unsigned long long>(n + 1));
+        std::fflush(stderr);
+    }
+}
+
+} // anonymous namespace
 
 
 #pragma region Miscellaneous Instructions
@@ -120,8 +168,8 @@ BoxResult execAddl(InstructionGrain const& g, ExecCtx const& c) noexcept
 //
 // Operation: Rc <- sign_extend_32_to_64(Ra<31:0> - Rb<31:0>)
 //
-// Underflow wraps modulo 2^32 per Alpha SRM (no trap; the _V variants
-// trap, but those are separate rows and are not implemented in v1).
+// Underflow wraps modulo 2^32 per Alpha SRM (no trap; the _V variant
+// is the separate execSublV row below).
 //
 AXP_HOT AXP_FLATTEN
 BoxResult execSubl(InstructionGrain const& g, ExecCtx const& c) noexcept
@@ -144,7 +192,7 @@ BoxResult execSubl(InstructionGrain const& g, ExecCtx const& c) noexcept
 //
 // Operation: Rc <- Ra + Rb  (modulo 2^64)
 //
-// Overflow wraps; the _V variant traps but is a separate row.
+// Overflow wraps; the _V variant is the separate execAddqV row below.
 //
 AXP_HOT AXP_FLATTEN
 BoxResult execAddq(InstructionGrain const& g, ExecCtx const& c) noexcept
@@ -174,6 +222,112 @@ BoxResult execSubq(InstructionGrain const& g, ExecCtx const& c) noexcept
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
+    return r;
+}
+
+
+// ----------------------------------------------------------------------------
+// Integer overflow-trapping (/V) forms -- opcode 0x10 func 0x40/0x49/0x60/0x69
+// ----------------------------------------------------------------------------
+//
+// AARM 4.4.1 (ADDx), 4.4.15/4.4.14 (SUBx): the /V form computes the
+// SAME stored result as the base form -- the low-order (longword:
+// sign-extended) or truncated (quadword) result is always written to
+// Rc -- and additionally signals integer overflow (IOV) when the true
+// two's-complement result cannot be represented:
+//
+//   ADDL/V, SUBL/V: overflow when the sign-extended 32-bit result
+//                   differs from the untruncated (64-bit) computation.
+//   ADDQ/V, SUBQ/V: overflow on two's-complement carry/borrow into
+//                   bit 64 (signed 64-bit overflow).
+//
+// Detection uses the alpha_int helpers, which were built for exactly
+// these rows (coreLib/alpha_int_helpers.h).  Trap delivery is the
+// named deviation int-ov-trap -- see noteIovNotDelivered above:
+// faultCode stays kNoFault and the detected IOV is traced loudly.
+// ----------------------------------------------------------------------------
+
+AXP_HOT AXP_FLATTEN
+BoxResult execAddlV(InstructionGrain const& g, ExecCtx const& c) noexcept
+{
+    alpha_int::IntStatus st;
+    int32_t const sum32 = alpha_int::addL(static_cast<int32_t>(c.opA),
+                                          static_cast<int32_t>(c.opB), st);
+    int64_t const result = sum32;       // sign-extend; identical to ADDL
+
+    if (st.overflow) {
+        static std::atomic<uint64_t> s_cnt{ 0 };
+        noteIovNotDelivered("ADDL/V", g, s_cnt);
+    }
+
+    BoxResult r;
+    r.semFlags      = g.semFlags;
+    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Rc
+    r.regWriteIsFp  = false;
+    r.regWriteValue = static_cast<uint64_t>(result);
+    return r;
+}
+
+AXP_HOT AXP_FLATTEN
+BoxResult execSublV(InstructionGrain const& g, ExecCtx const& c) noexcept
+{
+    alpha_int::IntStatus st;
+    int32_t const diff32 = alpha_int::subL(static_cast<int32_t>(c.opA),
+                                           static_cast<int32_t>(c.opB), st);
+    int64_t const result = diff32;      // sign-extend; identical to SUBL
+
+    if (st.overflow) {
+        static std::atomic<uint64_t> s_cnt{ 0 };
+        noteIovNotDelivered("SUBL/V", g, s_cnt);
+    }
+
+    BoxResult r;
+    r.semFlags      = g.semFlags;
+    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
+    r.regWriteIsFp  = false;
+    r.regWriteValue = static_cast<uint64_t>(result);
+    return r;
+}
+
+AXP_HOT AXP_FLATTEN
+BoxResult execAddqV(InstructionGrain const& g, ExecCtx const& c) noexcept
+{
+    alpha_int::IntStatus st;
+    int64_t const result = alpha_int::addQ(static_cast<int64_t>(c.opA),
+                                           static_cast<int64_t>(c.opB), st);
+    // Wrapped sum is bit-identical to the ADDQ (mod 2^64) result.
+
+    if (st.overflow) {
+        static std::atomic<uint64_t> s_cnt{ 0 };
+        noteIovNotDelivered("ADDQ/V", g, s_cnt);
+    }
+
+    BoxResult r;
+    r.semFlags      = g.semFlags;
+    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
+    r.regWriteIsFp  = false;
+    r.regWriteValue = static_cast<uint64_t>(result);
+    return r;
+}
+
+AXP_HOT AXP_FLATTEN
+BoxResult execSubqV(InstructionGrain const& g, ExecCtx const& c) noexcept
+{
+    alpha_int::IntStatus st;
+    int64_t const result = alpha_int::subQ(static_cast<int64_t>(c.opA),
+                                           static_cast<int64_t>(c.opB), st);
+    // Wrapped difference is bit-identical to the SUBQ (mod 2^64) result.
+
+    if (st.overflow) {
+        static std::atomic<uint64_t> s_cnt{ 0 };
+        noteIovNotDelivered("SUBQ/V", g, s_cnt);
+    }
+
+    BoxResult r;
+    r.semFlags      = g.semFlags;
+    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
+    r.regWriteIsFp  = false;
+    r.regWriteValue = static_cast<uint64_t>(result);
     return r;
 }
 
@@ -410,9 +564,8 @@ auto execUmulh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
 // MULQ Ra, Rb, Rc: Rc <- (Ra * Rb)<63:0>.  Low 64 bits of the
 // signed/unsigned product (low half is identical for both
 // signednesses).  C++ unsigned multiplication on 64-bit values
-// produces the correct low-half result; signed overflow is a
-// non-trap variant in this row (the trap variant would carry S_FpTrap
-// or an integer-overflow indicator -- not present in the v1 cut).
+// produces the correct low-half result; this row never traps (the
+// trapping form is the separate execMulqV row below).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execMulq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
@@ -447,6 +600,66 @@ auto execMull(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(sext);
+    return r;
+}
+
+
+// ----------------------------------------------------------------------------
+// Integer overflow-trapping multiplies -- opcode 0x13 func 0x40 / 0x60
+// ----------------------------------------------------------------------------
+//
+// AARM 4.4.11 (MULL/V), 4.4.13 (MULQ/V): the /V form stores the SAME
+// result as the base form and signals integer overflow (IOV) when the
+// true product cannot be represented:
+//
+//   MULL/V: overflow when the sign-extended 32-bit product differs
+//           from the true 64-bit product of the 32-bit operands.
+//   MULQ/V: overflow when the high 64 bits of the signed 128-bit
+//           product are not the sign-extension of the low 64 bits.
+//
+// Trap delivery is the named deviation int-ov-trap (see
+// noteIovNotDelivered): faultCode stays kNoFault.
+// ----------------------------------------------------------------------------
+
+AXP_HOT AXP_FLATTEN
+auto execMullV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+{
+    alpha_int::IntStatus st;
+    int32_t const lo32 = alpha_int::mulL(static_cast<int32_t>(c.opA),
+                                         static_cast<int32_t>(c.opB), st);
+    int64_t const sext = lo32;          // sign-extend; identical to MULL
+
+    if (st.overflow) {
+        static std::atomic<uint64_t> s_cnt{ 0 };
+        noteIovNotDelivered("MULL/V", g, s_cnt);
+    }
+
+    BoxResult r;
+    r.semFlags      = g.semFlags;
+    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
+    r.regWriteIsFp  = false;
+    r.regWriteValue = static_cast<uint64_t>(sext);
+    return r;
+}
+
+AXP_HOT AXP_FLATTEN
+auto execMulqV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+{
+    alpha_int::IntStatus st;
+    int64_t const result = alpha_int::mulQ(static_cast<int64_t>(c.opA),
+                                           static_cast<int64_t>(c.opB), st);
+    // Low 64 bits of the product; bit-identical to the MULQ result.
+
+    if (st.overflow) {
+        static std::atomic<uint64_t> s_cnt{ 0 };
+        noteIovNotDelivered("MULQ/V", g, s_cnt);
+    }
+
+    BoxResult r;
+    r.semFlags      = g.semFlags;
+    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
+    r.regWriteIsFp  = false;
+    r.regWriteValue = static_cast<uint64_t>(result);
     return r;
 }
 
@@ -1571,6 +1784,46 @@ auto execFtoit(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Rc (integer dest)
     r.regWriteIsFp  = false;
     r.regWriteValue = c.opA;                                    // fpReg[Ra], raw bits
+    return r;
+}
+
+
+// ----------------------------------------------------------------------------
+// FTOIS Fa, Rc -- FP-to-integer register move, S-format (opcode 0x1C func 0x78).
+// ----------------------------------------------------------------------------
+// AARM (Floating-Point to Integer Register Move):
+//     Rc<63:32> <- SEXT(Fav<63>)
+//     Rc<31:0>  <- Fav<63:62> || Fav<58:29>
+// i.e. the S_floating STORE extraction (the same 32 bits STS writes to
+// memory), sign-extended into the integer register.  "Exceptions: None"
+// -- this is a BITS-ONLY move: no FP operand check, no FPCR effect.
+//
+// The extraction is done inline rather than through
+// FpFormat.h::convertS_FloatingToMemory ON PURPOSE: that helper carries
+// the open exp==0 early-return defect (JRN-ISA-001 F-5 / audit WB-2)
+// which drops fraction bits, and FTOIS must be a pure bit reorder for
+// every input.  Revisit only once WB-2 lands and the helper is faithful.
+//
+// Added 2026-07-28 (audit CM-3): FTOIS was absent from the manifest
+// entirely while execAmask advertises the FIX extension, so AMASK-
+// probing code (Tru64 libc/libm, VMS math RTL) could legitimately emit
+// it and take an OPCDEC.  FTOIT (0x70) was already present.
+AXP_HOT AXP_FLATTEN
+auto execFtois(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+{
+    uint64_t const fav = c.opA;                       // fpReg[Ra], raw bits
+    uint32_t const packed =
+          static_cast<uint32_t>(((fav >> 62) & 0x3ULL) << 30)   // Fav<63:62>
+        | static_cast<uint32_t>((fav >> 29) & 0x3FFFFFFFULL);   // Fav<58:29>
+
+    BoxResult r;
+    r.semFlags      = g.semFlags;
+    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Rc (integer dest)
+    r.regWriteIsFp  = false;
+    // SEXT from bit 31 -- which IS Fav<63>, so this satisfies the
+    // Rc<63:32> <- SEXT(Fav<63>) clause exactly.
+    r.regWriteValue = static_cast<uint64_t>(
+                          static_cast<int64_t>(static_cast<int32_t>(packed)));
     return r;
 }
 

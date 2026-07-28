@@ -165,7 +165,15 @@ using coreLib::InstructionGrain;
 
 // CMPULE: hand-written -- see eBoxLib/grains/ for eBox::execCmpule
 
+// ADDL_V: hand-written -- see eBoxLib/grains/ for eBox::execAddlV
+
+// SUBL_V: hand-written -- see eBoxLib/grains/ for eBox::execSublV
+
 // CMPLT: hand-written -- see eBoxLib/grains/ for eBox::execCmplt
+
+// ADDQ_V: hand-written -- see eBoxLib/grains/ for eBox::execAddqV
+
+// SUBQ_V: hand-written -- see eBoxLib/grains/ for eBox::execSubqV
 
 // CMPLE: hand-written -- see eBoxLib/grains/ for eBox::execCmple
 
@@ -259,6 +267,10 @@ using coreLib::InstructionGrain;
 
 // UMULH: hand-written -- see eBoxLib/grains/ for eBox::execUmulh
 
+// MULL_V: hand-written -- see eBoxLib/grains/ for eBox::execMullV
+
+// MULQ_V: hand-written -- see eBoxLib/grains/ for eBox::execMulqV
+
 // ITOFS: hand-written -- see eBoxLib/grains/ for eBox::execItofs
 
 // ITOFF: hand-written -- see eBoxLib/grains/ for eBox::execItoff
@@ -308,6 +320,8 @@ using coreLib::InstructionGrain;
 // MAXSW4: hand-written -- see eBoxLib/grains/ for eBox::execMaxsw4
 
 // FTOIT: hand-written -- see eBoxLib/grains/ for eBox::execFtoit
+
+// FTOIS: hand-written -- see eBoxLib/grains/ for eBox::execFtois
 
 } // namespace eBox
 
@@ -910,7 +924,6 @@ using coreLib::InstructionGrain;
 // STQP: hand-written -- see palBoxLib/grains/ for palBox::execStqp_vms
 
 // SWPCTX: hand-written -- see palBoxLib/grains/ for palBox::execSwpctx_vms
-// (2026-07-27, SPEC-SWPCTX-001 C3; was the last generated stub in dispatch)
 
 // MFPR_ASN: hand-written -- see palBoxLib/grains/ for palBox::execMfprAsn_vms
 

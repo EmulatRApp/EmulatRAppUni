@@ -69,6 +69,14 @@ inline void loadCpuFromHwpcb(coreLib::CpuState& cpu, Hwpcb const& src) noexcept
     cpu.usp        = src.usp;
     cpu.ptbr       = src.ptbr & ~(uint64_t{1} << 63);   // strip phys-mode flag
     cpu.asn        = static_cast<coreLib::ASNType>(src.asn);
+    // apisrm SWPCTX writes the new ASN to DTB_ASN0/DTB_ASN1 as part of
+    // the swap (ev6_vms_callpal.mar:249-285; GATE-1 Q2 step 4).  The
+    // DTB fill path tags entries with dtbAsn0/1 while lookups key on
+    // cpu.asn -- without this install, every post-swap fill under a
+    // nonzero ASN is tagged with the OLD ASN and can never hit (audit
+    // PE-3, 2026-07-28; masked while all boot-era ASNs are 0).
+    cpu.dtbAsn0    = static_cast<coreLib::ASNType>(src.asn);
+    cpu.dtbAsn1    = static_cast<coreLib::ASNType>(src.asn);
     cpu.asten_sr   = src.asten_sr;
     // The HWPCB FEN quadword packs three architectural fields (apisrm
     // ev6_vms_pal_defs.mar:345-350): FEN<0>, PME<62>, DAT<63>.  Unpack

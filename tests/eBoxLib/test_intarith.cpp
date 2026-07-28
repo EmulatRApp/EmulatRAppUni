@@ -300,6 +300,228 @@ TEST_CASE("eBox::execCmpeq -- full 64-bit comparison (high bits matter)")
 
 
 // =============================================================================
+// Integer overflow-trapping (/V) forms -- ADDL/V, SUBL/V, ADDQ/V, SUBQ/V
+// (opcode 0x10, func 0x40/0x49/0x60/0x69) and MULL/V, MULQ/V (opcode
+// 0x13, func 0x40/0x60).  AARM 4.4: the /V form always stores the same
+// truncated / low-order result as the base form, and additionally
+// signals IOV when the true result cannot be represented.
+//
+// NAMED DEVIATION (int-ov-trap): V5 has no arithmetic-trap delivery
+// channel yet, so detected IOV is traced to stderr and NOT delivered --
+// faultCode stays kNoFault even on the overflow vectors below.  The
+// overflow cases here exercise that deviation path and pin the
+// AARM-required stored result; when trap delivery lands, the faultCode
+// CHECKs below flip to the arithmetic-trap expectation.
+// =============================================================================
+
+namespace {
+
+// Build an InstructionGrain shaped like an IntMul (opcode 0x13) row.
+InstructionGrain makeIntmulGrain(uint8_t func, uint8_t ra, uint8_t rb, uint8_t rc,
+                                 GrainFn execFn)
+{
+    InstructionGrain g = makeIntaGrain(func, ra, rb, rc, execFn);
+    g.encoded   = (g.encoded & ~(uint32_t{0x3F} << 26))
+                | (uint32_t{0x13} << 26);
+    g.primaryOp = 0x13;
+    return g;
+}
+
+} // anonymous namespace
+
+TEST_CASE("eBox::execAddlV -- non-overflow stores the ADDL result")
+{
+    InstructionGrain g = makeIntaGrain(0x40, 1, 2, 3, &eBox::execAddlV);
+    ExecCtx ctx{};
+    ctx.opA = 7;
+    ctx.opB = 5;
+
+    BoxResult r = eBox::execAddlV(g, ctx);
+
+    CHECK(r.faultCode == kNoFault);
+    CHECK(r.regWriteIdx == 3);
+    CHECK_FALSE(r.regWriteIsFp);
+    CHECK(r.regWriteValue == 12u);
+    CHECK(r.memSize == kNoMemEffect);
+    CHECK_FALSE(r.divert);
+}
+
+TEST_CASE("eBox::execAddlV -- overflow still stores sign-extended wrap")
+{
+    // 0x7FFFFFFF + 1 overflows 32-bit signed; AARM: the truncated,
+    // sign-extended result IS written (0xFFFFFFFF80000000).
+    InstructionGrain g = makeIntaGrain(0x40, 1, 2, 7, &eBox::execAddlV);
+    ExecCtx ctx{};
+    ctx.opA = 0x7FFFFFFFULL;
+    ctx.opB = 0x00000001ULL;
+
+    BoxResult r = eBox::execAddlV(g, ctx);
+
+    CHECK(r.regWriteIdx == 7);
+    CHECK(r.regWriteValue == 0xFFFFFFFF80000000ULL);
+    CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
+}
+
+TEST_CASE("eBox::execSublV -- non-overflow stores the SUBL result")
+{
+    InstructionGrain g = makeIntaGrain(0x49, 1, 2, 4, &eBox::execSublV);
+    ExecCtx ctx{};
+    ctx.opA = 10;
+    ctx.opB = 3;
+
+    BoxResult r = eBox::execSublV(g, ctx);
+
+    CHECK(r.faultCode == kNoFault);
+    CHECK(r.regWriteIdx == 4);
+    CHECK(r.regWriteValue == 7u);
+}
+
+TEST_CASE("eBox::execSublV -- overflow still stores sign-extended wrap")
+{
+    // 0x80000000 (INT32_MIN) - 1 overflows; stored result wraps to
+    // 0x7FFFFFFF, zero-extended by the positive sign.
+    InstructionGrain g = makeIntaGrain(0x49, 1, 2, 4, &eBox::execSublV);
+    ExecCtx ctx{};
+    ctx.opA = 0x80000000ULL;
+    ctx.opB = 0x00000001ULL;
+
+    BoxResult r = eBox::execSublV(g, ctx);
+
+    CHECK(r.regWriteValue == 0x000000007FFFFFFFULL);
+    CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
+}
+
+TEST_CASE("eBox::execAddqV -- non-overflow stores the ADDQ result")
+{
+    InstructionGrain g = makeIntaGrain(0x60, 1, 2, 4, &eBox::execAddqV);
+    ExecCtx ctx{};
+    ctx.opA = 0x100000000ULL;
+    ctx.opB = 0x200000001ULL;
+
+    BoxResult r = eBox::execAddqV(g, ctx);
+
+    CHECK(r.faultCode == kNoFault);
+    CHECK(r.regWriteIdx == 4);
+    CHECK(r.regWriteValue == 0x300000001ULL);
+}
+
+TEST_CASE("eBox::execAddqV -- overflow into bit 64 still stores wrap")
+{
+    // INT64_MAX + 1: two's-complement overflow; stored result is the
+    // mod-2^64 wrap 0x8000000000000000.
+    InstructionGrain g = makeIntaGrain(0x60, 1, 2, 4, &eBox::execAddqV);
+    ExecCtx ctx{};
+    ctx.opA = 0x7FFFFFFFFFFFFFFFULL;
+    ctx.opB = 0x0000000000000001ULL;
+
+    BoxResult r = eBox::execAddqV(g, ctx);
+
+    CHECK(r.regWriteValue == 0x8000000000000000ULL);
+    CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
+}
+
+TEST_CASE("eBox::execSubqV -- non-overflow stores the SUBQ result")
+{
+    InstructionGrain g = makeIntaGrain(0x69, 1, 2, 4, &eBox::execSubqV);
+    ExecCtx ctx{};
+    ctx.opA = 10;
+    ctx.opB = 3;
+
+    BoxResult r = eBox::execSubqV(g, ctx);
+
+    CHECK(r.faultCode == kNoFault);
+    CHECK(r.regWriteValue == 7u);
+}
+
+TEST_CASE("eBox::execSubqV -- overflow still stores wrap")
+{
+    // INT64_MIN - 1: two's-complement overflow; wraps to INT64_MAX.
+    InstructionGrain g = makeIntaGrain(0x69, 1, 2, 4, &eBox::execSubqV);
+    ExecCtx ctx{};
+    ctx.opA = 0x8000000000000000ULL;
+    ctx.opB = 0x0000000000000001ULL;
+
+    BoxResult r = eBox::execSubqV(g, ctx);
+
+    CHECK(r.regWriteValue == 0x7FFFFFFFFFFFFFFFULL);
+    CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
+}
+
+TEST_CASE("eBox::execMullV -- non-overflow stores the MULL result")
+{
+    InstructionGrain g = makeIntmulGrain(0x40, 1, 2, 5, &eBox::execMullV);
+    ExecCtx ctx{};
+    ctx.opA = 6;
+    ctx.opB = 7;
+
+    BoxResult r = eBox::execMullV(g, ctx);
+
+    CHECK(r.faultCode == kNoFault);
+    CHECK(r.regWriteIdx == 5);
+    CHECK(r.regWriteValue == 42u);
+}
+
+TEST_CASE("eBox::execMullV -- overflow still stores sign-extended low 32")
+{
+    // 0x10000 * 0x10000 = 2^32: true product exceeds 32 bits; stored
+    // result is the low 32 bits (0), sign-extended.
+    InstructionGrain g = makeIntmulGrain(0x40, 1, 2, 5, &eBox::execMullV);
+    ExecCtx ctx{};
+    ctx.opA = 0x10000ULL;
+    ctx.opB = 0x10000ULL;
+
+    BoxResult r = eBox::execMullV(g, ctx);
+
+    CHECK(r.regWriteValue == 0u);
+    CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
+}
+
+TEST_CASE("eBox::execMulqV -- non-overflow stores the MULQ result")
+{
+    InstructionGrain g = makeIntmulGrain(0x60, 1, 2, 5, &eBox::execMulqV);
+    ExecCtx ctx{};
+    ctx.opA = 6;
+    ctx.opB = 7;
+
+    BoxResult r = eBox::execMulqV(g, ctx);
+
+    CHECK(r.faultCode == kNoFault);
+    CHECK(r.regWriteIdx == 5);
+    CHECK(r.regWriteValue == 42u);
+}
+
+TEST_CASE("eBox::execMulqV -- 128-bit overflow still stores low 64 bits")
+{
+    // 0x8000000000000000 * 2: high half of the 128-bit signed product
+    // is not the sign-extension of the low half; stored result is the
+    // low 64 bits (0).
+    InstructionGrain g = makeIntmulGrain(0x60, 1, 2, 5, &eBox::execMulqV);
+    ExecCtx ctx{};
+    ctx.opA = 0x8000000000000000ULL;
+    ctx.opB = 0x0000000000000002ULL;
+
+    BoxResult r = eBox::execMulqV(g, ctx);
+
+    CHECK(r.regWriteValue == 0u);
+    CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
+}
+
+TEST_CASE("eBox::execMulqV -- negative operands, representable product")
+{
+    // (-3) * 5 = -15 fits in 64 bits: no overflow, exact signed result.
+    InstructionGrain g = makeIntmulGrain(0x60, 1, 2, 5, &eBox::execMulqV);
+    ExecCtx ctx{};
+    ctx.opA = static_cast<uint64_t>(int64_t{-3});
+    ctx.opB = 5;
+
+    BoxResult r = eBox::execMulqV(g, ctx);
+
+    CHECK(r.faultCode == kNoFault);
+    CHECK(r.regWriteValue == static_cast<uint64_t>(int64_t{-15}));
+}
+
+
+// =============================================================================
 // RC / RS -- atomic Read-and-Clear / Read-and-Set on cpu.intrFlag
 // (Misc-format opcode 0x18, function 0xE000 / 0xF000)
 //
@@ -459,5 +681,74 @@ TEST_CASE("eBox::execRpcc -- packed CC: offset<63:32> | counter<31:0> (F-1)")
         uint64_t const rx = r.regWriteValue;
         uint64_t const idiom = ((rx + (rx << 32)) >> 32) & 0xFFFFFFFFULL;
         CHECK(idiom == 0x10ULL);                 // 0xFFFFFFF0+0x20 mod 2^32
+    }
+}
+
+// =============================================================================
+// FTOIS (opcode 0x1C func 0x78) -- audit CM-3, 2026-07-28.  Was absent from
+// the manifest entirely while execAmask advertises the FIX extension, so
+// AMASK-probing code could legitimately emit it and take an OPCDEC.
+//
+// AARM: Rc<63:32> <- SEXT(Fav<63>) ; Rc<31:0> <- Fav<63:62> || Fav<58:29>
+// Exceptions: None -- a pure bit reorder for EVERY input, including the
+// zero-exponent images that the FpFormat.h store helper mishandles (WB-2).
+// =============================================================================
+
+namespace {
+// FpTiExt (opcode 0x1C) grain; Ra is the FP source, Rc the integer dest.
+InstructionGrain makeFpTiExtGrain(uint8_t func, uint8_t ra, uint8_t rc,
+                                  GrainFn execFn)
+{
+    InstructionGrain g = makeIntaGrain(func, ra, /*rb*/ 31, rc, execFn);
+    g.encoded   = (g.encoded & ~(uint32_t{0x3F} << 26))
+                | (uint32_t{0x1C} << 26);
+    g.primaryOp = 0x1C;
+    return g;
+}
+} // anonymous namespace
+
+TEST_CASE("eBox::execFtois -- AARM bit reorder with sign extension")
+{
+    InstructionGrain g = makeFpTiExtGrain(0x78, /*Fa*/ 1, /*Rc*/ 4,
+                                          &eBox::execFtois);
+    ExecCtx ctx{};
+
+    SUBCASE("positive S-float image: 1.0f") {
+        // S_floating register image of 1.0f: sign 0, exp11 0x3FF, frac 0.
+        // Extract: <63:62> = 0b00 -> result<31:30>; <58:29> = 0x3F800000's
+        // low 30 bits pattern.  1.0f as a raw single is 0x3F800000.
+        ctx.opA = 0x3FF0000000000000ULL;
+        BoxResult const r = eBox::execFtois(g, ctx);
+        CHECK(r.regWriteIdx  == 4);
+        CHECK(r.regWriteIsFp == false);
+        CHECK(r.regWriteValue == 0x000000003F800000ULL);   // 1.0f, zero-ext
+    }
+    SUBCASE("negative image sign-extends into Rc<63:32>") {
+        // Sign bit set -> result bit 31 set -> SEXT fills the upper half.
+        ctx.opA = 0xBFF0000000000000ULL;                   // -1.0
+        BoxResult const r = eBox::execFtois(g, ctx);
+        CHECK(r.regWriteValue == 0xFFFFFFFFBF800000ULL);   // -1.0f, sign-ext
+    }
+    SUBCASE("zero-exponent image keeps its fraction (bits-only, no WB-2 drop)") {
+        // exp field zero, fraction non-zero: FTOIS must still reorder the
+        // bits rather than collapsing to signed zero.
+        ctx.opA = 0x0000000020000000ULL;                   // frac bit 29 set
+        BoxResult const r = eBox::execFtois(g, ctx);
+        CHECK(r.regWriteValue == 0x0000000000000001ULL);
+    }
+    SUBCASE("round-trips ITOFS for a representative single") {
+        // FTOIS is the inverse of ITOFS; the pair must compose to identity
+        // on the 32-bit datum.
+        InstructionGrain gi = makeIntaGrain(0x004, /*Ra*/ 2, /*Rb*/ 31,
+                                            /*Fc*/ 3, &eBox::execItofs);
+        gi.encoded   = (gi.encoded & ~(uint32_t{0x3F} << 26))
+                     | (uint32_t{0x14} << 26);
+        gi.primaryOp = 0x14;
+        ExecCtx ic{};
+        ic.opA = 0x000000003F800000ULL;                    // 1.0f
+        BoxResult const ri = eBox::execItofs(gi, ic);
+        ctx.opA = ri.regWriteValue;
+        BoxResult const rf = eBox::execFtois(g, ctx);
+        CHECK(rf.regWriteValue == 0x000000003F800000ULL);
     }
 }

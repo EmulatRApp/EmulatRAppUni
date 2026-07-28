@@ -141,10 +141,11 @@ constexpr uint8_t kScbdMCtl    = 0x28;   // -> HW_M_CTL
 constexpr uint8_t kScbdCc      = 0xC0;   // -> HW_CC
 constexpr uint8_t kScbdVaCtl   = 0xC4;   // -> HW_VA_CTL
 
-// scbd 0x60 lands in the gap between PAL_TEMP_31 (raw scbd 0x5F) and
-// the bank-1 DTB regs (raw scbd 0xA0..0xA5 / HW_IPR 0x01A0..0x01A5).
-// Not in V1's HW_IPR enum -- guaranteed to hit the default arm.
-constexpr uint8_t kScbdUnknown = 0x60;
+// Raw scbd 0x80 lands in the gap between the PCTX range (0x40..0x7F,
+// EV6 HRM 5.2.21 -- audit PE-2 made the whole range PCTX) and the
+// bank-1 DTB regs (raw scbd 0xA0..0xA5).  Not in V1's HW_IPR enum --
+// guaranteed to hit the default arm.
+constexpr uint8_t kScbdUnknown = 0x80;
 
 } // anonymous namespace
 
@@ -197,8 +198,8 @@ TEST_CASE("palBox::execHwMfpr -- reads HW_CM as integer mode bits")
 
 TEST_CASE("palBox::execHwMfpr -- unknown selector raises kFaultUnimplemented")
 {
-    // scbd 0x60 lands in a gap of the V1 HW_IPR enum (between HW_PCTX
-    // and the bank-1 DTB regs); guaranteed to hit the default arm.
+    // scbd 0x80 lands in a gap of the V1 HW_IPR enum (above the PCTX
+    // range, below the bank-1 DTB regs); guaranteed to hit the default arm.
     InstructionGrain g = makeHwGrain(0x19, /*ra*/ 4, kScbdUnknown,
                                       kHwMfprFlags, &palBox::execHwMfpr);
     CpuState cpu{};
@@ -395,106 +396,96 @@ TEST_CASE("palBox::execHwMtpr -- HW_PAL_BASE rejects opA noise (regression: 2026
 }
 
 // ----------------------------------------------------------------------------
-// PAL_TEMP round-trip tests -- iprSelector now disambiguates the
-// PAL_TEMP range (raw scbd 0x40..0x5F -> HW_PAL_TEMP_0..31), so PT
-// writes/reads can be exercised directly.
+// PCTX tests (EV6 HRM 5.2.21; audit PE-2, 2026-07-28).  Raw scbd
+// 0x40..0x7F is the Process Context Register: writes select fields via
+// index<4:0> (0=ASN 1=ASTER 2=ASTRR 3=PPCE 4=FPE), reads return the
+// full composed register.  These replace the retired EV5-era PAL_TEMP
+// round-trip tests -- EV6 has no PALtemp IPRs, and the storage model
+// scattered the guest PAL's PCTX RMW idiom across independent cells
+// (MTPR_ASTEN wrote 0x42, MFPR_ASN/ASTEN read 0x5F: state lost).
 // ----------------------------------------------------------------------------
 
-TEST_CASE("palBox::execHwMtpr -- writes PT5 (raw scbd 0x45) into palTemp[5]")
+TEST_CASE("PCTX: EV6__ASTER write (0x42) updates only the ASTEN nibble; 0x5F read composes")
 {
-    constexpr uint8_t kScbdPt5 = 0x45;
-    InstructionGrain g = makeHwGrain(0x1D, /*ra*/ 31, kScbdPt5,
+    CpuState cpu{};
+    cpu.asn = 0x2A; cpu.asten_sr = 0xF0;   // ASTSR=0xF, ASTEN=0x0
+    ExecCtx ctx{};
+    ctx.cpu = &cpu;
+
+    // Guest MTPR_ASTEN idiom: value carries ASTER at PCTX<8:5>.
+    InstructionGrain gw = makeHwGrain(0x1D, /*ra*/ 31, /*scbd*/ 0x42,
                                       kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = 0x5ULL << 5;                 // ASTER = 0b0101
+    CHECK(palBox::execHwMtpr(gw, ctx).faultCode == kNoFault);
+    CHECK(cpu.asten_sr == 0xF5ULL);        // ASTSR nibble untouched
+    CHECK(cpu.asn == 0x2A);                // ASN untouched
+
+    // Full read at EV6__PROCESS_CONTEXT (0x5F): all fields composed.
+    InstructionGrain gr = makeHwGrain(0x19, /*ra*/ 3, /*scbd*/ 0x5F,
+                                      kHwMfprFlags, &palBox::execHwMfpr);
+    BoxResult rr = palBox::execHwMfpr(gr, ctx);
+    CHECK(rr.faultCode == kNoFault);
+    CHECK(((rr.regWriteValue >> 5)  & 0xF) == 0x5);   // ASTER
+    CHECK(((rr.regWriteValue >> 9)  & 0xF) == 0xF);   // ASTRR
+    CHECK(((rr.regWriteValue >> 39) & 0xFF) == 0x2A); // ASN
+}
+
+TEST_CASE("PCTX: ASN field write (0x41) takes value<46:39>; ASTRR write (0x44) takes <12:9>")
+{
     CpuState cpu{};
     ExecCtx ctx{};
     ctx.cpu = &cpu;
-    ctx.opB = 0xAABBCCDDEEFF0011ULL;
 
-    BoxResult r = palBox::execHwMtpr(g, ctx);
+    InstructionGrain gAsn = makeHwGrain(0x1D, 31, /*scbd*/ 0x41,
+                                        kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = 0x7BULL << 39;
+    CHECK(palBox::execHwMtpr(gAsn, ctx).faultCode == kNoFault);
+    CHECK(cpu.asn == 0x7B);
 
-    CHECK(r.faultCode == kNoFault);
-    CHECK(cpu.palTemp[5] == 0xAABBCCDDEEFF0011ULL);
+    InstructionGrain gRr = makeHwGrain(0x1D, 31, /*scbd*/ 0x44,
+                                       kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = 0x9ULL << 9;                 // ASTRR = 0b1001
+    CHECK(palBox::execHwMtpr(gRr, ctx).faultCode == kNoFault);
+    CHECK(cpu.asten_sr == 0x90ULL);        // -> HWPCB ASTSR nibble <7:4>
 }
 
-TEST_CASE("palBox::execHwMtpr -- writes PT31 (raw scbd 0x5F, EV5 extension) into palTemp[31]")
+TEST_CASE("PCTX: full write (0x5F) sets all five fields incl. FPE->fen, PPCE->pme")
 {
-    // PT31 is EV5-vintage; observed in the 2026-05-09 trace at PC 0x12f88
-    // (hw_mtpr Rx, 0x5F).  V4 provisions the full 32-entry range.
-    constexpr uint8_t kScbdPt31 = 0x5F;
-    InstructionGrain g = makeHwGrain(0x1D, /*ra*/ 31, kScbdPt31,
+    CpuState cpu{};
+    ExecCtx ctx{};
+    ctx.cpu = &cpu;
+
+    InstructionGrain gw = makeHwGrain(0x1D, 31, /*scbd*/ 0x5F,
                                       kHwMtprFlags, &palBox::execHwMtpr);
-    CpuState cpu{};
-    ExecCtx ctx{};
-    ctx.cpu = &cpu;
-    ctx.opB = 0x0123456789ABCDEFULL;
-
-    BoxResult r = palBox::execHwMtpr(g, ctx);
-
-    CHECK(r.faultCode == kNoFault);
-    CHECK(cpu.palTemp[31] == 0x0123456789ABCDEFULL);
+    ctx.opB = (0x33ULL << 39)              // ASN
+            | (0x6ULL  << 9)               // ASTRR
+            | (0xAULL  << 5)               // ASTER
+            | (1ULL    << 2)               // FPE
+            | (1ULL    << 1);              // PPCE
+    CHECK(palBox::execHwMtpr(gw, ctx).faultCode == kNoFault);
+    CHECK(cpu.asn == 0x33);
+    CHECK(cpu.asten_sr == 0x6AULL);
+    CHECK(cpu.fen == 1u);
+    CHECK(cpu.pme == 1u);
 }
 
-TEST_CASE("palBox::execHwMfpr -- reads PT5 from palTemp[5]")
+TEST_CASE("PCTX: bare read form 0x60 (01xx xxxx) is a legal composed read, not a fault")
 {
-    constexpr uint8_t kScbdPt5 = 0x45;
-    InstructionGrain g = makeHwGrain(0x19, /*ra*/ 12, kScbdPt5,
+    // HRM Table 5-1: the READ decode is the whole 01xx xxxx range.
+    // Regression pin: the old PT model faulted kFaultUnimplemented on
+    // 0x60..0x7F reads.
+    CpuState cpu{};
+    cpu.asn = 0x11;
+    cpu.fen = 1;
+    ExecCtx ctx{};
+    ctx.cpu = &cpu;
+
+    InstructionGrain gr = makeHwGrain(0x19, /*ra*/ 7, /*scbd*/ 0x60,
                                       kHwMfprFlags, &palBox::execHwMfpr);
-    CpuState cpu{};
-    cpu.palTemp[5] = 0xDEADBEEFCAFEBABEULL;
-    ExecCtx ctx{};
-    ctx.cpu = &cpu;
-
-    BoxResult r = palBox::execHwMfpr(g, ctx);
-
-    CHECK(r.faultCode == kNoFault);
-    CHECK(r.regWriteIdx == 12);
-    CHECK(r.regWriteValue == 0xDEADBEEFCAFEBABEULL);
-}
-
-TEST_CASE("palBox::execHwMfpr -- reads PT31 (EV5 extension) from palTemp[31]")
-{
-    constexpr uint8_t kScbdPt31 = 0x5F;
-    InstructionGrain g = makeHwGrain(0x19, /*ra*/ 13, kScbdPt31,
-                                      kHwMfprFlags, &palBox::execHwMfpr);
-    CpuState cpu{};
-    cpu.palTemp[31] = 0xFEDCBA9876543210ULL;
-    ExecCtx ctx{};
-    ctx.cpu = &cpu;
-
-    BoxResult r = palBox::execHwMfpr(g, ctx);
-
-    CHECK(r.faultCode == kNoFault);
-    CHECK(r.regWriteIdx == 13);
-    CHECK(r.regWriteValue == 0xFEDCBA9876543210ULL);
-}
-
-TEST_CASE("palBox::execHwMtpr / execHwMfpr -- PT round-trip across all 32 slots")
-{
-    // Write a unique value to every PT, then read each back and
-    // verify.  Catches off-by-one in iprSelector / palTempIndex and
-    // confirms palTemp[32] storage is fully addressable.
-    CpuState cpu{};
-    ExecCtx ctx{};
-    ctx.cpu = &cpu;
-
-    for (uint8_t i = 0; i < 32; ++i) {
-        uint8_t const scbd = 0x40 + i;
-        uint64_t const value = 0x10000ULL + i;
-        InstructionGrain gw = makeHwGrain(0x1D, /*ra*/ 31, scbd,
-                                          kHwMtprFlags, &palBox::execHwMtpr);
-        ctx.opB = value;
-        BoxResult rw = palBox::execHwMtpr(gw, ctx);
-        CHECK(rw.faultCode == kNoFault);
-    }
-    for (uint8_t i = 0; i < 32; ++i) {
-        uint8_t const scbd = 0x40 + i;
-        uint64_t const expected = 0x10000ULL + i;
-        InstructionGrain gr = makeHwGrain(0x19, /*ra*/ 1, scbd,
-                                          kHwMfprFlags, &palBox::execHwMfpr);
-        BoxResult rr = palBox::execHwMfpr(gr, ctx);
-        CHECK(rr.faultCode == kNoFault);
-        CHECK(rr.regWriteValue == expected);
-    }
+    BoxResult rr = palBox::execHwMfpr(gr, ctx);
+    CHECK(rr.faultCode == kNoFault);
+    CHECK(rr.regWriteIdx == 7);
+    CHECK(rr.regWriteValue == ((0x11ULL << 39) | (1ULL << 2)));
 }
 
 

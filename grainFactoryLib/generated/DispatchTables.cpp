@@ -55,7 +55,7 @@ GrainEntry const* lookupPalTru64(uint32_t func) noexcept;
 GrainEntry const* lookupPalVms(uint32_t func) noexcept;
 
 // ---------------------------------------------------------------------------
-// IntArith sub-table: 128 entries, 18 populated
+// IntArith sub-table: 128 entries, 22 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_intArithSubTable[128] = {
     /* 0x0000 */ { &eBox::execAddl, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ADDL" },
@@ -122,7 +122,7 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x003d */ { &eBox::execCmpule, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "CMPULE" },
     /* 0x003e */ kOpcDecEntry,
     /* 0x003f */ kOpcDecEntry,
-    /* 0x0040 */ kOpcDecEntry,
+    /* 0x0040 */ { &eBox::execAddlV, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ADDL_V" },
     /* 0x0041 */ kOpcDecEntry,
     /* 0x0042 */ kOpcDecEntry,
     /* 0x0043 */ kOpcDecEntry,
@@ -131,7 +131,7 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x0046 */ kOpcDecEntry,
     /* 0x0047 */ kOpcDecEntry,
     /* 0x0048 */ kOpcDecEntry,
-    /* 0x0049 */ kOpcDecEntry,
+    /* 0x0049 */ { &eBox::execSublV, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SUBL_V" },
     /* 0x004a */ kOpcDecEntry,
     /* 0x004b */ kOpcDecEntry,
     /* 0x004c */ kOpcDecEntry,
@@ -154,7 +154,7 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x005d */ kOpcDecEntry,
     /* 0x005e */ kOpcDecEntry,
     /* 0x005f */ kOpcDecEntry,
-    /* 0x0060 */ kOpcDecEntry,
+    /* 0x0060 */ { &eBox::execAddqV, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "ADDQ_V" },
     /* 0x0061 */ kOpcDecEntry,
     /* 0x0062 */ kOpcDecEntry,
     /* 0x0063 */ kOpcDecEntry,
@@ -163,7 +163,7 @@ GrainEntry const g_intArithSubTable[128] = {
     /* 0x0066 */ kOpcDecEntry,
     /* 0x0067 */ kOpcDecEntry,
     /* 0x0068 */ kOpcDecEntry,
-    /* 0x0069 */ kOpcDecEntry,
+    /* 0x0069 */ { &eBox::execSubqV, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SUBQ_V" },
     /* 0x006a */ kOpcDecEntry,
     /* 0x006b */ kOpcDecEntry,
     /* 0x006c */ kOpcDecEntry,
@@ -457,7 +457,7 @@ GrainEntry const g_intShiftSubTable[128] = {
 };
 
 // ---------------------------------------------------------------------------
-// IntMul sub-table: 128 entries, 3 populated
+// IntMul sub-table: 128 entries, 5 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_intMulSubTable[128] = {
     /* 0x0000 */ { &eBox::execMull, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MULL" },
@@ -524,7 +524,7 @@ GrainEntry const g_intMulSubTable[128] = {
     /* 0x003d */ kOpcDecEntry,
     /* 0x003e */ kOpcDecEntry,
     /* 0x003f */ kOpcDecEntry,
-    /* 0x0040 */ kOpcDecEntry,
+    /* 0x0040 */ { &eBox::execMullV, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MULL_V" },
     /* 0x0041 */ kOpcDecEntry,
     /* 0x0042 */ kOpcDecEntry,
     /* 0x0043 */ kOpcDecEntry,
@@ -556,7 +556,7 @@ GrainEntry const g_intMulSubTable[128] = {
     /* 0x005d */ kOpcDecEntry,
     /* 0x005e */ kOpcDecEntry,
     /* 0x005f */ kOpcDecEntry,
-    /* 0x0060 */ kOpcDecEntry,
+    /* 0x0060 */ { &eBox::execMulqV, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "MULQ_V" },
     /* 0x0061 */ kOpcDecEntry,
     /* 0x0062 */ kOpcDecEntry,
     /* 0x0063 */ kOpcDecEntry,
@@ -6897,7 +6897,7 @@ GrainEntry const g_jmpClassSubTable[4] = {
 };
 
 // ---------------------------------------------------------------------------
-// FpTiExt sub-table: 128 entries, 19 populated
+// FpTiExt sub-table: 128 entries, 20 populated
 // ---------------------------------------------------------------------------
 GrainEntry const g_fpTiExtSubTable[128] = {
     /* 0x0000 */ { &eBox::execSextb, GrainSem::S_OpFormat | GrainSem::S_ReadsRb | GrainSem::S_ReadsInt | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "SEXTB" },
@@ -7020,7 +7020,7 @@ GrainEntry const g_fpTiExtSubTable[128] = {
     /* 0x0075 */ kOpcDecEntry,
     /* 0x0076 */ kOpcDecEntry,
     /* 0x0077 */ kOpcDecEntry,
-    /* 0x0078 */ kOpcDecEntry,
+    /* 0x0078 */ { &eBox::execFtois, GrainSem::S_OpFormat | GrainSem::S_ReadsRa | GrainSem::S_ReadsFp | GrainSem::S_WritesRc | GrainSem::S_WritesInt, Box::Ebox, "FTOIS" },
     /* 0x0079 */ kOpcDecEntry,
     /* 0x007a */ kOpcDecEntry,
     /* 0x007b */ kOpcDecEntry,

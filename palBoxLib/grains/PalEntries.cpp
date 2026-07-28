@@ -178,20 +178,63 @@ auto execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c) noexcept -
 constexpr HW_IPR iprSelector(InstructionGrain const& g) noexcept
 {
     const uint16_t scbd = static_cast<uint16_t>((g.encoded >> 8) & 0xFFu);
-    // Raw scbd 0x40..0x5F is the PAL_TEMP range (PT0..PT31).  V4
-    // namespaces these at 0x01C0 + scbd = 0x0200..0x021F so they don't
-    // collide with the regular hardware IPR range (0x0100..).  EV6
-    // shadows HW_PCTX at raw scbd 0x40 with the disambiguator in the
-    // encoding's function bits; V4 has not ported that disambiguator
-    // yet, so raw scbd 0x40 resolves to HW_PAL_TEMP_0 (PT0) rather
-    // than HW_PCTX.  HW_PCTX is rarely accessed via HW_MFPR/HW_MTPR
-    // by PALcode (it's used by hardware during context switch), so
-    // this shadowing is acceptable until the function-bit
-    // disambiguator lands.
-    if (scbd >= 0x40u && scbd <= 0x5Fu) {
-        return static_cast<HW_IPR>(0x01C0u + scbd);
+    // Raw scbd 0x40..0x7F is PCTX (EV6 HRM 5.2.21 / Table 5-1: index
+    // "01xn nnnn" W, "01xx xxxx" R).  EV6 has NO PALtemp IPRs -- the
+    // earlier PT0..PT31 mapping here was an EV5-era model carried
+    // forward; it scattered PCTX field writes and reads across
+    // independent palTemp[] cells (guest MTPR_ASTEN wrote 0x42, the
+    // MFPR_ASN/ASTEN/SWASTEN read path composed from 0x5F -- every AST
+    // enable/request and FPE update via the delegated CALL_PALs was
+    // silently lost; audit PE-2, 2026-07-28).  The write leaf
+    // re-extracts index<4:0> from the encoding as the field-select
+    // mask (0=ASN 1=ASTER 2=ASTRR 3=PPCE 4=FPE per Table 5-13).
+    if (scbd >= 0x40u && scbd <= 0x7Fu) {
+        return coreLib::HW_PCTX;
     }
     return static_cast<HW_IPR>(0x0100u + scbd);
+}
+
+// ----------------------------------------------------------------------------
+// PCTX compose/decompose (EV6 HRM 5.2.21, Fig 5-24 / Tables 5-13, 5-14).
+//
+// The register is a VIEW over the live CpuState homes -- no shadow copy
+// exists, so SWPCTX / MTPR flows and PCTX reads can never desync (the
+// JRN-SCSI-026 class):
+//   ASN<46:39>   <-> cpu.asn
+//   ASTRR<12:9>  <-> cpu.asten_sr<7:4>  (HWPCB ASTSR nibble, K = LSB in
+//   ASTER<8:5>   <-> cpu.asten_sr<3:0>   both encodings -- direct copy)
+//   FPE<2>       <-> cpu.fen
+//   PPCE<1>      <-> cpu.pme
+// ----------------------------------------------------------------------------
+[[nodiscard]] AXP_HOT AXP_FLATTEN
+inline uint64_t composePctx(coreLib::CpuState const& cpu) noexcept
+{
+    return ((static_cast<uint64_t>(cpu.asn) & 0xFFULL) << 39)
+         | ((cpu.asten_sr & 0xF0ULL) << 5)     // ASTSR<7:4> -> ASTRR<12:9>
+         | ((cpu.asten_sr & 0x0FULL) << 5)     // ASTEN<3:0> -> ASTER<8:5>
+         | ((cpu.fen & 1ULL) << 2)
+         | ((cpu.pme & 1ULL) << 1);
+}
+
+AXP_HOT AXP_FLATTEN
+inline void applyPctxWrite(coreLib::CpuState& cpu, uint8_t fieldMask,
+                           uint64_t value) noexcept
+{
+    if (fieldMask & 0x01u) {                   // ASN
+        cpu.asn = static_cast<coreLib::ASNType>((value >> 39) & 0xFFULL);
+    }
+    if (fieldMask & 0x02u) {                   // ASTER -> ASTEN nibble
+        cpu.asten_sr = (cpu.asten_sr & ~0x0FULL) | ((value >> 5) & 0x0FULL);
+    }
+    if (fieldMask & 0x04u) {                   // ASTRR -> ASTSR nibble
+        cpu.asten_sr = (cpu.asten_sr & ~0xF0ULL) | (((value >> 9) & 0x0FULL) << 4);
+    }
+    if (fieldMask & 0x08u) {                   // PPCE
+        cpu.pme = (value >> 1) & 1ULL;
+    }
+    if (fieldMask & 0x10u) {                   // FPE
+        cpu.fen = (value >> 2) & 1ULL;
+    }
 }
 
 [[nodiscard]] AXP_HOT AXP_FLATTEN
@@ -2234,16 +2277,9 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     coreLib::HW_IPR const sel = iprSelector(g);
     uint64_t value = 0;
 
-    // PAL_TEMP range first: a tight range check is cheaper than 24
-    // case labels and the PT slots are heavily exercised by every
-    // PAL window.
-    if (coreLib::isPalTemp(sel)) {
-        value = c.cpu->palTemp[coreLib::palTempIndex(sel)];
-        r.regWriteIdx = raIndex(g);
-        r.regWriteIsFp = false;
-        r.regWriteValue = value;
-        return r;
-    }
+    // (The former PAL_TEMP fast path is gone: raw 0x40..0x7F is PCTX
+    // on EV6 -- audit PE-2, 2026-07-28.  iprSelector no longer emits
+    // HW_PAL_TEMP_n values.)
 
     switch (sel) {
         // ---- CpuState-backed reads ----
@@ -2403,12 +2439,19 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_DTB_ALTMODE:
     case coreLib::HW_DC_CTL:
     case coreLib::HW_DC_STAT:
-    case coreLib::HW_PCTX:
     case coreLib::HW_DTB_TAG1:
     case coreLib::HW_DTB_PTE1:
     case coreLib::HW_DTB_IS1:
     case coreLib::HW_DTB_ASN1:
         value = 0; break;
+
+        // PCTX read: full composed register regardless of index<4:0>
+        // (HRM 5.2.21: "A HW_MFPR from this register returns the values
+        // in all of its component bit fields").  The guest RMW idiom
+        // (MTPR_ASTEN et al.) reads 0x5F and extracts fields.
+    case coreLib::HW_PCTX:
+        value = composePctx(*c.cpu);
+        break;
 
         // ---- CBox CSR / IPR reads (HRM section 5.4) ----
         // HW_MFPR HW_C_DATA returns the visible 6-bit C_DATA register,
@@ -2464,26 +2507,6 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         r.faultCode = coreLib::kFaultUnimplemented;
         return r;
 
-        // PAL_TEMP range handled above by isPalTemp gate; the labels
-        // are still listed in the enum but cannot reach here.
-    case coreLib::HW_PAL_TEMP_0:  case coreLib::HW_PAL_TEMP_1:
-    case coreLib::HW_PAL_TEMP_2:  case coreLib::HW_PAL_TEMP_3:
-    case coreLib::HW_PAL_TEMP_4:  case coreLib::HW_PAL_TEMP_5:
-    case coreLib::HW_PAL_TEMP_6:  case coreLib::HW_PAL_TEMP_7:
-    case coreLib::HW_PAL_TEMP_8:  case coreLib::HW_PAL_TEMP_9:
-    case coreLib::HW_PAL_TEMP_10: case coreLib::HW_PAL_TEMP_11:
-    case coreLib::HW_PAL_TEMP_12: case coreLib::HW_PAL_TEMP_13:
-    case coreLib::HW_PAL_TEMP_14: case coreLib::HW_PAL_TEMP_15:
-    case coreLib::HW_PAL_TEMP_16: case coreLib::HW_PAL_TEMP_17:
-    case coreLib::HW_PAL_TEMP_18: case coreLib::HW_PAL_TEMP_19:
-    case coreLib::HW_PAL_TEMP_20: case coreLib::HW_PAL_TEMP_21:
-    case coreLib::HW_PAL_TEMP_22: case coreLib::HW_PAL_TEMP_23:
-    case coreLib::HW_PAL_TEMP_24: case coreLib::HW_PAL_TEMP_25:
-    case coreLib::HW_PAL_TEMP_26: case coreLib::HW_PAL_TEMP_27:
-    case coreLib::HW_PAL_TEMP_28: case coreLib::HW_PAL_TEMP_29:
-    case coreLib::HW_PAL_TEMP_30: case coreLib::HW_PAL_TEMP_31:
-        value = c.cpu->palTemp[coreLib::palTempIndex(sel)]; break;
-
     default:
         // Truly unknown selector -- raw scbd is not in the V1
         // HW_IPR enum.  Halt with a fault; the lookback ring
@@ -2523,38 +2546,10 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 
     coreLib::HW_IPR const sel = iprSelector(g);
 
-    // PAL_TEMP range first: range check is cheaper than case labels
-    // and PT slots are written on every PAL entry.
-    if (coreLib::isPalTemp(sel)) {
-        unsigned const ptIdx = coreLib::palTempIndex(sel);
-        c.cpu->palTemp[ptIdx] = c.opB;
-#if EMULATR_BRINGUP_PROBES
-        // JRN-VMB-006 PTBR-DIAG (env EMULATR_PTBR_DIAG).  The VMS PAL keeps the
-        // page-table walk base in PHYSICAL scratch at PT__PTBR(p_temp), where
-        // p_temp is a PAL_TEMP holding PAL__IMPURE_BASE (ev6_vms_pc264_pal.mar
-        // :3400 load / :4944 store).  Log page-aligned, nonzero PAL_TEMP writes:
-        // those are the candidate scratch/base pointers (p_temp is page-aligned),
-        // so we can see whether/when the PAL establishes its impure-scratch base
-        // before the DTB-miss loop.  Value-filtered + capped so the per-PAL-entry
-        // GPR-save writes do not flood.  Zero cost unless EMULATR_PTBR_DIAG set.
-        {
-            static bool const s_diag = (std::getenv("EMULATR_PTBR_DIAG") != nullptr);
-            if (s_diag && c.opB != 0 && (c.opB & 0x1FFFull) == 0) {
-                static unsigned long s_n = 0;
-                if (s_n < 128) { ++s_n;
-                    std::fprintf(stderr,
-                        "PTBR-DIAG[paltemp] cyc=%llu pc=0x%016llx PT[%u]=0x%016llx\n",
-                        static_cast<unsigned long long>(c.cpu->cycleCount),
-                        static_cast<unsigned long long>(g.pc),
-                        ptIdx,
-                        static_cast<unsigned long long>(c.opB));
-                    std::fflush(stderr);
-                }
-            }
-        }
-#endif
-        return r;
-    }
+    // (The former PAL_TEMP fast path + its PTBR-DIAG probe are gone:
+    // raw 0x40..0x7F is PCTX on EV6 -- audit PE-2, 2026-07-28.  The
+    // VMS PAL's "PT__PTBR(p_temp)" scratch is p_temp-relative MEMORY,
+    // not an IPR; iprSelector no longer emits HW_PAL_TEMP_n values.)
 
 #if EMULATR_BRINGUP_PROBES
     // JRN-VMB-008 R1: dedicated VA_CTL / I_CTL write probe (env EMULATR_VACTL_DIAG).
@@ -2948,7 +2943,16 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_DTB_ALTMODE:
     case coreLib::HW_DC_CTL:
     case coreLib::HW_DC_STAT:      // architecturally read-only; permissive
+        break;
+
+        // PCTX write: index<4:0> is the field-select mask (HRM Table
+        // 5-13); only selected fields update, from the value's
+        // architected positions.  EV6__ASTER (0x42) writes just the
+        // ASTER nibble; EV6__PROCESS_CONTEXT (0x5F) writes all five.
     case coreLib::HW_PCTX:
+        applyPctxWrite(*c.cpu,
+                       static_cast<uint8_t>((g.encoded >> 8) & 0x1Fu),
+                       c.opB);
         break;
 
         // ---- CBox CSR / IPR writes (HRM section 5.4) ----
@@ -3014,27 +3018,6 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         r.faultCode = coreLib::kFaultUnimplemented;
         return r;
     }
-
-        // PAL_TEMP range handled above by isPalTemp gate; the labels
-        // are still listed for switch exhaustiveness.
-    case coreLib::HW_PAL_TEMP_0:  case coreLib::HW_PAL_TEMP_1:
-    case coreLib::HW_PAL_TEMP_2:  case coreLib::HW_PAL_TEMP_3:
-    case coreLib::HW_PAL_TEMP_4:  case coreLib::HW_PAL_TEMP_5:
-    case coreLib::HW_PAL_TEMP_6:  case coreLib::HW_PAL_TEMP_7:
-    case coreLib::HW_PAL_TEMP_8:  case coreLib::HW_PAL_TEMP_9:
-    case coreLib::HW_PAL_TEMP_10: case coreLib::HW_PAL_TEMP_11:
-    case coreLib::HW_PAL_TEMP_12: case coreLib::HW_PAL_TEMP_13:
-    case coreLib::HW_PAL_TEMP_14: case coreLib::HW_PAL_TEMP_15:
-    case coreLib::HW_PAL_TEMP_16: case coreLib::HW_PAL_TEMP_17:
-    case coreLib::HW_PAL_TEMP_18: case coreLib::HW_PAL_TEMP_19:
-    case coreLib::HW_PAL_TEMP_20: case coreLib::HW_PAL_TEMP_21:
-    case coreLib::HW_PAL_TEMP_22: case coreLib::HW_PAL_TEMP_23:
-    case coreLib::HW_PAL_TEMP_24: case coreLib::HW_PAL_TEMP_25:
-    case coreLib::HW_PAL_TEMP_26: case coreLib::HW_PAL_TEMP_27:
-    case coreLib::HW_PAL_TEMP_28: case coreLib::HW_PAL_TEMP_29:
-    case coreLib::HW_PAL_TEMP_30: case coreLib::HW_PAL_TEMP_31:
-        c.cpu->palTemp[coreLib::palTempIndex(sel)] = c.opB;
-        break;
 
     default:
         // Truly unknown selector outside the V1 HW_IPR enum.

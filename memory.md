@@ -639,6 +639,22 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260728_JRN-AUD-001_isa_execution_pipeline_audit.md`
+  -- **READ FIRST ON RESUME.  COMPREHENSIVE ISA/DISPATCH/PIPELINE AUDIT
+  + correction log; VMS EXEC RAN 133M CYCLES PAST THE BANNER to an
+  INVEXCEPTN bugcheck (farthest ever; crash dump written through the
+  SCSI stack).**  Landed same-day: DS-1/DS-2 dispatch seam (FltVax +
+  ItFp 11-bit; buildCtx FP-literal bug -- EVERY default-rounded FP
+  operate read a garbage literal instead of F[Rb], first-ever pipeline-
+  level FP tests caught it), FV-1/2/3 (VAX addsub ordering, biased tie
+  rounding, underflow enable), PE-1 (SWPCTX save-set ESP/SSP/USP
+  clobber), PE-2 (EV6 PCTX decode -- palTemp scatter model retired, AST/
+  FPE state no longer black-holed), PE-3 (SWPCTX DTB_ASN installs).
+  OPEN BLOCKING: PE-4 SIRR/software interrupts absent, PE-5 AST
+  composition absent (the OpenVMS scheduling substrate -- top suspects
+  for the INVEXCEPTN), CM-1 CVTQL/V aliasing, CM-3 FTOIS, CM-4 int /V
+  forms (in flight), FV-4..FV-10 VAX backend batch (in flight).
+  Full matrices, work queue Sec 3, ledger updates Sec 5.
 - `journals/20260727_JRN-SCSI-033_swpctx_landed_openvms_banner.md`
   -- **READ FIRST ON RESUME.  SWPCTX LANDED; "OpenVMS (TM) Alpha Operating
   System, Version V8.3" PRINTED FOR THE FIRST TIME EVER.**  The wall was
