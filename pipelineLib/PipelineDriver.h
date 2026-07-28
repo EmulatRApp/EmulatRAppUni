@@ -1054,13 +1054,14 @@ private:
     //
     //     Direct / HwMfpr / HwLd / HwMtpr / HwRei / HwSt / Reserved
     //         use the primary entry's `direct` GrainEntry.
-    //     IntArith / IntLogical / IntShift / IntMul / ItFp /
+    //     IntArith / IntLogical / IntShift / IntMul /
     //     FltLogical / FpTiExt
     //         7-bit sub-decode at encoded[11:5] indexes the 128-
     //         entry sub-table.
-    //     FltIeee
+    //     ItFp / FltVax / FltIeee
     //         11-bit sub-decode at encoded[15:5] indexes the 2048-
-    //         entry sub-table.
+    //         entry sub-table (full FP function field incl. trap/
+    //         rounding qualifiers).
     //     JmpClass
     //         2-bit sub-decode at encoded[15:14] indexes the 4-
     //         entry sub-table.
@@ -1097,7 +1098,6 @@ private:
             case DispatchKind::IntLogical:
             case DispatchKind::IntShift:
             case DispatchKind::IntMul:
-            case DispatchKind::ItFp:
             case DispatchKind::FltLogical:
             case DispatchKind::FpTiExt: {
                 uint16_t const sub = static_cast<uint16_t>((encoded >> 5) & 0x7Fu);
@@ -1107,6 +1107,13 @@ private:
                 return coreLib::kOpcDecEntry;
             }
 
+            // ItFp (0x14) and FltVax (0x15) carry the full 11-bit FP
+            // function field (encoded[15:5]) -- their sub-tables are
+            // 2048 entries, same as FltIeee.  A 7-bit mask here would
+            // alias qualifier forms onto their _C bases (e.g. SQRTT
+            // 0x0AB -> SQRTT_C 0x02B) with no fault raised.
+            case DispatchKind::ItFp:
+            case DispatchKind::FltVax:
             case DispatchKind::FltIeee: {
                 uint16_t const sub = static_cast<uint16_t>((encoded >> 5) & 0x7FFu);
                 if (sub < pe.subTableLen && pe.subTable != nullptr) {
@@ -1182,20 +1189,24 @@ private:
         }
 
         if (has(grainFactory::GrainSem::S_ReadsRb)) {
-            // Op-format and FP-format encode IMM at bit 12 per
-            // instruction instance (every ALU/FP opcode covers both
-            // regfile-Rb and 8-bit-literal forms with the same
-            // dispatch entry).  Mem-format / Bra-format / Jmp-format
-            // / Misc-format do NOT have an IMM bit there -- encoded[12]
-            // belongs to the displacement / function-code field, so
-            // we gate the literal path on the format flag.
+            // Only INTEGER Operate format encodes IMM at bit 12 per
+            // instruction instance (AARM 3.3.3: encoded[12] selects the
+            // 8-bit literal at encoded[20:13]).  FP Operate format
+            // (AARM 3.3.4) has NO literal form -- encoded[15:5] is the
+            // 11-bit function field, and encoded[12] is function bit 7,
+            // the HIGH BIT OF THE ROUNDING QUALIFIER (func<7:6>: 00 /C,
+            // 01 /M, 10 normal, 11 /D).  Every default-rounded FP
+            // operate therefore carries encoded[12] = 1; gating the
+            // literal path on S_FpFormat read a garbage literal instead
+            // of F[Rb] for ALL of them (found 2026-07-28 by the dispatch
+            // reachability pins -- the first tests to drive FP through
+            // the full pipeline).
             //
             // Static S_HasLit at the dispatch level was the wrong
             // abstraction here; Alpha's literal/regfile choice is
-            // dynamic, not opcode-static.
-            bool const isOpFormat =
-                   has(grainFactory::GrainSem::S_OpFormat)
-                || has(grainFactory::GrainSem::S_FpFormat);
+            // dynamic, not opcode-static -- but it is dynamic for the
+            // integer Operate format ONLY.
+            bool const isOpFormat = has(grainFactory::GrainSem::S_OpFormat);
             bool const immBit =
                 isOpFormat && ((grain.encoded & (uint32_t{1} << 12)) != 0);
 
