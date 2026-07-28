@@ -516,3 +516,8 @@ fBox::execFble
 fBox::execFbne
 fBox::execFbge
 fBox::execFbgt
+# 2026-07-27 -- SPEC-SWPCTX-001 C3: the VMS SWPCTX leaf existed as
+# camelCase execSwpctxVms and was never dispatched (codegen bound the
+# stub -- the LDQP failure class).  Renamed to the canonical suffix
+# form and upgraded to the GATE-1 contract.
+palBox::execSwpctx_vms
