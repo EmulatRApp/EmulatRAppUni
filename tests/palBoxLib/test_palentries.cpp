@@ -234,41 +234,52 @@ TEST_CASE("palBox::execHwMfpr -- silent-stub IPR returns 0 with no fault")
 // for raw scbd 0x40..0x5F).
 
 
-TEST_CASE("palBox::execHwMtpr HW_CC -- round-trips through HW_MFPR HW_CC")
+TEST_CASE("palBox::execHwMtpr HW_CC -- packed format: writes OFFSET half only")
 {
-    // The 2026-05-11 two-counter split made cpu.cycleCount the sim-only
-    // pipeline counter and the architectural HW_CC a derived value
-    // (cycleCount + ccOffset).  HW_MTPR HW_CC now writes ccOffset such
-    // that a subsequent HW_MFPR HW_CC returns the written value.  Verify
-    // that round-trip; checking ccOffset directly would be brittle to
-    // future representation changes.
+    // F-1 PACKED MODEL (JRN-ISA-001 F-1; EV6 HRM 5.1.1): CC<63:32> =
+    // OFFSET (register storage), CC<31:0> = COUNTER (derived from
+    // cycleCount).  "A HW_MTPR instruction to the CC writes the upper
+    // half of the register and leaves the lower half unchanged."
+    // HW_MFPR CC / RPCC return the PACKED register -- fields NOT summed;
+    // software sums them via the AARM 4.11.9 idiom.
     //
     // HW_MTPR sources from Rb per Alpha PAL macro convention (Ra is
     // hardcoded to R31 by the macro).  The leaf reads c.opB; tests
     // bypass the register-file read and assign c.opB directly.
     CpuState cpu{};
-    cpu.cycleCount = 0;  // explicit -- the test assumes the sim counter is zero
+    cpu.cycleCount = 0x777ULL;   // nonzero: proves the counter half is live
 
-    // Write phase: HW_MTPR HW_CC <- 0xCAFEBABE
+    // Write phase: HW_MTPR HW_CC <- {offset 0xCAFEBABE, low half garbage}.
+    // The low half of the written value MUST be ignored.
     InstructionGrain gMt = makeHwGrain(0x1D, /*ra*/ 31, kScbdCc,
                                        kHwMtprFlags, &palBox::execHwMtpr);
     ExecCtx ctxMt{};
     ctxMt.cpu = &cpu;
-    ctxMt.opB = 0xCAFEBABEULL;
+    ctxMt.opB = (0xCAFEBABEULL << 32) | 0xDEADBEEFULL;
     BoxResult rMt = palBox::execHwMtpr(gMt, ctxMt);
     CHECK(rMt.faultCode == kNoFault);
+    CHECK(cpu.ccOffset == 0xCAFEBABEULL);
 
     // cycleCount must NOT be clobbered by HW_MTPR HW_CC.
-    CHECK(cpu.cycleCount == 0);
+    CHECK(cpu.cycleCount == 0x777ULL);
 
-    // Read phase: HW_MFPR HW_CC -- expect the value we wrote back.
+    // Read phase: HW_MFPR HW_CC -- expect PACKED {offset<<32 | counter}:
+    // the written upper half, the LIVE counter (not the written 0xDEADBEEF).
     InstructionGrain gMf = makeHwGrain(0x19, /*ra*/ 1, kScbdCc,
                                        kHwMfprFlags, &palBox::execHwMfpr);
     ExecCtx ctxMf{};
     ctxMf.cpu = &cpu;
     BoxResult rMf = palBox::execHwMfpr(gMf, ctxMf);
     CHECK(rMf.faultCode == kNoFault);
-    CHECK(rMf.regWriteValue == 0xCAFEBABEULL);
+    CHECK(rMf.regWriteValue == ((0xCAFEBABEULL << 32) | 0x777ULL));
+
+    // The AARM 4.11.9 software idiom -- RPCC Rx; SLL Rx,#32,Ry;
+    // ADDQ Rx,Ry,Ry; SRL Ry,#32,Ry -- must yield (offset + counter)
+    // mod 2^32.  Computed on the read-back value exactly as the guest
+    // instruction sequence would.
+    uint64_t const rx = rMf.regWriteValue;
+    uint64_t const idiom = ((rx + (rx << 32)) >> 32) & 0xFFFFFFFFULL;
+    CHECK(idiom == ((0xCAFEBABEULL + 0x777ULL) & 0xFFFFFFFFULL));
 }
 
 TEST_CASE("palBox::execHwMtpr -- writes HW_VA_CTL into CpuState::va_ctl")
