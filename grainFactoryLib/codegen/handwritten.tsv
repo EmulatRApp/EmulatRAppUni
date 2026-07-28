@@ -41,6 +41,16 @@ eBox::execCmple
 eBox::execUmulh
 eBox::execMulq
 eBox::execMull
+# 2026-07-28 -- CM-4: integer overflow-trapping (/V) forms.  Result is
+# identical to the base form; IOV detection is in the leaf (delivery is
+# a named deviation until an arithmetic-trap channel exists -- see
+# eBoxLib/grains/IntArith.cpp, TODO(int-ov-trap)).
+eBox::execAddlV
+eBox::execSublV
+eBox::execAddqV
+eBox::execSubqV
+eBox::execMullV
+eBox::execMulqV
 eBox::execCtpop
 eBox::execCtlz
 eBox::execCttz
@@ -67,6 +77,11 @@ eBox::execZap
 eBox::execSextw
 eBox::execSextb
 eBox::execFtoit
+# FTOIS (0x1C func 0x78) added 2026-07-28 (audit CM-3): was absent from the
+# manifest entirely while execAmask advertises the FIX extension.  MUST stay
+# ABOVE the gen_fp_leaves.py marker -- that generator rewrites marker-to-EOF
+# and silently eats hand-added rows below it (hazard LAT-1, same session).
+eBox::execFtois
 eBox::execItofs
 eBox::execItoft
 eBox::execItoff
@@ -265,6 +280,14 @@ palBox::execReadUnq
 palBox::execRscc_vms
 palBox::execSwasten_vms
 palBox::execWhami_tru64
+# 2026-07-27 -- SPEC-SWPCTX-001 C3: the VMS SWPCTX leaf existed as
+# camelCase execSwpctxVms and was never dispatched (codegen bound the
+# stub -- the LDQP failure class).  Renamed to the canonical suffix
+# form and upgraded to the GATE-1 contract.
+# (2026-07-28: moved ABOVE the generated-FP-leaves marker -- gen_fp_leaves.py
+# rewrites everything from that marker to EOF, and this entry previously sat
+# after it, so a regen dropped it and GrainStubs re-emitted a conflicting stub.)
+palBox::execSwpctx_vms
 #-----  FBOX
 fBox::execAddt
 fBox::execSubt
@@ -516,8 +539,3 @@ fBox::execFble
 fBox::execFbne
 fBox::execFbge
 fBox::execFbgt
-# 2026-07-27 -- SPEC-SWPCTX-001 C3: the VMS SWPCTX leaf existed as
-# camelCase execSwpctxVms and was never dispatched (codegen bound the
-# stub -- the LDQP failure class).  Renamed to the canonical suffix
-# form and upgraded to the GATE-1 contract.
-palBox::execSwpctx_vms

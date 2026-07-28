@@ -2191,30 +2191,52 @@ auto execFcmovgt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxRes
     BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;
 }
 
-// CVTQL
+// CVTQL -- AARM 4.10.2: integer overflow occurs if Fb is outside
+// -2**31..2**31-1; the truncated (repositioned low-32) result is STILL
+// stored, and IOV (FPCR bit 57, which names CVTQL) is recorded sticky.  The
+// FPCR sticky bits are recorded INDEPENDENT of the trapping mode (AARM 4.7.5),
+// so the plain variant records IOV exactly like /V and /SV -- only trap
+// DELIVERY differs, and that is deferred project-wide.  Audit FV-10,
+// 2026-07-28.  NOTE for regeneration: this fix must be mirrored into
+// gen_fp_leaves.py custom_body() (CVTQL branch) or it is lost on regen.
 AXP_HOT AXP_FLATTEN
 auto execCvtql(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const fb = c.opB;
     uint64_t const r = (((fb >> 30) & 0x3ULL) << 62) | ((fb & 0x3FFFFFFFULL) << 29);
+    if (static_cast<int64_t>(fb)
+            != static_cast<int64_t>(static_cast<int32_t>(fb))) {
+        fpBox::FpExc e; e.iov = true;
+        foldFpcrExc(c.cpu->fpcr, e);
+    }
     return fpWrite(g, r);
 }
 
-// CVTQL_V
+// CVTQL_V -- see execCvtql: same truncated result + sticky IOV (FV-10).
 AXP_HOT AXP_FLATTEN
 auto execCvtqlV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const fb = c.opB;
     uint64_t const r = (((fb >> 30) & 0x3ULL) << 62) | ((fb & 0x3FFFFFFFULL) << 29);
+    if (static_cast<int64_t>(fb)
+            != static_cast<int64_t>(static_cast<int32_t>(fb))) {
+        fpBox::FpExc e; e.iov = true;
+        foldFpcrExc(c.cpu->fpcr, e);
+    }
     return fpWrite(g, r);
 }
 
-// CVTQL_SV
+// CVTQL_SV -- see execCvtql: same truncated result + sticky IOV (FV-10).
 AXP_HOT AXP_FLATTEN
 auto execCvtqlSv(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const fb = c.opB;
     uint64_t const r = (((fb >> 30) & 0x3ULL) << 62) | ((fb & 0x3FFFFFFFULL) << 29);
+    if (static_cast<int64_t>(fb)
+            != static_cast<int64_t>(static_cast<int32_t>(fb))) {
+        fpBox::FpExc e; e.iov = true;
+        foldFpcrExc(c.cpu->fpcr, e);
+    }
     return fpWrite(g, r);
 }
 

@@ -102,9 +102,24 @@ def custom_body(name, mnem):
                 "    return fpWrite(g, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(lw))));\n}\n")
     if base == "CVTQL":
         # Fc = Fb<31:30> || 0<2:0> || Fb<29:0> || 0<28:0>  -- quad -> longword (FP-reg form)
+        #
+        # AARM 4.10.2: integer overflow occurs if Fb is outside
+        # -2**31..2**31-1; the truncated (repositioned low-32) result is
+        # STILL stored, and IOV -- FPCR bit 57, which names CVTQL -- is
+        # recorded sticky.  Per AARM 4.7.5 the FPCR sticky bits are set
+        # INDEPENDENT of the instruction's trapping mode, so the plain
+        # variant records IOV exactly like /V and /SV; only trap DELIVERY
+        # differs, and that is deferred project-wide.  Audit FV-10,
+        # 2026-07-28 -- the fix lives HERE (generator) as well as in the
+        # emitted FloatVariants.cpp, because a regen overwrites that file.
         return (head +
                 "    uint64_t const fb = c.opB;\n"
                 "    uint64_t const r = (((fb >> 30) & 0x3ULL) << 62) | ((fb & 0x3FFFFFFFULL) << 29);\n"
+                "    if (static_cast<int64_t>(fb)\n"
+                "            != static_cast<int64_t>(static_cast<int32_t>(fb))) {\n"
+                "        fpBox::FpExc e; e.iov = true;\n"
+                "        foldFpcrExc(c.cpu->fpcr, e);\n"
+                "    }\n"
                 "    return fpWrite(g, r);\n}\n")
     if base in FCMOV_COND:
         cond = FCMOV_COND[base]

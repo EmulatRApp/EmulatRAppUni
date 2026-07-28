@@ -94,16 +94,20 @@ enum VaxExc : uint32_t { None = 0u, Inv = 0x02u, Dze = 0x04u, Ovf = 0x08u, Unf =
 // ---- Unpacked form ---------------------------------------------------------
 struct Ufp { uint32_t sign; int32_t exp; uint64_t frac; };
 
-// Unpack register image -> UFP.  Reserved operand (exp==0 && sign==1) raises
-// INV; a clean zero (exp==0 && sign==0 && frac==0) becomes a true zero.
-inline Ufp unpack(uint64_t op, uint32_t& exc) noexcept
+// Unpack register image -> UFP.  Operand-check policy (AARM 4.7.7.1, audit
+// FV-8): a reserved operand (exp==0 && sign==1) ALWAYS raises INV; a dirty
+// zero (exp==0, sign==0, frac!=0) raises INV in the default trap modes but is
+// treated as a clean zero under /S software completion (`swc`).  A clean zero
+// (all fields zero) becomes a true zero in every mode.
+inline Ufp unpack(uint64_t op, uint32_t& exc, bool swc) noexcept
 {
     Ufp r;
     r.sign = static_cast<uint32_t>(op >> kSignPos) & 1u;
     r.exp  = static_cast<int32_t>((op >> kExpPos) & kExpField);
     r.frac = op & kFracMask;
     if (r.exp == 0) {
-        if (r.sign != 0) exc |= VaxExc::Inv;      // reserved operand / dirty zero
+        if (r.sign != 0)              exc |= VaxExc::Inv;   // reserved operand
+        else if (r.frac != 0 && !swc) exc |= VaxExc::Inv;   // dirty zero, default mode
         r.frac = 0; r.sign = 0;
         return r;
     }
@@ -152,10 +156,10 @@ inline uint64_t ufdiv(uint64_t dvd, uint64_t dvr, int prec) noexcept
 // ---- Operation kernels (a OP b -> register image, exc accumulated) ---------
 
 inline uint64_t addsub(uint64_t opa, uint64_t opb, bool sub, VaxGeom g,
-                       bool chop, bool unfEnable, uint32_t& exc) noexcept
+                       bool chop, bool unfEnable, bool swc, uint32_t& exc) noexcept
 {
-    Ufp a = unpack(opa, exc);
-    Ufp b = unpack(opb, exc);
+    Ufp a = unpack(opa, exc, swc);
+    Ufp b = unpack(opb, exc, swc);
     if (sub) b.sign ^= 1u;
     if (a.exp == 0) { Ufp t = b; return rpack(t, g, chop, unfEnable, exc); }  // 0 +- b = b
     if (b.exp == 0) return rpack(a, g, chop, unfEnable, exc);                 // a +- 0 = a
@@ -182,10 +186,10 @@ inline uint64_t addsub(uint64_t opa, uint64_t opb, bool sub, VaxGeom g,
 }
 
 inline uint64_t mul(uint64_t opa, uint64_t opb, VaxGeom g,
-                    bool chop, bool unfEnable, uint32_t& exc) noexcept
+                    bool chop, bool unfEnable, bool swc, uint32_t& exc) noexcept
 {
-    Ufp a = unpack(opa, exc);
-    Ufp b = unpack(opb, exc);
+    Ufp a = unpack(opa, exc, swc);
+    Ufp b = unpack(opb, exc, swc);
     if (a.exp == 0 || b.exp == 0) return 0;                  // x * 0 = 0
     a.sign ^= b.sign;
     a.exp = a.exp + b.exp - kExpBias - 1;                    // excess-1024 product
@@ -203,10 +207,10 @@ inline uint64_t mul(uint64_t opa, uint64_t opb, VaxGeom g,
 }
 
 inline uint64_t div(uint64_t opa, uint64_t opb, VaxGeom g,
-                    bool chop, bool unfEnable, uint32_t& exc) noexcept
+                    bool chop, bool unfEnable, bool swc, uint32_t& exc) noexcept
 {
-    Ufp a = unpack(opa, exc);
-    Ufp b = unpack(opb, exc);
+    Ufp a = unpack(opa, exc, swc);
+    Ufp b = unpack(opb, exc, swc);
     if (b.exp == 0) { exc |= VaxExc::Dze; return 0; }
     if (a.exp == 0) return 0;
     a.sign ^= b.sign;
@@ -217,9 +221,10 @@ inline uint64_t div(uint64_t opa, uint64_t opb, VaxGeom g,
     return rpack(a, g, chop, unfEnable, exc);
 }
 
-inline uint64_t sqrt(uint64_t opa, VaxGeom g, bool chop, bool unfEnable, uint32_t& exc) noexcept
+inline uint64_t sqrt(uint64_t opa, VaxGeom g, bool chop, bool unfEnable,
+                     bool swc, uint32_t& exc) noexcept
 {
-    Ufp a = unpack(opa, exc);
+    Ufp a = unpack(opa, exc, swc);
     if (a.sign != 0 && a.exp != 0) { exc |= VaxExc::Inv; return 0; }  // sqrt(neg) -> INV
     if (a.exp == 0) return 0;                                         // sqrt(0) = 0
     // Even-exponent setup so the mantissa stays in [1,4): result exp halves.

@@ -99,6 +99,33 @@ inline bool isNaNF64(uint64_t u)
         && ((u & 0x000FFFFFFFFFFFFFULL) != 0);
 }
 
+inline bool isFiniteF64(uint64_t u)
+{
+    return (u & 0x7FF0000000000000ULL) != 0x7FF0000000000000ULL;
+}
+
+// Low-order 64 bits of the integer part of a FINITE f64 (truncated toward
+// zero, two's complement for negatives) -- i.e. trunc(v) mod 2^64.  AARM
+// 4.7.7.9: "If an integer overflow occurs in CVTxQ ... the true result
+// truncated to the low-order 64 ... bits ... is stored in the result
+// register" -- NOT the saturated INT64_MAX/MIN pattern SoftFloat produces.
+// Overflow implies |v| >= 2^63 > 2^53, so v is an exact integer there and
+// rounding mode cannot alter the true result.  Audit FV-7, 2026-07-28.
+inline uint64_t f64TruncLow64(uint64_t bits)
+{
+    int const expF = static_cast<int>((bits >> 52) & 0x7FFULL);
+    int const e    = expF - 1023;                       // unbiased exponent
+    uint64_t mag = 0;
+    if (expF != 0 && e >= 0) {                          // |v| >= 1.0
+        uint64_t const sig = (bits & 0x000FFFFFFFFFFFFFULL) | (1ULL << 52);
+        int const sh = e - 52;                          // value = sig * 2^sh
+        if (sh >= 64)      mag = 0;                     // all bits above bit 63
+        else if (sh >= 0)  mag = sig << sh;             // natural mod-2^64 shift
+        else               mag = sig >> (-sh);          // truncate the fraction
+    }
+    return (bits >> 63) ? (0ULL - mag) : mag;
+}
+
 } // namespace
 
 // ---- IEEE T-format (double) ------------------------------------------------
@@ -237,7 +264,13 @@ auto SoftFloatBackend::cvtTQ(uint64_t a, FpExecCtx const& ctx) -> FpResult
     FpExc e;
     e.ine = (f & softfloat_flag_inexact) != 0;
     e.iov = (f & softfloat_flag_invalid) != 0;   // out-of-range / NaN convert -> Alpha IOV
-    return FpResult{ static_cast<uint64_t>(q), e };
+    // Integer overflow of a FINITE operand: AARM 4.7.7.9 stores the true
+    // result's low-order 64 bits, not SoftFloat's INT64_MAX/MIN saturation
+    // (NaN/Inf operands keep the SoftFloat pattern -- no true result exists).
+    // Audit FV-7, 2026-07-28.
+    uint64_t bits = static_cast<uint64_t>(q);
+    if (e.iov && isFiniteF64(a)) bits = f64TruncLow64(a);
+    return FpResult{ bits, e };
 }
 
 auto SoftFloatBackend::cvtQT(uint64_t a, FpExecCtx const& ctx) -> FpResult
@@ -264,20 +297,28 @@ auto SoftFloatBackend::cvtQS(uint64_t a, FpExecCtx const& ctx) -> FpResult
 // each kernel rebiases its operands to the true value (exponent - 2, exact),
 // runs the SoftFloat op, then rebiases the result back (exponent + 2).  This
 // avoids the spurious double overflow a naive register-space multiply would hit
-// near the VAX range limit.  INV is raised for reserved operands / dirty zeros.
-//
-// CAVEATS (flagged for the differential-harness oracle, like the IEEE shallow
-//   path): VAX-range OVF/UNF flag detection (double's range is wider than VAX)
-//   and F-format directed-rounding are approximate here -- results are correct
-//   for in-range values (the OpenVMS common case); validate before conformance.
+// near the VAX range limit.  Operand-check policy (audit FV-8): reserved
+// operands raise INV in every mode; dirty zeros raise INV in the default trap
+// modes but are treated as clean zeros under /S software completion.
+// F-format results now route through the native vax::rpack (VAX rounding +
+// F exponent-window OVF/UNF) -- the old approximate roundFreg is gone (FV-6).
 namespace {
 
-// VAX reserved operand / dirty zero: exp==0 with sign set or a non-zero fraction
-// (a clean VAX true zero is all-zero and is NOT reserved).
-inline bool vaxReserved(uint64_t reg)
+// /S software-completion class for this op (AARM 4.7.7.1 mode split: dirty
+// zeros are treated as clean zeros under /S-family qualifiers, trap INV in the
+// default modes; reserved operands trap INV in every mode).  Audit FV-8.
+inline bool vaxSwc(FpExecCtx const& ctx)
+{ return ctx.variant.hasSoftwareCompletion(); }
+
+// Does this VAX register image signal INV under the operand-check policy?
+// exp==0 && sign==1 (reserved operand): always.  exp==0, sign==0, frac!=0
+// (dirty zero): only outside software completion.  Clean zero: never.
+inline bool vaxOperandInv(uint64_t reg, bool swc)
 {
     uint64_t const exp = (reg >> 52) & 0x7FFULL;
-    return exp == 0 && (reg & 0x800FFFFFFFFFFFFFULL) != 0;
+    if (exp != 0) return false;
+    if ((reg >> 63) != 0) return true;                        // reserved operand
+    return !swc && (reg & 0x000FFFFFFFFFFFFFULL) != 0;        // dirty zero
 }
 
 // Adjust the IEEE-double exponent field by dexp (exact power-of-2 rescale).
@@ -292,18 +333,18 @@ inline uint64_t scaleExp(uint64_t reg, int dexp)
     return (reg & 0x800FFFFFFFFFFFFFULL) | (static_cast<uint64_t>(ne) << 52);
 }
 
-// Round a VAX-F register image (52-bit frac) to single (23-bit) precision,
-// round-to-nearest-even at bit 29; clears the low 29 fraction bits.
-inline uint64_t roundFreg(uint64_t reg)
+// Round a G register image to F precision + range via the native VAX kernel
+// helpers: vax::rpack rounds half-up (or chops) at 23 fraction bits and
+// applies the F exponent window (register exp11 897..1151), recording Ovf/Unf.
+// Replaces the old roundFreg, which hardcoded IEEE ties-to-even, ignored /C,
+// and never range-checked (AARM 4.10.11: CVTGF "rounds or chops to single
+// precision, then the 8-bit exponent range is checked for overflow/
+// underflow").  Audit FV-6, 2026-07-28.
+inline uint64_t packFRange(uint64_t gImage, bool chop, bool unfEnable, bool swc,
+                           uint32_t& exc)
 {
-    uint64_t const exp = (reg >> 52) & 0x7FFULL;
-    if (exp == 0 || exp == 0x7FF) return reg & ~((1ULL << 29) - 1);
-    uint64_t const low   = reg & ((1ULL << 29) - 1);
-    uint64_t const half  = 1ULL << 28;
-    uint64_t const lsb23 = (reg >> 29) & 1ULL;
-    uint64_t base = reg & ~((1ULL << 29) - 1);
-    if (low > half || (low == half && lsb23)) base += (1ULL << 29);  // may carry into exp
-    return base;
+    vax::Ufp u = vax::unpack(gImage, exc, swc);
+    return vax::rpack(u, vax::F, chop, unfEnable, exc);
 }
 
 // Map VAX trap mask -> FpExc; chop == round-toward-zero (the /C qualifier).
@@ -327,62 +368,114 @@ inline bool vaxChop(FpExecCtx const& ctx)
 // both.  TODO(fp-vax-validate): differential-harness the ADD/SUB/MUL/SQRT exponent
 // constants against SIMH vax_f* before a conformance claim (DIV is the direct port).
 auto SoftFloatBackend::addF(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, false, vax::F, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, false, vax::F, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::subF(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, true,  vax::F, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, true,  vax::F, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::mulF(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::mul(a, b, vax::F, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::mul(a, b, vax::F, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::divF(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::div(a, b, vax::F, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::div(a, b, vax::F, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::sqrtF(uint64_t a, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::sqrt(a, vax::F, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::sqrt(a, vax::F, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 
 auto SoftFloatBackend::addG(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, false, vax::G, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, false, vax::G, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::subG(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, true,  vax::G, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::addsub(a, b, true,  vax::G, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::mulG(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::mul(a, b, vax::G, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::mul(a, b, vax::G, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::divG(uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::div(a, b, vax::G, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::div(a, b, vax::G, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 auto SoftFloatBackend::sqrtG(uint64_t a, FpExecCtx const& c) -> FpResult
-{ uint32_t x = 0; uint64_t r = vax::sqrt(a, vax::G, vaxChop(c), c.variant.underflow, x); return FpResult{ r, vaxToFpExc(x) }; }
+{ uint32_t x = 0; uint64_t r = vax::sqrt(a, vax::G, vaxChop(c), c.variant.underflow, vaxSwc(c), x); return FpResult{ r, vaxToFpExc(x) }; }
 
-// G compare: the *4 register scaling preserves sign/order, so compare images.
-auto SoftFloatBackend::cmpG(FpCompare k, uint64_t a, uint64_t b, FpExecCtx const&) -> FpResult
+// G compare via the unpacked VAX fields.  The old image compare through IEEE
+// f64 predicates misread valid top-binade G values (register exp11 == 0x7FF)
+// as Inf/NaN -> unordered -> false, and never signaled INV for reserved
+// operands / dirty zeros (AARM 4.10.7: "an invalid operation trap is signaled
+// if either operand has exp=0 and is not a true zero").  Sign + lexicographic
+// (exp, frac) ordering is exact for VAX finites; unpack normalizes every
+// exp==0 operand to a true zero (sign=0), so zero orders correctly against
+// both signs.  Audit FV-4, 2026-07-28.
+auto SoftFloatBackend::cmpG(FpCompare k, uint64_t a, uint64_t b, FpExecCtx const& c) -> FpResult
 {
-    softfloat_exceptionFlags = 0;
-    float64_t const fa = f64bits(a), fb = f64bits(b);
+    uint32_t x = 0;
+    bool const swc = vaxSwc(c);
+    vax::Ufp const ua = vax::unpack(a, x, swc);
+    vax::Ufp const ub = vax::unpack(b, x, swc);
+    int rel;                                            // -1: a<b, 0: a==b, +1: a>b
+    if (ua.exp == 0 && ub.exp == 0) {
+        rel = 0;                                        // -0/dirty already zeroed
+    } else if (ua.sign != ub.sign) {
+        rel = (ua.sign != 0) ? -1 : 1;
+    } else {
+        int mag;                                        // |a| vs |b|
+        if (ua.exp != ub.exp)       mag = (ua.exp < ub.exp) ? -1 : 1;
+        else if (ua.frac != ub.frac) mag = (ua.frac < ub.frac) ? -1 : 1;
+        else                         mag = 0;
+        rel = (ua.sign != 0) ? -mag : mag;
+    }
     bool res = false;
     switch (k) {
-        case FpCompare::Eq: res = f64_eq(fa, fb);       break;
-        case FpCompare::Lt: res = f64_lt_quiet(fa, fb); break;
-        case FpCompare::Le: res = f64_le_quiet(fa, fb); break;
-        case FpCompare::Un: res = false;                break;  // VAX has no NaN
+        case FpCompare::Eq: res = (rel == 0); break;
+        case FpCompare::Lt: res = (rel <  0); break;
+        case FpCompare::Le: res = (rel <= 0); break;
+        case FpCompare::Un: res = false;      break;    // VAX has no unordered
     }
-    return FpResult{ res ? 0x4000000000000000ULL : 0ULL, harvest() };
+    return FpResult{ res ? 0x4000000000000000ULL : 0ULL, vaxToFpExc(x) };
 }
 
 // VAX conversions (true value == image/4; rebias around the IEEE conversion).
+// CVTGF routes through the native unpack/rpack kernel with vax::F geometry so
+// it gets VAX half-up rounding, /C chop, and the F exponent-window check with
+// Ovf/Unf recording (audit FV-6; AARM 4.10.11 note: "rounds or chops to
+// single precision, then the 8-bit exponent range is checked").
 auto SoftFloatBackend::cvtGF(uint64_t a, FpExecCtx const& c) -> FpResult
-{ FpExc e; if (vaxReserved(a)) { e.inv = true; return FpResult{0,e}; } return FpResult{ roundFreg(a), e }; }
+{
+    uint32_t x = 0;
+    uint64_t const r = packFRange(a, vaxChop(c), c.variant.underflow, vaxSwc(c), x);
+    return FpResult{ r, vaxToFpExc(x) };
+}
 auto SoftFloatBackend::cvtGD(uint64_t a, FpExecCtx const&) -> FpResult { return FpResult{ a, FpExc{} }; } // G<->D image identical here
 auto SoftFloatBackend::cvtDG(uint64_t a, FpExecCtx const&) -> FpResult { return FpResult{ a, FpExc{} }; }
 auto SoftFloatBackend::cvtGQ(uint64_t a, FpExecCtx const& c) -> FpResult
 {
-    FpExc e; if (vaxReserved(a)) { e.inv = true; return FpResult{0,e}; }
+    FpExc e;
+    bool const swc = vaxSwc(c);
+    if (vaxOperandInv(a, swc)) { e.inv = true; return FpResult{0,e}; }   // FV-8 policy
+    if (((a >> 52) & 0x7FFULL) == 0) return FpResult{ 0, e };  // true/dirty zero -> exact 0
     softfloat_exceptionFlags = 0;
-    int_fast64_t const q = f64_to_i64(f64bits(scaleExp(a, -2)), resolveRmVax(c), true);
+    uint64_t const scaled = scaleExp(a, -2);   // exact /4: register image -> true value
+    int_fast64_t const q = f64_to_i64(f64bits(scaled), resolveRmVax(c), true);
     uint_fast8_t const f = softfloat_exceptionFlags;
     e.ine = (f & softfloat_flag_inexact) != 0;
     e.iov = (f & softfloat_flag_invalid) != 0;
-    return FpResult{ static_cast<uint64_t>(q), e };
+    // Overflow: store the true result's low-order 64 bits (AARM 4.7.7.9), not
+    // SoftFloat's saturation.  `scaled` is always finite (the *4 register bias
+    // keeps valid G exponents below the IEEE Inf/NaN encoding after -2).
+    // Audit FV-7, 2026-07-28.
+    uint64_t bits = static_cast<uint64_t>(q);
+    if (e.iov) bits = f64TruncLow64(scaled);
+    return FpResult{ bits, e };
 }
 auto SoftFloatBackend::cvtQF(uint64_t a, FpExecCtx const& c) -> FpResult
 {
     softfloat_roundingMode = resolveRmVax(c); softfloat_exceptionFlags = 0;
     float64_t const r = i64_to_f64(static_cast<int64_t>(a));
-    return FpResult{ roundFreg(scaleExp(r.v, +2)), harvest() };
+    FpExc e = harvest();
+    // Round to F precision via the native kernel (VAX half-up / chop) instead
+    // of the old ties-to-even roundFreg (audit FV-6).  i64_to_f64 is exact for
+    // |q| < 2^53; above that the i64->f64 step rounds to 52 bits before rpack
+    // rounds to 23 -- a named double-rounding deviation, reachable only when
+    // the 52-bit intermediate lands exactly on a 24-bit halfway point.  The F
+    // exponent window cannot over/underflow from an int64 (|q| <= 2^63 <<
+    // F max ~1.7e38), so the range check is vacuous-but-correct here.
+    uint32_t x = 0;
+    uint64_t const f = packFRange(scaleExp(r.v, +2), vaxChop(c),
+                                  c.variant.underflow, vaxSwc(c), x);
+    FpExc const ve = vaxToFpExc(x);
+    e.inv = e.inv || ve.inv; e.ovf = e.ovf || ve.ovf; e.unf = e.unf || ve.unf;
+    return FpResult{ f, e };
 }
 auto SoftFloatBackend::cvtQG(uint64_t a, FpExecCtx const& c) -> FpResult
 {

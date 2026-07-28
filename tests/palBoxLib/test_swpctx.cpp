@@ -128,6 +128,12 @@ TEST_CASE("SWPCTX T1+T5: A->B->A round-trips save-set fields and CPC")
     CHECK(cpu.pcbb == kPcbbB);
     CHECK(cpu.intReg[30] == 0x1B00ULL);
     CHECK(cpu.asn == 4);
+    // PE-3 pin (2026-07-28): the swap installs the new ASN into the
+    // DTB fill-staging registers too (apisrm :249-285) -- otherwise
+    // every post-swap DTB fill is tagged with the OLD ASN and can
+    // never hit under a nonzero-ASN process.
+    CHECK(cpu.dtbAsn0 == 4);
+    CHECK(cpu.dtbAsn1 == 4);
     CHECK(((cpu.ccOffset + cpu.cycleCount) & 0xFFFFFFFFULL) == 0x9999ULL);
 
     // PE-1 pin: the A->B save did NOT write the stale ESP/SSP/USP mirrors

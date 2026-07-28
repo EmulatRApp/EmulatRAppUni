@@ -35,6 +35,7 @@
 #include "coreLib/ExecCtx.h"
 #include "coreLib/CpuState.h"
 #include "coreLib/InstructionGrain.h"
+#include "coreLib/alpha_fpcr_core.h"   // AlphaFPCR::IOV / SUM (CVTQL pins)
 
 #include "grainFactoryLib/generated/SemanticFlagsEnum.h"
 #include "grainFactoryLib/generated/GrainsForward.h"
@@ -456,4 +457,90 @@ TEST_CASE("fBox::execCpys -- explicit sign bit comparison")
 
     CHECK((r.regWriteValue & kSignBit) == kSignBit);
     CHECK(doubleOf(r.regWriteValue) == -2.0);
+}
+
+
+// =============================================================================
+// CVTQL /V and /SV integer-overflow detection (audit FV-10, 2026-07-28).
+// AARM 4.10.2: integer overflow occurs if Fb is outside -2**31..2**31-1; the
+// truncated (repositioned low-32) result is STILL stored, and IOV -- FPCR bit
+// 57, which names CVTQL explicitly -- is recorded sticky (plus SUM, bit 63).
+// The repositioning is Fc <- Fbv<31:30> || 0<2:0> || Fbv<29:0> || 0<28:0>.
+// =============================================================================
+
+TEST_CASE("fBox::execCvtqlV -- in-range quadword: repositioned, no IOV")
+{
+    InstructionGrain g = makeFpGrain(0x17, 0x130, 31, 2, 3,
+                                     kIeeeFlags, &fBox::execCvtqlV);
+    ExecCtx ctx{};
+    ctx.cpu = &fpTestCpu();
+    ctx.opB = 0x0000000012345678ULL;
+
+    BoxResult r = fBox::execCvtqlV(g, ctx);
+
+    // 0x12345678<31:30> = 0; <29:0> << 29 = 0x12345678 * 2^29.
+    CHECK(r.regWriteValue == 0x02468ACF00000000ULL);
+    CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) == 0u);
+}
+
+TEST_CASE("fBox::execCvtqlV -- 2**31 overflows: truncated result + IOV sticky")
+{
+    InstructionGrain g = makeFpGrain(0x17, 0x130, 31, 2, 3,
+                                     kIeeeFlags, &fBox::execCvtqlV);
+    ExecCtx ctx{};
+    ctx.cpu = &fpTestCpu();
+    ctx.opB = 0x0000000080000000ULL;   // 2**31 > INT32_MAX
+
+    BoxResult r = fBox::execCvtqlV(g, ctx);
+
+    // Truncated low 32 repositioned: <31:30> = 0b10 -> bit 63 of Fc.
+    CHECK(r.regWriteValue == 0x8000000000000000ULL);
+    CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) != 0u);
+    CHECK((ctx.cpu->fpcr & AlphaFPCR::SUM) != 0u);
+}
+
+TEST_CASE("fBox::execCvtqlV -- negative in-range longword does not overflow")
+{
+    InstructionGrain g = makeFpGrain(0x17, 0x130, 31, 2, 3,
+                                     kIeeeFlags, &fBox::execCvtqlV);
+    ExecCtx ctx{};
+    ctx.cpu = &fpTestCpu();
+    ctx.opB = 0xFFFFFFFF80000000ULL;   // -2**31: the most negative in-range
+
+    BoxResult r = fBox::execCvtqlV(g, ctx);
+
+    CHECK(r.regWriteValue == 0x8000000000000000ULL);
+    CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) == 0u);
+}
+
+TEST_CASE("fBox::execCvtqlSv -- overflow above 32 bits: IOV recorded")
+{
+    InstructionGrain g = makeFpGrain(0x17, 0x530, 31, 2, 3,
+                                     kIeeeFlags, &fBox::execCvtqlSv);
+    ExecCtx ctx{};
+    ctx.cpu = &fpTestCpu();
+    ctx.opB = 0x0000000100000000ULL;   // 2**32: low 32 are zero
+
+    BoxResult r = fBox::execCvtqlSv(g, ctx);
+
+    CHECK(r.regWriteValue == 0u);      // truncated low 32 repositioned
+    CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) != 0u);
+}
+
+TEST_CASE("fBox::execCvtql -- plain variant records sticky IOV too (AARM 4.7.5)")
+{
+    // FPCR exception bits are set independent of the instruction's trapping
+    // mode, and CVTQL is explicitly named as setting them -- so the plain
+    // (no-/V) variant still records IOV on overflow; only trap delivery
+    // (deferred project-wide) differs from /V.
+    InstructionGrain g = makeFpGrain(0x17, 0x030, 31, 2, 3,
+                                     kIeeeFlags, &fBox::execCvtql);
+    ExecCtx ctx{};
+    ctx.cpu = &fpTestCpu();
+    ctx.opB = 0x0000000100000000ULL;
+
+    BoxResult r = fBox::execCvtql(g, ctx);
+
+    CHECK(r.regWriteValue == 0u);
+    CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) != 0u);
 }

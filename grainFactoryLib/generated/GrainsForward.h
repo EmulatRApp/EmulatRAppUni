@@ -176,9 +176,25 @@ BoxResult execS8subq(InstructionGrain const& g, ExecCtx const& c) noexcept;
 AXP_HOT AXP_FLATTEN
 BoxResult execCmpule(InstructionGrain const& g, ExecCtx const& c) noexcept;
 
+// ADDL_V: ADDL/V: 32-bit add, same stored result as ADDL; signals IOV on overflow (AARM 4.4.1)
+AXP_HOT AXP_FLATTEN
+BoxResult execAddlV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+
+// SUBL_V: SUBL/V: 32-bit subtract, same stored result as SUBL; signals IOV on overflow (AARM 4.4.15)
+AXP_HOT AXP_FLATTEN
+BoxResult execSublV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+
 // CMPLT: compare signed less than
 AXP_HOT AXP_FLATTEN
 BoxResult execCmplt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+
+// ADDQ_V: ADDQ/V: 64-bit add, same stored result as ADDQ; signals IOV on two's-complement overflow (AARM 4.4.2)
+AXP_HOT AXP_FLATTEN
+BoxResult execAddqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+
+// SUBQ_V: SUBQ/V: 64-bit subtract, same stored result as SUBQ; signals IOV on two's-complement overflow (AARM 4.4.14)
+AXP_HOT AXP_FLATTEN
+BoxResult execSubqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
 
 // CMPLE: compare signed less or equal
 AXP_HOT AXP_FLATTEN
@@ -364,6 +380,14 @@ BoxResult execMulq(InstructionGrain const& g, ExecCtx const& c) noexcept;
 AXP_HOT AXP_FLATTEN
 BoxResult execUmulh(InstructionGrain const& g, ExecCtx const& c) noexcept;
 
+// MULL_V: MULL/V: 32-bit multiply, same stored result as MULL; signals IOV on overflow (AARM 4.4.11)
+AXP_HOT AXP_FLATTEN
+BoxResult execMullV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+
+// MULQ_V: MULQ/V: 64-bit multiply, same stored result as MULQ; signals IOV when 128-bit product high half is not the sign-extension of the low half (AARM 4.4.13)
+AXP_HOT AXP_FLATTEN
+BoxResult execMulqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+
 // ITOFS: integer -> FP single-precision move
 AXP_HOT AXP_FLATTEN
 BoxResult execItofs(InstructionGrain const& g, ExecCtx const& c) noexcept;
@@ -463,6 +487,10 @@ BoxResult execMaxsw4(InstructionGrain const& g, ExecCtx const& c) noexcept;
 // FTOIT: FP T-format -> integer register move
 AXP_HOT AXP_FLATTEN
 BoxResult execFtoit(InstructionGrain const& g, ExecCtx const& c) noexcept;
+
+// FTOIS: FP S-format -> integer register move (AARM: Rc<31:0> = Fav<63:62>||Fav<58:29>, SEXT); audit CM-3 2026-07-28
+AXP_HOT AXP_FLATTEN
+BoxResult execFtois(InstructionGrain const& g, ExecCtx const& c) noexcept;
 
 } // namespace eBox
 

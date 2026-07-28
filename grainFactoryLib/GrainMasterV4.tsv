@@ -146,16 +146,20 @@ STQ_C	0x2F	0x0	Direct	Mem	Mbox	S_MemFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Writ
 # Integer arithmetic -- opcode 0x10
 # ----------------------------------------------------------------------------
 ADDL	0x10	0x00	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	32-bit add; result sign-extended to 64
+ADDL_V	0x10	0x40	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	ADDL/V: 32-bit add, same stored result as ADDL; signals IOV on overflow (AARM 4.4.1)
 S4ADDL	0x10	0x02	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add longword: Rc = sext((Ra*4 + Rb)<31:0>)
 SUBL	0x10	0x09	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	32-bit subtract
+SUBL_V	0x10	0x49	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	SUBL/V: 32-bit subtract, same stored result as SUBL; signals IOV on overflow (AARM 4.4.15)
 S4SUBL	0x10	0x0B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub longword: Rc = sext((Ra*4 - Rb)<31:0>)
 CMPBGE	0x10	0x0F	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-byte unsigned compare; 8-bit result in low byte of Rc
 S8ADDL	0x10	0x12	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add longword: Rc = sext((Ra*8 + Rb)<31:0>)
 S8SUBL	0x10	0x1B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub longword: Rc = sext((Ra*8 - Rb)<31:0>)
 CMPULT	0x10	0x1D	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	compare unsigned less than
 ADDQ	0x10	0x20	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	64-bit add
+ADDQ_V	0x10	0x60	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	ADDQ/V: 64-bit add, same stored result as ADDQ; signals IOV on two's-complement overflow (AARM 4.4.2)
 S4ADDQ	0x10	0x22	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add quadword: Rc = Ra*4 + Rb
 SUBQ	0x10	0x29	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	64-bit subtract
+SUBQ_V	0x10	0x69	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	SUBQ/V: 64-bit subtract, same stored result as SUBQ; signals IOV on two's-complement overflow (AARM 4.4.14)
 S4SUBQ	0x10	0x2B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub quadword: Rc = Ra*4 - Rb
 S8ADDQ	0x10	0x32	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled add quadword: Rc = Ra*8 + Rb
 S8SUBQ	0x10	0x3B	IntArith	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	scaled sub quadword: Rc = Ra*8 - Rb
@@ -224,7 +228,9 @@ INSQH	0x12	0x77	IntShift	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Wri
 # Integer multiply -- opcode 0x13
 # ----------------------------------------------------------------------------
 MULL	0x13	0x00	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	32-bit multiply
+MULL_V	0x13	0x40	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	MULL/V: 32-bit multiply, same stored result as MULL; signals IOV on overflow (AARM 4.4.11)
 MULQ	0x13	0x20	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	64-bit multiply
+MULQ_V	0x13	0x60	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	MULQ/V: 64-bit multiply, same stored result as MULQ; signals IOV when 128-bit product high half is not the sign-extension of the low half (AARM 4.4.13)
 UMULH	0x13	0x30	IntMul	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	unsigned multiply high (upper 64 bits of 128-bit product)
 
 # ----------------------------------------------------------------------------
@@ -698,6 +704,7 @@ MAXUW4	0x1C	0x3D	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_Wri
 MAXSB8	0x1C	0x3E	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane signed max, 8 byte lanes
 MAXSW4	0x1C	0x3F	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsRb|S_ReadsInt|S_WritesRc|S_WritesInt	per-lane signed max, 4 word lanes
 FTOIT	0x1C	0x70	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsFp|S_WritesRc|S_WritesInt	FP T-format -> integer register move
+FTOIS	0x1C	0x78	FpTiExt	Op	Ebox	S_OpFormat|S_ReadsRa|S_ReadsFp|S_WritesRc|S_WritesInt	FP S-format -> integer register move
 
 # ----------------------------------------------------------------------------
 # HW_MTPR -- opcode 0x1D (PALmode)
