@@ -2231,13 +2231,16 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_M_CTL:    value = c.cpu->m_ctl;      break;
     case coreLib::HW_MM_STAT:  value = c.cpu->mm_stat;    break;
     case coreLib::HW_VA_CTL:   value = c.cpu->va_ctl;     break;
-    // 2026-05-29: HW_CC must match execRpcc -- both are the architectural
-    // view of one counter (per IntArith.cpp note "RPCC and HW_CC are two
-    // architectural views of one counter").  Multiply by kCcMultiplier so
-    // the firmware's RSCC handler's scale-down division resolves quickly.
-    // See CpuState.h kCcMultiplier comment for full rationale.
-    case coreLib::HW_CC:       value = (c.cpu->cycleCount + c.cpu->ccOffset)
-                                     * coreLib::CpuState::kCcMultiplier; break;
+    // PACKED FORMAT (JRN-ISA-001 F-1): CC<63:32> = OFFSET, CC<31:0> =
+    // COUNTER (EV6 HRM 5.1.1); fields are NOT pre-summed -- software
+    // sums them (AARM 4.11.9 idiom; apisrm SWPCTX depends on the
+    // layout).  Must mirror execRpcc exactly; both sites change
+    // together.  kCcMultiplier scales the COUNTER FIELD ONLY.
+    case coreLib::HW_CC:
+        value = ((c.cpu->ccOffset & 0xFFFFFFFFULL) << 32)
+              | ((c.cpu->cycleCount * coreLib::CpuState::kCcMultiplier)
+                 & 0xFFFFFFFFULL);
+        break;
     case coreLib::HW_CM:       value = static_cast<uint64_t>(c.cpu->mode); break;
 
         // HW_ISUM (Interrupt Summary, scbd 0x0D).  Backed by
@@ -2793,14 +2796,17 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 #endif
         break;
     }
-        /* NOLINT(clang-diagnostic-invalid-utf8)
-         * Derived ticking -- cpu.ccOffset is the only stored field;
-         * HW_MFPR HW_CC returns uint32_t(cpu.cycleCount + cpu.ccOffset),
-         * HW_MTPR HW_CC sets cpu.ccOffset = written - cpu.cycleCount. No extra increment cost. \
-         * Architecturally indistinguishable from a real free-running counter that was set by HW_MTPR.
+        /* PACKED FORMAT (JRN-ISA-001 F-1).  EV6 HRM 5.1.1: "A HW_MTPR
+         * instruction to the CC writes the upper half of the register
+         * and leaves the lower half unchanged."  cpu.ccOffset stores
+         * the 32-bit OFFSET field (CC<63:32>); the COUNTER field is
+         * derived from cycleCount and is NOT writable here.  This is
+         * exactly what apisrm SWPCTX relies on when it writes the new
+         * process offset via hw_mtpr pN, EV6__CC with the offset
+         * pre-shifted into <63:32> (ev6_vms_callpal.mar:407-411).
          */
     case coreLib::HW_CC: {
-        c.cpu->ccOffset = c.opB - c.cpu->cycleCount;
+        c.cpu->ccOffset = (c.opB >> 32) & 0xFFFFFFFFULL;
     }                                       break;
     case coreLib::HW_CM:       c.cpu->mode = static_cast<coreLib::Mode_Privilege>(c.opB & 0x3ULL); break;
 

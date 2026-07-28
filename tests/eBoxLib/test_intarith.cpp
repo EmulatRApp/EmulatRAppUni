@@ -425,3 +425,39 @@ TEST_CASE("eBox::execRc -> execRs -- atomic toggle round-trip")
     CHECK(rRs.regWriteValue == 0u);
     CHECK(cpu.intrFlag == 1u);
 }
+
+
+TEST_CASE("eBox::execRpcc -- packed CC: offset<63:32> | counter<31:0> (F-1)")
+{
+    // JRN-ISA-001 F-1 / EV6 HRM 5.1.1: RPCC returns the PACKED register.
+    // The fields are NOT pre-summed -- the AARM 4.11.9 idiom does the sum
+    // in software.  The counter field truncates to 32 bits (a cycleCount
+    // past 2^32 must NOT bleed into the offset half), and kCcMultiplier
+    // (currently 1) scales the COUNTER FIELD ONLY.
+    CpuState cpu{};
+    ExecCtx  ctx{};
+    ctx.cpu = &cpu;
+    InstructionGrain const g = makeMiscGrain(0xC000, /*ra*/ 3,
+                                             &eBox::execRpcc);
+
+    SUBCASE("fields are packed, not summed") {
+        cpu.cycleCount = 0x777ULL;
+        cpu.ccOffset   = 0xCAFEBABEULL;
+        BoxResult const r = eBox::execRpcc(g, ctx);
+        CHECK(r.regWriteValue == ((0xCAFEBABEULL << 32) | 0x777ULL));
+    }
+    SUBCASE("counter overflow does not corrupt the offset half") {
+        cpu.cycleCount = 0x1'2345'6789ULL;      // > 2^32
+        cpu.ccOffset   = 0x11112222ULL;
+        BoxResult const r = eBox::execRpcc(g, ctx);
+        CHECK(r.regWriteValue == ((0x11112222ULL << 32) | 0x23456789ULL));
+    }
+    SUBCASE("AARM 4.11.9 idiom yields (offset+counter) mod 2^32") {
+        cpu.cycleCount = 0xFFFFFFF0ULL;
+        cpu.ccOffset   = 0x00000020ULL;
+        BoxResult const r = eBox::execRpcc(g, ctx);
+        uint64_t const rx = r.regWriteValue;
+        uint64_t const idiom = ((rx + (rx << 32)) >> 32) & 0xFFFFFFFFULL;
+        CHECK(idiom == 0x10ULL);                 // 0xFFFFFFF0+0x20 mod 2^32
+    }
+}

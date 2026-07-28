@@ -223,7 +223,10 @@ struct CpuState
     // Free-running cycle counter.  Read by RPCC; ticked by the
     // pipeline driver each cycle.
     uint64_t cycleCount = 0; // pipeline - TRACE only cycle counter
-    uint64_t ccOffset = 0; // architectural CC
+    uint64_t ccOffset = 0; // CC OFFSET field, CC<63:32> (32-bit; F-1 packed
+                           // model).  RPCC/HW_MFPR CC return
+                           // (ccOffset<<32)|counter<31:0>; HW_MTPR CC
+                           // replaces ccOffset from written<63:32> only.
     // WARP accounting (2026-06-30): running sum of cycles injected by WARP
     // fast-forwards (IDLEWARP now; delay-loop warps when re-homed).  Invariant:
     // cycleCount = executed + warpCycles.  Kept in step at every warp site so
@@ -276,8 +279,15 @@ struct CpuState
     // timer_check loop exited after scaledspan/5594 == 1790 real cyc, proving
     // RSCC = cycleCount x 5594 passed through UNSCALED). With =1, RPCC=RSCC=
     // cycleCount (faithful) and the timer_check window uncollapses. The long
-    // rationale comment above is SUPERSEDED/FALSE -- rewrite when the fix lands
-    // permanently (spec sec.8). Revert to 5594 only for A/B comparison.
+    // rationale comment above is SUPERSEDED/FALSE.
+    //
+    // 2026-07-27 (JRN-ISA-001 F-1 / SPEC-SWPCTX-001 C1): the CC is now the
+    // PACKED architectural register -- COUNTER<31:0> derived from
+    // cycleCount, OFFSET<63:32> stored in ccOffset.  kCcMultiplier is a
+    // NAMED DEVIATION that scales the COUNTER FIELD ONLY (never the packed
+    // 64-bit value); at 1 it is a no-op.  Any future non-1 value must keep
+    // that scoping or SWPCTX's CPC arithmetic (offset+counter mod 2^32)
+    // mixes scaled and unscaled quantities.
     static constexpr uint64_t kCcMultiplier = 1;
 
     // CBox CSR / IPR shadow state.  Models the three logical shift

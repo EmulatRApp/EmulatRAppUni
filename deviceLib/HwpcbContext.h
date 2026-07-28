@@ -72,14 +72,17 @@ inline void loadCpuFromHwpcb(coreLib::CpuState& cpu, Hwpcb const& src) noexcept
     cpu.fen        = src.fen;
     // Per-process PCC restore: route through ccOffset, NEVER raw cycleCount.
     // cycleCount is the system timebase (the value the Cchip interval timer
-    // masks against); a context switch must NOT move it.  Mirroring HW_MTPR
-    // HW_CC (PalEntries.cpp: ccOffset = written - cycleCount), this makes the
-    // architectural CC -- (cycleCount + ccOffset), what RPCC / HW_MFPR HW_CC
-    // read -- resume at the saved src.cc while the raw timebase stays
-    // monotonic.  (Was `cpu.cycleCount = src.cc`, which conflated the per-
-    // process PCC with the system clock; see Phase-2 P2-T3 cycleCount-write
-    // enumeration.)
-    cpu.ccOffset   = src.cc - cpu.cycleCount;
+    // masks against); a context switch must NOT move it.  F-1 PACKED MODEL
+    // (JRN-ISA-001 F-1): src.cc holds the process's Charged Process Cycles
+    // -- (offset + counter) mod 2^32, a 32-bit quantity (AARM 10-88;
+    // PCB__CPC).  The restore computes the new OFFSET FIELD exactly as
+    // apisrm SWPCTX does (ev6_vms_callpal.mar:407-409):
+    //     new offset = (CPC - current counter) mod 2^32
+    // so that offset+counter resumes at the saved CPC while the raw
+    // timebase stays monotonic.
+    cpu.ccOffset   = (src.cc
+                      - (cpu.cycleCount * coreLib::CpuState::kCcMultiplier))
+                     & 0xFFFFFFFFULL;
     // src.scratch[] is PAL-private context the OS does not see; PALcode
     // is responsible for copying it into PT slots if its convention
     // expects that mirroring.
@@ -104,12 +107,16 @@ inline void storeCpuToHwpcb(Hwpcb& dst, coreLib::CpuState const& cpu) noexcept
     dst.asn      = static_cast<uint64_t>(cpu.asn);
     dst.asten_sr = cpu.asten_sr;
     dst.fen      = cpu.fen;
-    // Save the architectural CC -- (cycleCount + ccOffset), the value HW_MFPR
-    // HW_CC / RPCC observe -- NOT raw cycleCount.  Symmetric with the ccOffset-
-    // based restore in loadCpuFromHwpcb: storeCpuToHwpcb then loadCpuFromHwpcb
-    // round-trips the process PCC exactly while leaving the system timebase
-    // (raw cycleCount) untouched.  (Was `dst.cc = cpu.cycleCount`.)
-    dst.cc       = cpu.cycleCount + cpu.ccOffset;
+    // Save the Charged Process Cycles -- (offset + counter) mod 2^32, the
+    // 32-bit quantity the AARM stores at HWPCB_PCC (AARM 10-88; apisrm
+    // saves it with a LONGWORD store, ev6_vms_callpal.mar:428) -- NOT the
+    // packed 64-bit CC and NOT raw cycleCount.  Symmetric with the
+    // ccOffset-based restore in loadCpuFromHwpcb: store-then-load
+    // round-trips the process CPC exactly while leaving the system
+    // timebase (raw cycleCount) untouched.
+    dst.cc       = ((cpu.ccOffset & 0xFFFFFFFFULL)
+                    + (cpu.cycleCount * coreLib::CpuState::kCcMultiplier))
+                   & 0xFFFFFFFFULL;
     // dst.scratch[] is PAL-private; left at whatever the previous
     // contents were.  PALcode populates it explicitly if the personality
     // needs scratch state to survive across the SWPCTX.

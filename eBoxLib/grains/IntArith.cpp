@@ -36,8 +36,6 @@
 #include "fBoxLib/grains/FpFormat.h"   // convertS_/convertF_FloatingToRegister (ITOFx)
 
 #include <cstdint>
-#include <cstdio>   // TEMP (spec v2 sec.0 RPCC probe) 2026-06-01 -- revert with probe
-#include <cstdlib>  // TEMP (spec v2 sec.0 RPCC probe) 2026-06-01 -- revert with probe
 
 namespace eBox {
 
@@ -1488,12 +1486,19 @@ auto execRs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 // function 0xC000.  Ra <- the architectural cycle counter.  Pure read:
 // unlike RC/RS it mutates no CpuState.
 //
+// PACKED FORMAT (JRN-ISA-001 F-1; SPEC-SWPCTX-001 C1).  EV6 HRM 5.1.1:
+//   CC<31:0>  = COUNTER (increments per cycle)
+//   CC<63:32> = OFFSET  (32 bits of register storage, written by HW_MTPR CC)
+// RPCC returns the full 64-bit register -- the two fields are NOT pre-
+// summed.  The AARM 4.11.9 software idiom (RPCC; SLL #32; ADDQ; SRL #32)
+// exists precisely because software does the sum; DEC's own VMS PALcode
+// SWPCTX (apisrm ev6_vms_callpal.mar:399-411) depends on this exact
+// layout to compute Charged Process Cycles.  kCcMultiplier (a named
+// deviation, currently 1) scales the COUNTER FIELD ONLY.
+//
 // The value MUST match what HW_MFPR HW_CC returns -- RPCC and HW_CC are
-// two architectural views of one counter, and the guest sees incoherent
-// time if they diverge.  execHwMfpr's HW_CC case yields cpu.cycleCount +
-// cpu.ccOffset (the free-running pipeline tick plus the offset that
-// HW_MTPR HW_CC last wrote); this leaf mirrors that expression exactly.
-// If the HW_CC representation is ever revised, both sites change together.
+// two architectural views of one counter.  If the representation is
+// ever revised, both sites change together.
 //
 // Destination is the Ra field (bits 25:21), per S_WritesRa in the TSV --
 // the same field RC/RS write.  This leaf replaces a kFaultUnimplemented
@@ -1508,65 +1513,11 @@ auto execRpcc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>((g.encoded >> 21) & 0x1F);   // Ra
     r.regWriteIsFp  = false;
-    // 2026-05-29: scale by CpuState::kCcMultiplier so the firmware's
-    // RSCC handler (which divides RPCC by ~5594 on DS10 SRM) sees a
-    // value that lets its delay loops terminate in tractable pipeline
-    // cycles.  See CpuState.h kCcMultiplier comment for full rationale.
-    r.regWriteValue = (c.cpu->cycleCount + c.cpu->ccOffset)
-                    * coreLib::CpuState::kCcMultiplier;
+    uint64_t const counter = (c.cpu->cycleCount
+                              * coreLib::CpuState::kCcMultiplier)
+                             & 0xFFFFFFFFULL;
+    r.regWriteValue = ((c.cpu->ccOffset & 0xFFFFFFFFULL) << 32) | counter;
 
-    // ---- TEMP RPCC PROBE (timer spec v2 sec.0 gating measurement) 2026-06-01 ----
-    // Every firmware rscc() funnels its internal `rpcc` through this leaf, so
-    // logging here captures the timer_check delay loop (apisrm timer.c:1377-1395)
-    // one read per iteration.  Goal: measure the loop SPAN in raw cycleCount.
-    // kCcMultiplier STAYS IN for this run -- this measures the collapse, it does
-    // NOT fix it.  Decision rule: the timer_check loop shows as the TIGHTEST
-    // cluster of pal=1 reads (tiny cyc deltas between consecutive lines) ending
-    // just before the no_timer print; its first->last cyc delta is the span.
-    // span ~10^2-10^3 cycleCount => collapse confirmed, proceed to spec sec.5.1;
-    // span ~10^6 => firmware divide was real, STOP.
-    //
-    // Self-opens its own file so capture does NOT depend on shell `2>` redirection
-    // (the prior run's redirect did not take; UART mirror also owns stderr).
-    // Threshold: EMULATR_RPCC_LOG_AFTER=<cycleCount> if set, ELSE defaults to
-    //            185,000,000 at compile time -- the probe is ON by default in
-    //            this build, NO shell env needed (env inheritance kept eating it).
-    //            Set EMULATR_RPCC_LOG_AFTER to a huge value to effectively disable.
-    // File:    EMULATR_RPCC_LOG_FILE=<path>          (default below, in V4 tree)
-    // Bound:   EMULATR_RPCC_LOG_MAX=<lines>          (default 200000)
-    // REVERT this whole block + the two TEMP includes after the gating run.
-    static const uint64_t s_rpccLogAfter = []() -> uint64_t {
-        const char* e = std::getenv("EMULATR_RPCC_LOG_AFTER");
-        return e ? std::strtoull(e, nullptr, 0) : 185000000ull;
-    }();
-    if (s_rpccLogAfter && (c.cpu->cycleCount >= s_rpccLogAfter)) {
-        static const uint64_t s_rpccLogMax = []() -> uint64_t {
-            const char* e = std::getenv("EMULATR_RPCC_LOG_MAX");
-            return e ? std::strtoull(e, nullptr, 0) : 200000ull;
-        }();
-        static std::FILE* s_rpccLogFp = []() -> std::FILE* {
-            const char* p = std::getenv("EMULATR_RPCC_LOG_FILE");
-            const char* path = p ? p
-                : "D:\\EmulatR\\EmulatRAppUniV4\\rpcc_probe.txt";
-            std::FILE* fp = std::fopen(path, "w");
-            std::fprintf(stderr, "[RPCC probe] armed -> %s (fp=%p)\n",
-                         path, (void*)fp);
-            return fp;
-        }();
-        static uint64_t s_rpccLogCount = 0;
-        if (s_rpccLogFp && s_rpccLogCount < s_rpccLogMax) {
-            ++s_rpccLogCount;
-            std::fprintf(s_rpccLogFp,
-                "[RPCC] cyc=%llu off=%llu scaled=%llu pc=0x%llx pal=%d\n",
-                (unsigned long long)c.cpu->cycleCount,
-                (unsigned long long)c.cpu->ccOffset,
-                (unsigned long long)r.regWriteValue,
-                (unsigned long long)c.cpu->pcAddr(),
-                (int)c.cpu->inPalMode());
-            std::fflush(s_rpccLogFp);  // survive an abrupt exit / halt
-        }
-    }
-    // ---- END TEMP RPCC PROBE 2026-06-01 ----
 
     return r;
 }
