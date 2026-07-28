@@ -61,8 +61,12 @@ TEST_CASE("HWPCB guest I/O: full image reads back what was written")
     CHECK(img.scratch[6] == 0xA00000000000000FULL);
 }
 
-TEST_CASE("HWPCB save set: writes SPs+AST+CPC(longword) and nothing else")
+TEST_CASE("HWPCB save set: writes KSP+AST+CPC(longword) and nothing else")
 {
+    // GATE-1 Q2 / audit PE-1 (2026-07-28): the save set is apisrm's exact
+    // field set -- KSP, AST, CPC.  ESP/SSP/USP are guest-PAL-maintained in
+    // the HWPCB at mode transitions; SWPCTX must NOT touch them (AARM
+    // 10-90 Note), so their sentinels must survive the save.
     GuestMemory mem(4ULL * 1024 * 1024);
     // Sentinel background: every quad of the old image = 0xEE..EE | idx.
     for (unsigned i = 0; i < 16; ++i) {
@@ -78,13 +82,18 @@ TEST_CASE("HWPCB save set: writes SPs+AST+CPC(longword) and nothing else")
 
     uint64_t q = 0;
     CHECK(mem.read8(kPcbbPa + 0x00, q) == MemStatus::Ok); CHECK(q == 0x1111);
-    CHECK(mem.read8(kPcbbPa + 0x08, q) == MemStatus::Ok); CHECK(q == 0x2222);
-    CHECK(mem.read8(kPcbbPa + 0x10, q) == MemStatus::Ok); CHECK(q == 0x3333);
-    CHECK(mem.read8(kPcbbPa + 0x18, q) == MemStatus::Ok); CHECK(q == 0x4444);
     CHECK(mem.read8(kPcbbPa + 0x30, q) == MemStatus::Ok); CHECK(q == 0x5A);
     // CPC is a LONGWORD store: high half of +0x40 preserved.
     CHECK(mem.read8(kPcbbPa + 0x40, q) == MemStatus::Ok);
     CHECK(q == (0xEEEEEEEE00000000ULL | 0xCAFE0123ULL));
+    // ESP/SSP/USP: the live guest-maintained values survive untouched
+    // even though the source struct carries stale mirrors.
+    CHECK(mem.read8(kPcbbPa + 0x08, q) == MemStatus::Ok);
+    CHECK(q == (0xEEEEEEEE00000000ULL | 1));
+    CHECK(mem.read8(kPcbbPa + 0x10, q) == MemStatus::Ok);
+    CHECK(q == (0xEEEEEEEE00000000ULL | 2));
+    CHECK(mem.read8(kPcbbPa + 0x18, q) == MemStatus::Ok);
+    CHECK(q == (0xEEEEEEEE00000000ULL | 3));
     // NOT in the save set -- sentinels intact: PTBR, ASN, FEN, UNQ/SCT.
     CHECK(mem.read8(kPcbbPa + 0x20, q) == MemStatus::Ok);
     CHECK(q == (0xEEEEEEEE00000000ULL | 4));
