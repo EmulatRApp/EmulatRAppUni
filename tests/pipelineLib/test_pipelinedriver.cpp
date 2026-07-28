@@ -408,3 +408,112 @@ TEST_CASE("PipelineDriver -- trap delivery swaps PAL shadow regs when SDE set")
     CHECK(cpu.intShadow[0]  == 0x00000000000000A4ULL);   // was intReg[4]
     CHECK(cpu.intShadow[5]  == 0x0000000000000C21ULL);   // was intReg[21]
 }
+
+
+// =============================================================================
+// Dispatch reachability pins (JRN-SCSI-033 Sec 4 / 2026-07-28 fix).
+//
+// Failure class: "every layer present, one seam unwired".  The decode()
+// DispatchKind switch had NO FltVax case (all 225 VAX-FP leaves fell to
+// kOpcDecEntry) and indexed ItFp with a 7-bit mask against its 2048-entry
+// table (funcs > 0x7F silently ALIASED onto their _C bases -- SQRTT
+// executed as SQRTT_C, wrong result, no fault).  These pins prove one
+// representative encoding per kind reaches its real leaf, and would have
+// caught both defects.  palBase stays 0 so any fault halts the run with
+// lastFaultCode captured instead of vectoring.
+// =============================================================================
+
+namespace {
+// FP operate encoder: 11-bit function field at encoded[15:5].
+constexpr uint32_t encFp(uint8_t op, uint8_t fa, uint8_t fb,
+                         uint16_t func11, uint8_t fc)
+{
+    return (uint32_t{op}              << 26)
+         | (uint32_t{fa}              << 21)
+         | (uint32_t{fb}              << 16)
+         | ((uint32_t{func11} & 0x7FFu) << 5)
+         |  uint32_t{fc};
+}
+} // anonymous namespace
+
+
+TEST_CASE("PipelineDriver -- FltVax dispatch: CVTQG/CVTGQ round-trip reaches the VAX-FP leaves")
+{
+    GuestMemory mem(4096);
+    // The exact boot-frontier encoding: 0x57e017c1 = CVTQG F1 <- (F0),
+    // op 0x15 func 0x0BE (fa = F31 for 2-operand FP converts).
+    uint32_t const cvtqg = encFp(0x15, 31, 0, 0x0BE, 1);
+    CHECK(cvtqg == 0x57E017C1u);
+    CHECK(mem.write4(0x000, cvtqg) == MemStatus::Ok);
+    // CVTGQ F2 <- (F1): op 0x15 func 0x0AF, closes the round-trip so the
+    // pin does not depend on the G-float register bit layout.
+    CHECK(mem.write4(0x004, encFp(0x15, 31, 1, 0x0AF, 2)) == MemStatus::Ok);
+    CHECK(mem.write4(0x008, kHalt) == MemStatus::Ok);
+
+    CpuState cpu = palModeCpu(0x000);
+    cpu.fpReg[0] = 5;                        // integer quad source
+
+    runBus(cpu, mem, /*maxCycles*/ 8);
+
+    CHECK(cpu.halted);
+    CHECK(cpu.lastFaultCode == kFaultHalt);  // no OPCDEC on the way
+    CHECK(cpu.fpReg[1] != 0u);               // CVTQG produced a G-float
+    CHECK(cpu.fpReg[2] == 5u);               // and CVTGQ recovered the quad
+}
+
+
+TEST_CASE("PipelineDriver -- ItFp dispatch: SQRTT func 0x0AB does not alias onto SQRTT_C")
+{
+    GuestMemory mem(4096);
+    // SQRTT F1 <- (F0): op 0x14 func 0x0AB.  Under the old 7-bit mask this
+    // indexed 0x2B = SQRTT_C (chopped).  sqrt(2) discriminates: the true
+    // value lies BELOW the nearest double, so round-to-nearest lands on
+    // 0x3FF6A09E667F3BCD while chop truncates to ...BCC.
+    CHECK(mem.write4(0x000, encFp(0x14, 31, 0, 0x0AB, 1)) == MemStatus::Ok);
+    CHECK(mem.write4(0x004, kHalt) == MemStatus::Ok);
+
+    CpuState cpu = palModeCpu(0x000);
+    cpu.fpReg[0] = 0x4000000000000000ULL;    // T-float 2.0
+
+    runBus(cpu, mem, /*maxCycles*/ 8);
+
+    CHECK(cpu.halted);
+    CHECK(cpu.lastFaultCode == kFaultHalt);
+    CHECK(cpu.fpReg[1] == 0x3FF6A09E667F3BCDULL);   // nearest, NOT chopped
+}
+
+
+TEST_CASE("PipelineDriver -- FltIeee dispatch control: CVTQT reaches its leaf")
+{
+    GuestMemory mem(4096);
+    // CVTQT F1 <- (F0): op 0x16 func 0x0BE.  Control pin for the 11-bit
+    // group the ItFp/FltVax kinds joined.
+    CHECK(mem.write4(0x000, encFp(0x16, 31, 0, 0x0BE, 1)) == MemStatus::Ok);
+    CHECK(mem.write4(0x004, kHalt) == MemStatus::Ok);
+
+    CpuState cpu = palModeCpu(0x000);
+    cpu.fpReg[0] = 3;                        // integer quad source
+
+    runBus(cpu, mem, /*maxCycles*/ 8);
+
+    CHECK(cpu.halted);
+    CHECK(cpu.lastFaultCode == kFaultHalt);
+    CHECK(cpu.fpReg[1] == 0x4008000000000000ULL);   // T-float 3.0
+}
+
+
+TEST_CASE("PipelineDriver -- FltVax dispatch bounds: unpopulated function still OPCDECs")
+{
+    GuestMemory mem(4096);
+    // Func 0x7FF is unpopulated in g_fltVaxSubTable; with palBase == 0 the
+    // fault halts the run and is captured for post-mortem.
+    CHECK(mem.write4(0x000, encFp(0x15, 31, 0, 0x7FF, 1)) == MemStatus::Ok);
+    CHECK(mem.write4(0x004, kHalt) == MemStatus::Ok);
+
+    CpuState cpu = palModeCpu(0x000);
+
+    runBus(cpu, mem, /*maxCycles*/ 8);
+
+    CHECK(cpu.halted);
+    CHECK(cpu.lastFaultCode == kFaultOpcDec);
+}
