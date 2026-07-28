@@ -570,6 +570,18 @@ struct CpuState
     // HWPCB+56[0:0] (AARM Section III).
     uint64_t fen = 0;
 
+    // Performance Monitor Enable and Data Alignment Trap fixup bits --
+    // the other two architectural fields packed into the HWPCB FEN
+    // quadword: PME = HWPCB+56<62>, DAT = HWPCB+56<63> (apisrm
+    // ev6_vms_pal_defs.mar:347-350; SPEC-SWPCTX-001 GATE-1 Q1/D3).
+    // Loaded/saved by SWPCTX via deviceLib/HwpcbContext.h.  PME has no
+    // performance-counter backend (the counters are unmodeled; the
+    // spinlock_hack PCTR block is a named non-replicated deviation,
+    // GATE-1 D1); both bits ROUND-TRIP so the guest-visible HWPCB
+    // image stays faithful.  Bit 0 of each field is the value.
+    uint64_t pme = 0;
+    uint64_t dat = 0;
+
     // AST enable / status composite register.  Per HWPCB layout
     // (HWPCB+48); per-mode AST request and enable bits packed.  Read
     // by CALL_PAL MFPR_ASTEN / MFPR_ASTSR; written by MTPR_ASTEN /

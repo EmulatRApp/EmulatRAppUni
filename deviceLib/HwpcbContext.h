@@ -45,6 +45,7 @@
 
 #include "Hwrpb.h"
 #include "coreLib/CpuState.h"
+#include "memoryLib/GuestMemory.h"
 
 #include <cstdint>
 
@@ -69,7 +70,12 @@ inline void loadCpuFromHwpcb(coreLib::CpuState& cpu, Hwpcb const& src) noexcept
     cpu.ptbr       = src.ptbr & ~(uint64_t{1} << 63);   // strip phys-mode flag
     cpu.asn        = static_cast<coreLib::ASNType>(src.asn);
     cpu.asten_sr   = src.asten_sr;
-    cpu.fen        = src.fen;
+    // The HWPCB FEN quadword packs three architectural fields (apisrm
+    // ev6_vms_pal_defs.mar:345-350): FEN<0>, PME<62>, DAT<63>.  Unpack
+    // into their CpuState homes; the quad's other bits are MBZ.
+    cpu.fen        = src.fen & 0x1ULL;
+    cpu.pme        = (src.fen >> 62) & 0x1ULL;
+    cpu.dat        = (src.fen >> 63) & 0x1ULL;
     // Per-process PCC restore: route through ccOffset, NEVER raw cycleCount.
     // cycleCount is the system timebase (the value the Cchip interval timer
     // masks against); a context switch must NOT move it.  F-1 PACKED MODEL
@@ -106,7 +112,11 @@ inline void storeCpuToHwpcb(Hwpcb& dst, coreLib::CpuState const& cpu) noexcept
     dst.ptbr     = cpu.ptbr;
     dst.asn      = static_cast<uint64_t>(cpu.asn);
     dst.asten_sr = cpu.asten_sr;
-    dst.fen      = cpu.fen;
+    // Repack the FEN quadword: FEN<0> | PME<62> | DAT<63> (see the
+    // unpack note in loadCpuFromHwpcb).
+    dst.fen      = (cpu.fen & 0x1ULL)
+                 | ((cpu.pme & 0x1ULL) << 62)
+                 | ((cpu.dat & 0x1ULL) << 63);
     // Save the Charged Process Cycles -- (offset + counter) mod 2^32, the
     // 32-bit quantity the AARM stores at HWPCB_PCC (AARM 10-88; apisrm
     // saves it with a LONGWORD store, ev6_vms_callpal.mar:428) -- NOT the
@@ -120,6 +130,63 @@ inline void storeCpuToHwpcb(Hwpcb& dst, coreLib::CpuState const& cpu) noexcept
     // dst.scratch[] is PAL-private; left at whatever the previous
     // contents were.  PALcode populates it explicitly if the personality
     // needs scratch state to survive across the SWPCTX.
+}
+
+// ----------------------------------------------------------------------------
+// Guest-physical HWPCB I/O (SPEC-SWPCTX-001 C2).
+//
+// ALL HWPCB access is PHYSICAL (brief Sec 4.2): these helpers go straight
+// through GuestMemory quad accessors -- no DTB, no SPAM TB, no translation,
+// exactly like apisrm's hw_ldq/p / hw_stq/p.  Alignment (PA<6:0> == 0) is
+// the LEAF's contract to enforce (ILLOP per AARM 10-88 / apisrm
+// ev6_vms_callpal.mar:199,461); helpers propagate MemStatus and do not
+// re-check.
+// ----------------------------------------------------------------------------
+
+// Read the full 128-byte HWPCB image at physical address `pa`.
+// Returns the first non-Ok MemStatus, or Ok when all 16 quads read.
+[[nodiscard]] inline memoryLib::MemStatus
+readHwpcbFromGuest(memoryLib::GuestMemory const& mem,
+                   coreLib::PAType               pa,
+                   Hwpcb&                        out) noexcept
+{
+    uint64_t* const q = reinterpret_cast<uint64_t*>(&out);
+    for (unsigned i = 0; i < sizeof(Hwpcb) / 8; ++i) {
+        memoryLib::MemStatus const st = mem.read8(pa + i * 8ULL, q[i]);
+        if (st != memoryLib::MemStatus::Ok) return st;
+    }
+    return memoryLib::MemStatus::Ok;
+}
+
+// Write the SWPCTX SAVE SET into the old HWPCB at physical address `pa`.
+//
+// Field-set policy lives HERE, in one place (GATE-1 Q1/Q2): the AARM
+// internal-register legs save the four stack pointers and ASTEN/ASTSR
+// (AARM 10-88 pseudocode), plus Charged Process Cycles as a 32-BIT
+// quantity (apisrm stores CPC with hw_stl/p, ev6_vms_callpal.mar:428 --
+// the high half of HWPCB+0x40 is NOT ours to clobber).  PTBR is never
+// saved; ASN save is UNPREDICTABLE (we do not); FEN/PME/DAT are
+// maintained in the HWPCB by their own MTPR/CLRFEN flows (AARM: CLRFEN
+// "writes ... to the HWPCB", txt:17679-17694), not by SWPCTX; UNQ/SCT
+// belong to RD/WR_UNQ and PALcode (GATE-1 D4).
+[[nodiscard]] inline memoryLib::MemStatus
+writeHwpcbSaveSet(memoryLib::GuestMemory& mem,
+                  coreLib::PAType         pa,
+                  Hwpcb const&            src) noexcept
+{
+    using memoryLib::MemStatus;
+    MemStatus st;
+    if ((st = mem.write8(pa + 0x00, src.ksp)) != MemStatus::Ok) return st;
+    if ((st = mem.write8(pa + 0x08, src.esp)) != MemStatus::Ok) return st;
+    if ((st = mem.write8(pa + 0x10, src.ssp)) != MemStatus::Ok) return st;
+    if ((st = mem.write8(pa + 0x18, src.usp)) != MemStatus::Ok) return st;
+    if ((st = mem.write8(pa + 0x30, src.asten_sr)) != MemStatus::Ok) return st;
+    // CPC longword: read-merge-write the low 32 bits of HWPCB+0x40.
+    uint64_t old40 = 0;
+    if ((st = mem.read8(pa + 0x40, old40)) != MemStatus::Ok) return st;
+    uint64_t const merged = (old40 & 0xFFFFFFFF00000000ULL)
+                          | (src.cc & 0xFFFFFFFFULL);
+    return mem.write8(pa + 0x40, merged);
 }
 
 }  // namespace hwrpb
