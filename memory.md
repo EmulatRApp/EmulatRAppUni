@@ -639,9 +639,24 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260727_JRN-SCSI-033_swpctx_landed_openvms_banner.md`
+  -- **READ FIRST ON RESUME.  SWPCTX LANDED; "OpenVMS (TM) Alpha Operating
+  System, Version V8.3" PRINTED FOR THE FIRST TIME EVER.**  The wall was
+  the LDQP failure class, 2nd instance: a complete leaf (execSwpctxVms)
+  existed but the camelCase name missed handwritten.tsv -> codegen stub
+  shadowed it.  Landed via SPEC-SWPCTX-001 gates: C1 9608d90 (F-1 packed
+  CC -- DEC's own PAL contains the model verbatim), C2 301685d (HWPCB
+  guest-physical I/O + save-set policy + PME/DAT + FEN-quad packing), C3
+  ac2342e (leaf per GATE-1: alignment fault, save-first, pcbb==0 guard,
+  PT__PTBR/PT__PCBB PAL-temp MEMORY mirrors -- the 026 desync class --
+  TBIAP both realms, no R0).  Retest: swap fired once at 0x2f09c, OS
+  banner, exec ran at S0 PCs to cyc 2.12e9.  NEW FRONTIER: OPCDEC at S0
+  exec PC 0xffffffff8009d0ec ("Exception taken before...", PS 1F00) --
+  the PREDICTED A1/A2 gate; suspects = FloatVariants 225 unaudited +
+  FTOIS (confirmed unwired).  OWED: DS10/ES40 P00>>> boots; Q3
+  ground-truth follow-up; MTPR_FEN HWPCB write-through check.
 - `journals/20260727_JRN-SCSI-032_gh_block_aliasing_rootcause_fixed.md`
-  -- **READ FIRST ON RESUME.  ROOT CAUSE OF %SYSBOOT-F-LDFAIL, FOUND AND
-  FIXED.**  applyTlbHit composed every TB hit as (PFN<<13)|va<12:0> while
+  -- ROOT CAUSE OF %SYSBOOT-F-LDFAIL, FOUND AND FIXED.  applyTlbHit composed every TB hit as (PFN<<13)|va<12:0> while
   the lookup matched GH=g entries block-wide (8^g pages) -- every page of
   a GH block aliased onto its base page.  SYSBOOT's GH=3 S0 region
   collapsed onto PA 0x1000000; the relocation walk read layered residue;
