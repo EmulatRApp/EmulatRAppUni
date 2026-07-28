@@ -585,6 +585,8 @@ set(EMULATR_TEST_SOURCES
     tests/deviceLib/test_iicpcf8584.cpp
     # 2026-06-07: S1 scsiCoreLib port -- no-media ATAPI CD command layer
     tests/deviceLib/test_scsi_iso.cpp
+    # 2026-07-27: SPEC-SWPCTX-001 C2 -- HWPCB guest I/O + FEN-quad packing
+    tests/deviceLib/test_hwpcb_context.cpp
     # 2026-06-12: IBlockMedia seam -- FileBlockMedia + MockBlockMedia (Phase A)
     tests/deviceLib/test_block_media.cpp
     # 2026-06-07: S2 CY82C693 IDE taskfile + ATA/ATAPI detection
