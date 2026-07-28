@@ -160,14 +160,20 @@ readHwpcbFromGuest(memoryLib::GuestMemory const& mem,
 
 // Write the SWPCTX SAVE SET into the old HWPCB at physical address `pa`.
 //
-// Field-set policy lives HERE, in one place (GATE-1 Q1/Q2): the AARM
-// internal-register legs save the four stack pointers and ASTEN/ASTSR
-// (AARM 10-88 pseudocode), plus Charged Process Cycles as a 32-BIT
-// quantity (apisrm stores CPC with hw_stl/p, ev6_vms_callpal.mar:428 --
-// the high half of HWPCB+0x40 is NOT ours to clobber).  PTBR is never
-// saved; ASN save is UNPREDICTABLE (we do not); FEN/PME/DAT are
-// maintained in the HWPCB by their own MTPR/CLRFEN flows (AARM: CLRFEN
-// "writes ... to the HWPCB", txt:17679-17694), not by SWPCTX; UNQ/SCT
+// Field-set policy lives HERE, in one place (GATE-1 Q2): the save set is
+// KSP + AST + CPC, apisrm's exact field set (ev6_vms_callpal.mar:426-433).
+// ESP/SSP/USP are NOT touched by EV6 SWPCTX (AARM 10-90 Note): on
+// processors without per-mode internal SPs, only the CURRENT mode's SP
+// lives in a register -- SWPCTX runs in kernel mode, so only KSP swaps
+// here; the other three are exchanged with the HWPCB at mode transitions
+// by the guest PAL (hw_stq/p ... PCB__ESP/SSP/USP), which makes the
+// HWPCB the live home of those fields between swaps.  Writing them from
+// CpuState mirrors here clobbered the guest-maintained values with
+// stale swap-in-era copies (audit PE-1, 2026-07-28).  CPC saves as a
+// 32-BIT quantity (apisrm hw_stl/p -- the high half of HWPCB+0x40 is
+// NOT ours to clobber).  PTBR is never saved; ASN save is UNPREDICTABLE
+// (we do not); FEN/PME/DAT are maintained in the HWPCB by their own
+// MTPR/CLRFEN flows (AARM txt:17679-17694), not by SWPCTX; UNQ/SCT
 // belong to RD/WR_UNQ and PALcode (GATE-1 D4).
 [[nodiscard]] inline memoryLib::MemStatus
 writeHwpcbSaveSet(memoryLib::GuestMemory& mem,
@@ -177,9 +183,6 @@ writeHwpcbSaveSet(memoryLib::GuestMemory& mem,
     using memoryLib::MemStatus;
     MemStatus st;
     if ((st = mem.write8(pa + 0x00, src.ksp)) != MemStatus::Ok) return st;
-    if ((st = mem.write8(pa + 0x08, src.esp)) != MemStatus::Ok) return st;
-    if ((st = mem.write8(pa + 0x10, src.ssp)) != MemStatus::Ok) return st;
-    if ((st = mem.write8(pa + 0x18, src.usp)) != MemStatus::Ok) return st;
     if ((st = mem.write8(pa + 0x30, src.asten_sr)) != MemStatus::Ok) return st;
     // CPC longword: read-merge-write the low 32 bits of HWPCB+0x40.
     uint64_t old40 = 0;

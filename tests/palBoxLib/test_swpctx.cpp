@@ -110,6 +110,10 @@ TEST_CASE("SWPCTX T1+T5: A->B->A round-trips save-set fields and CPC")
     CHECK(((cpu.ccOffset + cpu.cycleCount) & 0xFFFFFFFFULL) == 0x100ULL);
 
     // Run "in A" for a while; dirty the live state that the save set owns.
+    // The ESP/SSP/USP CpuState mirrors are deliberately dirtied too: per
+    // GATE-1 Q2 / audit PE-1 (2026-07-28) SWPCTX must NOT write them back
+    // -- the HWPCB is their live home (guest PAL maintains them at mode
+    // transitions), so the stale mirrors must be discarded, not saved.
     cpu.cycleCount += 0x1000;
     cpu.intReg[30]  = 0x1A08;                  // A pushed something
     cpu.esp = 0x2A08; cpu.ssp = 0x3A08; cpu.usp = 0x4A08;
@@ -126,6 +130,18 @@ TEST_CASE("SWPCTX T1+T5: A->B->A round-trips save-set fields and CPC")
     CHECK(cpu.asn == 4);
     CHECK(((cpu.ccOffset + cpu.cycleCount) & 0xFFFFFFFFULL) == 0x9999ULL);
 
+    // PE-1 pin: the A->B save did NOT write the stale ESP/SSP/USP mirrors
+    // into A's HWPCB -- the guest-maintained seeds survive.
+    {
+        uint64_t q = 0;
+        CHECK(mem.read8(kPcbbA + 0x08, q) == MemStatus::Ok);
+        CHECK(q == 0x2A00ULL);                 // seed, NOT the 0x2A08 mirror
+        CHECK(mem.read8(kPcbbA + 0x10, q) == MemStatus::Ok);
+        CHECK(q == 0x3A00ULL);
+        CHECK(mem.read8(kPcbbA + 0x18, q) == MemStatus::Ok);
+        CHECK(q == 0x4A00ULL);
+    }
+
     // B runs.
     cpu.cycleCount += 0x777;
 
@@ -135,9 +151,11 @@ TEST_CASE("SWPCTX T1+T5: A->B->A round-trips save-set fields and CPC")
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.pcbb == kPcbbA);
     CHECK(cpu.intReg[30] == 0x1A08ULL);        // A's PUSHED ksp, not the seed
-    CHECK(cpu.esp == 0x2A08ULL);
-    CHECK(cpu.ssp == 0x3A08ULL);
-    CHECK(cpu.usp == 0x4A08ULL);
+    // Mirrors reload from A's HWPCB (the live home): the seeds, not the
+    // discarded 0x?A08 values dirtied above.
+    CHECK(cpu.esp == 0x2A00ULL);
+    CHECK(cpu.ssp == 0x3A00ULL);
+    CHECK(cpu.usp == 0x4A00ULL);
     CHECK(cpu.asten_sr == 0x5FULL);
     CHECK(cpu.asn == 3);
     // T5: CPC continuity -- A resumes charged exactly what it left with.
