@@ -159,8 +159,16 @@ inline uint64_t addsub(uint64_t opa, uint64_t opb, bool sub, VaxGeom g,
     if (sub) b.sign ^= 1u;
     if (a.exp == 0) { Ufp t = b; return rpack(t, g, chop, unfEnable, exc); }  // 0 +- b = b
     if (b.exp == 0) return rpack(a, g, chop, unfEnable, exc);                 // a +- 0 = a
-    // Align the smaller exponent to the larger (guard bits absorb the shift).
-    if (a.exp < b.exp) { Ufp t = a; a = b; b = t; }
+    // Order so |a| >= |b|: swap on smaller exponent, AND on equal
+    // exponents with smaller fraction -- the effective-subtraction
+    // branch below computes a.frac - b.frac unsigned and relies on
+    // |a| >= |b|; without the equal-exponent term, same-binade
+    // subtraction with |b| > |a| wraps modulo 2^64 and keeps a's sign
+    // (SUBG 1.0 - 1.5 returned +1.5 instead of -0.5).  Matches the
+    // SIMH vax_fadd ordering this kernel ports.
+    if (a.exp < b.exp || (a.exp == b.exp && a.frac < b.frac)) {
+        Ufp t = a; a = b; b = t;
+    }
     int const sh = a.exp - b.exp;
     b.frac = (sh >= 64) ? 0 : (b.frac >> sh);
     if (a.sign == b.sign) {
