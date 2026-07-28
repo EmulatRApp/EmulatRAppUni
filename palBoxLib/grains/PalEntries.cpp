@@ -1757,7 +1757,9 @@ auto execMfprWhami([[maybe_unused]] InstructionGrain const& g,
 // Architectural semantics (AARM Section 26 + palcode_dsgn_gde.txt):
 //
 //   R16 (a0) -- physical address of the NEW HWPCB to install.
-//   R0  (v0) -- previous PTBR value (the OS uses this to release the
+//   R0  (v0) -- [SUPERSEDED 2026-07-27: NO R0 output per apisrm/AARM;
+//                 the sketch below is the ORIGINAL SimH-derived design,
+//                 kept for history -- GATE-1 answers doc governs] (the
 //               old process's page-table memory).
 //
 // PALcode actions:
@@ -1824,8 +1826,8 @@ auto execMfprWhami([[maybe_unused]] InstructionGrain const& g,
 //      DONE -- see deviceLib/HwpcbContext.h.
 //   3. Leaf-side guest-memory accessor on ExecCtx (read N qwords +
 //      write N qwords against a guest physical address synchronously).
-//      OPEN -- the deferred-memEffect pattern handles only one access
-//      per leaf; SWPCTX needs ~16 reads + 16 writes in one shot.
+//      DONE 2026-07-27 (SPEC-SWPCTX-001 C2) -- readHwpcbFromGuest /
+//      writeHwpcbSaveSet in deviceLib/HwpcbContext.h over ExecCtx::memory.
 //   4. PerCpuSlot reachability: the OS reads its PCBB by walking the
 //      HWRPB; firmware must publish the correct PerCpuSlot::hwpcb at
 //      HWRPB-build time so the OS finds a coherent initial context.
@@ -1835,147 +1837,167 @@ auto execMfprWhami([[maybe_unused]] InstructionGrain const& g,
 //      guest memory at boot (Machine orchestrator memcpy).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execSwpctxVms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    // Implements palBoxLib/swpctx_spec.md (VMS PALcode SWPCTX).  Step
-    // numbers below refer to spec section 5; HWPCB field offsets to
-    // section 4.  Accesses are PHYSICAL, quadword-aligned via
-    // ExecCtx::memory (SimH ReadPQ/WritePQ semantics); R16 / cpu.pcbb are
-    // physical HWPCB addresses, NOT translated.  No runtime alignment
-    // check (spec 6.1: the bus masks the low 3 bits; debug-assert only,
-    // deferred until a DCHECK macro lands -- spec 11.2).
+    // Faithful VMS SWPCTX (SPEC-SWPCTX-001 C3).  Design record: the GATE-1
+    // answers doc (journals/SPEC-SWPCTX-001_GATE1_ANSWERS.md); ground truth
+    // apisrm ev6_vms_callpal.mar:189-470; contract AARM 10-88..10-90.
+    //
+    // HISTORY (2026-07-27): a complete implementation existed here as
+    // execSwpctxVms but was NEVER DISPATCHED -- the camelCase name missed
+    // handwritten.tsv, so codegen emitted the kFaultUnimplemented stub and
+    // DispatchTables bound THAT (the LDQP failure class, see the 2026-06-05
+    // note above execLdqp_vms).  SYSBOOT's first context swap therefore
+    // OPCDEC'd ("Illegal inst" wall, JRN-SCSI-032 Sec 6).  Renamed to the
+    // codegen-canonical execSwpctx_vms and upgraded to the GATE-1 contract.
+    //
+    // NAMED DEVIATIONS (GATE-1 D1-D4): spinlock_hack PCTR/SPCE block NOT
+    // replicated (no counter model; PME round-trips architecturally);
+    // ev6_p1 CNS__FPE_STATE store NOT replicated (pass-1 silicon);
+    // misaligned R16 delivered as kFaultOpcDec (nearest modeled exception;
+    // architecturally reserved-operand -> SCB ILLOP); UNQ/SCT untouched
+    // (RD/WR_UNQ own UNQ).  No R0 output: apisrm writes no result register
+    // (the prior body's R0 = old PTBR followed SimH, a secondary source).
     BoxResult r;
     r.semFlags = g.semFlags;
 
-    // Spec 11.3 -- bare unit harness with no memory bus: SWPCTX is a no-op.
-    if (c.memory == nullptr) {
-        return r;
-    }
+    // Bare unit harness with no memory bus: no-op (harness convention,
+    // matches the other PAL-intrinsic leaves).
+    if (c.memory == nullptr) return r;
 
     using deviceLib::hwrpb::Hwpcb;
     using deviceLib::hwrpb::loadCpuFromHwpcb;
+    using deviceLib::hwrpb::readHwpcbFromGuest;
     using deviceLib::hwrpb::storeCpuToHwpcb;
+    using deviceLib::hwrpb::writeHwpcbSaveSet;
 
-#if EMULATR_BRINGUP_PROBES
-    // PT__PTBR DESYNC SENSOR (2026-07-26, JRN-SCSI-026 A4 row 1; env
-    // EMULATR_PTBR_DIAG).  Sibling of the VPTB sensor that cracked the halt-10
-    // arc.  The .mar SWPCTX (EV6_VMS_CALLPAL.MAR:430) stores PT__PTBR(p_temp)
-    // = PFN<<13, and the guest's OWN TB-miss handlers read THAT CELL as the
-    // page-table walk root (EV6_VMS_PAL.MAR:1107/1166/1505/1778).  This leaf
-    // maintains cpu.ptbr -- which has NO functional consumer in EmulatR (only
-    // diag printfs) -- so if the cell and the leaf disagree the guest walks a
-    // stale page table exactly as it walked a stale VPTB.  Logs both sides so
-    // "is this live on the current path" is answered by the boot we already
-    // have to run, at zero extra runs.
-    {
-        static bool const s_ptbrDiag = (std::getenv("EMULATR_PTBR_DIAG") != nullptr);
-        if (s_ptbrDiag) {
-            static unsigned long s_n = 0;
-            if (s_n < 256) { ++s_n;
-                uint64_t const pTempBase = c.cpu->intShadow[5] & ~uint64_t{7};
-                uint64_t cellPtbr = 0;
-                bool const pTempOk = (pTempBase >= 0x1000ull && pTempBase < 0x8000ull);
-                if (pTempOk && c.memory != nullptr) {
-                    (void)c.memory->read8(
-                        static_cast<coreLib::PAType>(pTempBase + 0x8), cellPtbr);
-                }
-                std::fprintf(stderr,
-                    "PTBR-DIAG[swpctx] cyc=%llu pc=0x%llx newPcbb=0x%llx "
-                    "cpu.ptbr=0x%llx (<<13=0x%llx) PT__PTBR=0x%llx p_temp=0x%llx%s\n",
-                    static_cast<unsigned long long>(c.cpu->cycleCount),
-                    static_cast<unsigned long long>(g.pc),
-                    static_cast<unsigned long long>(c.cpu->intReg[16]),
-                    static_cast<unsigned long long>(c.cpu->ptbr),
-                    static_cast<unsigned long long>(c.cpu->ptbr << 13),
-                    static_cast<unsigned long long>(cellPtbr),
-                    static_cast<unsigned long long>(pTempBase),
-                    pTempOk ? "" : "  [p_temp UNUSABLE]");
-                std::fflush(stderr);
-            }
+    uint64_t const newPcbb = c.cpu->intReg[16];   // R16 = PA of new HWPCB
+
+    // R16<6:0> must be zero -- 128-byte HWPCB alignment (AARM 10-88
+    // "reserved operand"; apisrm :199 checks 0x7F, :461 -> SCB__ILLOP).
+    // No state is touched on the fault path.
+    if ((newPcbb & 0x7FULL) != 0) {
+        r.faultCode = coreLib::kFaultOpcDec;      // named deviation, see header
+        return r;
+    }
+
+    // (1) SAVE the outgoing context through the CURRENT PCBB.  Field-set
+    // policy lives in writeHwpcbSaveSet (4 SPs + ASTEN/ASTSR + CPC as a
+    // LONGWORD; PTBR never saved, ASN not saved, FEN/PME/DAT maintained
+    // by their own MTPR flows -- GATE-1 Q1/Q2/D4).  The live R30 IS the
+    // kernel SP here (AARM 10-90 note: SWPCTX executes in kernel mode),
+    // overriding whatever cpu.ksp last cached.  SAVE-FIRST ordering: a
+    // self-swap (newPcbb == pcbb) must observe the just-saved values in
+    // the load below.
+    //
+    // pcbb == 0 guard: the console PAL seeds PT__PCBB in the PAL-temps
+    // MEMORY region, not cpu.pcbb; on the very first OS swap cpu.pcbb
+    // may still be the power-on zero.  Writing the save set to PA 0
+    // would clobber the console PAL image -- skip the save instead
+    // (there is no outgoing OS context to lose on the first swap).
+    if (c.cpu->pcbb != 0) {
+        c.cpu->ksp = c.cpu->intReg[30];
+        Hwpcb save{};
+        storeCpuToHwpcb(save, *c.cpu);
+        if (writeHwpcbSaveSet(*c.memory,
+                              static_cast<coreLib::PAType>(c.cpu->pcbb),
+                              save) != memoryLib::MemStatus::Ok) {
+            r.faultCode = coreLib::kFaultBusError;   // NXM -> machine check (AARM)
+            return r;
         }
     }
-#endif
 
-    // Step 1 -- capture old PTBR (R0 return) BEFORE any state change.
-    uint64_t const oldPtbr = c.cpu->ptbr;
-    uint64_t const oldPcbb = c.cpu->pcbb;
-    uint64_t const newPcbb = c.cpu->intReg[16];   // R16 = new HWPCB phys addr
-
-    // Step 2 -- snapshot live state.  The running R30 IS the architectural
-    // KSP whenever PALcode executes (PAL entry forces kernel mode), so it
-    // overrides whatever storeCpuToHwpcb copied from cpu.ksp.
-    Hwpcb oldCtx{};
-    storeCpuToHwpcb(oldCtx, *c.cpu);
-    oldCtx.ksp = c.cpu->intReg[30];
-
-    // Step 3 -- write old HWPCB (9 quadwords).  MUST precede step 4: for a
-    // self-switch (newPcbb == oldPcbb) the reads in step 4 must observe the
-    // values just saved (spec 5, ordering note).
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x00), oldCtx.ksp);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x08), oldCtx.esp);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x10), oldCtx.ssp);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x18), oldCtx.usp);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x20), oldCtx.ptbr);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x28), oldCtx.asn);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x30), oldCtx.asten_sr);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x38), oldCtx.fen);
-    (void)c.memory->write8(static_cast<coreLib::PAType>(oldPcbb + 0x40), oldCtx.cc);
-
-    // Step 4 -- read new HWPCB (9 quadwords).  NXM return-value handling is
-    // a known gap (spec 7 / 11.1): a non-memory R16 leaves newCtx zero and
-    // a zero context is installed.
-    Hwpcb newCtx{};
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x00), newCtx.ksp);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x08), newCtx.esp);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x10), newCtx.ssp);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x18), newCtx.usp);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x20), newCtx.ptbr);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x28), newCtx.asn);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x30), newCtx.asten_sr);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x38), newCtx.fen);
-    (void)c.memory->read8(static_cast<coreLib::PAType>(newPcbb + 0x40), newCtx.cc);
-
-    // Step 5 -- install new context, switch PCBB, and load the running SP.
-    // cpu.intReg[30] = newCtx.ksp is the step the AARM pseudocode elides and
-    // SimH makes explicit (alpha_pal_vms.c:1430); without it the kernel
-    // stack stays inactive (SP=0 -> the top-of-PA sweep this fixes).
-    loadCpuFromHwpcb(*c.cpu, newCtx);
+    // (2) LOAD the full incoming image.  Physical, no translation, no TB
+    // allocation (brief Sec 4.2; apisrm hw_ldq/p discipline).  An NXM here
+    // after the save above leaves the old HWPCB updated but the context
+    // unswitched -- AARM terms a non-memory-like reference UNDEFINED; we
+    // deliver the machine-check shape and stop.
+    Hwpcb img{};
+    if (readHwpcbFromGuest(*c.memory,
+                           static_cast<coreLib::PAType>(newPcbb),
+                           img) != memoryLib::MemStatus::Ok) {
+        r.faultCode = coreLib::kFaultBusError;
+        return r;
+    }
+    loadCpuFromHwpcb(*c.cpu, img);                 // SPs/PTBR/ASN/AST/FEN+PME+DAT/CC
     c.cpu->pcbb       = newPcbb;
-    c.cpu->intReg[30] = newCtx.ksp;
+    c.cpu->intReg[30] = img.ksp;                   // running SP <- new KSP
 
-    // Step 6 -- report old PTBR in R0 (spec 3; matches S_WritesRa).
-    r.regWriteIdx   = 0;
-    r.regWriteIsFp  = false;
-    r.regWriteValue = oldPtbr;
+    // (3) PAL-temp MEMORY mirrors.  The guest's own TB-miss handlers read
+    // PT__PTBR / PT__PCBB from the temps region (ev6_vms_pal.mar:1107/
+    // 1166/1505/1778), NOT our CpuState fields, and the .mar SWPCTX
+    // stores both cells (ev6_vms_callpal.mar:418-419 PT__PTBR = PFN<<13;
+    // :432 PT__PCBB = r16).  Skipping this recreates the VPTB-desync
+    // failure class (JRN-SCSI-026).  p_temp = PAL-bank R21 = intShadow[5]
+    // in this non-PAL context; offsets per ev6_pal_temps.mar:31-32; the
+    // HWPCB PTBR field is PFN-form (AARM Fig 12-1), the cell takes the
+    // byte form, PTBR<63> physical-mode flag stripped.
+    {
+        uint64_t const pTemp = c.cpu->intShadow[5] & ~uint64_t{7};
+        if (pTemp >= 0x1000ULL && pTemp < 0x8000ULL) {
+            uint64_t const ptbrByte =
+                (img.ptbr & ~(uint64_t{1} << 63)) << 13;
+            (void)c.memory->write8(
+                static_cast<coreLib::PAType>(pTemp + 0x08), ptbrByte);
+            (void)c.memory->write8(
+                static_cast<coreLib::PAType>(pTemp + 0x10), newPcbb);
+        }
 #if EMULATR_BRINGUP_PROBES
-    // JRN-VMB-006 PTBR-DIAG (env EMULATR_PTBR_DIAG).  SWPCTX is the ONLY writer
-    // of the cpu->ptbr abstraction (read by MFPR_PTBR).  Log each swap so we can
-    // see whether the console/OS ever installs a real (nonzero) PTBR from a
-    // valid HWPCB before the DTB-miss loop, and at what cycle.  Low volume.
+        else {
+            static bool s_warned = false;
+            if (!s_warned) {
+                s_warned = true;
+                std::fprintf(stderr,
+                    "SWPCTX: p_temp (intShadow[5]=0x%llx) outside the sane "
+                    "temps window -- PT__PTBR/PT__PCBB mirrors NOT written\n",
+                    static_cast<unsigned long long>(c.cpu->intShadow[5]));
+            }
+        }
+#endif
+    }
+
+    // (4) TB action -- GATE-1 Q3 decision (b), CONSERVATIVE-FIRST: TBIAP
+    // on swap; ASM=1 entries survive (SPAM invalidateAllProcess is the
+    // epoch sweep pinned by tests/pteLib/test_spam.cpp).  Both authorities
+    // permit NO invalidation on an ASN-tagged TB (AARM 10-88 conditional;
+    // apisrm performs none) -- switching to that ground truth is a named
+    // follow-up once the OS era stabilizes past the next gates.
+    c.cpu->dtbMgr.invalidateAllProcess();
+    c.cpu->itbMgr.invalidateAllProcess();
+
+#if EMULATR_BRINGUP_PROBES
+    // Swap trace (env EMULATR_PTBR_DIAG, low volume) -- successor of the
+    // JRN-VMB-006 / JRN-SCSI-026 PT__PTBR desync sensor: log both the
+    // CpuState view and the PT-cell view so a future desync is visible in
+    // the boot we already have to run.
     {
         static bool const s_diag = (std::getenv("EMULATR_PTBR_DIAG") != nullptr);
         if (s_diag) {
             static unsigned long s_n = 0;
-            if (s_n < 64) { ++s_n;
+            if (s_n < 64) {
+                ++s_n;
                 std::fprintf(stderr,
-                    "PTBR-DIAG[swpctx] cyc=%llu pc=0x%016llx oldPcbb=0x%016llx "
-                    "newPcbb=0x%016llx newPtbr=0x%016llx\n",
-                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    "SWPCTX-DIAG pc=0x%llx cyc=%llu newPcbb=0x%llx "
+                    "ptbr(PFN)=0x%llx asn=%llu ksp=0x%llx\n",
                     static_cast<unsigned long long>(g.pc),
-                    static_cast<unsigned long long>(oldPcbb),
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
                     static_cast<unsigned long long>(newPcbb),
-                    static_cast<unsigned long long>(newCtx.ptbr));
+                    static_cast<unsigned long long>(img.ptbr),
+                    static_cast<unsigned long long>(img.asn),
+                    static_cast<unsigned long long>(img.ksp));
                 std::fflush(stderr);
             }
         }
     }
 #endif
+
     return r;
 }
 
 // ----------------------------------------------------------------------------
 // execSwpctxOsf -- swap process context, OSF/Tru64 + Linux flavor.
-// CALL_PAL function 0x30 (Tru64+Linux).  Same operation as execSwpctxVms;
+// CALL_PAL function 0x30 (Tru64+Linux).  Same operation family as
+// execSwpctx_vms (VMS, 0x05) but the Tru64 register contract differs;
 // just a different function-code encoding per the VMS-vs-OSF personality
 // split (AARM Table C-15 lines 47741 + 47656).
 //
@@ -1989,7 +2011,7 @@ auto execSwpctxVms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxR
 AXP_HOT AXP_FLATTEN
 auto execSwpctxOsf(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
-    // Identical body to execSwpctxVms; kept as a separate symbol so the
+    // Body deferred (see execSwpctx_vms for the VMS one); separate symbol so the
     // codegen can wire it to the 0x30 dispatch slot when personality fan-
     // out lands.
     BoxResult r;

@@ -909,17 +909,8 @@ using coreLib::InstructionGrain;
 
 // STQP: hand-written -- see palBoxLib/grains/ for palBox::execStqp_vms
 
-// SWPCTX: swap process context (VMS); R16=new HWPCB PA, R0=old PTBR; distinct from Tru64 swpctx at 0x30 (DIFFERENT opcode); v1 leaf is forward-looking stub (palBoxLib/grains/PalEntries.cpp execSwpctx_vms) -- needs CpuState shadow regs + leaf-side memory accessor
-AXP_HOT AXP_FLATTEN
-BoxResult execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept
-{
-    static std::atomic<uint64_t> s_cnt{ 0 };
-    logUnimplementedStub("SWPCTX", g, c, s_cnt);
-    BoxResult r;
-    r.semFlags  = g.semFlags;
-    r.faultCode = coreLib::kFaultUnimplemented;
-    return r;
-}
+// SWPCTX: hand-written -- see palBoxLib/grains/ for palBox::execSwpctx_vms
+// (2026-07-27, SPEC-SWPCTX-001 C3; was the last generated stub in dispatch)
 
 // MFPR_ASN: hand-written -- see palBoxLib/grains/ for palBox::execMfprAsn_vms
 
