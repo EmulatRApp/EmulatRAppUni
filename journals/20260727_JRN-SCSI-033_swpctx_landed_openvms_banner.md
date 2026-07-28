@@ -78,15 +78,61 @@ ASCII(128) only.  Hex radix.
       Exception PC = FFFFFFFF.8009D0EC   Exception PS = 10000000.00001F00
   -> OPCDEC at an S0 executive PC, cyc ~2.12e9, then CALL_PAL HALT at
   0xffffffff8368a660 (HaltedClean).  This is the PREDICTED A1/A2-era
-  gate (SPEC Sec 9): first exec-image instruction outside the audited
-  set -- FP/FloatVariants (225 unaudited leaves) and the confirmed-
-  unwired FTOIS are the prime suspects.  NEXT ACTION (one probe):
-  re-run with --snapshot-on-pc armed near the exception (or DIAG window
-  0x8009d000..0x8009d100 logging encodings) and decode the single word
-  at S0 0x8009D0EC through the live page tables; then Track B's
-  FloatVariants/FTOIS work becomes demand-driven.
+  gate (SPEC Sec 9).
 
-## 5. Owed / follow-ups
+  DECODED SAME EVENING, ZERO RUNS (the fault log already carried it --
+  logs/faults.log: cyc 2113273477 pc 0xffffffff8009d0e8 encoded
+  0x57e017c1 op 0x15 kFaultOpcDec):
+
+    0x57e017c1 = CVTQG f0, f1   (opcode 0x15, func 0x0BE -- VAX
+                 convert quadword -> G_floating; VMS-heritage time
+                 arithmetic territory)
+
+  ROOT CAUSE OF THE OPCDEC (static, complete):
+    - The leaf EXISTS and is REAL: fBoxLib/grains/FloatVariants.cpp
+      :1366 execCvtqg -> fpBox::activeBackend().cvtQG(...).
+    - The dispatch entry EXISTS: g_fltVaxSubTable[0x0be]
+      (DispatchTables.cpp:2841), and the primary table routes 0x15 ->
+      FltVax (:7645).
+    - The DECODE ENGINE'S DispatchKind switch HAS NO case for
+      DispatchKind::FltVax (pipelineLib/PipelineDriver.h ~:1097-1140:
+      7-bit group, FltIeee 11-bit, JmpClass, Misc, Pal -- FltVax
+      absent) -> falls through -> kOpcDecEntry.  ALL 225 VAX-FP leaves
+      are wired-but-unreachable.  The fix is ONE case label joining
+      the FltIeee 11-bit group.  NOT FIXED TONIGHT: outside the
+      SPEC-SWPCTX-001 drift fence -- reported per the fence rule.
+    - ADJACENT FINDING (same defect family, same switch): ItFp
+      (opcode 0x14) sits in the 7-BIT sub-decode group but
+      g_itFpSubTable has 2048 entries -- any 0x14 function above 0x7F
+      (SQRT qualifier forms, e.g. SQRTT/SUI 0x7AB) OPCDECs the same
+      way.  Verify + fix together with FltVax.
+    - Failure-class note: fourth instance tonight of "every layer
+      present, one seam unwired" (stub-shadowed leaf, name-mismatch
+      manifest, now a missing switch case).  Track B should add a
+      REACHABILITY sweep: for every DispatchKind and sub-table, one
+      test that a representative encoding actually reaches its leaf.
+
+## 5. TOMORROW'S ACTIONABLES (in order), then standing owed items
+
+  A. FltVax dispatch: add `case DispatchKind::FltVax:` to the FltIeee
+     11-bit group in PipelineDriver.h (~:1110); same commit resolves
+     the ItFp 7-bit/2048-entry question (verify 0x14 func widths
+     against the TSV first); reachability doctests for both kinds
+     (representative encodings reach their leaves -- CVTQG 0x57e017c1
+     itself is the natural pin); then the boot retest.  EXPECTATION:
+     the exec proceeds past 0x8009d0e8 into FloatVariants territory
+     whose 225 bodies are UNAUDITED (JRN-ISA-001) -- the backend cvtQG
+     result becomes live guest state, so the FIRST FP-shaped
+     divergence after this fix is a FloatVariants-fidelity suspect,
+     not a dispatch suspect.
+  B. DS10 + ES40 P00>>> boots (the standing tri-platform gate debt --
+     now covering the GH fix, C1, and C3 together).
+  C. FTOIS: wire or explicitly OPCDEC-by-record (it is architecturally
+     real, currently absent from the TSV entirely).
+  D. Track B kickoff: PalEntries context/MM/IPL read + the
+     reachability sweep from Sec 4.
+
+## 5b. Standing owed / follow-ups
 
   - G3 tri-platform: DS10 + ES40 P00>>> boots (still owed from
     JRN-SCSI-032 Sec 6; fold into the next session's first gate run).
