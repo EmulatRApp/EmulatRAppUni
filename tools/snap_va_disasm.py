@@ -83,7 +83,6 @@ def main():
         elif a == '--img-size': img_size = int(argv[i + 1], 0); i += 2
         else:
             print("unknown option: %s" % a); sys.exit(2)
-        i += 1
 
     sz = os.path.getsize(path)
     fh = open(path, 'rb')

@@ -639,8 +639,26 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260727_JRN-SCSI-031_double_relocation_mechanism.md`
+  -- **READ FIRST ON RESUME (partially supersedes 030 Sec 5-6; 029/030 live
+  on branch worktree-snappc-cyclo-gate, unmerged).**  LDFAIL mechanism NAMED
+  from static reads alone: SYSBOOT's symbol-vector relocation walk (0x421c0)
+  ran TWICE.  Pass 1 relocated all 2497 bitmap-selected sec1 quads CORRECTLY
+  (measured in the verdict4 snapshot via certified page-walk); pass 2 re-read
+  an already-relocated (huge/negative) quad at the first set bit and
+  faithfully returned BADIMGOFF -> LDFAIL.  The "0x66666666 fill" of 028/030
+  was never fill -- it is the live relocation BITMAP, and the file's chunk
+  chain terminates cleanly (simulated walk on raw vdisk bytes: all values
+  classify; Charon's success reproduced from our own disk).  Idempotence
+  flag digest+0x3d bit2 was CLEAR at pass 2 (its longword +0x3c sat ONE
+  LONGWORD outside 030's PA-WATCH window).  State word *(0x14708):
+  file-initial 0x0, live 0x1001, runtime-written; bit2 gates the second
+  translator call site 0x60980 and two translator legs.  RESIDUAL (dynamic):
+  who invokes twice / who fails to set the done flag -- probes P1 (PA-WATCH
+  0x6C476C len 8), P2 (PA-WATCH 0x1000068 len 8), P3 (snapshot-on-pc
+  0x5ff00, branch instrument) with verdict rule in the journal Sec 6.
 - `journals/20260727_JRN-SCSI-028_dma_window_and_cache_exonerated_HANDOFF.md`
-  -- **READ FIRST ON RESUME.**  Architect's DMA hypothesis tested, both
+  -- (superseded as entry point by 031)  Architect's DMA hypothesis tested, both
   halves NEGATIVE: (a) scatter-gather windows are NEVER enabled on this
   path -- every WSBA write across a full boot has SG=0, only window 1 is
   live (0xffffffff80000001, direct-mapped 1GB), zero sg=1 translations;
