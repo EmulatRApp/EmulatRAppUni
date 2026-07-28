@@ -639,9 +639,26 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/20260727_JRN-SCSI-032_gh_block_aliasing_rootcause_fixed.md`
+  -- **READ FIRST ON RESUME.  ROOT CAUSE OF %SYSBOOT-F-LDFAIL, FOUND AND
+  FIXED.**  applyTlbHit composed every TB hit as (PFN<<13)|va<12:0> while
+  the lookup matched GH=g entries block-wide (8^g pages) -- every page of
+  a GH block aliased onto its base page.  SYSBOOT's GH=3 S0 region
+  collapsed onto PA 0x1000000; the relocation walk read layered residue;
+  BADIMGOFF was a faithful report.  Fix: GH-aware compose (VA<13+3g-1:13>
+  pass through, low 3g PFN bits masked); TlbEntry::physAddrOf DELETED
+  (dead, same defect, wrong-model comment); cross-page doctest both realms
+  x GH 0-3 (74 asserts); suite 503/506 (3 pre-existing).  Supersession
+  boundary over 031 Sec 4 drawn precisely in 032 Sec 5: file oracle and
+  register analysis survive, "completed pass 1"/double-call/transient-bit2
+  RETRACTED (aliased-memory artifacts).  JRN-SCSI-020 defect class, third
+  instance: match wide, compose narrow.  TB-tier constraint recorded
+  (032 Sec 4).  Instrument ledger #7: DIAG_WREG silent despite armed --
+  unresolved, do not trust silent WREG runs.
 - `journals/20260727_JRN-SCSI-031_double_relocation_mechanism.md`
-  -- **READ FIRST ON RESUME (partially supersedes 030 Sec 5-6; 029/030 live
-  on branch worktree-snappc-cyclo-gate, unmerged).**  LDFAIL mechanism NAMED
+  -- (partially superseded by 032 Sec 5 -- the double-pass frame is
+  RETRACTED; its Sec 3 translator decode and file oracle remain valid;
+  029/030 live on branch worktree-snappc-cyclo-gate, unmerged).  LDFAIL mechanism NAMED
   from static reads alone: SYSBOOT's symbol-vector relocation walk (0x421c0)
   ran TWICE.  Pass 1 relocated all 2497 bitmap-selected sec1 quads CORRECTLY
   (measured in the verdict4 snapshot via certified page-walk); pass 2 re-read

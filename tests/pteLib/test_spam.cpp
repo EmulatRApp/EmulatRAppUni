@@ -250,3 +250,69 @@ TEST_CASE("SPAMShardManager clear resets epochs and drops slots")
     CHECK(mgr.processEpoch() == 0);
     CHECK(mgr.occupancy()    == 0);
 }
+
+
+// ============================================================================
+// JRN-SCSI-032: GH-block cross-page compose -- the load-bearing pin.
+// ============================================================================
+// The DS20 %SYSBOOT-F-LDFAIL root cause: a GH=3 entry matched all 512 pages
+// of its 4 MiB block (tag normalised by vpnMaskForGh) but applyTlbHit
+// composed PA with the bare 8 KiB offset, aliasing EVERY page of the block
+// onto the base page.  Single-page tests pass on the broken code; only the
+// wide-match-then-compose case regresses, so that is what is pinned: fill
+// the TB via page N of the block, hit via page N+k, and the composed PA
+// must land on the k-th page.  Both realms, all four GH values.
+
+#include "mmuLib/Ev6Translator.h"
+
+TEST_CASE("GH blocks: fill via page N, hit via page k, PA lands on page k")
+{
+    using coreLib::AccessKind;
+    using coreLib::Mode_Privilege;
+    using mmuLib::TranslationResult;
+    using mmuLib::applyTlbHit;
+
+    constexpr uint64_t kPage = uint64_t{1} << 13;
+
+    struct Realm { TlbRealm realm; AccessKind access; };
+    Realm const realms[] = {
+        { TlbRealm::Dtb, AccessKind::DataRead },
+        { TlbRealm::Itb, AccessKind::Execute  },
+    };
+
+    for (auto const& R : realms) {
+        for (uint8_t gh = 0; gh <= 3; ++gh) {
+            uint64_t const pages   = uint64_t{1} << (3 * gh);   // 8**gh
+            uint64_t const baseVa  = 0x88000000ULL;             // block-aligned
+            uint64_t const basePfn = 0x800ULL;                  // block-aligned
+            uint64_t const fillN   = pages / 2;                 // mid page (0 for gh=0)
+
+            SPAMShardManager<8, 4> mgr;
+            // PAL fills with the FAULTING page's own PTE: pfn = base + N.
+            AlphaPte pte = AlphaPte::makeValid(basePfn + fillN,
+                                               /*kre=*/true, /*kwe=*/true,
+                                               /*ure=*/false, /*uwe=*/false,
+                                               /*asm=*/false);
+            pte.setGh(gh);
+            mgr.insert(R.realm, baseVa + fillN * kPage, /*asn=*/0, pte, gh);
+
+            uint64_t const probes[] = { 0, 1, pages - 1 };
+            for (uint64_t k : probes) {
+                if (k >= pages) continue;                       // gh=0: only k=0
+                uint64_t const va = baseVa + k * kPage + 0x123;
+                auto const r = mgr.lookup(R.realm, va, 0);
+                CHECK(r.isHit());
+                if (!r.isHit()) continue;
+                uint64_t pa = 0;
+                CHECK(applyTlbHit(r.pte, va, R.access,
+                                  Mode_Privilege::Kernel, pa)
+                      == TranslationResult::Success);
+                // Page-index pass-through: PA must land on the k-th page.
+                CHECK(pa == (basePfn + k) * kPage + 0x123);
+            }
+            // One page PAST the block must MISS (gh > 0 only; for gh=0 the
+            // next page is simply a different 8 KiB page).
+            CHECK_FALSE(mgr.lookup(R.realm, baseVa + pages * kPage, 0).isHit());
+        }
+    }
+}
