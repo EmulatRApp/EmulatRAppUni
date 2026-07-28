@@ -654,7 +654,21 @@ dispatch matches them (silent PAL corruption otherwise).
   composition absent (the OpenVMS scheduling substrate -- top suspects
   for the INVEXCEPTN), CM-1 CVTQL/V aliasing, CM-3 FTOIS, CM-4 int /V
   forms (in flight), FV-4..FV-10 VAX backend batch (in flight).
-  Full matrices, work queue Sec 3, ledger updates Sec 5.
+  Full matrices, work queue Sec 3, ledger updates Sec 5.  Standing
+  rules Sec 5c: (R1) pipeline-level reachability is part of DONE --
+  leaf unit tests bypass buildCtx and cannot catch operand-resolution
+  bugs; (R2) a half-wired IPR is a LIVENESS change -- truthful state
+  without its consumer turns a wrong-but-progressing no-op into a hang;
+  (R3) the codegen manifest is not append-safe and fails silently
+  (three instances in one session).
+- `journals/SPEC-SIRR-AST-001.md` -- PE-4/PE-5 design spec (software
+  interrupts + AST delivery), GATE-1 NOT CLEARED, no code written.
+  Field-exact HRM transcription (IER_CM/SIRR/ISUM/PCTX), the derivation
+  rules, and the Sec 2 hazard that forbids landing state and delivery
+  separately.  Open questions Q1 snapshot layout, Q2 IPL model, Q3 AST
+  PALmode gate.  Sequencing: tri-platform gate BEFORE the OS boot,
+  because a spurious software interrupt would present as a console-era
+  regression.
 - `journals/20260727_JRN-SCSI-033_swpctx_landed_openvms_banner.md`
   -- **READ FIRST ON RESUME.  SWPCTX LANDED; "OpenVMS (TM) Alpha Operating
   System, Version V8.3" PRINTED FOR THE FIRST TIME EVER.**  The wall was
