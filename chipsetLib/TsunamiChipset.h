@@ -471,7 +471,7 @@ public:
             uint64_t const pci   = pciAddr + done;
             size_t const   chunk = static_cast<size_t>(
                 std::min<uint64_t>(n - done, 0x1000ULL - (pci & 0xFFFULL)));
-            uint64_t const paBase = m_pchip.translateDmaToPa(pci);
+            uint64_t const paBase = m_pchip.translateDmaToPa(pci, chunk);
             for (size_t i = 0; i < chunk; ++i) {
                 uint8_t b = 0;
                 (void) m_guestMemory.read1(paBase + i, b);
@@ -490,7 +490,7 @@ public:
             uint64_t const pci   = pciAddr + done;
             size_t const   chunk = static_cast<size_t>(
                 std::min<uint64_t>(n - done, 0x1000ULL - (pci & 0xFFFULL)));
-            uint64_t const paBase = m_pchip.translateDmaToPa(pci);
+            uint64_t const paBase = m_pchip.translateDmaToPa(pci, chunk);
             for (size_t i = 0; i < chunk; ++i) {
                 (void) m_guestMemory.write1(paBase + i, in[done + i]);
             }

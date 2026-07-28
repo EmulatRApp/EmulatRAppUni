@@ -498,7 +498,12 @@ public:
     static void wsbaWriteProbe(int, uint64_t) noexcept {}
 #endif
 
-    uint64_t translateDmaToPa(uint64_t pci) const noexcept {
+    // `sz` is the transfer chunk size, carried only so a WINDOW MISS can be
+    // logged with the full tuple (JRN-SCSI-028 amendment): a bare miss COUNT
+    // cannot distinguish "fall-through PA coincidentally equals the intended
+    // PA" (benign by luck) from "fall-through PA diverges" (corruption with an
+    // address attached).  Defaulted so existing callers are unaffected.
+    uint64_t translateDmaToPa(uint64_t pci, size_t sz = 0) const noexcept {
         dumpWindowsOnce();
         for (int i = 0; i < 4; ++i) {
             if (!(m_wsba[i] & 0x1ull)) continue;                 // W_EN
@@ -515,9 +520,35 @@ public:
             dmaTraceOnce(pci, pa, i, false);
             return pa;
         }
+        // WINDOW MISS.  No enabled window claims this PCI address, so the
+        // address falls through and is used as a RAW physical address.  On real
+        // hardware the Pchip would not silently identity-map: an unclaimed DMA
+        // address is an error condition (21272 HRM Ch.8.8 error model).  This
+        // silent fall-through is therefore a corruption ROUTE, not just a gap
+        // -- and it is invisible at the device layer, exactly like the SG TODO.
+        // ALWAYS logged (never capped): a miss is the whole question.
+        dmaMissProbe(pci, sz);
         dmaTraceOnce(pci, pci, -1, false);
         return pci;
     }
+
+#if defined(EMULATR_BRINGUP_PROBES)
+    static void dmaMissProbe(uint64_t pci, size_t sz) noexcept
+    {
+        static bool const on = (std::getenv("EMULATR_PCHIP_WIN_PROBE") != nullptr)
+                            || (std::getenv("EMULATR_TULIP_TRACE") != nullptr);
+        if (!on) return;
+        static unsigned long seq = 0;
+        std::fprintf(stderr,
+            "PCHIP-DMA MISS seq=%lu pci=0x%016llx size=%zu -> falls through to "
+            "RAW pa=0x%016llx (no enabled window claims it)\n",
+            seq++, static_cast<unsigned long long>(pci), sz,
+            static_cast<unsigned long long>(pci));
+        std::fflush(stderr);
+    }
+#else
+    static void dmaMissProbe(uint64_t, size_t) noexcept {}
+#endif
 
     // ========================================================================
     // MMIO Read Handler (top-level dispatch)
