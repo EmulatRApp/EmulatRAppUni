@@ -405,6 +405,39 @@ ASCII(128) only.  Hex radix.
   named suspects have moved since the run that produced this banner.
 
 --------------------------------------------------------------------------------
+## 5c. STANDING RULES PROPOSED FROM THIS AUDIT
+
+  R1. PIPELINE-LEVEL REACHABILITY IS PART OF DONE.  A leaf can be
+      perfect and still never see a correct operand.  9,000+ leaf-level
+      assertions never caught that EVERY default-rounded FP operate read
+      a garbage literal instead of F[Rb] (DS-2), because leaf unit tests
+      call the leaf directly and bypass buildCtx.  For every DispatchKind
+      and every operand-resolution path, at least one test must drive a
+      real encoding through the WHOLE pipeline: encode -> decode ->
+      operand resolve -> leaf -> commit.  The four pins added in 307a8f5
+      are the template.
+
+  R2. A HALF-WIRED IPR IS A LIVENESS CHANGE, NOT JUST A FIDELITY ONE.
+      When a register currently reads as a silent zero, making it
+      truthful is safe ONLY IF every consumer of the truthful value also
+      exists.  Concrete case (SPEC-SIRR-AST-001 Sec 2): giving SIRR a
+      real backing store without wiring delivery turns "poll SISR until
+      the ISR clears it" from a wrong-but-progressing no-op into an
+      infinite spin -- a NEW hang at a LATER point that reads as a
+      regression caused by the fix.  State and its consumer land in one
+      commit, or neither does.
+
+  R3. THE MANIFEST IS NOT APPEND-SAFE, AND NOTHING WARNS.  Two separate
+      instances today (LAT-1: gen_fp_leaves.py rewrites handwritten.tsv
+      marker-to-EOF and ate the SWPCTX entry; CM-1: genGrains silently
+      drops TSV rows whose subDecode exceeds the table size, and the
+      runtime mask then ALIASES them onto a different instruction).  A
+      third, self-inflicted: a bare-LF line inserted into a CRLF TSV
+      merged two rows and the FTOIS row vanished with no diagnostic.
+      Every codegen input needs a loud failure mode; see the CODEGEN
+      HARDENING items in Sec 3.
+
+--------------------------------------------------------------------------------
 ## 6. FILES TOUCHED TODAY
 
   Commits 307a8f5, b469ed3, 7368b35 (see Sec 1 table).  This journal:
