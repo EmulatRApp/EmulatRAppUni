@@ -186,12 +186,10 @@ struct TlbEntry {
     constexpr uint8_t  gh()        const noexcept { return tag.gh;    }
     constexpr TlbRealm realm()     const noexcept { return tag.realm; }
     constexpr uint64_t pfn()       const noexcept { return pte.pfn(); }
-    constexpr uint64_t physAddrOf(uint64_t va) const noexcept
-    {
-        // Re-add the page offset; GH expansions keep the same low-bit
-        // semantics because PFN already addresses the *base* of the block.
-        return (pte.pfn() << kAlphaPageShift) | (va & kAlphaPageMask);
-    }
+    // physAddrOf was DELETED 2026-07-27 (JRN-SCSI-032): it was caller-less
+    // and composed PA with the bare 8 KiB offset -- the exact GH-block
+    // aliasing defect fixed in Ev6Translator.h applyTlbHit.  PA composition
+    // has ONE owner: applyTlbHit.  Do not reintroduce a compose here.
 
     // Targeted invalidation: TBIS / TBISI / TBISD locate this entry by
     // VA + ASN and clear it in place.  The epoch sweep cannot handle

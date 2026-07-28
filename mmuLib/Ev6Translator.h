@@ -250,8 +250,20 @@ inline TranslationResult applyTlbHit(
             break;
     }
 
-    constexpr uint64_t kOffsetMask = (1ULL << kEv6BasePageShift) - 1ULL;
-    pa_out = ((pte.pfn() << kEv6BasePageShift) | (va & kOffsetMask)) & kEv6PaMask;
+    // GH-aware PA compose (JRN-SCSI-032).  A TB entry with GH=g matches a
+    // naturally aligned block of 8^g pages (SPAMShardManager normalises the
+    // tag by vpnMaskForGh), so the VA bits that select the page WITHIN the
+    // block -- VA<13+3g-1:13> -- must pass through into the PA, and the low
+    // 3g bits of the PFN are superseded by them (AARM 3.3.3: the block maps
+    // physically contiguous, naturally aligned pages).  Composing with the
+    // bare 8 KiB offset aliased EVERY page of a GH block onto the block's
+    // base page: SYSBOOT's GH=3 S0 data region collapsed onto one physical
+    // page, the PUBLIC_VECTORS relocation walk read layered garbage, and the
+    // loader faithfully reported BADIMGOFF -> %SYSBOOT-F-LDFAIL (DS20).
+    uint64_t const ghBits  = uint64_t{3} * pte.gh();
+    uint64_t const offMask = (1ULL << (kEv6BasePageShift + ghBits)) - 1ULL;
+    pa_out = (((pte.pfn() << kEv6BasePageShift) & ~offMask) | (va & offMask))
+             & kEv6PaMask;
     return TranslationResult::Success;
 }
 
