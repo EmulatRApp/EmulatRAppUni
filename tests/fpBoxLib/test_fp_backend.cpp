@@ -137,3 +137,70 @@ TEST_CASE("SoftFloatBackend: S-format is single-rounded (not double-rounded)") {
     CHECK(t.bits != kD1_0);
     CHECK_FALSE(t.exc.ine);
 }
+
+
+// ============================================================================
+// VAX G-float fidelity pins (audit FV-1 / FV-2 / FV-3, 2026-07-28).
+// Register-image convention: a VAX G image read as an IEEE double is 4x the
+// true VAX value (exponent rebias is exactly 2^2), so G 1.0 = 0x4010...,
+// G 1.5 = 0x4018..., G -0.5 = 0xC000... .
+// ============================================================================
+
+namespace {
+inline FpExecCtx vaxNormal() {
+    return FpExecCtx{ FPVariant{ coreLib::FpRoundingMode::RoundToNearest,
+                                 coreLib::FPTrapMode::None, false }, 0 };
+}
+inline FpExecCtx vaxUnderflowEnabled() {
+    return FpExecCtx{ FPVariant{ coreLib::FpRoundingMode::RoundToNearest,
+                                 coreLib::FPTrapMode::Underflow, false }, 0 };
+}
+} // anonymous namespace
+
+TEST_CASE("VAX addsub: same-binade effective subtraction orders |a| >= |b| (FV-1)") {
+    SoftFloatBackend be;
+    uint64_t const g1_0  = 0x4010000000000000ULL;  // G 1.0
+    uint64_t const g1_5  = 0x4018000000000000ULL;  // G 1.5
+    uint64_t const gm0_5 = 0xC000000000000000ULL;  // G -0.5
+    uint64_t const g0_5  = 0x4000000000000000ULL;  // G  0.5
+    // The broken ordering wrapped a.frac - b.frac modulo 2^64 and kept a's
+    // sign: SUBG 1.0 - 1.5 returned +1.5.  Correct: -0.5.
+    CHECK(be.subG(g1_0, g1_5, vaxNormal()).bits == gm0_5);
+    // Control (|a| > |b|, was already correct) and the mirrored operand order.
+    CHECK(be.subG(g1_5, g1_0, vaxNormal()).bits == g0_5);
+    // Same defect shape through ADDG with a negative operand.
+    CHECK(be.addG(g1_0, gm0_5 | 0x0018000000000000ULL, vaxNormal()).bits == gm0_5);
+}
+
+TEST_CASE("VAX CVTQG: exact-halfway quad rounds AWAY from zero, not to even (FV-2)") {
+    SoftFloatBackend be;
+    // 2^53 + 1 is exactly halfway between representable 2^53 and 2^53 + 2.
+    // VAX biased rounding (AARM 4.7.6) takes the larger magnitude; IEEE RNE
+    // would take the even 2^53.
+    uint64_t const q = (1ULL << 53) + 1ULL;
+    uint64_t const g_2p53plus2 = 0x4360000000000001ULL;  // G(2^53+2): +2 exp rebias
+    CHECK(be.cvtQG(q, vaxNormal()).bits == g_2p53plus2);
+    // Negative mirror: away from zero means MORE negative.
+    auto const neg = be.cvtQG(static_cast<uint64_t>(-static_cast<int64_t>(q)),
+                              vaxNormal());
+    CHECK(neg.bits == (g_2p53plus2 | 0x8000000000000000ULL));
+}
+
+TEST_CASE("VAX underflow is recorded when the qualifier enables it (FV-3)") {
+    // Ctor pin: /U, /SU, /SUI all set the underflow-enable flag.
+    CHECK(FPVariant{ coreLib::FpRoundingMode::RoundToNearest,
+                     coreLib::FPTrapMode::Underflow, false }.underflow);
+    CHECK(FPVariant{ coreLib::FpRoundingMode::RoundToNearest,
+                     coreLib::FPTrapMode::SU, false }.underflow);
+    CHECK_FALSE(FPVariant{ coreLib::FpRoundingMode::RoundToNearest,
+                           coreLib::FPTrapMode::None, false }.underflow);
+    // Behavioral pin: G-min * G-min underflows; /U variant must record Unf.
+    SoftFloatBackend be;
+    uint64_t const gMin = 0x0010000000000000ULL;   // G smallest normal (exp = 1)
+    auto const r = be.mulG(gMin, gMin, vaxUnderflowEnabled());
+    CHECK(r.bits == 0u);        // VAX flushes the underflowed result to zero
+    CHECK(r.exc.unf);           // and the enabled qualifier records it
+    auto const rq = be.mulG(gMin, gMin, vaxNormal());
+    CHECK(rq.bits == 0u);
+    CHECK_FALSE(rq.exc.unf);    // default mode: flush silently
+}

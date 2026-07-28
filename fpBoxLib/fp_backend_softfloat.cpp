@@ -65,6 +65,18 @@ inline auto resolveRm(FpExecCtx const& ctx) -> uint_fast8_t
     }
 }
 
+// VAX-op variant of resolveRm.  AARM 4.7.6: normal VAX rounding is BIASED --
+// exact halfway cases round to the LARGER magnitude, never to even.  SoftFloat's
+// near_maxMag is exactly that.  The dynamic (/D) FPCR modes and the directed
+// modes are unchanged; only the "normal" tie rule differs from IEEE.  Used by
+// the VAX conversions below (the vax_float.h arithmetic kernels already round
+// half-up natively).  Audit FV-2, 2026-07-28.
+inline auto resolveRmVax(FpExecCtx const& ctx) -> uint_fast8_t
+{
+    uint_fast8_t const rm = resolveRm(ctx);
+    return (rm == softfloat_round_near_even) ? softfloat_round_near_maxMag : rm;
+}
+
 // Map SoftFloat's global exception flags into FpExc (arithmetic ops). iov is
 // left false here; the integer-result conversion sets it explicitly.
 inline auto harvest() -> FpExc
@@ -360,7 +372,7 @@ auto SoftFloatBackend::cvtGQ(uint64_t a, FpExecCtx const& c) -> FpResult
 {
     FpExc e; if (vaxReserved(a)) { e.inv = true; return FpResult{0,e}; }
     softfloat_exceptionFlags = 0;
-    int_fast64_t const q = f64_to_i64(f64bits(scaleExp(a, -2)), resolveRm(c), true);
+    int_fast64_t const q = f64_to_i64(f64bits(scaleExp(a, -2)), resolveRmVax(c), true);
     uint_fast8_t const f = softfloat_exceptionFlags;
     e.ine = (f & softfloat_flag_inexact) != 0;
     e.iov = (f & softfloat_flag_invalid) != 0;
@@ -368,13 +380,13 @@ auto SoftFloatBackend::cvtGQ(uint64_t a, FpExecCtx const& c) -> FpResult
 }
 auto SoftFloatBackend::cvtQF(uint64_t a, FpExecCtx const& c) -> FpResult
 {
-    softfloat_roundingMode = resolveRm(c); softfloat_exceptionFlags = 0;
+    softfloat_roundingMode = resolveRmVax(c); softfloat_exceptionFlags = 0;
     float64_t const r = i64_to_f64(static_cast<int64_t>(a));
     return FpResult{ roundFreg(scaleExp(r.v, +2)), harvest() };
 }
 auto SoftFloatBackend::cvtQG(uint64_t a, FpExecCtx const& c) -> FpResult
 {
-    softfloat_roundingMode = resolveRm(c); softfloat_exceptionFlags = 0;
+    softfloat_roundingMode = resolveRmVax(c); softfloat_exceptionFlags = 0;
     float64_t const r = i64_to_f64(static_cast<int64_t>(a));
     return FpResult{ scaleExp(r.v, +2), harvest() };
 }

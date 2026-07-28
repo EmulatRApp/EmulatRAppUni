@@ -97,6 +97,12 @@ struct FPVariant {
     {
         suppressUnderflow = (tm == FPTrapMode::SU || tm == FPTrapMode::SUI);
         suppressInexact   = (tm == FPTrapMode::SUI);
+        // /U, /SU, /SUI all carry the underflow-enable function bit
+        // (AARM 4.7.7.1); the VAX kernels gate their Unf recording on
+        // this flag, so leaving it false silently discarded every VAX
+        // underflow (audit FV-3, 2026-07-28).
+        underflow = (tm == FPTrapMode::Underflow || tm == FPTrapMode::SU
+                     || tm == FPTrapMode::SUI);
     }
 
     // Effective rounding mode after folding in the individual bit flags.
