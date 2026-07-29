@@ -391,6 +391,17 @@ ASCII(128) only.  Hex radix.
   tools/run_ds20_invexceptn_trace.sh (gate is ONE-SHOT -- verify the
   dump's cycle against the banner's before trusting it).
 
+  *** SUPERSEDED 2026-07-28 EVENING -- see TASK-MEMWB-001 Sec 9/10. ***
+  The reading below concluded the INVEXCEPTN was likely a PAL-posted MM
+  exception with PE-2/PE-3 in the causal path.  MEASUREMENT REFUTED IT:
+  the exception is an ACCVIO on INSTRUCTION FETCH; guest memory,
+  translation/GH/TB/bus, the MEM writeback and any post-retire clobber
+  are ALL ruled out; ASN never leaves 0 so PE-3 is inert here; and IPL 31
+  is legitimate for early init so PE-4/PE-5 are not implicated either.
+  The paragraph is kept verbatim as the record of a hypothesis that was
+  reasonable on the evidence then available and wrong on the evidence
+  since.  Do not act on it.
+
   READING OF THE EVIDENCE (important, and it reframes the hunt):
   "no emulator-delivered fault" does NOT mean "no exception".  The
   guest VMS PAL posts ACV/TNV to the SCB from its OWN page-table-walk

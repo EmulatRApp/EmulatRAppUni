@@ -492,3 +492,75 @@ Caution recorded: the ring-dump gates are ONE-SHOT and share a single
 `s_fired` latch, so a common value (0x1CC hit a loop counter) burns the
 trigger before the interesting event.  Prefer PC gates or full 64-bit
 values.
+
+---
+
+## 11. ROOT-CAUSE DIRECTION FOUND (2026-07-28, final run) -- I-STREAM
+
+Callee-window run 20260728_202127 confirms Sec 10.2's corrected model AND
+localises the defect.
+
+### 11.1 The JSR lands correctly; the callee runs
+
+```
+LOAD-WATCH cyc=2059176474 pc=82ccc194 va=818df200 pa=0x10df200
+                          raw=ffffffff801151c0 status=0
+DIAG-PC    cyc=2059176482 pc=ffffffff801151c0 enc=0x3c8c9e45 memAddr=ffffffff81c0ec80
+DIAG-PC    cyc=2059176483 pc=ffffffff801151c4 enc=0xd61365b8
+DIAG-PC    cyc=2059176484 pc=ffffffff801151c8 enc=0xdcf58235
+DIAG-PC    cyc=2059176485 pc=ffffffff801151cc enc=0x45593c8a
+DIAG-PC    cyc=2059176486 pc=ffffffff801151d0 enc=0xdc3b6efd
+```
+
+Execution begins at exactly 801151C0, 7 cycles after the load (the
+8-instruction caller tail).  **The JSR is correct.  H1/H1a/H1b and the
+whole caller-side line of inquiry are closed.**
+
+### 11.2 The callee's instruction stream is DATA, not code
+
+Primary opcodes of the five fetched words: 0x0F (STQ_U), 0x35 (FBNE),
+0x37 (FBGT), 0x11 (IntLogical), 0x37 (FBGT).  A VMS I/O routine does not
+open with a store and three floating-point branches.  This is data being
+executed.
+
+CONTROL (why the enc field is trusted): in the SAME log the caller's
+encodings decode perfectly -- a7400008 = LDQ R26,8(R0), 6b5a4000 =
+JSR R26,(R26) (opcode 0x1A, Ra=26, Rb=26, func=01), b63d0018 =
+STQ R17,0x18(R29).  The field is reliable; only the callee's stream is
+garbage.
+
+### 11.3 Consequence -- the defect is I-SIDE
+
+The CPU transfers to a CORRECT address, fetches nonsense, executes it,
+and wanders until it lands on FFFFFFFF.7FFF0DC8 and takes the I-fetch
+ACCVIO.  This dissolves every remaining puzzle:
+  - why 801151C0 and 7FFF0DC8 have no bit-level relationship (they are
+    unrelated: one is the call target, the other is where the garbage
+    walk ended)
+  - why the D-side load measured perfect while the failure persisted
+
+**ALL of this session's translation verification was D-SIDE** --
+applyTlbHit reached via the data path, LOAD-WATCH at the data bus.  The
+I-side has its own fill path (canonicalFromItbPte, low-field mask
+0x0F70) and was never measured.
+
+The callee's page is ALSO GH=3: from the dump,
+`FFFFFFFF.80114000  PTE 0000048A.00001F71  GH 3`.
+
+### 11.4 The exact next test
+
+Expected I-side PA, computed from that PTE:
+  page index 0x80114000>>13 = 0x4008A; GH=3 drops 9 bits -> block base
+  index 0x40000 -> block base VA 0x80000000; base PFN = 0x48A - 0x8A =
+  0x400.
+      PA(801151C0) = (0x400 << 13) | (0x801151C0 & 0x3FFFFF) = 0x9151C0
+
+Arm `EMULATR_XLATE` over 0xFFFFFFFF80115000..0xFFFFFFFF80115FFF (its
+output tags D vs I) and read the I-side VA->PA for the fetch.  Anything
+other than 0x9151C0 is the root cause.
+
+Secondary check worth pairing: disassemble IO_ROUTINES+371C0 from a
+working system (Charon + SDA on the dka0_t.vdisk copy, `EXAMINE
+/INSTRUCTION`) and diff against the five fetched words above -- that
+gives the correct bytes and, by their offset from what we fetched, may
+name the mistranslated bits directly.
