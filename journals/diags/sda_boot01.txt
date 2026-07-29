@@ -3,24 +3,18 @@ SDA> show stack
 Process Stacks (on CPU 00)
 --------------------------
 Current Operating Stack (System):
-                       FFFFFFFF.83657738    18000000.00001F00  CTL$C_CLIDATASZ+0
-0198
+                       FFFFFFFF.83657738    18000000.00001F00  CTL$C_CLIDATASZ+00198
                        FFFFFFFF.83657740    00000000.00000000
-                       FFFFFFFF.83657748    FFFFFFFF.8184B348  SYSTEM_PRIMITIVES
-_MIN+5E748
-                       FFFFFFFF.83657750    FFFFFFFF.8180B304  EXE$GL_NONPAGED+0
-0004
+                       FFFFFFFF.83657748    FFFFFFFF.8184B348  SYSTEM_PRIMITIVES_MIN+5E748
+                       FFFFFFFF.83657750    FFFFFFFF.8180B304  EXE$GL_NONPAGED+00004
                 SP =>  FFFFFFFF.83657758    FFFFFFFF.83657938
-                       FFFFFFFF.83657760    FFFFFFFF.81854DC0  EXE_STD$ALLOCATE+
-00020
+                       FFFFFFFF.83657760    FFFFFFFF.81854DC0  EXE_STD$ALLOCATE+00020
                        FFFFFFFF.83657768    00000000.000001D8
                        FFFFFFFF.83657770    00000000.00000060
-                       FFFFFFFF.83657778    00000000.00000220  IRP$Q_SHD_RESERV_
-Q10
+                       FFFFFFFF.83657778    00000000.00000220  IRP$Q_SHD_RESERV_Q10
                        FFFFFFFF.83657780    00000000.00000000
                        FFFFFFFF.83657788    00000000.00000000
-                       FFFFFFFF.83657790    FFFFFFFF.8180B304  EXE$GL_NONPAGED+0
-0004
+                       FFFFFFFF.83657790    FFFFFFFF.8180B304  EXE$GL_NONPAGED+00004
                        FFFFFFFF.83657798    00000000.00000000
                        FFFFFFFF.836577A0    00000000.00000001
                        FFFFFFFF.836577A8    FFFFFFFF.836577B0
@@ -32,34 +26,27 @@ CHF$IS_MCH_DEPTH       FFFFFFFF.836577D0    FFFFFFFF.FFFFFFFD
 CHF$PH_MCH_DADDR       FFFFFFFF.836577D8    FFFFFFFF.0000001F
 CHF$PH_MCH_ESF_ADDR    FFFFFFFF.836577E0    FFFFFFFF.83657980
 CHF$PH_MCH_SIG_ADDR    FFFFFFFF.836577E8    FFFFFFFF.83657938
-CHF$IH_MCH_RETVAL      FFFFFFFF.836577F0    FFFFFFFF.818DF1F8  EXE$MNTVERSHDOL+0
-0048
+CHF$IH_MCH_RETVAL      FFFFFFFF.836577F0    FFFFFFFF.818DF1F8  EXE$MNTVERSHDOL+00048
 CHF$IH_MCH_RETVAL2     FFFFFFFF.836577F8    FFFFFFFF.800EBC40  IOC$IOPOST_C
 CHF$IH_MCH_SAVR16      FFFFFFFF.83657800    FFFFFFFF.81C1D680
 CHF$IH_MCH_SAVR17      FFFFFFFF.83657808    FFFFFFFF.82CCC064  IO_ROUTINES+64064
 CHF$IH_MCH_SAVR18      FFFFFFFF.83657810    00000000.00000000
 CHF$IH_MCH_SAVR19      FFFFFFFF.83657818    00000000.00000000
-CHF$IH_MCH_SAVR20      FFFFFFFF.83657820    FFFFFFFF.8180B030  EXE$AR_FASTPATH_B
-LOCK
-CHF$IH_MCH_SAVR21      FFFFFFFF.83657828    FFFFFFFF.8180ABF8  SMP$GL_LAST_CPU_A
-SSIGNED
+CHF$IH_MCH_SAVR20      FFFFFFFF.83657820    FFFFFFFF.8180B030  EXE$AR_FASTPATH_BLOCK
+CHF$IH_MCH_SAVR21      FFFFFFFF.83657828    FFFFFFFF.8180ABF8  SMP$GL_LAST_CPU_ASSIGNED
 CHF$IH_MCH_SAVR22      FFFFFFFF.83657830    00000000.00000002
 CHF$IH_MCH_SAVR23      FFFFFFFF.83657838    00000000.00000001
 CHF$IH_MCH_SAVR24      FFFFFFFF.83657840    FFFFFFFF.81C1E500
 CHF$IH_MCH_SAVR25      FFFFFFFF.83657848    00000000.00000003
 CHF$IH_MCH_SAVR26      FFFFFFFF.83657850    FFFFFFFF.82CCC1B4  IO_ROUTINES+641B4
-CHF$IH_MCH_SAVR27      FFFFFFFF.83657858    FFFFFFFF.818DF1F8  EXE$MNTVERSHDOL+0
-0048
-CHF$IH_MCH_SAVR28      FFFFFFFF.83657860    00000002.818DF1F8  EXE$MNTVERSHDOL+0
-0048
+CHF$IH_MCH_SAVR27      FFFFFFFF.83657858    FFFFFFFF.818DF1F8  EXE$MNTVERSHDOL+00048
+CHF$IH_MCH_SAVR28      FFFFFFFF.83657860    00000002.818DF1F8  EXE$MNTVERSHDOL+00048
                        FFFFFFFF.83657868    00000000.00000000
                        FFFFFFFF.83657870    00000000.00000000
                        FFFFFFFF.83657878    00000000.0000007F
                        FFFFFFFF.83657880    FFFFFFFF.836578E0
-                       FFFFFFFF.83657888    FFFFFFFF.8180B2F8  EXE$GS_NPP_BASE_L
-STHDS
-                       FFFFFFFF.83657890    00000000.00001FFF  CTL$C_CLIDATASZ+0
-0297
+                       FFFFFFFF.83657888    FFFFFFFF.8180B2F8  EXE$GS_NPP_BASE_LSTHDS
+                       FFFFFFFF.83657890    00000000.00001FFF  CTL$C_CLIDATASZ+00297
                        FFFFFFFF.83657898    FFFFFFFF.836578A0
                        FFFFFFFF.836578A0    FFFFFFFF.81855C20  EXE$ALLOCATE_POOL
                        FFFFFFFF.836578A8    FFFFFFFF.81C15300  SISR+00EB8
@@ -74,8 +61,7 @@ STHDS
                        FFFFFFFF.836578F0    FFFFFFFF.81C17240
                        FFFFFFFF.836578F8    FFFFFFFF.800A8998  EXCEPTION+04998
                        FFFFFFFF.83657900    FFFFFFFF.836579F0
-                       FFFFFFFF.83657908    FFFFFFFF.818DF1F8  EXE$MNTVERSHDOL+0
-0048
+                       FFFFFFFF.83657908    FFFFFFFF.818DF1F8  EXE$MNTVERSHDOL+00048
                        FFFFFFFF.83657910    FFFFFFFF.800EBC40  IOC$IOPOST_C
                        FFFFFFFF.83657918    FFFFFFFF.81C1D680
 CHF$PH_MCH_SIG64_ADDR  FFFFFFFF.83657920    FFFFFFFF.83657950
@@ -83,18 +69,13 @@ CHF$PH_MCH_SIG64_ADDR  FFFFFFFF.83657920    FFFFFFFF.83657950
                        FFFFFFFF.83657930    00000000.00000000
                        FFFFFFFF.83657938    0000000C.00000005
                        FFFFFFFF.83657940    7FFF0DC8.00010000  SYS$K_VERSION_19
-                       FFFFFFFF.83657948    00001F00.7FFF0DC8  CTL$GQ_SSI_DATA+0
-08D0
-CHF64$L_SIG_ARGS       FFFFFFFF.83657950    00002604.00000005  UCB$M_TEMPLATE+00
-604
+                       FFFFFFFF.83657948    00001F00.7FFF0DC8  CTL$GQ_SSI_DATA+008D0
+CHF64$L_SIG_ARGS       FFFFFFFF.83657950    00002604.00000005  UCB$M_TEMPLATE+00604
 CHF64$Q_SIG_NAME       FFFFFFFF.83657958    00000000.0000000C
 CHF64$Q_SIG_ARG1       FFFFFFFF.83657960    00000000.00010000  SYS$K_VERSION_19
-                       FFFFFFFF.83657968    FFFFFFFF.7FFF0DC8  CTL$GQ_SSI_DATA+0
-08D0
-                       FFFFFFFF.83657970    FFFFFFFF.7FFF0DC8  CTL$GQ_SSI_DATA+0
-08D0
-                       FFFFFFFF.83657978    30000000.00001F00  CTL$C_CLIDATASZ+0
-0198
+                       FFFFFFFF.83657968    FFFFFFFF.7FFF0DC8  CTL$GQ_SSI_DATA+008D0
+                       FFFFFFFF.83657970    FFFFFFFF.7FFF0DC8  CTL$GQ_SSI_DATA+008D0
+                       FFFFFFFF.83657978    30000000.00001F00  CTL$C_CLIDATASZ+00198
 INTSTK$Q_R2            FFFFFFFF.83657980    FFFFFFFF.81C1D680
 INTSTK$Q_R3            FFFFFFFF.83657988    FFFFFFFF.836B7740  EXEC_INIT+3B740
 INTSTK$Q_R4            FFFFFFFF.83657990    FFFFFFFF.81C1D680
@@ -6571,4 +6552,95 @@ Image                                         Base               End       Image
 IO_ROUTINES
     Nonpaged read/write                 FFFFFFFF.818D4C00 FFFFFFFF.818E2BFF  0005E5F8
 SDA>
+
+
+SDA>  EXAMINE FFFFFFFF.818DF1F8;20
+FFFFFFFF 81808B48 FFFFFFFF 8180A708 FFFFFFFF 801151C0 00000200 00003008  .0......ÀQ.......§......H.......     FFFFFFFF.818DF1F8
+SDA> MAP FFFFFFFF.818DF1F8
+Image                                         Base               End       Image Offset
+IO_ROUTINES
+    Nonpaged read/write                 FFFFFFFF.818D4C00 FFFFFFFF.818E2BFF  0005E5F8
+SDA> EXAMINE FFFFFFFF.818DF1F8;20
+FFFFFFFF 81808B48 FFFFFFFF 8180A708 FFFFFFFF 801151C0 00000200 00003008  .0......ÀQ.......§......H.......     FFFFFFFF.818DF1F8
+SDA>
+
+  That yields a single decisive command. The entry-point field is at VA 818DF200, offset 0x1200 within its page. If compose collapsed to the block base — the precise old-bug signature — the load would instead have read offset 0x1200 of the base
+  page, i.e.:
+
+SDA> EXAMINE FFFFFFFF.81801200
+SYS$PUBLIC_VECTORS+05200:  00010000.00003000   ".0......"
+SDA>
+
+
+SDA> SEARCH/length=QUADWORD FFFFFFFF.81800000:FFFFFFFF.81BFFFFF FFFFFFFF7FFF0DC8
+Searching from FFFFFFFF.81800000 to FFFFFFFF.81BFFFFF in longword steps for FFFFFFFF.7FFF0DC8...
+No matches found
+SDA>
+
+SDA>  MAP FFFFFFFF.801151C0
+Image                                         Base               End       Image Offset
+IO_ROUTINES
+    Nonpaged read only                  FFFFFFFF.800DE000 FFFFFFFF.801305FF  000371C0
+SDA>
+
+
+SDA> SEARCH/length=QUADWORD FFFFFFFF.80000000:FFFFFFFF.83FFFFFF FFFFFFFF7FFF0DC8
+Searching from FFFFFFFF.80000000 to FFFFFFFF.83FFFFFF in longword steps for FFFFFFFF.7FFF0DC8...
+Match at FFFFFFFF.82F9D160    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.82FC3A58    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.82FC4F18    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.82FCB458    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.835A9C98    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.83657968    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.83657970    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.836579B0    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.8365B160    FFFFFFFF.7FFF0DC8
+9 matches found
+
+Index: 202607281931
+
+SDA> MAP FFFFFFFF.801151C0
+Image                                         Base               End       Image Offset
+IO_ROUTINES
+    Nonpaged read only                  FFFFFFFF.800DE000 FFFFFFFF.801305FF  000371C0
+SDA> EXAMINE/INSTRUCTION FFFFFFFF.801151C0:FFFFFFFF.801151E0
+IOC_STD$CREATE_DIOBM_C+001D0:   LDQ             R16,#X0010(R27)
+IOC_STD$CREATE_DIOBM_C+001D4:   BIS             R31,#X02,R20
+IOC_STD$CREATE_DIOBM_C+001D8:   BIS             R31,#X01,R0
+IOC_STD$CREATE_DIOBM_C+001DC:   INSBL           R20,R17,R20
+IOC_STD$CREATE_DIOBM_C+001E0:   LDL             R16,(R16)
+IOC_STD$CREATE_DIOBM_C+001E4:   AND             R16,#X04,R16
+IOC_STD$CREATE_DIOBM_C+001E8:   BNE             R16,#X000005
+IOC_STD$CREATE_DIOBM_C+001EC:   LDQ_U           R19,(R17)
+IOC_STD$CREATE_DIOBM_C+001F0:   BIC             R19,R20,R19
+IOC_STD$CREATE_DIOBM_C+001F4:   STQ_U           R19,(R17)
+
+The callee's first instruction is LDQ R16,#X0010(R27) — it reads its own procedure descriptor through R27, which the caller set at +641AC via BIS R31,R0,R27. Descriptor+0x10 is FFFFFFFF.8180A708, and the callee immediately does LDL R16,(R16) / AND R16,#X04 on it — a global flag test through a pointer stored in the descriptor. Caller and callee agree on the calling convention and on the descriptor contents. This is a real entry point; SDA is labeling by nearest global symbol, so IOC_STD$CREATE_DIOBM_C+001D0 is almost certainly a local routine following that global, not a mid-routine branch.
+
+Section 6 of the task doc is dead. Nothing upstream corrupted anything.
+
+But H1 is broader than "dropped writeback," and the doc under-specifies it. Three mechanisms produce a wrong R26 with correct memory:
+
+Writeback dropped. The load read correctly and never committed; R26 retained a stale value.
+Translation wrong. Correct VA, correct displacement, but EmulatR's DTB mapped it to the wrong PA and returned whatever lives there. This is exactly the wrong-but-valid PTE case — resolves silently, logs nothing, counts as "resolved" in your fault log, and survives PE-2/PE-3 untouched.
+Data path corruption between the memory read and the register file.
+
+The dump cannot distinguish these. SDA maps through the saved page tables, so it shows what the correct translation yields regardless of what EmulatR's DTB was doing at the time.
+
+Widen or repeat across ranges as needed — worth checking S0/S1 and the nonpaged pool region at minimum. A hit gives you the PA that EmulatR's translation landed on instead of 818DF200, which is a direct read on the TLB defect. No hits across a broad sweep pushes hard toward mechanism 1.
+
+Two things already ruled out, worth recording so section 5 doesn't chase them. R0 was correct at +641AC and nothing writes R0 between +64164 and +64194, so a stale base register would require register-file read inconsistency — exotic. And no displacement within the descriptor yields the bad value (+0 is 0000020000003008, +0x10 is 8180A708, +0x18 is 81808B48), so an offset bug on the correct base is out.
+
+SDA> SEARCH/LENGTH=QUADWORD FFFFFFFF.80000000;4000000 FFFFFFFF7FFF0DC8
+Searching from FFFFFFFF.80000000 to FFFFFFFF.83FFFFFF in longword steps for FFFFFFFF.7FFF0DC8...
+Match at FFFFFFFF.82F9D160    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.82FC3A58    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.82FC4F18    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.82FCB458    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.835A9C98    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.83657968    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.83657970    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.836579B0    FFFFFFFF.7FFF0DC8
+Match at FFFFFFFF.8365B160    FFFFFFFF.7FFF0DC8
+9 matches found
 
