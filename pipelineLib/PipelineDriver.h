@@ -1275,22 +1275,35 @@ private:
             static uint64_t const diagCycHi = envU64("EMULATR_DIAG_CYCHI", ~uint64_t{0});
             static int const diagCap =
                 static_cast<int>(envU64("EMULATR_DIAG_CAP", 200));
+            // EMULATR_DIAG_SHOWREG=<0..31> appends the live value of one
+            // integer GPR to every DIAG-PC line (2026-07-28).  retire() runs
+            // AFTER MemDrainer::drain, so the value printed on an
+            // instruction's own line is its POST-COMMIT state -- which is what
+            // makes this the discriminator between "the load never committed"
+            // and "the load committed and something later clobbered it".
+            // Unset (or out of range) prints reg=-- val=0.
+            static int const diagShowReg =
+                static_cast<int>(envU64("EMULATR_DIAG_SHOWREG", ~uint64_t{0}));
             uint64_t const diagApc = slot.grain.pc & ~uint64_t{3};
             static int diagPcN = 0;
             if (diagApc >= diagPcLo && diagApc <= diagPcHi
                 && cpu.cycleCount >= diagCycLo && cpu.cycleCount <= diagCycHi
                 && diagPcN < diagCap) {
                 ++diagPcN;
+                bool const showReg = (diagShowReg >= 0 && diagShowReg < 32);
                 std::fprintf(stderr,
                     "DIAG-PC: cyc=%llu pc=0x%llx enc=0x%08x pal=%d fault=%d "
-                    "memAddr=0x%llx excAddr=0x%llx\n",
+                    "memAddr=0x%llx excAddr=0x%llx r%d=0x%016llx\n",
                     static_cast<unsigned long long>(cpu.cycleCount),
                     static_cast<unsigned long long>(diagApc),
                     static_cast<unsigned>(slot.grain.encoded),
                     cpu.inPalMode() ? 1 : 0,
                     static_cast<int>(r.faultCode),
                     static_cast<unsigned long long>(r.memAddr),
-                    static_cast<unsigned long long>(cpu.excAddr));
+                    static_cast<unsigned long long>(cpu.excAddr),
+                    showReg ? diagShowReg : -1,
+                    static_cast<unsigned long long>(
+                        showReg ? cpu.intReg[diagShowReg] : uint64_t{0}));
                 std::fflush(stderr);
             }
             // EMULATR_PCTRACE: forward retire-trace, armed at the CSERVE-START
