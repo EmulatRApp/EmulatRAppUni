@@ -639,6 +639,30 @@ dispatch matches them (silent PAL corruption otherwise).
 
 ## 7. JOURNAL INDEX (detail lives here; most load-bearing first)
 
+- `journals/TASK-MEMWB-001.md`
+  -- **READ WITH JRN-AUD-001.  The OS-era INVEXCEPTN investigation,
+  2026-07-28.**  VMS V8.3 reaches EXE$INIT and bugchecks 000001CC
+  (INVEXCEPTN, "exception while above ASTDEL") -- an ACCVIO on
+  INSTRUCTION FETCH at FFFFFFFF.7FFF0DC8, IPL 31, no process.  Four
+  identical reproductions; determinism solid.  RULED OUT BY MEASUREMENT,
+  in order: guest memory (descriptor at 818DF200 holds the correct
+  FFFFFFFF.801151C0; dispatch table intact); translation/GH/TB/bus
+  (LOAD-WATCH measured va/pa/raw/status ALL correct, XLATE reports clean
+  TLBHIT -- the GH=3-vs-GH=0 asymmetry was coincidence); MEM writeback
+  H1a and post-retire clobber H1b (DIAG_SHOWREG=26 shows R26 committed
+  correct and held unchanged across all six intervening instructions,
+  cycles contiguous, no PAL ran).  ALSO ruled out: bus error (never
+  logged), PE-4/PE-5 SIRR/AST (IPL 31 is legitimate for early init),
+  ASN churn (census: ONE ASN, zero ASN-attributable misses).
+  **FRAMING ERROR RECORDED (Sec 10.2): 7FFF0DC8 is the EXCEPTION PC, not
+  the JSR's target -- equating them was an untested assumption, and the
+  two values have no bit relationship because they were never the same
+  thing.**  Corrected model: the JSR lands correctly at IO_ROUTINES+371C0
+  and the callee transfers to 7FFF0DC8.  Sec 10.4 operational lessons
+  (never gate on absolute cycles across runs -- they vary with the
+  console path; a selective dump cannot answer a wrong-PA question);
+  Sec 10.5 the reusable env-armed instrument set.
+
 - `journals/20260728_JRN-AUD-001_isa_execution_pipeline_audit.md`
   -- **READ FIRST ON RESUME.  COMPREHENSIVE ISA/DISPATCH/PIPELINE AUDIT
   + correction log; VMS EXEC RAN 133M CYCLES PAST THE BANNER to an

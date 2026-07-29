@@ -388,3 +388,107 @@ Same commit repaired `systemLib/Machine.cpp:1164`, where a VS2022 session
 attached to the running emulator had silently deleted two characters from
 `pipelineLib::PipelineDriver::step`.  Caught only because it broke the
 build; full working-tree diff reviewed, no other stray edits.
+
+---
+
+## 10. FINDING UPDATE (2026-07-28 evening) -- H1a AND H1b both ruled out
+
+### 10.1 R26 measured across the fatal sequence
+
+`EMULATR_DIAG_SHOWREG=26` added to the DIAG-PC line (retire() runs AFTER
+MemDrainer::drain, so the value on an instruction's own line is its
+POST-COMMIT state).  Run 20260728_201335, final pass:
+
+```
+cyc         pc          insn              r26 after
+2080153487  82ccc190    BLBS              ffffffff82ccc1b4   (stale, prior JSR link)
+2080153488  82ccc194    LDQ R26,8(R0)     ffffffff801151c0   <- COMMIT WORKED
+2080153489  82ccc198    ADDL              ffffffff801151c0
+2080153490  82ccc19c    STQ R17,18(FP)    ffffffff801151c0
+2080153491  82ccc1a0    ADDL              ffffffff801151c0
+2080153492  82ccc1a4    ADDL              ffffffff801151c0
+2080153493  82ccc1a8    BIS               ffffffff801151c0
+2080153494  82ccc1ac    BIS               ffffffff801151c0
+2080153495  82ccc1b0    JSR R26,(R26)     ffffffff82ccc1b4   (its own link write, correct)
+```
+
+Paired LOAD-WATCH at cyc 2080153488: va=818df200 pa=0x10df200
+raw=ffffffff801151c0 status=0.
+
+**H1a (MEM writeback defect) -- RULED OUT BY MEASUREMENT.**  The load
+committed the correct value to the correct register.
+
+**H1b (post-retire clobber) -- RULED OUT BY MEASUREMENT.**  R26 held
+ffffffff801151c0 unchanged across all six intervening instructions, and
+the cycles are contiguous (487..495, one per instruction, every line
+fault=0 pal=0) so no interrupt, exception or PALcode ran in the window.
+
+Jump path verified by inspection as well: buildCtx resolves Rb=26 from
+the encoding (0x6b5a4000 -> opcode 0x1A, Ra=26, Rb=26, func=01=JSR);
+execJsr computes `divertTarget = (opB & ~3) | (pc & 1)`; retire does
+`cpu.pc = r.divertTarget`.  Every link is correct.
+
+### 10.2 THE FRAMING ERROR (recorded so it is not repeated)
+
+This investigation treated `FFFFFFFF.7FFF0DC8` as THE JSR'S TARGET.  It
+is not.  It is **the PC at which the ACCVIO was taken** -- the two are
+the same thing ONLY IF the JSR branched directly into the fault.  The
+DIAG-PC window stopped at +641B4, so there was NO visibility after the
+JSR fired, and the assumption was never tested.
+
+Evidence the assumption is wrong:
+  - The same JSR succeeded TWICE in the immediately preceding loop
+    iterations, returning to +641B4 after 25 and 58 cycles.  The callee
+    demonstrably runs.
+  - On the fatal pass no return line appears -- consistent with the
+    callee faulting, not with the jump failing.
+  - `801151C0` and `7FFF0DC8` have no bit-level relationship.  Repeated
+    attempts to derive one from the other failed because THEY WERE NEVER
+    THE SAME VALUE: one is the call target, the other is wherever the
+    callee subsequently went.
+
+Corrected model: the JSR most likely lands correctly at
+`IO_ROUTINES+371C0` (= 801151C0, nonpaged read-only, confirmed by MAP),
+the callee executes, and something inside it transfers to 7FFF0DC8.
+
+### 10.3 Test in flight
+
+DIAG-PC window moved to the CALLEE (`0xFFFFFFFF80115000` ..
+`0xFFFFFFFF80116000`, CYCLO=0, CAP=5000).  Lines present -> the JSR
+worked and the defect is inside the callee.  Silence -> the jump really
+did go astray and JmpClass dispatch needs a much harder look.
+
+### 10.4 Operational lessons from this session
+
+  1. **Never gate an instrument on an absolute cycle number across
+     runs.**  Cycle counts VARY run to run with the console path taken
+     (observed 2.080e9, 2.086e9, 2.938e9 for the same fault, depending
+     on whether the SRM took the firmware-update branch).  Gate on PC,
+     which is stable, and use cycles only WITHIN a single run's log.
+  2. **Determinism is otherwise solid** -- four consecutive reproductions
+     of bugcheck 000001CC with identical register state and identical
+     instruction sequence.
+  3. **A dump cannot answer a wrong-PA question.**  A selective dump
+     captures MAPPED VIRTUAL memory; a read of a valid-but-wrong
+     physical address returns data the dump never contains.  Bus-level
+     instrumentation is the only instrument for that class.
+  4. **Two emulators, two disk images.**  EmulatR runs dka0.vdisk,
+     Charon analyses a COPY (dka0_t.vdisk).  Keep it that way -- a
+     shared image would let a live VMS and an emulator run corrupt it.
+
+### 10.5 Instruments available for reuse (all env-armed, probes only)
+
+```
+EMULATR_LOAD_WATCH_PC / _PA / _CYCLO / _CYCHI / _CAP   bus-level load observation
+                                                       (va, pa, raw, bus status)
+EMULATR_DIAG_PCLO / _PCHI / _CYCLO / _CYCHI / _CAP     retire window
+EMULATR_DIAG_SHOWREG=<0..31>                           append a live GPR to each line
+EMULATR_XLATE + _VALO / _VAHI / _CYC                   translation classification, VA<->PA
+EMULATR_ASN_CENSUS                                     ASN allocation + miss attribution
+EMULATR_VALUE_GATE / _FLOOR, EMULATR_PC_GATE           lookback ring dump triggers
+```
+
+Caution recorded: the ring-dump gates are ONE-SHOT and share a single
+`s_fired` latch, so a common value (0x1CC hit a loop counter) burns the
+trigger before the interesting event.  Prefer PC gates or full 64-bit
+values.
