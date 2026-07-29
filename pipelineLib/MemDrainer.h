@@ -721,25 +721,79 @@ private:
         }
         uint64_t const raw = br.data;
 
-#if EMULATR_MEMDIAG
-        // TEMP LOAD-WATCH 2026-05-30 -- REMOVE BEFORE COMMIT.  The PAL-takeover
-        // copy at PC 0x600938 writes the corrupt byte (0xd956: 0xe2 vs 0xe6)
-        // into PA 0xd950 around cyc 5528602.  Capture every load in that copy
-        // window to see the SOURCE byte: if a load returns ...e2... the source
-        // is already corrupt (decompression bug); if ...e6... the copy mangled
-        // it (a byte-extract/insert/ALU slip).  Tight cyc gate (this run's
-        // timing; deterministic across cold boots).
-        if (cpu.cycleCount >= 5528490ull && cpu.cycleCount <= 5528660ull) {
-            std::fprintf(stderr,
-                "LOAD-WATCH cyc=%llu pc=0x%016llx sz=%u pa=0x%016llx raw=0x%016llx\n",
-                static_cast<unsigned long long>(cpu.cycleCount),
-                static_cast<unsigned long long>(cpu.pc),
-                static_cast<unsigned>(r.memSize),
-                static_cast<unsigned long long>(pa),
-                static_cast<unsigned long long>(raw));
-            std::fflush(stderr);
-        }
+#if EMULATR_BRINGUP_PROBES
+        // ------------------------------------------------------------------
+        // LOAD-WATCH -- parameterized load observation point (2026-07-28).
+        //
+        // This is the ONLY site where a load's VA, its translated PA, the bus
+        // status and the returned data all exist at once, so it is the right
+        // altitude for "the load completed but produced the wrong value"
+        // questions.  Retire-level instruments (DIAG-PC) see the VA but not
+        // the PA; a crash dump sees neither, and cannot see a wrong-PA read at
+        // all because a selective dump captures MAPPED VIRTUAL memory -- a
+        // read of a valid-but-wrong physical address returns data the dump
+        // never contains.
+        //
+        // SUPERSEDES the 2026-05-30 scaffold that hardcoded a cycle window
+        // (5528490..5528660) and lived under EMULATR_MEMDIAG, which is
+        // #define'd 0 -- i.e. it had never compiled since.  Static addresses
+        // and cycle numbers bind a probe to one investigation and one run;
+        // every gate here is env-driven so the probe outlives its motivating
+        // bug.
+        //
+        //   EMULATR_LOAD_WATCH_PC     exact instruction PC (0 = any)
+        //   EMULATR_LOAD_WATCH_PA     exact physical address (0 = any)
+        //   EMULATR_LOAD_WATCH_CYCLO  first cycle to observe (default 0)
+        //   EMULATR_LOAD_WATCH_CYCHI  last  cycle to observe (default ~0)
+        //   EMULATR_LOAD_WATCH_CAP    max lines (default 512)
+        //
+        // Inert unless at least one gate is set: one relaxed bool test on a
+        // path that is already doing a bus transaction.
+        // ------------------------------------------------------------------
+        {
+            auto envU64 = [](char const* name, uint64_t dflt) {
+                char const* e = std::getenv(name);
+                return e ? std::strtoull(e, nullptr, 0) : dflt;
+            };
+            static uint64_t const lwPc    = envU64("EMULATR_LOAD_WATCH_PC", 0);
+            static uint64_t const lwPa    = envU64("EMULATR_LOAD_WATCH_PA", 0);
+            static uint64_t const lwCycLo = envU64("EMULATR_LOAD_WATCH_CYCLO", 0);
+            static uint64_t const lwCycHi = envU64("EMULATR_LOAD_WATCH_CYCHI",
+                                                   ~uint64_t{0});
+            static uint64_t const lwCap   = envU64("EMULATR_LOAD_WATCH_CAP", 512);
+            static bool const lwArmed =
+                (lwPc != 0) || (lwPa != 0) || (lwCycLo != 0)
+                || (lwCycHi != ~uint64_t{0});
 
+            if (lwArmed) {
+                // cpu.pc carries PALmode in bit 0 and, at MEM, still points at
+                // the executing instruction (retire advances it).  Compare on
+                // the aligned PC so a caller supplies the plain address.
+                uint64_t const lwApc = cpu.pc & ~uint64_t{3};
+                static uint64_t lwN = 0;
+                if ((lwPc == 0 || lwApc == (lwPc & ~uint64_t{3}))
+                    && (lwPa == 0 || pa == lwPa)
+                    && cpu.cycleCount >= lwCycLo
+                    && cpu.cycleCount <= lwCycHi
+                    && lwN < lwCap) {
+                    ++lwN;
+                    std::fprintf(stderr,
+                        "LOAD-WATCH cyc=%llu pc=0x%016llx sz=%u va=0x%016llx "
+                        "pa=0x%016llx raw=0x%016llx status=%d\n",
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(lwApc),
+                        static_cast<unsigned>(r.memSize),
+                        static_cast<unsigned long long>(r.memAddr),
+                        static_cast<unsigned long long>(pa),
+                        static_cast<unsigned long long>(raw),
+                        static_cast<int>(br.status));
+                    std::fflush(stderr);
+                }
+            }
+        }
+#endif
+
+#if EMULATR_MEMDIAG
         // TEMP TICK-LOADWATCH 2026-05-31 -- REMOVE BEFORE COMMIT.  Pair to the
         // store-side TICK-STOREWATCH below.  PA 0x1d0d6c = pcb$q_cputime
         // (pcb 0x1d0ca0 + 0xcc), the first counter the clock ISR bumps.  The
