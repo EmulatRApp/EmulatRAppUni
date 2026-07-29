@@ -82,6 +82,9 @@
 #include "grainFactoryLib/generated/SemanticFlagsEnum.h"
 #include "mmuLib/CboxEventLog.h"
 #include "pteLib/Ev6PteFormat.h"
+#if EMULATR_BRINGUP_PROBES
+#include "pteLib/AsnCensus.h"   // ASN install census (2026-07-28)
+#endif
 
 // CSERVE C2: terminal-I/O routes through the (already-compiled) console
 // manager.  ConsoleManager is global-namespace (Qt); global_ConsoleManager()
@@ -1965,6 +1968,12 @@ auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Box
     loadCpuFromHwpcb(*c.cpu, img);                 // SPs/PTBR/ASN/AST/FEN+PME+DAT/CC
     c.cpu->pcbb       = newPcbb;
     c.cpu->intReg[30] = img.ksp;                   // running SP <- new KSP
+#if EMULATR_BRINGUP_PROBES
+    // ASN census A1: the context swap is the architectural point where a
+    // NEW address space becomes current -- the event whose frequency the
+    // census exists to count (2026-07-28).
+    pteLib::AsnCensus::recordInstall(c.cpu->asn, c.cpu->cycleCount);
+#endif
 
     // (3) PAL-temp MEMORY mirrors.  The guest's own TB-miss handlers read
     // PT__PTBR / PT__PCBB from the temps region (ev6_vms_pal.mar:1107/
@@ -2887,8 +2896,18 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         // DTB_ASN holds ASN at register bits [63:56] (HRM, Tim 2026-05-20).
     case coreLib::HW_DTB_TAG0:  c.cpu->dtbTag0 = c.opB;                       break;
     case coreLib::HW_DTB_TAG1:  c.cpu->dtbTag1 = c.opB;                       break;
-    case coreLib::HW_DTB_ASN0:  c.cpu->dtbAsn0 = (c.opB >> 56) & 0xFFULL;     break;
-    case coreLib::HW_DTB_ASN1:  c.cpu->dtbAsn1 = (c.opB >> 56) & 0xFFULL;     break;
+    case coreLib::HW_DTB_ASN0:
+        c.cpu->dtbAsn0 = (c.opB >> 56) & 0xFFULL;
+#if EMULATR_BRINGUP_PROBES
+        pteLib::AsnCensus::recordInstall(c.cpu->dtbAsn0, c.cpu->cycleCount);
+#endif
+        break;
+    case coreLib::HW_DTB_ASN1:
+        c.cpu->dtbAsn1 = (c.opB >> 56) & 0xFFULL;
+#if EMULATR_BRINGUP_PROBES
+        pteLib::AsnCensus::recordInstall(c.cpu->dtbAsn1, c.cpu->cycleCount);
+#endif
+        break;
     case coreLib::HW_DTB_PTE0: {
         c.cpu->dtbPteTemp = c.opB;   // TEMP contract: stage raw IPR value
         pteLib::AlphaPte const pte = pteLib::canonicalFromDtbPte(c.opB);

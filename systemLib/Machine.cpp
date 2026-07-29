@@ -42,6 +42,10 @@
 #include <QString>
 #include <spdlog/spdlog.h>
 
+#if EMULATR_BRINGUP_PROBES
+#include "pteLib/AsnCensus.h"   // end-of-run ASN census report (2026-07-28)
+#endif
+
 
 // ----------------------------------------------------------------------------
 // TEMP DIAGNOSTIC (DIVERT-REI register ledger, fill side) -- REMOVE AFTER
@@ -1304,6 +1308,14 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
     if (m_traceSink) {
         m_traceSink->onRunEnd(m_cpu);
     }
+
+#if EMULATR_BRINGUP_PROBES
+    // ASN census (2026-07-28): emit the ASN allocation table and the
+    // cold / ASN-different / same-ASN miss split.  Prints nothing unless
+    // EMULATR_ASN_CENSUS is armed.  Placed here so it fires on every
+    // stop reason (clean halt, fault, max-cycles) exactly like the sink.
+    pteLib::AsnCensus::report();
+#endif
 
     // Boot profiler (2026-06-05): end-of-run histogram dump.  Cheap
     // (one ASCII file), and the data is exactly the "where did the

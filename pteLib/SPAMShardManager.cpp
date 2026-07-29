@@ -46,6 +46,10 @@
 
 #include "pteLib/SPAMShardManager.h"
 
+#if EMULATR_BRINGUP_PROBES
+#include "pteLib/AsnCensus.h"   // ASN allocation + ASN-attributable miss census
+#endif
+
 namespace pteLib {
 
 
@@ -89,6 +93,16 @@ LookupResult SPAMShardManager<Shards, Ways>::lookup(
         }
     }
 
+#if EMULATR_BRINGUP_PROBES
+    // ASN census (2026-07-28): classify this miss as cold / ASN-different
+    // / same-ASN-refill so the ASN tag's contribution to the TB miss rate
+    // can be measured rather than inferred.  See pteLib/AsnCensus.h for
+    // what M2 does and does not prove.  Zero cost unless armed.
+    AsnCensus::classifyMiss(realm == TlbRealm::Dtb ? CensusRealm::Dtb
+                                                   : CensusRealm::Itb,
+                            rawVpn, asn);
+#endif
+
     return LookupResult::miss(realm);
 }
 
@@ -117,6 +131,15 @@ void SPAMShardManager<Shards, Ways>::insert(
 
     std::size_t const shardIdx = shardIndexOf(tag);
     (void)m_shards[shardIdx].insert(entry);
+
+#if EMULATR_BRINGUP_PROBES
+    // ASN census A2: fills per ASN, and the (realm,VPN)->ASN-set history
+    // the miss classifier reads.  Records the RAW vpn so it pairs with
+    // the lookup-side probe key.  Zero cost unless armed.
+    AsnCensus::recordFill(realm == TlbRealm::Dtb ? CensusRealm::Dtb
+                                                 : CensusRealm::Itb,
+                          vaToVpn(va), asn);
+#endif
 }
 
 
