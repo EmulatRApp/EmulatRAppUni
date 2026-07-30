@@ -387,6 +387,18 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
     // swap).  Do NOT bind this to a second CPU's cycleCount when CPU1 lands.
     m_chipset.rtc().bindCycleSource(&m_cpu.cycleCount);
 
+    // SPEC-TOY-001 Sec 6: CMOS persistence store, relative to the run
+    // directory (the launchers pin CWD there).  EMULATR_TOY_NVRAM
+    // overrides the path (a scratch path satisfies the Sec 7 gate rule
+    // alongside EMULATR_TOY_MODE=fixed, whose mode-mismatch check
+    // already refuses a store written by another mode).  bindBacking
+    // loads an existing store immediately; absent/corrupt stores leave
+    // the dead-battery (unset) semantics in force with one loud line.
+    {
+        char const* const nv = std::getenv("EMULATR_TOY_NVRAM");
+        m_chipset.rtc().bindBacking(nv && nv[0] ? nv : "nvram/toy_cmos.bin");
+    }
+
     // CpuState default-init is sufficient for a freshly constructed
     // machine: regfiles all zero, pc = 0, palMode = false, halted =
     // false, lastFaultCode = 0.  Memory is zero-initialised by
