@@ -18,10 +18,15 @@
 
 #include "memoryLib/GuestMemory.h"
 #include "systemLib/Machine.h"
+#include "systemLib/SrmLoader.h"
 #include "systemLib/StopReason.h"
 
 #include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <ostream>
+#include <vector>
 
 
 using memoryLib::MemStatus;
@@ -223,4 +228,140 @@ TEST_CASE("Machine::tryFetch -- without SRM load returns false")
     // got must be left unchanged on miss; pipeline relies on the
     // returned bool, not the out param, to decide what to do.
     CHECK(got == 0xDEADBEEFu);
+}
+
+
+// =============================================================================
+// tryFetch retirement at Step D (TASK-MEMWB-001 root cause, 2026-07-29).
+//
+// Before Step D the override serves the frozen payload bytes for any
+// I-fetch in [loadPa, loadPa + payloadSize) -- the decompressor-stub
+// coherency window.  Once onBeforeFetch fires at descriptor.entryPa()
+// (the JSR into the decompressed image), the stub era is over and the
+// override must DISARM: OpenVMS later loads exec code into that same
+// physical range, and a still-armed override feeds the IF stage stale
+// firmware bytes while the D-stream sees real memory (bugcheck
+// INVEXCEPTN at PA 0x9151C0, VA FFFFFFFF.801151C0).
+//
+// Synthetic .exe layout mirrors test_srmloader.cpp's makeFakeExe.
+// =============================================================================
+
+TEST_CASE("Machine::tryFetch -- serves payload before Step D, disarms after")
+{
+    // Build a minimal fake SRM .exe: sig at 0x300, PAL_BASE 0x600000,
+    // LDA disp (finalPC) 0x5C0, 0x4000 total.
+    constexpr size_t   kSigOff   = 0x300;
+    constexpr uint64_t kPalBase  = 0x600000ULL;
+    constexpr uint16_t kFinalPc  = 0x05C0;
+    constexpr size_t   kExeSize  = 0x4000;
+    constexpr uint64_t kLoadPa   = systemLib::kDefaultLoadPa;   // 0x900000
+
+    std::vector<uint8_t> bytes(kExeSize, 0);
+    std::memcpy(&bytes[kSigOff], systemLib::kDecompSig, systemLib::kDecompSigLen);
+    std::memcpy(&bytes[kSigOff + 0x10], &kPalBase, sizeof(kPalBase));
+    uint32_t const lda = 0x201A0000u | uint32_t{kFinalPc};   // LDA R0, disp(R26)
+    uint32_t const jsr = 0x6BE04000u;                        // JSR R31, (R0)
+    std::memcpy(&bytes[kSigOff + 0x18], &lda, sizeof(lda));
+    std::memcpy(&bytes[kSigOff + 0x1C], &jsr, sizeof(jsr));
+
+    auto const path = std::filesystem::temp_directory_path() /
+                      "emulatr_machine_stepd_disarm.exe";
+    {
+        std::ofstream out{path, std::ios::binary};
+        out.write(reinterpret_cast<char const*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+    }
+
+    Machine m{16ULL * 1024ULL * 1024ULL};
+    REQUIRE(m.loadSrmFirmware(path, kLoadPa));
+    REQUIRE(m.srmDescriptor().valid);
+
+    // Pick a probe PA inside the payload window and overwrite the guest
+    // RAM copy there, emulating the stub's self-overwrite.
+    constexpr uint64_t kProbeOff = 0x1000;
+    uint32_t origWord = 0;
+    std::memcpy(&origWord, m.srmPayload().data() + kProbeOff, sizeof(origWord));
+    writeWord(m, kLoadPa + kProbeOff, 0xBADC0DE5u);
+
+    // Stub era: override serves the frozen payload bytes, not RAM.
+    uint32_t got = 0;
+    CHECK(m.tryFetch(kLoadPa + kProbeOff, got));
+    CHECK(got == origWord);
+
+    // Fire Step D: first fetch from descriptor.entryPa() (= targetPalBase
+    // + finalPC, OUTSIDE the payload window).
+    CHECK(m.srmDescriptor().entryPa() == kPalBase + kFinalPc);
+    m.onBeforeFetch(m.srmDescriptor().entryPa());
+
+    // Post-Step-D: the override is retired.  IF reads now fall through
+    // to GuestMemory, so guest code loaded into the old stub range
+    // executes its OWN bytes.
+    got = 0xDEADBEEF;
+    CHECK_FALSE(m.tryFetch(kLoadPa + kProbeOff, got));
+    CHECK(got == 0xDEADBEEFu);
+
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+}
+
+
+// =============================================================================
+// Loads to R31 / F31 are prefetches / UNOP -- no access, no fault.
+//
+// 21264 HRM Sec 2.6: LDBU/LDWU/LDL/LDQ/LDF/LDG/LDS/LDT with destination
+// R31/F31 are software-directed prefetches; the HRM's fault-capable
+// instruction list reads "LDQ_U (not to R31)" -- the UNOP never touches
+// the memory pipe at all.  EmulatR previously executed these as real
+// loads: at an unmapped/out-of-range EA they faulted, and since the real
+// VMS PALcode has no dismiss arm for LDQ_U R31 (hardware guarantees that
+// fault cannot occur), the fault escalated to an impossible guest ACCVIO
+// -- INVEXCEPTN in SWAPPER's SCH$FIND_NEXT_PROC epilogue, LDQ_U R31,(SP)
+// at the popped stack boundary (2026-07-29).
+// =============================================================================
+
+TEST_CASE("Machine -- loads to R31/F31 never access memory or fault")
+{
+    constexpr uint8_t  kOpLDAH = 0x09;
+    constexpr uint8_t  kOpLDQ_U = 0x0B;
+    constexpr uint8_t  kOpLDS  = 0x22;
+    constexpr uint8_t  kOpLDL  = 0x28;
+    constexpr uint8_t  kOpLDQ  = 0x29;
+
+    // R1 = 0x10000 -- far outside this machine's 4 KB memory, so a REAL
+    // load through this EA takes kFaultBusError (control case below).
+    SUBCASE("prefetch/UNOP forms sail through")
+    {
+        Machine m{4096};
+        writeWord(m, 0x000, encMem(kOpLDAH, 1, 31, 0x0001));   // R1 = 0x10000
+        writeWord(m, 0x004, encMem(kOpLDQ_U, 31, 1, 0x0000));  // UNOP
+        writeWord(m, 0x008, encMem(kOpLDQ,   31, 1, 0x0008));  // prefetch
+        writeWord(m, 0x00C, encMem(kOpLDL,   31, 1, 0x0004));  // prefetch
+        writeWord(m, 0x010, encMem(kOpLDS,   31, 1, 0x0004));  // prefetch w/ intent
+        writeWord(m, 0x014, encMem(kOpLDA,    2, 31, 0x0077)); // marker
+        writeWord(m, 0x018, kHalt);
+
+        m.reset(/*pc*/ 0x000, /*palMode*/ true);
+        StopReason const sr = m.run(/*maxCycles*/ 64);
+
+        CHECK(sr == StopReason::HaltedClean);
+        CHECK(m.cpu().intReg[2] == 0x77u);            // marker reached
+        CHECK(m.cpu().lastFaultCode == 13u);          // kFaultHalt only
+    }
+
+    // Control: the SAME EA through a real destination register must
+    // still fault (bus error) -- proving the R31 path above skipped the
+    // access rather than the fault having gone soft.
+    SUBCASE("real load at the same EA still faults")
+    {
+        Machine m{4096};
+        writeWord(m, 0x000, encMem(kOpLDAH, 1, 31, 0x0001));   // R1 = 0x10000
+        writeWord(m, 0x004, encMem(kOpLDQ,   3, 1, 0x0000));   // real LDQ -> fault
+        writeWord(m, 0x008, encMem(kOpLDA,   2, 31, 0x0077));  // marker
+        writeWord(m, 0x00C, kHalt);
+
+        m.reset(/*pc*/ 0x000, /*palMode*/ true);
+        (void)m.run(/*maxCycles*/ 64);
+
+        CHECK(m.cpu().intReg[2] != 0x77u);            // marker NOT reached
+    }
 }

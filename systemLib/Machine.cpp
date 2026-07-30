@@ -792,6 +792,19 @@ bool Machine::tryFetch(uint64_t pa, uint32_t& out) const noexcept
         return false;
     }
 
+    // Retirement gate (TASK-MEMWB-001, 2026-07-29): the override models
+    // the decompressor-stub I-cache coherency window ONLY (the stub
+    // overwrites its own memory image while its instructions execute
+    // from the real chip's I-cache).  That era ends at Step D -- the
+    // first fetch from descriptor.entryPa(), i.e. the JSR into the
+    // decompressed image -- after which serving payload bytes FOREVER
+    // handed stale firmware content to any guest code later loaded
+    // into [m_srmLoadPa, +payload) (VMS exec code at PA 0x9151C0
+    // fetched garbage while D-stream saw real memory).
+    if (m_palImageRelocated) {
+        return false;
+    }
+
     // Range check: pa must be inside the loaded stub region and have
     // four bytes available before the payload buffer ends.
     uint64_t const payloadSize = m_srmPayload.size();
