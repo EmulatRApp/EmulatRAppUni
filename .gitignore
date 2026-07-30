@@ -71,6 +71,9 @@ berkeley-softfloat-3-master/build/EmulatR-MSVC-x64/*
 *.tlog
 *.lastbuildstate
 
+# journals
+journals/
+
 # Trace, snapshot, and runtime artifacts --------------------------------------
 Trace Output/
 traces/
