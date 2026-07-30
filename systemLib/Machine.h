@@ -145,11 +145,15 @@ public:
 
     // pipelineLib::IFetchOverride implementation.  Returns true with
     // out filled when pa falls inside [m_srmLoadPa, m_srmLoadPa +
-    // payloadSize) and the SRM descriptor is valid; false otherwise.
+    // payloadSize), the SRM descriptor is valid, AND Step D has not
+    // yet fired (m_palImageRelocated false); false otherwise.
     // PipelineDriver consults this at the IF stage before reading
     // the encoded instruction word from GuestMemory, so the IBox
     // sees the original SRM stub bytes even after the decompressor
-    // has overwritten them in guest memory.
+    // has overwritten them in guest memory.  The override retires at
+    // Step D: serving payload bytes past the stub era handed stale
+    // firmware content to guest code later loaded into the same PA
+    // range (TASK-MEMWB-001 root cause, 2026-07-29).
     bool tryFetch(uint64_t pa, uint32_t& out) const noexcept override;
 
     // pipelineLib::IFetchOverride pre-fetch hook.  Implements V4's

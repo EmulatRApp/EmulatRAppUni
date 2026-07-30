@@ -288,6 +288,35 @@ private:
     {
         coreLib::BoxResult& r = slot.result;
 
+        // Prefetch / UNOP rule (21264 HRM Sec 2.6; AARM UNOP = LDQ_U
+        // R31,0(Rx)): architectural loads with destination R31/F31 are
+        // software-directed prefetches, and LDQ_U R31 never reaches the
+        // memory pipe at all -- the HRM's fault-capable instruction list
+        // reads "LDQ_U (not to R31)".  With no Dcache model the whole
+        // family reduces to: no access, no fault.  Faulting them is not
+        // just wasted work: the real VMS PALcode dismisses prefetch
+        // faults (HRM 2.6 "must be dismissed by PALcode") but has no
+        // dismiss arm for LDQ_U R31 -- hardware guarantees that fault
+        // cannot occur -- so an emulator-raised fault there escalates
+        // into an impossible guest ACCVIO (INVEXCEPTN in SWAPPER's
+        // SCH$FIND_NEXT_PROC epilogue, LDQ_U R31,(SP) at the popped
+        // stack boundary, 2026-07-29).  Opcode-gated (not S_Load-
+        // gated) so CALL_PAL intrinsics, whose encoded<25:21> is not
+        // an Ra field, never match.  LDx_L (0x2A/0x2B: reservation
+        // side effect, R31 form UNPREDICTABLE) and HW_LD (0x1B: PAL
+        // contract) intentionally keep their normal path.
+        switch (slot.grain.primaryOp) {
+          case 0x0Au: case 0x0Bu: case 0x0Cu:               // LDBU, LDQ_U, LDWU
+          case 0x20u: case 0x21u: case 0x22u: case 0x23u:   // LDF, LDG, LDS, LDT
+          case 0x28u: case 0x29u:                           // LDL, LDQ
+            if (((slot.grain.encoded >> 21) & 0x1Fu) == 31u) {
+                return;
+            }
+            break;
+          default:
+            break;
+        }
+
         // Translate VA to PA.  Always alignment-checked: the
         // alignment rule for size > 1 is naturally aligned, and the
         // leaf has already pre-aligned LDQ_U / STQ_U via its own
