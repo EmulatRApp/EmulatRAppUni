@@ -21,6 +21,47 @@
 // CHECK CONDITION / ILLEGAL REQUEST with sense retained for REQUEST SENSE
 // -- never silent, per the no-silent-absorbers house rule.
 // ============================================================================
+// CHANGE HISTORY
+// ============================================================================
+//   2026-08-04  SPEC-DISK-001 (architect-approved): atomic drive profiles.
+//               FUNCTION: setProfile (new) / cmdInquiry / cmdModeSense.
+//               CHANGE:  With a DriveProfile set (manifest "model" ->
+//                        DriveProfile.h table), INQUIRY identity strings,
+//                        byte 7 flags, RMB, and ANSI version come from the
+//                        profile (closes JRN-AUD-003 S-4: byte7 was 0,
+//                        suppressing CmdQue/Sync negotiation), and MODE
+//                        SENSE serves pages 03h/04h/3Fh with profile
+//                        geometry (closes S-12: pages were zero under
+//                        GOOD).  Two-step probe honored: the header's
+//                        mode-data-length always describes the FULL
+//                        response so a short probe sizes its re-issue.
+//                        DBD honored.  Unsupported page code -> CHECK
+//                        CONDITION ILLEGAL REQUEST invalid field in CDB
+//                        (05/24/00), never a truncated header under GOOD.
+//                        PC field: current values for all PC codes,
+//                        _PROVISIONAL.  Page layouts [CONFIRM] vs SCSI-2
+//                        X3.131 mode page 3/4 definitions.
+//                        WITHOUT a profile (default), behavior is
+//                        byte-identical to the previous revision -- the
+//                        legacy EMULATR identity and header+bd MODE SENSE
+//                        -- so direct-constructed devices (tests, any
+//                        non-manifest path) are unchanged.
+//
+//   2026-08-02  JRN-AUD-003 Batch G (architect-approved): S-3, allocation
+//               length honored.
+//               FUNCTION: cmdInquiry / cmdRequestSense / cmdModeSense (and
+//               the LUN!=0 INQUIRY/REQUEST SENSE arms).
+//               CHANGE:  Parameter-data commands now transfer
+//                        min(allocation length, available) per SCSI-2
+//                        8.2.5/8.2.10/8.2.14 (CDB byte 4; MODE SENSE(10)
+//                        bytes 7-8).  Previously the full structure was
+//                        returned regardless, so an initiator issuing the
+//                        classic short probe (4-byte MODE SENSE header
+//                        peek, small INQUIRY peek) was left with the nexus
+//                        stuck in DATA IN and the next STATUS-phase move
+//                        raised a phase mismatch the pke driver answers
+//                        with a full port re-init (JRN-AUD-003 S-3).
+// ============================================================================
 
 #ifndef DEVICELIB_SCSI_VIRTUALDISKDEVICE_H
 #define DEVICELIB_SCSI_VIRTUALDISKDEVICE_H
@@ -30,6 +71,7 @@
 #include <cstring>
 #include <memory>
 
+#include "deviceLib/scsi/DriveProfile.h"
 #include "deviceLib/scsi/IBlockMedia.h"
 #include "deviceLib/scsi/ScsiCommand.h"
 #include "deviceLib/scsi/ScsiSenseData.h"
@@ -57,6 +99,16 @@ public:
         return m_media && m_media->isOpen() && m_media->isPresent();
     }
 
+    // SPEC-DISK-001: bind the atomic drive profile.  nullptr (default)
+    // keeps legacy behavior exactly.  The caller (Machine storage attach)
+    // validates media size against the profile BEFORE binding.
+    void setProfile(DriveProfile const* p) noexcept { m_profile = p; }
+    DriveProfile const* profile() const noexcept    { return m_profile; }
+
+    // W-4: SCSI bus reset re-latches UNIT ATTENTION (power-on latches it
+    // at construction).
+    void busReset() noexcept override { m_unitAttention = true; }
+
     ScsiPeripheralDeviceType deviceType() const noexcept override
     {
         return ScsiPeripheralDeviceType::DirectAccessBlockDevice;
@@ -79,20 +131,43 @@ public:
                 buf[2] = 0x02;
                 buf[3] = 0x02;
                 buf[4] = 31;
-                cmd.dataTransferred = copyOut(cmd, buf, sizeof(buf));
+                // Batch G S-3: clamp to CDB allocation length (SCSI-2 8.2.5).
+                cmd.dataTransferred = copyOut(cmd, buf,
+                    clampAlloc(sizeof(buf), cmd.cdb[4]));
                 cmd.setGood();
                 return;
             }
             if (cmd.opcode() == ScsiOp::REQUEST_SENSE) {
                 ScsiFixedSenseData const s = ScsiFixedSenseData::make(
                     ScsiSenseKey::IllegalRequest, 0x25, 0x00);
+                // Batch G S-3: clamp to CDB allocation length (SCSI-2 8.2.14).
                 cmd.dataTransferred = copyOut(cmd, s.bytes(),
-                    static_cast<uint32_t>(s.size()));
+                    clampAlloc(static_cast<uint32_t>(s.size()), cmd.cdb[4]));
                 cmd.setGood();
                 return;
             }
             check(cmd, ScsiSenseKey::IllegalRequest, 0x25, 0x00);
             return;
+        }
+        // W-4 (BRIEF-SCSI-040 Sec 4, architect-approved 2026-08-04): UNIT
+        // ATTENTION.  Latched at power-on (construction) and on SCSI bus
+        // reset (busReset()); delivered as CHECK CONDITION 06/29/00
+        // (power on, reset, or bus device reset occurred) on the first
+        // command OTHER than INQUIRY or REQUEST SENSE (SCSI-2 7.9: INQUIRY
+        // succeeds without clearing UA; REQUEST SENSE reports without
+        // clearing), and CLEARED once reported.  MEASURED consumer: run
+        // 20260803_185257 -- with the RZ29L profile, DKDRIVER entered its
+        // readiness/attention poll (RC/TUR/RS repeating, all GOOD, 131k
+        // sessions) awaiting exactly this attention; instant readiness with
+        // no UA is a state no real drive exhibits (SPEC-DISK-001 D-2
+        // interaction).  Also lights DK Flags first_attn_seen VMS-side.
+        if (m_unitAttention) {
+            uint8_t const op = cmd.opcode();
+            if (op != 0x12 /*INQUIRY*/ && op != 0x03 /*REQUEST SENSE*/) {
+                m_unitAttention = false;           // reported ONCE
+                check(cmd, ScsiSenseKey::UnitAttention, 0x29, 0x00);
+                return;
+            }
         }
         switch (cmd.opcode()) {
         case ScsiOp::TEST_UNIT_READY: cmdTestUnitReady(cmd); return;
@@ -142,8 +217,9 @@ private:
 
     void cmdRequestSense(ScsiCommand& cmd) noexcept
     {
+        // Batch G S-3 (2026-08-02): transfer min(alloc, 18) -- SCSI-2 8.2.14.
         cmd.dataTransferred = copyOut(cmd, m_lastSense.bytes(),
-                                      static_cast<uint32_t>(m_lastSense.size()));
+            clampAlloc(static_cast<uint32_t>(m_lastSense.size()), cmd.cdb[4]));
         m_lastSense = ScsiFixedSenseData{};       // sense is consumed by delivery
         cmd.setGood();
     }
@@ -151,41 +227,129 @@ private:
     void cmdInquiry(ScsiCommand& cmd) noexcept
     {
         // Standard INQUIRY data, 36 bytes (SPC-2 subset the SRM probes).
+        // SPEC-DISK-001: identity comes from the bound profile ATOMICALLY
+        // (vendor/product/revision/byte7/RMB/ANSI from one table entry);
+        // without a profile, the legacy EMULATR identity is byte-identical
+        // to the pre-profile revision.
         uint8_t buf[36] = {};
         buf[0] = static_cast<uint8_t>(deviceType());   // direct-access, connected
-        buf[1] = 0x00;                                 // non-removable
-        buf[2] = 0x02;                                 // SCSI-2
-        buf[3] = 0x02;                                 // response data format
-        buf[4] = 31;                                   // additional length (36-5)
-        std::memcpy(&buf[8],  "EMULATR ",         8);  // T10 vendor (8)
-        std::memcpy(&buf[16], "VIRTUAL DISK    ", 16); // product id (16)
-        std::memcpy(&buf[32], "0001",             4);  // revision (4)
-        cmd.dataTransferred = copyOut(cmd, buf, sizeof(buf));
+        if (m_profile != nullptr) {
+            buf[1] = m_profile->inquiryRmb ? 0x80 : 0x00;
+            buf[2] = m_profile->inquiryAnsiVersion;
+            buf[3] = 0x02;                             // response data format
+            buf[4] = 31;                               // additional length
+            buf[7] = m_profile->inquiryByte7;          // S-4 closed: CmdQue/Sync
+            std::memcpy(&buf[8],  m_profile->inquiryVendor,   8);
+            std::memcpy(&buf[16], m_profile->inquiryProduct, 16);
+            std::memcpy(&buf[32], m_profile->inquiryRevision, 4);
+        } else {
+            buf[1] = 0x00;                             // non-removable
+            buf[2] = 0x02;                             // SCSI-2
+            buf[3] = 0x02;                             // response data format
+            buf[4] = 31;                               // additional length (36-5)
+            std::memcpy(&buf[8],  "EMULATR ",         8);  // T10 vendor (8)
+            std::memcpy(&buf[16], "VIRTUAL DISK    ", 16); // product id (16)
+            std::memcpy(&buf[32], "0001",             4);  // revision (4)
+        }
+        // Batch G S-3 (2026-08-02): transfer min(alloc, 36) -- SCSI-2 8.2.5.
+        cmd.dataTransferred = copyOut(cmd, buf,
+            clampAlloc(sizeof(buf), cmd.cdb[4]));
         good(cmd);
     }
 
     void cmdModeSense(ScsiCommand& cmd, bool ten) noexcept
     {
-        // Minimal: header + 8-byte block descriptor, zero mode pages.  The SRM
-        // dk driver only needs the block size / geometry-free identity.
         uint64_t const blocks = hasMedia() ? m_media->blockCount() : 0;
         uint32_t const bs     = hasMedia() ? m_media->blockSize()  : 512;
-        uint8_t  buf[16]      = {};
-        uint32_t n;
-        if (!ten) {
-            buf[0] = 11;                       // mode data length (n-1)
-            buf[3] = 8;                        // block descriptor length
-            put24(&buf[5],  blocks > 0xFFFFFF ? 0 : static_cast<uint32_t>(blocks));
-            put24(&buf[9],  bs);               // bytes 9..11 of descriptor
-            n = 12;
-        } else {
-            buf[1] = 14;                       // mode data length low (n-2)
-            buf[7] = 8;                        // block descriptor length low
-            put24(&buf[9],  blocks > 0xFFFFFF ? 0 : static_cast<uint32_t>(blocks));
-            put24(&buf[13], bs);
-            n = 16;
+        uint32_t const alloc  = ten
+            ? ((uint32_t(cmd.cdb[7]) << 8) | uint32_t(cmd.cdb[8]))
+            :   uint32_t(cmd.cdb[4]);
+
+        if (m_profile == nullptr) {
+            // LEGACY (no profile bound): header + 8-byte block descriptor,
+            // zero mode pages, any page code -- byte-identical to the
+            // pre-SPEC-DISK-001 revision.
+            uint8_t  buf[16] = {};
+            uint32_t n;
+            if (!ten) {
+                buf[0] = 11;                   // mode data length (n-1)
+                buf[3] = 8;                    // block descriptor length
+                put24(&buf[5],  blocks > 0xFFFFFF ? 0 : static_cast<uint32_t>(blocks));
+                put24(&buf[9],  bs);
+                n = 12;
+            } else {
+                buf[1] = 14;                   // mode data length low (n-2)
+                buf[7] = 8;                    // block descriptor length low
+                put24(&buf[9],  blocks > 0xFFFFFF ? 0 : static_cast<uint32_t>(blocks));
+                put24(&buf[13], bs);
+                n = 16;
+            }
+            cmd.dataTransferred = copyOut(cmd, buf, (alloc < n) ? alloc : n);
+            good(cmd);
+            return;
         }
-        cmd.dataTransferred = copyOut(cmd, buf, n);
+
+        // SPEC-DISK-001 Sec 6.3 (architect-approved): pages 03h/04h from the
+        // profile; 3Fh returns all supported pages; page 00h returns header
+        // (+ descriptor) only, GOOD -- permissive legacy shape [CONFIRM SRM
+        // usage].  Any OTHER page code: CHECK CONDITION, ILLEGAL REQUEST,
+        // invalid field in CDB (05/24/00) -- never a truncated header under
+        // GOOD (JRN-AUD-003 S-12 closed).  PC field <7:6>: current values
+        // returned for ALL PC codes, _PROVISIONAL.  Page layouts [CONFIRM]
+        // vs SCSI-2 X3.131 (recalled field order; see SPEC-DISK-001).
+        uint8_t const pageCode = cmd.cdb[2] & 0x3F;
+        bool const dbd = (cmd.cdb[1] & 0x08) != 0;
+        bool const wantP3 = (pageCode == 0x03) || (pageCode == 0x3F);
+        bool const wantP4 = (pageCode == 0x04) || (pageCode == 0x3F);
+        if (!wantP3 && !wantP4 && pageCode != 0x00) {
+            check(cmd, ScsiSenseKey::IllegalRequest, 0x24, 0x00);
+            return;
+        }
+
+        uint8_t buf[80] = {};
+        uint32_t const hdr = ten ? 8u : 4u;
+        uint32_t pos = hdr;
+        if (!dbd) {                            // 8-byte block descriptor
+            // density 00 | number of blocks (3, BE; 0 if > 24 bits) |
+            // reserved 00 | block length (3, BE)
+            put24(&buf[pos + 1], blocks > 0xFFFFFF ? 0
+                                                   : static_cast<uint32_t>(blocks));
+            put24(&buf[pos + 5], bs);
+            pos += 8;
+        }
+        if (wantP3) {                          // page 03h Format Device
+            uint8_t* p = &buf[pos];
+            p[0]  = 0x03; p[1] = 0x16;         // code, page length 22
+            p[10] = uint8_t(m_profile->sectorsPerTrack >> 8);
+            p[11] = uint8_t(m_profile->sectorsPerTrack);
+            p[12] = uint8_t(bs >> 8);
+            p[13] = uint8_t(bs);
+            p[15] = 0x01;                      // interleave 0001
+            pos += 24;
+        }
+        if (wantP4) {                          // page 04h Rigid Disk Geometry
+            uint8_t* p = &buf[pos];
+            p[0] = 0x04; p[1] = 0x16;          // code, page length 22
+            put24(&p[2], m_profile->cylinders);
+            p[5] = uint8_t(m_profile->tracksPerCylinder);
+            p[20] = uint8_t(m_profile->rotationRateRpm >> 8);
+            p[21] = uint8_t(m_profile->rotationRateRpm);
+            pos += 24;
+        }
+        // Header LAST: the mode-data-length field always describes the FULL
+        // response, so the driver's SHORT first probe (header peek) reads
+        // the true size and re-issues correctly -- the two-step sequence
+        // whose absence left DK Flags 2 = 0.
+        if (!ten) {
+            buf[0] = uint8_t(pos - 1);         // does not count itself
+            buf[3] = dbd ? 0 : 8;
+        } else {
+            buf[0] = uint8_t((pos - 2) >> 8);
+            buf[1] = uint8_t(pos - 2);
+            buf[6] = 0;
+            buf[7] = dbd ? 0 : 8;
+        }
+        cmd.dataTransferred = copyOut(cmd, buf, (alloc < pos) ? alloc : pos);
         good(cmd);
     }
 
@@ -259,8 +423,16 @@ private:
     void cmdReadCapacity(ScsiCommand& cmd) noexcept
     {
         if (!hasMedia()) { check(cmd, ScsiSenseKey::NotReady, 0x3A, 0x00); return; }
-        uint64_t const last = m_media->blockCount() ? m_media->blockCount() - 1 : 0;
-        uint32_t const bs   = m_media->blockSize();
+        // SPEC-DISK-001 Sec 6.2: with a profile bound, capacity is the
+        // PROFILE's (attach-time validation guarantees media >= profile;
+        // a larger image's tail is deliberately unaddressable).  Returns
+        // blocks - 1 = LAST LBA, never the count -- the source document's
+        // "Sectors/drive 8,380,079" is the last LBA; do not "fix" this.
+        uint64_t const nblk = (m_profile != nullptr)
+                            ? m_profile->blocks : m_media->blockCount();
+        uint64_t const last = nblk ? nblk - 1 : 0;
+        uint32_t const bs   = (m_profile != nullptr)
+                            ? m_profile->blockSize : m_media->blockSize();
         uint8_t buf[8];
         put32(&buf[0], last > 0xFFFFFFFFull ? 0xFFFFFFFFu
                                             : static_cast<uint32_t>(last));
@@ -329,9 +501,23 @@ private:
         if (cmd.dataBuffer && c) std::memcpy(cmd.dataBuffer, src, c);
         return c;
     }
+    // Batch G S-3 (2026-08-02): SCSI-2 allocation-length clamp for
+    // parameter-data commands -- transfer min(alloc, available); alloc 0
+    // legally means "no data".
+    static uint32_t clampAlloc(uint32_t avail, uint32_t alloc) noexcept
+    {
+        return (alloc < avail) ? alloc : avail;
+    }
 
     std::unique_ptr<IBlockMedia> m_media;
     ScsiFixedSenseData           m_lastSense{};
+    DriveProfile const*          m_profile = nullptr;  // SPEC-DISK-001
+    // W-4: power-on UA latched at construction; re-latched by busReset().
+    // SCOPE NOTE (architect review 2026-08-04): UNIT ATTENTION is strictly
+    // per-initiator-per-LUN; a single flag is correct for today's single-
+    // initiator bus, but a future multi-initiator config must NOT inherit
+    // this global -- promote to a per-initiator set at that point.
+    bool m_unitAttention = true;
 };
 
 } // namespace scsi

@@ -1,0 +1,46 @@
+# ============================================================================
+# emulatr_env_registry.tsv -- curated EMULATR_* runtime variable registry
+# ============================================================================
+# Project: EmulatR -- EmulatrLaunch (SPEC-LAUNCH-001 Rev D.2)
+# Version: 1.0.0-alpha   Date: 2026-07-29
+# Spec:    Section 7.1 (V1/V2) -- the ONLY source of rows for the W6 panel.
+#
+# ####################  GATE G2b IS NOT CLOSED  ##############################
+# Section 13 G2b requires an EVIDENCE CENSUS of every runtime getenv
+# ("EMULATR_*") in the core tree, with file/line anchors, value kind, effect,
+# and TIM'S SIGN-OFF ON THE TIERING, before rows appear here.  The panel
+# renders ONLY census output (V1), so this file ships nearly empty BY DESIGN.
+# It is not a stub to be filled in by guesswork -- classifying a diagnostic
+# knob as "safe" without evidence is exactly the failure G2b exists to prevent.
+#
+# Census scale (measured 2026-07-29, informational only, NOT a classification):
+#   ~140 getenv("EMULATR_*") call sites across coreLib, chipsetLib, deviceLib,
+#   pipelineLib, mmuLib, memoryLib, palBoxLib, systemLib, traceLib, main.cpp.
+#
+# The ONE row below is not census output either -- it is transcribed from the
+# spec itself, which names EMULATR_RSCCWARP as the founding denied-tier member
+# (Section 7.1 V2, "confirmed boot corruption").  Shipping it now means the
+# denylist STRIPPING PATH is live and testable from day one.
+# ############################################################################
+#
+# Columns (tab-separated):
+#   name         the environment variable, verbatim
+#   kind         flag | path | integer | enum        (flag hides the value cell)
+#   default      default value; empty for flag rows
+#   description  one line, tester-readable
+#   tier         safe | dev | denied                 (V2)
+#   anchor       core-tree evidence, file:line of the getenv
+#
+# tier semantics (V2):
+#   safe    visible to everyone
+#   dev     behind "Show developer variables", default off
+#   denied  never displayed, never settable, and STRIPPED from the child
+#           environment even when present in the launcher's own inherited
+#           environment.  Quarantining is a data change, not a code change.
+# ============================================================================
+# name	kind	default	description	tier	anchor
+EMULATR_RSCCWARP	flag		REMOVED 2026-08-01 (injection: out-of-band 0x3c970 rewrite). Stripped from every child environment.	denied	(code removed) journals/20260801_JRN-AUD-002 Sec 4
+EMULATR_IDLEWARP	flag		REMOVED 2026-08-01 (injection: fabricated system-clock advance across idle spins). Stripped from every child environment.	denied	(code removed) journals/20260801_JRN-AUD-002 Sec 4
+EMULATR_DELAYWARP	flag		REMOVED 2026-08-01 (injection: wrote cpu.intReg, advanced cycleCount with no timer replay). Stripped from every child environment.	denied	(code removed) journals/20260801_JRN-AUD-002 Sec 4
+EMULATR_TICKWARP	flag		REMOVED 2026-08-01 (dead name in the warp family). Stripped from every child environment.	denied	(code removed) journals/20260801_JRN-AUD-002 Sec 4
+EMULATR_UDELAYWARP_LEGACY_UNSAFE	flag		REMOVED 2026-08-01 (injection: jumped to an RSCC deadline, skipping timer edges). Stripped from every child environment.	denied	(code removed) journals/20260801_JRN-AUD-002 Sec 4

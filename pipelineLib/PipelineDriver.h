@@ -13,6 +13,36 @@
 // Documentation:  https://timothypeer.github.io/ASA-EMulatR-Project/
 // ============================================================================
 //
+// CHANGE HISTORY
+// ----------------------------------------------------------------------------
+// FILE 1: pipelineLib/PipelineDriver.h
+//   DATE:     2026-08-01
+//   FUNCTION: step() -- retire-path warp sites
+//   CHANGE:   REMOVED six cycle/register "warp" blocks (287-480, 515-607 of the
+//             pre-change file): the EMULATR_TICKWARP tick-delay warp, the
+//             EMULATR_RSCCWARP deadline warp, the EMULATR_DELAYWARP general
+//             SUBQ-countdown warp, the 0x7bef0 C970DUMP diagnostic riding the
+//             quarantined RSCCWARP gate, the EMULATR_UDELAYWARP_LEGACY_UNSAFE
+//             micro-delay warp, and the EMULATR_RSCCWARP general spin warp.
+//   RATIONALE: all six are INJECTIONS -- they fabricate guest-observable state
+//             the machine would not have reached.  DELAYWARP wrote
+//             cpu.intReg[rn]=1 to force a countdown loop to exit and advanced
+//             cycleCount with NO interval-timer replay, silently swallowing
+//             every timer edge in the skipped span (the same mechanism behind
+//             the 0x7f4xx boot corruption and the 0x8bdb0 memory-test hang).
+//             The RSCCWARP family additionally rewrote the 0x3c970 tick
+//             counter out of band.  EmulatR is the primary Oracle; an Oracle
+//             that patches the machine it models is not an Oracle.  Performance
+//             is not a justification for breaking fidelity.
+//   BEHAVIOR:  delay loops now run literally.  DS20 sys__reset settling
+//             (0x13e40/0x13e80/0x13ec0) costs ~300M cycles of honest boot.
+//   RETAINED:  the EMULATR_RSCC_DIAG delay-loop capture (observation only) and
+//             the EMULATR_DIVERT_PALSWAP shadow-bank swap (a verified fidelity
+//             fix, see JRN-AUD-002 Sec 6.2).
+//   SEE:      journals/20260801_JRN-AUD-002_injection_lever_ledger.md Sec 4
+//             journals/20260801_JRN-BOOT-002_crash_path_wall_warp_input_corruption.md
+// ----------------------------------------------------------------------------
+//
 // PipelineDriver runs one in-flight slot at a time through all six
 // stages -- IF, DE, GR, EX, MEM, WB -- before fetching the next.
 // This is the V4 v1 cut: deterministic, single-issue, no
@@ -169,7 +199,7 @@ struct PipelineDriver
 
         if (itr != mmuLib::TranslationResult::Success) {
 #if EMULATR_BRINGUP_PROBES
-            // IFETCH-DIAG (JRN-VMB-015 §11): catch the OS-entry fetch fault at the
+            // IFETCH-DIAG (JRN-VMB-015 Sec 11): catch the OS-entry fetch fault at the
             // b dqa0 handoff -- confirms the 0x20000000 fetch ITB-misses on the
             // missing OS-side base, and shows the base state (i_ctl/va_ctl VPTB,
             // ptbr, palBase) at that exact point.  EMULATR_IFETCH_DIAG, capped.
@@ -284,199 +314,12 @@ struct PipelineDriver
         // option-ROM signature -- absent on a headless (VGA-less) ES40.  See
         // journals/20260711_es40_srom_tig_validation_trace.md, task #20.)
 
-        // ---- TEMP tick-delay warp (Task #5) 2026-06-02 -- arm with EMULATR_TICKWARP=1 ----
-        // Fast-forwards the console-init tick-counted real-time delays. At the delay-loop
-        // compare (PC 0x7c314: CMPLT r0,r6,r0; loop while counter<r6): R5 = counter PA
-        // (0x3c970), R6 = target ticks, R0 = current counter (just loaded by 0x7c310).
-        // We advance BOTH the tick counter and cycleCount coherently (RSCC stays consistent)
-        // so a multi-second wait collapses to one step. Reads R6 live -> handles any target.
-        // Self-limiting (loop re-reads target next pass and exits) + thresholded (long waits
-        // only). Checksum: advanced cycles must equal skipped ticks * interval. Off unless
-        // EMULATR_TICKWARP set. REMOVE/replace when Task #5 hardens into the registry form.
-        {
-            // QUARANTINED 2026-06-12: these warps jump cycleCount past many tick
-            // boundaries in one step AND rewrite the 0x3c970 counter out-of-band
-            // -- the confirmed cause of the overnight 0x7f4xx boot corruption.
-            // Moved off EMULATR_TICKWARP onto EMULATR_RSCCWARP (off by default).
-            // The clean replacement is the single-tick idle-warp in Machine.cpp
-            // (EMULATR_IDLEWARP), which advances cycleCount one tick at a time and
-            // lets the real ISR increment 0x3c970 -- no out-of-band rewrite.
-            static const bool s_tickWarp = (std::getenv("EMULATR_RSCCWARP") != nullptr);
-            // One-shot diagnostics: prove (a) the env is seen and (b) the gate PC is hit.
-            static bool s_warpArmAnnounced = false;
-            if (!s_warpArmAnnounced) {
-                s_warpArmAnnounced = true;
-                std::fprintf(stderr, "TICKWARP: armed=%d (EMULATR_TICKWARP %s)\n",
-                             s_tickWarp ? 1 : 0,
-                             s_tickWarp ? "seen" : "NOT set -- use export in bash");
-                std::fflush(stderr);
-            }
-            constexpr uint64_t kTickInterval  = (1ull << 20);   // cycles per tick (2^20)
-            constexpr uint64_t kWarpThreshold = 8;              // skip only waits > 8 ticks
-            if (cpu.pcAddr() == 0x000000000007c314ull) {
-                static bool s_gateHitAnnounced = false;
-                if (!s_gateHitAnnounced) {
-                    s_gateHitAnnounced = true;
-                    std::fprintf(stderr,
-                        "TICKWARP: gate 0x7c314 first reached cyc=%llu R0=%llu "
-                        "R5=0x%llx R6=%llu\n",
-                        static_cast<unsigned long long>(cpu.cycleCount),
-                        static_cast<unsigned long long>(cpu.intReg[0]),
-                        static_cast<unsigned long long>(cpu.intReg[5]),
-                        static_cast<unsigned long long>(cpu.intReg[6]));
-                    std::fflush(stderr);
-                }
-            }
-            if (s_tickWarp && cpu.pcAddr() == 0x000000000007c314ull) {
-                uint64_t const cntAddr = cpu.intReg[5];
-                uint64_t const target  = cpu.intReg[6];
-                uint64_t const cur     = cpu.intReg[0];
-                if (target > cur && (target - cur) > kWarpThreshold) {
-                    uint64_t const delta = target - cur;
-                    uint64_t const c0    = cpu.cycleCount;
-                    (void)bus.write(cntAddr, target, 4);        // counter -> target ([[nodiscard]])
-                    cpu.cycleCount += delta * kTickInterval;    // advance time coherently
-                    cpu.warpCycles += delta * kTickInterval;    // WARP accounting (2026-06-30)
-                    bool const checksumOk =
-                        (cpu.cycleCount - c0) == (delta * kTickInterval);
-                    std::fprintf(stderr,
-                        "TICKWARP cyc=%llu->%llu addr=0x%llx from=%llu to=%llu "
-                        "delta=%llu interval=%llu checksum=%s\n",
-                        static_cast<unsigned long long>(c0),
-                        static_cast<unsigned long long>(cpu.cycleCount),
-                        static_cast<unsigned long long>(cntAddr),
-                        static_cast<unsigned long long>(cur),
-                        static_cast<unsigned long long>(target),
-                        static_cast<unsigned long long>(delta),
-                        static_cast<unsigned long long>(kTickInterval),
-                        checksumOk ? "OK" : "FAIL");
-                    std::fflush(stderr);
-                }
-            }
-        }
-        // ---- END TEMP tick-delay warp ----
-
-        // ---- RSCC-deadline warp at 0x7c304 (Task #5) 2026-06-02 -- arm EMULATR_TICKWARP ----
-        // Decoded from the DEADLINE dumps: at 0x7c304, R19 = elapsed (currentSCC - startSCC,
-        // climbs ~1:1 with cycles), R07 = duration to wait; loop exits when R19 >= R07 (CMPLT
-        // at 0x7c304, BEQ at 0x7c308). This is a pure RSCC time-delay (e.g. ~260M cyc).
-        // WARP: advance cycleCount by the remaining (R07-R19) so the next rscc read makes
-        // elapsed >= duration and the loop exits; bump the 0x3c970 tick counter coherently by
-        // remaining/2^20 so uptime-in-ticks stays consistent with cycleCount. Self-limiting
-        // (one more iteration exits), thresholded (> 1 tick), checksummed. REMOVE/registry-ize
-        // when Task #5 hardens.
-        static const bool s_tickWarpRscc = (std::getenv("EMULATR_RSCCWARP") != nullptr); // QUARANTINED (rewrites 0x3c970)
-        if (s_tickWarpRscc && cpu.pcAddr() == 0x7c304ull) {
-            uint64_t const elapsed  = cpu.intReg[19];
-            uint64_t const duration = cpu.intReg[7];
-            constexpr uint64_t kRsccWarpThresh = (1ull << 20);   // skip only waits > 1 tick
-            if (duration > elapsed && (duration - elapsed) > kRsccWarpThresh) {
-                uint64_t const delta  = duration - elapsed;
-                uint64_t const c0     = cpu.cycleCount;
-                cpu.cycleCount += delta;                          // advance time to the deadline
-                cpu.warpCycles += delta;                          // WARP accounting (2026-06-30)
-                uint64_t const dticks = delta >> 20;              // ticks coherently skipped
-                memoryLib::BusResult const rd = bus.read(0x3c970ull, 4);
-                (void)bus.write(0x3c970ull,
-                                rd.data + dticks, 4);             // keep tick-count coherent
-                bool const checksumOk = (cpu.cycleCount - c0) == delta;
-                std::fprintf(stderr,
-                    "RSCCWARP cyc=%llu->%llu elapsed=%llu duration=%llu delta=%llu "
-                    "ticks+=%llu checksum=%s\n",
-                    static_cast<unsigned long long>(c0),
-                    static_cast<unsigned long long>(cpu.cycleCount),
-                    static_cast<unsigned long long>(elapsed),
-                    static_cast<unsigned long long>(duration),
-                    static_cast<unsigned long long>(delta),
-                    static_cast<unsigned long long>(dticks),
-                    checksumOk ? "OK" : "FAIL");
-                std::fflush(stderr);
-            }
-        }
-        // ---- END RSCC-deadline warp ----
-
-        // ---- General SUBQ-countdown delay warp (FIX 2, JRN-VMB-016) 2026-07-22 ----
-        // The DS20 sys__reset_init settling delays -- e.g. 0x13e40 (after Pchip1
-        // WSBA programming, R12~=0xE4E1C0 iters) and 0xb740 -- are pure countdown
-        // spins with NO memory access inside:
-        //     SUBQ Rn,#1,Rn ; BEQ Rn,exit ; BR R31,<back to the SUBQ>
-        // i.e. a calibrated elapsed-time delay whose ONLY effect is that time
-        // passes.  The PC-specific warps (RSCC 0x7c304, tick 0x7c314) don't cover
-        // them, so 2D_NOOP stalls here.  Recognize the idiom by DECODE (any PC)
-        // and fast-forward: set Rn=1 so this SUBQ->0->BEQ exits next iteration, and
-        // advance cycleCount+warpCycles by the skipped iterations (3 instr each).
-        // Pure loop => safe; self-limiting (exits within 1 iter), thresholded
-        // (long spins only), PAL-only.  Arm with EMULATR_DELAYWARP=1.
-        {
-            static const bool s_delayWarp = (std::getenv("EMULATR_DELAYWARP") != nullptr);
-            // SUBQ Rn,#1,Rn : op 0x10, func 0x29, literal form, lit==1, Ra==Rc.
-            if (s_delayWarp && cpu.inPalMode()
-                && (encoded >> 26) == 0x10u                 // INTA* group
-                && ((encoded >> 5) & 0x7Fu) == 0x29u        // SUBQ
-                && ((encoded >> 12) & 1u) != 0u             // literal operand
-                && ((encoded >> 13) & 0xFFu) == 1u          // lit == 1 (decrement)
-                && ((encoded >> 21) & 0x1Fu) == (encoded & 0x1Fu)   // Ra == Rc
-                && (encoded & 0x1Fu) != 31u) {
-                uint32_t const rn = encoded & 0x1Fu;
-                uint64_t const cnt = cpu.intReg[rn];
-                constexpr uint64_t kDelayThresh = 4096ull;  // skip only long spins
-                if (cnt > kDelayThresh) {
-                    // Confirm loop shape: next = BEQ Rn (op 0x39, Ra==Rn); then
-                    // BR R31 back to THIS SUBQ (op 0x30, target == this pc).
-                    uint64_t const pcA = cpu.pcAddr();
-                    uint32_t const i1 = static_cast<uint32_t>(bus.fetch(pcA + 4u, 4).data);
-                    uint32_t const i2 = static_cast<uint32_t>(bus.fetch(pcA + 8u, 4).data);
-                    bool const beqRn = (i1 >> 26) == 0x39u && ((i1 >> 21) & 0x1Fu) == rn;
-                    int64_t const brDisp =
-                        static_cast<int64_t>(static_cast<int32_t>(i2 << 11) >> 11);
-                    bool const brBack = (i2 >> 26) == 0x30u
-                        && (static_cast<int64_t>(pcA) + 12 + brDisp * 4) == static_cast<int64_t>(pcA);
-                    if (beqRn && brBack) {
-                        uint64_t const skip = cnt - 1u;     // leave 1 -> SUBQ->0 -> BEQ exits
-                        cpu.intReg[rn] = 1u;
-                        uint64_t const adv = skip * 3ull;   // 3 instrs / iteration
-                        cpu.cycleCount += adv;
-                        cpu.warpCycles += adv;              // WARP accounting
-                        static unsigned long s_dwN = 0;
-                        if (s_dwN < 60) { ++s_dwN;
-                            std::fprintf(stderr,
-                                "DELAYWARP #%lu pc=0x%llx R%u=%llu->1 skip=%llu cyc+=%llu\n",
-                                s_dwN, static_cast<unsigned long long>(pcA),
-                                rn, static_cast<unsigned long long>(cnt),
-                                static_cast<unsigned long long>(skip),
-                                static_cast<unsigned long long>(adv));
-                            std::fflush(stderr);
-                        }
-                    }
-                }
-            }
-        }
-        // ---- END general SUBQ-countdown delay warp ----
-
-        // ---- 0x7bef0 software-tick loop register dump (2026-06-08, #21) ----
-        // The post-GCT/FRU + pre-dva0 + dva0 stalls are ONE loop: pc=0x7bef0
-        // stores 0x3c970=counter+1 once per ~2^18 cyc; NOT covered by the RSCC/
-        // tick warps (no rscc wrapper). Dump all 32 int regs on the first 4 hits
-        // so the COUNTER (increments by 1 across dumps) and the TARGET (stays
-        // constant) registers can be identified -> then warp the loop. Gated on
-        // EMULATR_TICKWARP (already passed on warp runs). Strip after #21 lands.
-        {
-            static const bool s_c970dump = (std::getenv("EMULATR_RSCCWARP") != nullptr); // diagnostic, moved with the quarantined warps
-            static int s_c970dumps = 0;
-            if (s_c970dump && s_c970dumps < 4 && cpu.pcAddr() == 0x000000000007bef0ull) {
-                ++s_c970dumps;
-                std::fprintf(stderr, "C970DUMP #%d pc=0x7bef0 cyc=%llu",
-                             s_c970dumps,
-                             static_cast<unsigned long long>(cpu.cycleCount));
-                for (int i = 0; i < 32; ++i) {
-                    std::fprintf(stderr, " R%d=0x%llx", i,
-                                 static_cast<unsigned long long>(cpu.intReg[i]));
-                }
-                std::fprintf(stderr, "\n");
-                std::fflush(stderr);
-            }
-        }
-        // ---- END 0x7bef0 dump ----
+        // WARP SITES REMOVED 2026-08-01 -- six injection blocks excised here.
+        // See the CHANGE HISTORY block at the head of this file and
+        // journals/20260801_JRN-AUD-002_injection_lever_ledger.md Sec 4.
+        // Delay loops run literally.  The proven, interrupt-aware equivalent
+        // (closed-form countdown collapse with timer replay) is
+        // systemLib/SpinSkip.h -- use that, never a hand-matched warp.
 
         // ---- RSCC delay-loop capture at 0x6a514 (spec 20260713 EDIT 2) ------
         // The silicon LFU-reset "Initializing...." hang spins here: CMPLE
@@ -512,112 +355,30 @@ struct PipelineDriver
         }
         // ---- END RSCC delay-loop capture ----
 
-        // ---- micro-delay warp at 0x6a514 (2026-07-13) -- arm EMULATR_UDELAYWARP -
-        // The console's krn$_micro_delay / RSCC busy-wait at 0x6a4f8-0x6a520 spins
-        // reading the System Cycle Counter until it reaches a deadline computed
-        // ONCE in the prologue: r3 = start_RSCC + N (0x6a4f0 ADDQ r3,r0,r3); the
-        // loop exits when current (r4) exceeds the deadline (r3).  IDLEWARP
-        // (gated at PC ~0x7bafc) does NOT cover this loop, so an un-warped silicon
-        // boot grinds every delay cycle-for-cycle -- this is the loop the PCSAMPLE
-        // stream sits in for long stretches.  Collapse it: at the compare PC, if
-        // the remaining wait (r3 - r4) is large, advance cycleCount to the
-        // deadline so the next RSCC read satisfies the exit.
-        //
-        // CLEAN BY CONSTRUCTION: it ONLY advances the clock (+ warpCycles
-        // accounting).  It does NOT rewrite guest memory -- that out-of-band
-        // 0x3c970 rewrite is exactly why the RSCCWARP/SPINWARP family below was
-        // quarantined.  Pure time delay (both exit tests are RSCC-vs-RSCC, no
-        // hardware condition), so fast-forwarding it cannot change control flow
-        // or state -- only wall-time.  Self-limiting (next pass r3-r4 -> 0, below
-        // threshold) and thresholded (leave sub-threshold real delays alone).
-        // RSCC == cycleCount (kCcMultiplier=1), so a cycleCount delta IS an RSCC
-        // delta.  Off unless EMULATR_UDELAYWARP is set.
-        {
-            // SUPERSEDED 2026-07-21 by the COHERENT warp in Machine.cpp (which
-            // advances only to min(deadline, next-timer-edge) so the interval
-            // timer never skips a boundary).  This cycleCount-only version
-            // jumped straight to the deadline and skipped timer ticks (0x3c970
-            // fell behind -> memory-test hang at 0x8bdb0).  Gated OFF (renamed
-            // env) -- do not re-enable; EMULATR_UDELAYWARP now drives the
-            // coherent Machine.cpp path.
-            static bool const s_uDelayWarp =
-                std::getenv("EMULATR_UDELAYWARP_LEGACY_UNSAFE") != nullptr;
-            if (s_uDelayWarp && cpu.pcAddr() == 0x000000000006a514ull) {
-                uint64_t const cur      = cpu.intReg[4];   // current RSCC (0x6a50c)
-                uint64_t const deadline = cpu.intReg[3];   // start_RSCC + N
-                constexpr uint64_t kUDelayWarpThresh = (1ull << 16);  // skip short waits
-                if (deadline > cur && (deadline - cur) > kUDelayWarpThresh) {
-                    uint64_t const delta = deadline - cur;
-                    uint64_t const c0    = cpu.cycleCount;
-                    cpu.cycleCount += delta;    // advance the clock to the deadline
-                    cpu.warpCycles += delta;    // WARP accounting (no memory write)
-                    static uint64_t s_uwLog = 0;
-                    if ((s_uwLog++ & 0x3FFull) == 0) {      // throttle 1/1024
-                        std::fprintf(stderr,
-                            "UDELAYWARP cyc=%llu->%llu cur=0x%llx deadline=0x%llx "
-                            "delta=%llu\n",
-                            static_cast<unsigned long long>(c0),
-                            static_cast<unsigned long long>(cpu.cycleCount),
-                            static_cast<unsigned long long>(cur),
-                            static_cast<unsigned long long>(deadline),
-                            static_cast<unsigned long long>(delta));
-                        std::fflush(stderr);
-                    }
-                }
-            }
-        }
-        // ---- END micro-delay warp ----
-
-        // ---- General RSCC-spin warp (Task #5) 2026-06-02 -- arm EMULATR_TICKWARP ----
-        // The firmware does MANY real-time delays at different PCs, each spinning on the
-        // rscc wrapper (0x1c655c) comparing elapsed-SCC to a per-loop duration. Rather than
-        // gate every loop, detect the spin generically: the wrapper called repeatedly from
-        // the SAME 4KB caller-page (resets when the page changes = real forward progress).
-        // Once confirmed (>256 calls), inject one tick (2^20 cyc) of cycleCount per wrapper
-        // call so each iteration's SCC read climbs ~1 tick and the loop's own deadline fires
-        // in O(duration_ticks) iterations instead of grinding every cycle. Bump 0x3c970
-        // coherently. Overshoot <= ~1 tick. The precise 0x7c304 warp above wins where it
-        // applies (fires before 256 calls); this is the catch-all for other delay loops.
-        {
-            static const bool s_spinWarp = (std::getenv("EMULATR_RSCCWARP") != nullptr); // QUARANTINED (rewrites 0x3c970)
-            if (s_spinWarp && cpu.pcAddr() == 0x1c655cull) {
-                static uint64_t s_lastPage = ~0ull;
-                static uint64_t s_spinCnt  = 0;
-                uint64_t const page = cpu.intReg[26] & ~0xFFFull;   // caller 4KB page
-                if (page == s_lastPage) { ++s_spinCnt; }
-                else { s_lastPage = page; s_spinCnt = 0; }
-                if (s_spinCnt > 256) {                              // confirmed delay spin
-                    constexpr uint64_t kChunk = (1ull << 20);       // inject 1 tick / call
-                    cpu.cycleCount += kChunk;
-                    memoryLib::BusResult const rd = bus.read(0x3c970ull, 4);
-                    (void)bus.write(0x3c970ull, rd.data + 1, 4);    // coherent +1 tick
-                    static uint64_t s_spinLog = 0;
-                    if ((s_spinLog++ & 0x3FFull) == 0) {            // throttle 1/1024
-                        std::fprintf(stderr,
-                            "SPINWARP cyc=%llu caller_page=0x%llx injections~%llu\n",
-                            static_cast<unsigned long long>(cpu.cycleCount),
-                            static_cast<unsigned long long>(page),
-                            static_cast<unsigned long long>(s_spinLog));
-                        std::fflush(stderr);
-                    }
-                }
-            }
-        }
-        // ---- END General RSCC-spin warp ----
-
         // ---- TEMP periodic PC sampler 2026-06-02 -- what is the current grind doing? ----
         // Two delays warped, but the boot keeps finding new grinds. Sample the native PC
         // every ~4M cycles: if it clusters at a few PCs -> another delay/spin loop (warpable);
         // if it ranges widely -> real work (memory test/probe, must run, don't warp). Also
         // shows the caller of the rscc wrapper if that's where it sits. REMOVE after.
 #if EMULATR_BRINGUP_PROBES
-        if ((cpu.cycleCount & 0x3FFFFFull) == 0) {   // every 4,194,304 cycles
-            std::fprintf(stderr, "PCSAMPLE cyc=%llu pc=0x%llx pal=%d ra=0x%llx\n",
-                static_cast<unsigned long long>(cpu.cycleCount),
-                static_cast<unsigned long long>(cpu.pcAddr()),
-                cpu.inPalMode() ? 1 : 0,
-                static_cast<unsigned long long>(cpu.intReg[26]));
-            std::fflush(stderr);
+        // Stride is deliberately NOT a power of two (2026-07-30): the Cchip
+        // interval timer fires at (cycleCount & kCchipTimerMask)==0 with
+        // kCchipTimerBit=18, so any power-of-2 sample cadence >= 2^18 is a
+        // strict subset of timer edges -- every sample lands exactly at
+        // interrupt delivery (PC = PAL INTERRUPT entry 0x8680) and the
+        // stream carries zero information about inter-tick execution.  A
+        // prime-ish stride sweeps all phases of the tick window.
+        {
+            static uint64_t s_nextSample = 0;
+            if (cpu.cycleCount >= s_nextSample) {
+                s_nextSample = cpu.cycleCount + 3999971ull;   // ~4M, not 2^k
+                std::fprintf(stderr, "PCSAMPLE cyc=%llu pc=0x%llx pal=%d ra=0x%llx\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(cpu.pcAddr()),
+                    cpu.inPalMode() ? 1 : 0,
+                    static_cast<unsigned long long>(cpu.intReg[26]));
+                std::fflush(stderr);
+            }
         }
 #endif
         // ---- END periodic PC sampler ----
@@ -1384,7 +1145,7 @@ private:
         // HALT: graceful shutdown signal, not a trap.
         if (r.faultCode == coreLib::kFaultHalt) {
 #if EMULATR_BRINGUP_PROBES
-            // HALT-DIAG (JRN-VMB-015 §11): pin WHERE the console halts on the
+            // HALT-DIAG (JRN-VMB-015 Sec 11): pin WHERE the console halts on the
             // b dqa0 handoff -- the swppal/console_exit transfer PC + halt code,
             // so we know where to establish PT__PTBR before the OS runs.
             static bool const s_haltDiag = (std::getenv("EMULATR_HALT_DIAG") != nullptr);
@@ -1449,7 +1210,7 @@ private:
         if (r.faultCode != coreLib::kNoFault) {
             cpu.lastFaultCode = r.faultCode;
 
-            // Fault telemetry -> logs/faults.log (offline review, not the
+            // Fault telemetry -> logs/<stem>_faults.log (offline review, not the
             // multi-GB .trc).  Skip routine TB misses: kFaultDtbMiss /
             // kFaultItbMiss are high-volume paging events and would flood the
             // log; everything else (OPCDEC, unimplemented, privileged,

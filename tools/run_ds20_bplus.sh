@@ -12,9 +12,6 @@
 # The three knobs (see journals/20260722_JRN-VMB-016_...md):
 #   EMULATR_2D_NOOP=1          make HW_MTPR<scbd 0x2d> a no-op so sys__reset_init
 #                              runs and p_temp (0x7000 on ds20_v7_3) is built.
-#   EMULATR_DELAYWARP=1        warp the SUBQ-countdown settling delays in
-#                              sys__reset (0x13e40/0x13e80/0x13ec0) so the ~300M
-#                              settle does not dominate wall-clock.
 #   EMULATR_CSERVE_START_MODE=cpp   take the B+ handoff at CSERVE START (0x42):
 #                              read the HWRPB per-CPU slot (halt_pc=0x20000000),
 #                              install PTBR/VPTB, clear p_misc<63>, and SEED the
@@ -47,7 +44,6 @@ if [[ $# -ge 1 && "$1" =~ ^[0-9]+$ ]]; then
 fi
 
 export EMULATR_2D_NOOP="${EMULATR_2D_NOOP:-1}"
-export EMULATR_DELAYWARP="${EMULATR_DELAYWARP:-1}"
 # 2026-07-22: default flipped cpp -> guest.  Option A (guest) now mirrors AXPBox
 # vmspal_call_cserve exactly (sets p23=CALL_PAL return PC + diverts to the guest
 # cfw_start/exit_console, letting the REAL PAL do the mode/vptb/IPL transition).
@@ -117,7 +113,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "run_ds20_bplus: faithful-exec stack ->"
 echo "  MAXCYC=${MAXCYC:-<default 999e9>}  [guest-cycle cap -> showdev --max-cycles]"
 echo "  EMULATR_2D_NOOP=$EMULATR_2D_NOOP"
-echo "  EMULATR_DELAYWARP=$EMULATR_DELAYWARP"
 echo "  EMULATR_CSERVE_START_MODE=$EMULATR_CSERVE_START_MODE"
 echo "  EMULATR_CSERVE_AUDIT=$EMULATR_CSERVE_AUDIT  [CSERVE contract capture -> CSERVE-CONTRACT-MISSING]"
 echo "  EMULATR_CSERVE_ROUTE=${EMULATR_CSERVE_ROUTE:-<off>}  [default: -> guest sys__cserve dispatcher]"

@@ -9,7 +9,8 @@
 #   - REFUSES to run a stale exe older than today's edited sources,
 #   - forces ini model=DS20 for this run (restored on exit),
 #   - leaves PuTTY auto-launch ON (does NOT set EMULATR_NO_PUTTY),
-#   - turns on the console mirror + IDLEWARP so the log shows MHz_eff,
+#   - turns on the console mirror so the log shows MHz_eff (IDLEWARP removed
+#     2026-08-01 -- see journals/20260801_JRN-AUD-002 Sec 4),
 #   - tees console/stderr into a timestamped log.
 #
 # Host    : Windows / Git Bash (PC) is the supported path; a macOS/Linux branch
@@ -31,7 +32,8 @@ esac
 # ---- locate the build/run dir ----------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-RUN_DIR="${RUN_DIR:-$PROJ_DIR/out/build/release}"
+#RUN_DIR="${RUN_DIR:-$PROJ_DIR/out/build/release}"
+RUN_DIR="${RUN_DIR:-$PROJ_DIR/out/build/relwithdebinfo}"
 cd "$RUN_DIR"
 
 # binary: Windows emits Emulatr.exe, POSIX a bare Emulatr -- prefer .exe.
@@ -41,7 +43,7 @@ else EXE="./Emulatr.exe"; fi   # keep a stable value; preflight below FATALs
 FW="firmware/ds20_v7_3.exe"
 INI="config/Emulatr.ini"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
-MAXCYC="${MAXCYC:-2000000000}"
+MAXCYC="${MAXCYC:-222000000000}"
 LOG="run_ds20_$(date +%Y%m%d_%H%M%S).log"
 
 # ---- preflight -------------------------------------------------------------
@@ -83,18 +85,12 @@ fi
 # ---- environment -----------------------------------------------------------
 unset  EMULATR_NO_PUTTY               # KEEP PuTTY auto-launch ON
 export EMULATR_CONSOLE_MIRROR=1       # banner + rewritten badge -> stderr/log
-export EMULATR_IDLEWARP=1             # clean idle warp (little effect before the banner)
 export EMULATR_CONSOLE_PORT="$PORT"
 
-# Optional delay-loop warp.  DELAYWARP=1 enables EMULATR_RSCCWARP, which collapses
-# the firmware's boot delay spins and so inflates the boot-time MHz_eff the badge
-# samples.  QUARANTINED: it rewrites the guest tick counter 0x3c970 out-of-band
-# and has corrupted boot in the past -- the run may NOT reach P00>>>.  Use only
-# to observe a warp-inflated badge; revert (drop DELAYWARP) if boot breaks.
-if [[ "${DELAYWARP:-0}" == "1" ]]; then
-    export EMULATR_RSCCWARP=1
-    echo "WARN: DELAYWARP -> EMULATR_RSCCWARP=1 (QUARANTINED delay-loop warp); boot may not reach P00>>>"
-fi
+# NOTE 2026-08-01: the optional DELAYWARP -> EMULATR_RSCCWARP hook was removed
+# with the warp family itself (injection: it rewrote the guest tick counter
+# 0x3c970 out of band).  Delay spins now run literally.  See
+# journals/20260801_JRN-AUD-002_injection_lever_ledger.md Sec 4.
 
 # ---- launch ----------------------------------------------------------------
 echo "RUN_DIR = $RUN_DIR"

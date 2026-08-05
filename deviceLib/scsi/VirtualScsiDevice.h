@@ -35,6 +35,11 @@ public:
 
     // Execute one CDB; sets cmd.status / cmd.senseData / cmd.dataTransferred.
     virtual void handleCommand(ScsiCommand& cmd) noexcept = 0;
+
+    // W-4 (BRIEF-SCSI-040, 2026-08-04): SCSI bus reset notification -- the
+    // HBA calls this when the initiator asserts RST (SCNTL1<3>).  Targets
+    // that model UNIT ATTENTION re-latch it here.  Default: no-op.
+    virtual void busReset() noexcept {}
 };
 
 } // namespace scsi
