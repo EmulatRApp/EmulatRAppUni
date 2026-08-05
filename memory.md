@@ -12,7 +12,511 @@ drill into journals only as needed.
 
 # EmulatR -- Project Memory
 
-## -1. LATEST (2026-07-25): SCSI live gate PASSED; NOIOVEC is PROTOCOL-INDEPENDENT
+## -8. LATEST (2026-08-04): W-3 VERIFIED LIVE (TOOMUCHDATA storm GONE);
+##      SPEC-DISK-001 drive profiles LANDED (JRN-DISK-001)
+
+- Run 173325 (W-3/W-1 binary): every N810-CMD row GOOD with clamps
+  min()-consistent (INQUIRY 255->36, MODE SENSE 255->12, RC 8) -- the
+  45k TOOMUCHDATA storm is GONE; W-3 (MA halts the script) verified at
+  the device level.  Remaining symptom: driver loops its validation
+  cycle (TUR/INQ/RC/MODE SENSE, 78k+ sessions) because MODE SENSE
+  returned header+bd with NO geometry pages (ret=12).  Architect
+  crashed for SDA; DK_VMS_STATUS read pending (expect not 0x29C).
+- SPEC-DISK-001 LANDED same day (JRN-DISK-001; architect decisions:
+  keys carry the L; manifest-only selection; smaller image REFUSED /
+  larger WARNS; RZ29L default): NEW deviceLib/scsi/DriveProfile.h --
+  ATOMIC profiles RZ28L/RZ29L(CONFIRMED x3: 113/20/3708 = 8,380,080 =
+  DEVDEPEND 0x0E7C1471)/RZ40 + EMULATR-512M synthetic (64/16/1024 =
+  1,048,576 EXACT for the six 512 MB dka1..6 scratch images -- keeps
+  the DS20 bus topology intact under the hard stop).  VirtualDiskDevice
+  serves INQUIRY identity/byte7 0x12 (S-4 CLOSED), Byte 7 = 0x12 asserts CmdQue (bit 1) and Sync (bit 4) -- capabilities we don't implement, There's no tagged queuing (no reselection, no tag messages), and G-4 answers SDTR/WDTR with MESSAGE REJECT.  [THIS CONCERN WAS CORRECT AND WAS NOT ACTED ON FOR A DAY.  It cost 61,748 unexplained operations on the mount path -- byte7 is now 0x00, see the 2026-08-04 EVENING block below and JRN-DISK-003.]
+  READ CAPACITY blocks-1, MODE SENSE pages 03h/04h/3Fh with two-step probe + DBD +
+  CHECK 05/24/00 on unsupported pages (S-12 CLOSED); page layouts
+  [CONFIRM] vs SCSI-2.  No profile = legacy byte-identical.  Manifest:
+  ds20 unit0 + es40 unit0 -> RZ29L, ds20 units 1-6 -> EMULATR-512M;
+  ds10 is IDE-only (no SCSI rows -- unchanged).  disk_types.json
+  mirrors (C++ table authoritative).  Geometry sanity is a +/-2% BAND,
+  NEVER equality (ZBR: RZ28L +1.93%, RZ40 -0.32%) -- an equality
+  assert would hard-stop two of three profiles.
+- SOURCE HAZARDS (EK-SM2DR-PN.B01, never re-extract without
+  SPEC-DISK-001 Sec 3): tables 4/5 columns SCRAMBLED (match by
+  capacity); 3078 is a digit transposition of 3708; "1024-byte sector"
+  is an HP disktab artifact -- 512 is correct.
+- RUN 185257 VERDICT (JRN-DISK-001 Sec 6): profiles attached clean;
+  ZERO check conditions; the driver moved onto the REAL-DRIVE path
+  and converged into its readiness/attention poll (RC/TUR/RS, all
+  GOOD, 131k sessions, NO INQUIRY/MODE SENSE) -- waiting for the
+  POWER-ON UNIT ATTENTION we never delivered.  Dump corroboration
+  (architect, direct fields): UCB$L_DK_UNIT_ATTENTION=0 with the UA
+  ring allocated = never once delivered.  CORRECTION: DK_READY_RETRY
+  0x1E is an ALLOWANCE not a countdown (C-1 species; siblings read 0
+  on a device that never transferred).
+- W-4 LANDED same day (architect-approved + review refinements): UA
+  latched at construction AND on busReset() (new VirtualScsiDevice
+  virtual; wired at Ncr53C810 kSCNTL1<RST> HOST-write seam; script-
+  side rw-op WRITES still bypass regWrite8 -- TODO(N810-SCNTL1-
+  SCRIPT-RST)); CHECK 06/29/00 on first non-INQUIRY/non-RS command,
+  reported ONCE; TWO-HALVES clear (CHECK clears pending + STAGES
+  sense; RS delivers staged 70/06/0A/29/00 then clears); INQUIRY is
+  exempt AND does not consume (T-10, the silent-loop trap); per-
+  initiator scope note for future multi-initiator.  8 existing tests
+  quiesce via ackUnitAttention().
+- NEXT: rebuild, suite (4 W-4 checks + prior), G-4 three-platform
+  gate, DS20 soak.  FIRST MARKER: UCB$L_DK_UNIT_ATTENTION nonzero --
+  if it moves and DK_READ_COUNT stays 0, the UA landed and the next
+  wall is NEW information.  Then MODE SENSE ret 60 w/ pages;
+  DK_FLAGS2 0x30; DEVDEPEND 0x0E7C1471; first_attn_seen; cmdq;
+  DEVTYPE recognized + DTN 0; SHOW DEV type RZ29L; STS valid + VCB
+  ALPHASYS = C2.
+  
+  Memory Addendum. 
+  - REFERENCE SET CLOSED (2026-08-03).  Nothing on the SCSI target or
+  W-4 path is recall-based any longer:
+    ANSI X3.131-1994 (SCSI-2)   protocol, sense, mode pages.  Page 04h
+      = Table 171, page 03h = Table 163; UA state machine = Sec 7.9.
+    EK-KZPBA-UG.B01             DEC INQUIRY string form
+      ("DEC RZ28  (C) DECX442" -> vendor 8 / product 16 / rev 4) AND
+      the SRM console rendering: it prints the product's FIRST TOKEN
+      only ("dka200.2.0.1.0 RZ26"), not the full 16-byte field.
+    EK-SM2DR-PN.B01             geometry (source hazards per SPEC-DISK-001 Sec 3)
+    53C895 DM, 21272/21264 HRM  unchanged
+    Schmidt 2nd ed.             SECONDARY only -- its OCR tables are
+      damaged; an apparent page-04h off-by-one and a missing
+      "medium rotation rate" were BOTH artifacts.  Do not cite it
+      against the standard.
+  CONSEQUENCE: the [CONFIRM] on pages 03h/04h COMES OFF -- cite
+  SCSI-2 9.3.3.3 and 9.3.3.7.  Both layouts verified correct as built.
+- PLAN-SCSI-001 (Claude-web, 2026-08-03): three-phase staging with hard
+  gates.  Phase A's target-side CODE is landed (W-4/W-5); PHASE A ITSELF
+  IS NOT COMPLETE -- its exit is VCB nonzero (C2) and DKA0 has never gone
+  VALID (CORRECTED 2026-08-04, JRN-DISK-003; C-7 species, same as the
+  struck "C1 FALLS" headline).  Phase B (target command
+  set: MODE SENSE PC field / 3Fh / DBD, block-descriptor FFFFFFh
+  overflow for RZ40, write path, missing opcodes, EVPD 80h/83h, ISO
+  parity) GATES on VCB nonzero.  Phase C (reselection, tagged queuing)
+  GATES on E-1.  Anti-goals X-1..X-6 -- especially X-1: having the
+  standard in hand makes every unimplemented command look like a gap;
+  most are correctly absent and loud.  Promote by evidence.
+
+
+  2026-08-04 EVENING -- THE CMDQUE STORM, MEASURED (JRN-DISK-003).
+- THE RZ29L PROFILE BINDS.  First verification: crash dump DKA0 UCB
+  81C67040, UCB$L_DK_INQUIRY_DATA byte-exact "DEC     " /
+  "RZ29L-AA (C)DEC " / "LYJ0"; DK_HW_REV 304A594C = "LYJ0".  SHOW DEV
+  renders "DEC RZ29L-AA".  Identity reaches the guest.
+- AND IT WEDGED THE MOUNT PATH.  byte 7 = 0x12 asserted CmdQue+Sync ->
+  OpenVMS SET DK_FLAGS cmdq+port_cmdq (SDA's own decode of 0x0030001A),
+  QDEPTH 8 -> the HBA silently swallows tag messages 20h-22h (N-7) and
+  the target has no queue -> DK_UNEXPLAINED 0xF134 = 61,748 of 61,750
+  ops, READ_COUNT 0, STS 0x08000110, VCB 0.  JRN-AUD-004 RANK 1 /
+  DK-10 / D-4 PREDICTED THIS EXACT CHAIN before the run existed.
+- FIX LANDED + COMMITTED: inquiry_byte7 0x12 -> 0x00 on all DEC
+  profiles (DriveProfile.h), doctest T-7 flipped (it was pinning the
+  unproven value -- PR-7), disk_types.json byte7 0 everywhere with a
+  policy rule.  Re-assert ONLY with Phase C-3 tagged queuing AND C-2
+  reselection.
+- ERROR SPECIES (new, ledger it): a document's FEATURE LIST describes
+  the SILICON, not the model.  A wrong geometry is inert until read; a
+  wrong CAPABILITY claim changes what the guest DOES.  byte 7 is an
+  assertion the initiator acts on, not a label.
+- ALSO MEASURED, same dump: W-4 WORKS (first_attn_seen set,
+  DK_ERROR_TYPE 6 / ERR_MASK 0x40 = sense key 06h consumed; the
+  DK_UNIT_ATTENTION COUNTER reads 0 -- the FLAG is the witness, C-1
+  species).  READ CAPACITY correct (MAXBLOCK 0x007FDEB0 = 8,380,080).
+  GEOMETRY DOES NOT BIND (DEVDEPEND 0x00000604, cylinders 0) -- not yet
+  attributable; the storm plausibly blocked the MODE SENSE exchange and
+  the byte-7 rerun settles it (SPEC-STORAGE-001 C-10).
+- DEVTYPE IS 0x36 GENERIC_DK DESPITE THE EXACT DEC IDENTITY (Charon:
+  0x89 DT$_RZ29).  LEAD, unread: UCB$L_DK_DISABLE_DDR = 1 -- Data
+  Driven Recognition is OFF, so DKDRIVER never consults the recognition
+  database.  Charon runs PKQDRIVER, EmulatR PKEDRIVER (both confirmed).
+  CONSEQUENCE: SPEC-STORAGE-001 C-8 (generic identity) is not a change
+  of behavior -- it makes the model honest about what DDR already
+  forces.
+- PKA0 PORT IDENTITY CORRECT: Class/Type 80/2E = DC$_BUS 128 /
+  DT$_N810_SCSI 46.  JRN-DISK-002 O-4 CLOSED.
+- LADDER CORRECTION: JRN-SES-004 N-3 says "DK_FLAGS2 0x30"; FLAGS2 is
+  0, the 0x30 is in DK_FLAGS (0x0030001A).  Wrong field.
+- NEW, off boot path: SDA> show dev ew -> NOSUCHDEV.  The DE500 tulip
+  never produced an EWA0 under VMS despite the manifest row and P-16.
+- SPEC-STORAGE-001 (this session): config/disk_types.json is now the
+  storage SSOT, schema 2, ADOPTED and LIVE -- authority+fidelity per
+  field block, drives / custom_drives / withdrawn, guest OpenVMS DT$
+  codes + Tru64 floors, emulated_arch [alpha|vax].  tools/mkdisk.py
+  enforces it (--type REQUIRED, size DERIVED, withdrawn keys rejected
+  with their reinstatement evidence).  G-1 landed; G-2..G-5 (manifest
+  keys, Machine.cpp binder, schema+editor, retire the tsv) are SPEC'd
+  and NOT started -- they change the binary and must not be bundled
+  into a boot experiment.
+- JRN-DISK-002 (this session): $DCDEF restored as "Processor Support/
+  dcdev_h_mar.txt" (1704 lines; JRN-AUD-004 PR-1 CLOSED).  NO DT$_RZ29L
+  EXISTS and NO DT$_RZ40 EXISTS; RZ28L is 172 (0xAC).  Generic slots:
+  GENERIC_DK 54, GENERIC_DU 35, GENERIC_RX 180, FD1-FD8 129-136.
+  DEVDEPEND packing VERIFIED: byte0 sectors/track, byte1 tracks/cyl,
+  bytes2-3 cylinders (Charon 0x0E7C1471 = 113/20/3708).
+- MEASURED-CAPTURE PROCEDURE now documented in the SSOT
+  (custom_drives): F$GETDVI DEVTYPE/DEVCLASS/SECTORS/TRACKS/CYLINDERS/
+  MAXBLOCK/DEVDEPEND on a NON-EmulatR host, plus SHOW DEVICE/FULL.
+  A capture taken from EmulatR is CIRCULAR and is not an authority.
+
+## -7. PREVIOUS (2026-08-03/04): JRN-SCSI-040's "C1 FALLS" STRUCK (C-7);
+##      TOOMUCHDATA root cause = MA DID NOT HALT THE SCRIPT; W-3 revised
+##      + W-1 probe LANDED (JRN-SCSI-041 -- read it before 040)
+
+- BRIEF-SCSI-040 (Claude-web, architect-supplied) decoded the 140935
+  dump: UCB$L_DK_VMS_STATUS=0x29C SS$_TOOMUCHDATA; 45,340/45,341 ops
+  FAILED; DKA0 never VALID (STS 0x08000010, VCB 0, READ_COUNT 0).
+  C1 is OPEN again -- the varied PCs were storm servicing.  What
+  survives of 040: the mechanical chain (INQUIRY end-to-end,
+  path_available, 26k+ delivered interrupts, H-3.3b keystone).
+- Brief's clamp diagnosis was one seam off (verified in code): the
+  W-2 clamp EXISTS (Batch G S-3) and D1 padding was retired
+  (JRN-SCSI-034); run 140935 shows MA firing armed=1 irq=1 with the
+  MODE SENSE signature (count=239 have=20 etc., probe at 400-cap).
+  LIVE DEFECT: the MA never HALTED the SCRIPTS engine -- script ran
+  on, MMs zeroed DBC, completion merged with mismatch, ISR read
+  residual=0 -> transferred=full count -> TOOMUCHDATA.
+- LANDED (architect-approved, one build): W-3 revised (kPhDatIn
+  mismatch -> m_running=false, DBC residual intact, resume via DSP/
+  DCNTL<STD>; doctest incl. STD resume); W-1 N810-CMD per-command
+  ledger (opcode/alloc/ret/status, first-64+every-256th; deviation
+  from brief's compile guard recorded -- dark-probe risk); C-4 mask
+  writes re-evaluate the IRQ line + masked-ABRT doctest (line was
+  already DIEN-gated; ISTAT DIP composition stays [CONFIRM]).
+- CORRECTIONS APPLIED (JRN-SCSI-041 Sec 4, from the brief): C-2
+  SCH_STALL_RTN is a configured callback (invariant, not evidence);
+  C-3 0x0F7901B8 = SCDT pool header, coincidence, STRUCK; C-5 SBCL
+  bit3=ATN never RST; C-6 the 63 console MA rows are the same
+  species -- and with W-3 the console now takes REAL halts: G-4
+  THREE-PLATFORM GATE MANDATORY before the next soak; C-8 TOY epoch
+  is fixed-base PLUS ELAPSED (dumps differ by seconds -- they ARE
+  distinguishable); C-9 pk interrupt chain fully closed.
+- ARCHITECT DECISIONS: W-1+W-3 one build (done); corrections as new
+  journal 041 (done); W-6 INQUIRY identity HELD until after C2.
+  W-4 (UNIT ATTENTION) + W-5 (mode pages 3/4, RZ29 geometry 113/20/
+  3708) land NEXT batch once this one's markers read clean.
+- NEXT RUN read order (brief Sec 7 / 041 Sec 5): N810-CMD alloc-vs-
+  ret consistency; MA rows now halt+fixup+resume, storm gone;
+  DK_UNEXPLAINED ~0; SENSE_LEN nonzero on failure; READ_COUNT
+  nonzero; STS valid + VCB nonzero = C2.  Geometry bits stay 0 until
+  W-5.  Era-tag every claim; read STATUS beside every counter (the
+  040 lesson).
+
+## -6. PREVIOUS (2026-08-03 evening): C1 claim -- STRUCK by JRN-SCSI-041
+##      (kept for the mechanical-chain findings, which survive)
+
+- Run 20260803_140935 (H-3.3/H-3.3b binary) + architect crash/SDA:
+  DKA0 shows "EMULATR VIRTUAL DIS" (INQUIRY data through the whole
+  chain), SUD path_available via PKA0.0, Class/Type 01/36, and
+  OPERATION COUNT 45341 (was 0 in every prior dump; error count 1).
+  The machine was BOOTING OFF THE DISK when crashed -- SYSINIT-era
+  image loads.  PCSAMPLE off 0x801A0170 into varied kernel PCs.
+  C1 PASS (measured twice); C2 was IN PROGRESS at crash.
+- The "kick storm" (217k+ PKE sessions, park/resume per exchange) is
+  the HEALTHY steady-state signature of the port under
+  run-to-completion -- one script run per DSP write.  Not a defect;
+  do not chase it.  Its wall-clock cost makes H-4 budgeted stepping
+  a PERFORMANCE batch now, no longer a correctness bet.
+- KEYSTONE was H-3.3b (JRN-SCSI-039 Sec 9): execRw read m_reg[] raw,
+  so the script's CTEST2 read never saw SIGP -- every wake read as
+  spurious.  Root-cause chain closed in JRN-SCSI-040 Sec 3.  Error
+  species now standing vocabulary: contract verified on one access
+  path, unhonored on the path the guest uses.
+- NEXT RUN (JRN-SCSI-040 Sec 5): rebuild picks up I-6 (N810-INT
+  DSPS rows) + I-7 (N810-DSTATEAT, decides the [CONFIRM] on script-
+  read DSTAT clear-on-read); drop/bound FCLOSE-WATCH (70% of log).
+  Same recipe, DO NOT CRASH EARLY: soak 45-90 wall min for C2
+  (SYSINIT output) then C3 (username prompt).  Then G-4 full-suite
+  gate, then the O-5 instrument sweep (removal triggers now met --
+  keep through one clean C2/C3 run first), then the H-4 brief.
+- Open: DKA0 error count 1 (identify via errorlog / N810-INT rows);
+  SWAPPER-only in the crash paste -- watch SYSINIT appear next dump.
+
+## -5. PREVIOUS (2026-08-03): PKE STALL ROOT-CAUSED by the ledger's FIRST run.
+##      SCRIPTS Memory Move (type 3) is unimplemented; fix = Batch H-1
+
+- JRN-SCSI-036: the overnight soak of run_ds20_20260802_193619.log
+  caught it.  Session 1711 (the ONLY non-console SCRIPTS session all
+  run) = PKEDRIVER's init script at DSP 0xC00012D4; two instructions
+  in it hits Memory Move (type 3) w0=0xC0000004 src=0x01001010 (the
+  chip's OWN mem BAR + 0x10 = DSA self-read).  Model raises IID and
+  stops; real 810 executes it.  Driver concludes chip failure, never
+  retries, times out silently at t=7 -- the whole JRN-SES-003 dump
+  picture (virgin SCDRP, STS 0x13 -> 0x10) follows from this one
+  unimplemented opcode.  JRN-AUD-003 V-1 suspect bit 6 CONFIRMED;
+  Batch H partially un-gated (H-1 = memory move ONLY, rest stay gated).
+- Fix proposed (awaiting approval): Ncr53C810.h stepScripts fetches the
+  THIRD dword (memory move is 3 dwords, DSP advances +12), new
+  execMemoryMove with own-BAR routing to regRead8/regWrite8, v1Probe
+  bit-6 arm removed same edit, CCHIP-ASSERT cap widened (was first-64
+  ONLY -- went dark before the VMS era, second D-LEDGER lesson).
+- The 0xBFF42380/0xBFF42408 session ping-pong (1710 sessions, both
+  eras) is the SRM CONSOLE's own healthy poll loop, running under
+  CSERVE func=0x43 callbacks in the VMS era (DSTAT=0x84 DFE|SIR,
+  SIST=0).  NOT a defect; do not chase it in log reads.
+- TODO(N810-LEDGER) removal trigger technically met; KEEP through the
+  H-1 verification run (it is the instrument that proves the fix).
+- SAME DAY, BATCH H-2 LANDED (JRN-SCSI-037): the SCRIPTDUMP census
+  showed H-1 alone was INSUFFICIENT -- the PKE script uses FOUR
+  unfaithful constructs, not one.  H-2a Memory Move (3-dword, own-BAR
+  routing both directions, cited IID forms, bit-24 execute+loud
+  _PROVISIONAL); H-2b relative transfer control (tc<23>, sext24, neg
+  offsets); H-2c rw opc 5 sources SFBR; H-2d WAIT RESELECT = pke IDLE
+  idiom (PARKED state, no STO; ISTAT<SIGP> resumes at alternate; SIGP
+  cleared ONLY by CTEST2 read -- read-clear modeled same batch or the
+  handshake livelocks).  v1Probe reworked (modeled constructs removed;
+  bit 6 = LOAD-STORE-810A identity watch); cap sweep: ACTIVITY probes
+  now first-N PLUS every-Mth (CCHIP-ASSERT, reportNxm, IIC-IRQ,
+  IDREAD); one-shot CAPTURE probes stay first-N by design.  8 new
+  doctest cases incl. CALL->MM->RETURN asserting the silicon-true TEMP
+  clobber (D-ORACLE inversion guard).  Zero type-7 words and zero
+  IDREAD rows in the census: LS stays IDENTITY-WATCH [CONFIRM], P-2
+  identity coherence DEPRIORITIZED-NOT-FORGOTTEN (matrix rows).
+  JRN-SES-003 "S-1/S-6 deprioritized" REVERSED: console-script
+  exoneration misread as whole-machine verdict (same species as the
+  E-5 dark probe).  apisrm tree FOUND on disk at Processor Support/
+  PalcodeBitsavers/apisrm/apisrm/ref (depth 5; earlier absent-verdict
+  was a depth-4 search error) -- n810_def.h cites for tc_rel/io_rel/
+  istat_sigp/ctest2_sigp/k_mm; NO Load/Store symbols anywhere.
+  PENDING: MSVC build, suite green, G-4 gate (DS10/DS20/ES40 to
+  P00>>>, console-era cycle compare), then the Option-2 combined
+  verification + census-completion soak (dump window now 0x400).
+- H-2 VERIFIED LIVE same evening (JRN-SCSI-038, run 205650): MM[0]
+  executed through the old kill point; init ladder ran end-to-end;
+  N810-PARK -> driver SIGP -> N810-RESUME; the guest script itself
+  does the CTEST2 SIGP read-clear at +0x2A4 (the H-2d trap was real
+  and is exercised).  Console era byte-equivalent (505 sessions);
+  zero V-1 rows = NO fifth construct.  NEW FRONTIER, TIME-DIVERGENT:
+  post-resume the script busy-polls its mailbox registers from
+  SCRIPTS; run-to-completion freezes the CPU so the polled state can
+  never change; the 100k guard executed a LEGAL poll loop to death
+  (runaway at DSP=0xC0001598).  Threads REJECTED (determinism/races/
+  Qt-minimal).  H-3 poll-park shim LANDED (_PROVISIONAL, labeled):
+  budget exhaustion parks instead of kills; wake = next completed
+  host MMIO write; NAMED LIMIT: RAM-mailbox-only posts do not wake
+  (that sighting = H-4 evidence).  H-4 SCOPED (budgeted stepping,
+  guest-cycle pollTick): R-1 rate with authority [CONFIRM 895 DM +
+  DMODE burst], R-2 console-era cycle compare MANDATORY (highest-risk
+  edit; instantaneous console sessions are THEMSELVES time-divergent),
+  R-3 runaway guard becomes bounded heartbeat, never a kill.  Brief
+  owed before H-4 edits.  Next-run pre-decode in JRN-SCSI-038 Sec 6.
+- TWO CONVENTIONS PROMOTED (architect, 2026-08-03, JRN-SCSI-038 Sec 5):
+  (1) Wake/step seams belong at TRANSACTION boundaries, never access
+  boundaries -- a multi-byte register write is not observable
+  mid-flight on silicon; per-byte wakes would be self-inflicted
+  nondeterminism.  Applies to every future stepping/wake design.
+  (2) Pre-decode a shim's failure mode as successor evidence -- every
+  _PROVISIONAL landing ships with its limitation's sighting already
+  classified onto the successor's ledger (the V-1 probe move, applied
+  to shims).  Sightings are evidence, not mysteries.
+- LEDGER HYGIENE DONE: JRN-SES-003 carries Sec 5A CORRECTION (V-SCSI
+  observability artifact; S-1/S-6 deprioritization reversed; error
+  species = console-era observation standing in for whole-machine
+  verdict).  P-1 matrix (SPEC-MATRIX-001): the four census construct
+  rows from JRN-SCSI-037 Sec 1 are its first content, QUEUED.
+- Threads for device concurrency: REJECTED with reasoning recorded in
+  JRN-SCSI-038 Sec 3 (determinism/races/Qt-minimal).  Re-read it, do
+  not re-argue it, when the next TIME-DIVERGENT finding arrives.
+- SESSION CLOSED mid-run 20260802_212601 (H-3 first live read-out,
+  JRN-SCSI-038 Sec 7): shim works mechanically -- POLLPARK[0] at the
+  old kill DSP 0xC0001598, ONE real POLLWAKE, fresh budget, re-park at
+  0xC00015B0, then silence (parks=2 wakes=1, ACK 6144 at read time).
+  Frontier = TWO-PARTY DEADLOCK: script parked awaiting a mailbox
+  post, driver awaiting something from the chip.  Console/PKE chip
+  ownership proven TIME-SEPARATED (park never superseded).  NEXT
+  SESSION PICKUP (Sec 7 P-1..P-4): confirm t=7 give-up terminal state;
+  architect crash -> SDA FORMAT PKA0 UCB + unit-init KPB (saved PC has
+  MOVED from +20678 -- its new value names what the driver awaits);
+  land H-3.1 (POLLWAKE row must carry waking reg+value); decide H-3.2
+  (SBCL: script polls it at +0x304, we hardcode 0 -- TODO(N810-SBCL)
+  is now a live suspect); if exchanges rise but never converge ->
+  H-4 brief per JRN-SCSI-038 Sec 5 R-1..R-4.
+- 2026-08-03 DAY SESSION (JRN-SCSI-038 Sec 8): P-1 EXECUTED on the
+  212601 log post-mortem: t=7 fired and PASSED (ITINTR-ACK[8192],
+  t~=8); LAST N810 row of the run = POLLPARK[1]; ZERO POLLWAKE after
+  (first-8 bound makes absence CONCLUSIVE) -- the driver NEVER wrote
+  the chip again after the re-park, so its wait is INT/event-flag-
+  shaped, not a write-poll.  "Driver waits for an INT the script never
+  raises" now leads.  NO crash was taken that night: the P-2 dump does
+  not exist yet; next run must re-soak past give-up, then Ctrl/P.
+  H-3.1 LANDED (POLLWAKE rows carry waking reg+value+width from the
+  ioWrite tail; cadence unchanged; rides the shim, dies with it).
+  ARCHITECT DECISION: H-3.2 (SBCL) HELD -- next run is H-3.1-ONLY
+  (one-variable experiment); SDA evidence decides SBCL.  PENDING:
+  MSVC rebuild, suite, soak run, Ctrl/P -> SDA FORMAT PKA0 UCB +
+  unit-init KPB (~81C58940).
+- SAME DAY, THE VERDICT RUN + CRASH READ (JRN-SCSI-039): H-3.1 run
+  20260803_103333 (PKE session at 1809 this build -- identify by DSP,
+  not index) + SDA (UCB 81C67A80, KPB 81C5A6C0, SCDRP 82F1DD40).
+  P-2 COMPLETE, deadlock fully NAMED: (1) KPB stall site UNCHANGED
+  since July -- SCH_STALL_RTN = SYS$PKEDRIVER+20678, restart rtn 0,
+  never resumed; KP stack RA chain = unit-init(+20F80) -> +23B58
+  helper -> EXE$KP_STALL.  (2) SCDRP VIRGIN (FUNC/CDB/CMD all 0):
+  the driver NEVER BUILT A COMMAND and posts NOTHING -- it kicks the
+  script, SIGPs, and stalls awaiting the script's INIT-DONE INT
+  (script code 0x0F79 at window +0x210; driver-side tag 0x0F7901B8
+  on the KP stack [CONFIRM]).  (3) The script never routes to
+  init-done: it polls its SCRATCHA/DSA mailbox dispatch (ladder
+  8084F800..07 at +0xB0..+0x190) for a post that never comes.
+  (4) Wake identities (H-3.1 verified live): SIGP 0x20 -> t=7
+  timeout -> ISTAT ABRT 0x80 (t~=11 after DUETIM re-arm to 0xB) ->
+  SIEN0/1, DIEN, DMODE zeroed.  ISTAT<ABRT> is a MEASURED gap ON the
+  driver recovery path: we store the bit, silicon stops the script +
+  raises DSTAT<ABRT> INT -- their abort wait dies on it (H-3.3a
+  candidate).  (5) SBCL DOWNGRADED from prime suspect (the starving
+  loop polls SCRATCHA, not SBCL).  H-4 NOT yet implicated -- this is
+  a protocol-VISIBILITY gap: DSA/SCRATCHA/SCRATCHB writes and MM data
+  are unledgered dark channels (D-LEDGER vindicated again).  Batch
+  H-3.3 APPROVED AND LANDED same day (Ncr53C810.h + doctest): I-3
+  DSA/SCRATCHA/SCRATCHB writes join the CTL ledger (rows carry
+  "(script)" when the SCRIPTS engine is the author); I-4 N810-MM
+  success rows carry val= (first dword moved -- the polled values);
+  I-5 N810-ISTATCTL loud rows for ABRT/RST writes; H-3.3a ISTAT<ABRT>
+  EXECUTES (script stops, parks cleared, DSP preserved, DSTAT<ABRT>
+  -> DIP; doctest "H-3.3a ISTAT<ABRT>" pins park-then-abort-then-
+  no-resume).  ARCHITECT REVIEW ADDITIONS (same day, JRN-SCSI-039
+  Sec 9): I-3 widened to READS (mailbox rows on read, author-tagged);
+  SCRIPTDUMP widened DOWN 0x1600 (the init-done route lives in the
+  library below the entry DSP; -0xNNNN offset rows) -- and the read-
+  side work surfaced H-3.3b, a ROOT-CAUSE CANDIDATE, approved and
+  LANDED: execRw read its source from m_reg[] RAW, so the pke
+  script's MOVE CTEST2 to SFBR (+0x2A4) NEVER SAW SIGP (composed
+  only in regRead8) -- every SIGP wake read as spurious, no dispatch,
+  no init-done INT 0x0F79, m_sigp latched forever (the observed
+  wake-repark churn).  Fix: opc 6/7 source reads route through
+  regRead8 (CTEST2 read-clear, ISTAT composition, DSTAT/SIST
+  clear-on-read now reach script reads); write side stays direct
+  (separate decision); [CONFIRM] 895 DM Ch.6 rw-op semantics;
+  doctest "H-3.3b" pins script-side CTEST2 see-and-clear.  ERROR
+  SPECIES (pattern ledger): contract verified on one access path
+  (host ioRead), silently unhonored on the path the guest uses
+  (script rw-op).  G-4 console-era cycle compare MANDATORY for this
+  batch (console scripts use rw ops).  PENDING: MSVC rebuild, suite
+  green (3 new doctests), rerun same recipe.  Pre-decode: (1) CTEST2
+  row 0x40 -> ladder -> INT 0x0F79 -> SCDRP fills -> first SELECT =
+  root cause confirmed, C1 may fall; (2) dispatch then later stall ->
+  read I-3/I-4 mailbox values + widened dump; (3) console divergence
+  -> revisit the [CONFIRM].  Ladder: JRN-SCSI-039 Sec 8 + Sec 9.
+
+## -4. PREVIOUS (2026-08-03): CLOCK BLOCKER CLEARED (measured); SCSI PKE
+##      port-init stall is the SOLE frontier; DOCTRINE sharpened
+
+- THE VERDICT RUN (JRN-SES-003 + addenda): interval-timer delivery AND
+  service measured ALIVE in the OS era (ITINTR-ACK >= 5120 post-banner,
+  EXE$GL_ABSTIM nonzero in-dump for the first time); the full Ctrl/P ->
+  BUGCHECK -> dump path COMPLETES (JRN-BOOT-002 DEFECT B closed); 0x2D
+  faithful-by-default landed (O-6, env gate DELETED); the two No-Devsel
+  regressions root-caused and fixed same-day (P-16 stub BAR claims;
+  F-2 subtractive decode -- Cypress/ALi claim unclaimed mem/IO cycles,
+  so PIO master aborts cannot happen on hose 0).
+- SOLE FRONTIER: VMS PKEDRIVER unit-init stalls with a VIRGIN SCDRP
+  (no command ever built), arms a t=7 timeout, gives up SILENTLY when
+  it fires (tim/int cleared, nothing rearmed).  KPB stall PV =
+  SYS$PKEDRIVER+20678; DK init parked behind it on IOC$RETURN.  The
+  chip-level channel was DARK -- TODO(N810-LEDGER) (unconditional
+  session + control-register ledger, Ncr53C810.h) landed 2026-08-03;
+  the next boot names what PKE does to the chip before giving up.
+  Prime suspect: run-to-completion SCRIPTS delivers the init-done
+  interrupt BEFORE the driver reaches its stall (a WHEN defect).
+- DOCTRINE (architect, 2026-08-03; JRN-AUD-003 Sec 12A): "EmulatR as
+  an Oracle is a USABLE HRM.  Fidelity first, all subsystems."
+  D-LEDGER: every device model carries a bounded unconditional
+  activity ledger on its command/control surface (N810 done; IDE/
+  tulip/IIC next).  D-TIME: audits carry a temporal/ordering axis;
+  verdict vocabulary gains TIME-DIVERGENT ("correct values, wrong
+  moment").
+- Deterministic TOY hands every dump the SAME wall time (27-JUL-2026
+  19:16) -- dumps are indistinguishable by date; identify by content
+  (SPEC-TOY-001 territory).
+
+## -3. PREVIOUS (2026-08-02): PCI/SCSI gap-closure batches landed; full-stack
+##      audit JRN-AUD-003; the PERROR error chain is LIVE and DOCUMENTED
+
+- Batches C1/C2/D/E/F/G + P-16 landed (journals/20260802_JRN-SES-002 and
+  JRN-AUD-003 addenda): silicon interrupt-pin constants + generalized
+  loader validation (pins are HARDWARE-SET in the device model; routing/
+  usage lives in platform.json -- architect rule 2026-08-02), slot-keyed
+  pci_irq_map form, tulip = named de500 model on ALL platforms,
+  PERROR<NDS>+<SGE> sources wired, stub devices claim their BAR windows,
+  SCSI target hardening (alloc-length/LUN/MODE SENSE/SDTR-reject),
+  N810-V1 SCRIPTS probe, P-1/P-2 clock diagnostics.
+- The DS20 "No Devsel" storm (PCI 0x0100_1148) was P-16: the config-stub
+  tulip never claimed its SRM-assigned BAR window; FIXED (JRN-AUD-003
+  Sec 11).  The error chain itself is VALIDATED against the SRM's own
+  IRQ0 handler.  "No Devsel" is now always a real finding: decode
+  PERROR ADDR<47:18> = PCI addr <31:2>.
+- H&M DOC OF RECORD for the error chain:
+  `H&M/HMDocs/Topics/Tsunami-Error-Chain.xml` ("Tsunami Error Chain
+  (PERROR / No Devsel)") -- chain walk-through, PERROR decode with worked
+  example, PERRMASK gating, live sources, the storm case study.  UPDATE
+  THIS TOPIC whenever PERROR sources change (TA/RDPE/PERR/APE/SERR/DCRTO
+  remain unwired).
+- Full gap ledger + ranked actions: journals/20260802_JRN-AUD-003_full_
+  stack_hrm_faithfulness_audit.md.  Next reads: one DS20 boot (N810-V1
+  rows, ITINTR-ACK + divert ier rows = the clock verdict, SPARSEIO-G8)
+  and the ES40 EMULATR_PCI_CFG_TRACE run (routing tables from the
+  console's own 0x3C INT_LINE writes).
+
+## -2. PREVIOUS (2026-07-31): OS-boot wall ROOT-CAUSED to the missing software-
+##      interrupt tier; SPEC-SIRR-AST-001 GATE-1 APPROVED; implement next
+
+- **`b dka0` reaches the OpenVMS V8.3 banner reliably**, then spins forever
+  at 0xFFFFFFFF801A0170 polling the system device's **UCB$L_STS bit 11
+  (VALID)** -- UCB 81C68040, cell VA FFFFFFFF.81C68118 = 0x08000110
+  (ONLINE|BSY), SDA-confirmed BY NAME from the hung system's dump, with the
+  disk driver's **fork continuation parked in the UCB (Fork PC 81989EE8)**.
+- ROOT CAUSE: `HW_MTPR SIRR` is a silent no-op and ISUM composes only
+  chipset EI causes -> IPL 4 IOPOST, IPL 3 RESCHED, fork dispatch, ASTs all
+  dead.  The clock tick IS delivered (measured at palBase+0x680 with excAddr
+  = the spin PC) -- its downstream work rides the missing tier.  RULED OUT by
+  measurement: chipset CSR gap, masked-interrupt gate, missing SWPPAL (VMS
+  never swaps PAL; 0x8000 IS the VMS PAL -- JRN-VMB-007 prior art).
+- **GATE-1 APPROVED.  Everything needed to implement is in
+  `journals/SPEC-SIRR-AST-001.md` Sec 8-10**: Q1-Q3 answers, ev6_defs.mar
+  field verification (ASTEN=13 -- IprFields.h/CpuState.h comments say 2,
+  WRONG, fix with landing), VMS-PAL contract citations (SIRR plain-R/W;
+  ipl_offset IER table = guest owns IPL; ASTRR via PCTX alias 0x44), D2
+  staging semantics, edit list E1-E6, acceptance gates A/B/C with recipes.
+  ONE commit, state+delivery together (Sec 2 hazard).  Session narrative:
+  `journals/20260731_JRN-BOOT-001_ucb_valid_spin_after_openvms_banner.md`
+  (append-only dated OBS-1..15; also records the run_ds20_putty.sh
+  no-2D_NOOP launcher trap, p_temp=0xf00 vs 0x7000 discriminator, and the
+  OS-era console-marker snapshot instrument + its stale-CpuState caveat).
+- STATUS 2026-07-31 end-of-day (JRN-BOOT-001 OBS-17..22): **IMPLEMENTED
+  (E1-E6, uncommitted).  Gate A PASS** (T1-T7 7/7, suite 558/561 = the 3
+  pre-existing).  **THE SIRR/SOFTINT TIER IS MEASURED-SOUND END TO END**
+  (d2 discriminator run, MTPR_SIRR window 0xA600): request -> delivery
+  in ~190-210 cyc, per-level clear correct, fork softints (IPL 6/8) and
+  sw-timer (IPL 7) dispatch, the old parked fork RAN (FPC 81989EE8 ->
+  818598A8).  **Gate B: DS20 PASS; ES40+DS10 legs OWED** (first attempts
+  invalid -- PLATFORM MISMATCH, ini model= WINS over firmware stem,
+  read once at launch; re-runs killed by the 17:05 instance sweep; DS10
+  baseline died P00-less at 18.4e9; TU storm NOT SIRR-caused, identical
+  ~41K lines/B-cycle both binaries).  **Gate C: C0 PASS, C1 FAIL -- and
+  the wall is NO LONGER SIRR: it is the DEVICE-INTERRUPT tier (JRN-
+  BOOT-002 seed): the 53C810's OS-era completion interrupt never
+  arrives, so IOPOST (IPL 4) is never requested (full-ledger fact) and
+  UCB$L_STS stays 0x08000110.**  Suspects: m_intr wiring -> Tsunami
+  DRIR -> EI vector -> SCB (model's masked-IRQ seam itself is correct).
+  Architect forced a crash dump on their conversational MIN-boot repro
+  (halt PC ffffffff83143128, `crash`) -- SDA output is the next input.
+  Driver gotcha: --expect "P00>>>" false-passes on the firmware's
+  TRANSIENT init prompt; use marker-echo (`set oem_string <MARK>`).
+  **NEW REGRESSION REPORT (OBS-23): SRM `crash` is a SILENT NO-OP on the
+  current binary** -- console parses it, never re-enters VMS (no
+  restart/BUGCHECK/dump, zero post-crash CSERVE), resumes idle; the
+  pre-SIRR binary wrote the OBS-14 dump with the same workflow.  Not
+  yet attributed (canAcceptInterrupt flip exonerated by inspection;
+  suspects: halt-context save, MFPR ISUM compose, or the NON-SIRR probe/
+  naming edits).  A/B repro recipe in OBS-23.  Architect's conversational
+  run also showed ZERO softint deliveries end-to-end (open question) and
+  confirmed HBA INTx manifest-routed (slot 8 pin 2 -> DRIR 26).
+  COMMIT RULE: SIRR commit = ONLY the 7 interrupt-path files; naming
+  work separate -- and the SIRR commit now ALSO gates on resolving the
+  crash no-op (it may not be SIRR's fault, but it must be attributed
+  first).
+
+## -1. PREVIOUS (2026-07-25): SCSI live gate PASSED; NOIOVEC is PROTOCOL-INDEPENDENT
 
 - **JRN-SCSI-003 P1/P2 acceptance PASSED live:** DS20 `show config` shows
   "NCR 53C810" at slot 8; `show dev` shows pka0.7.0.8.0 + dka0..dka600 (7
@@ -1099,12 +1603,12 @@ EmulatR Version should match Help & Manual Version.  We should create a scaffold
 it updates a C++ header that is included in the build. 
 One version, one source of truth. The emulatr-doc-release skill already maintains versionbuild in 
 the H&M .hmxp project file as the documentation's version authority. If the UART banner ("Alpha Emulator Console V4.0-0") carries 
-its own hardcoded string, that's two owners for one fact — the exact pattern the SSOT rules exist to prevent, same family as the 
+its own hardcoded string, that's two owners for one fact -- the exact pattern the SSOT rules exist to prevent, same family as the 
 kSnapshotExtension single-constant rename on the housekeeping list. 
 The clean shape: 
 one kEmulatrVersion constant (or a build-time-generated version header) that the UART banner, 
 --version output, log headers, and any About surface all consume; 
 the release workflow then bumps one place and the H&M versionbuild tracks it (or is generated from it) at release time. 
 Also worth deciding while you're in there: the banner says V4.0-0 while the active tree is 
-V5 — per the file-naming convention the version lives in headers and trees, not names, but a user-facing banner 
+V5 -- per the file-naming convention the version lives in headers and trees, not names, but a user-facing banner 
 claiming V4 from a V5 build is a real mismatch, not a naming-convention question.
