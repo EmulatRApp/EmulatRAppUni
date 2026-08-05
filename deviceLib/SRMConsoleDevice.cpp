@@ -14,6 +14,7 @@
 // ============================================================================
 
 #include "SRMConsoleDevice.h"
+#include "emulatr_version.h"   // generated: <binary>/generated (CMake configure_file)
 #include "coreLib/LoggingMacros.h"
 #include <spdlog/spdlog.h>
 #include <QProcess>
@@ -44,13 +45,24 @@ namespace ASCII {
 // firmware output.  ASCII(128) only; explicit CRLF for the raw terminal.
 // Mirrors the V1 SRMConsole::showBanner text.
 // ============================================================================
+// Version fragment comes from the generated emulatr_version.h (single source
+// of truth: the project() VERSION in CMakeLists.txt, mirrored into the H&M doc
+// project by tools/sync_hm_version.py).  Never hand-edit the badge here.
 namespace {
     constexpr char kConsoleBanner[] =
         "\r\n"
         "ASA EmulatR -- Alpha AXP (EV6 / 21264) Emulator\r\n"
-        "Alpha Emulator Console V4.0-0\r\n"
+        "Alpha Emulator Console " EMULATR_VERSION_STRING "\r\n"
         "(c) 2026 Timothy Peer / eNVy Systems, Inc.\r\n"
         "\r\n";
+}
+
+// Test seam: expose the connect-time banner so the doctest can pin the badge
+// to the generated version constants (drift between badge and version.h is a
+// build error by construction, but the H&M-facing FORMAT is pinned by test).
+const char* SRMConsoleDevice::consoleBanner() noexcept
+{
+    return kConsoleBanner;
 }
 
 // ============================================================================
