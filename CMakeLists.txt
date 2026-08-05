@@ -38,7 +38,24 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET AND WIN32)
         CACHE STRING "vcpkg target triplet")
 endif()
 
-project(Emulatr VERSION 4.0.0 LANGUAGES C CXX)   # C enabled for the vendored SoftFloat (.c) static lib (task #26).  VERSION feeds CPACK_PACKAGE_VERSION.
+project(Emulatr VERSION 1.5.12 LANGUAGES C CXX)  # C enabled for the vendored SoftFloat (.c) static lib (task #26).  VERSION feeds CPACK_PACKAGE_VERSION.
+# VERSION grammar (H&M topic "EmulatR Version Numbering and Release Stages",
+# 2026-08-04): <stage><major>.<variant>-<build>.  MAJOR=release series,
+# MINOR=appuni variant (5), PATCH=deliberate build number.  Synchronized with
+# the H&M doc project (claudeRV4.hmxp versionmajor/minor/build).
+# THIS LINE + THE STAGE LETTER BELOW ARE THE SINGLE SOURCE OF TRUTH.
+#
+# DEC release-stage letter (per the same topic): X=experimental (development),
+# T=field test, V=released.  Flip this ONE letter at stage transitions; the
+# badge renders "<stage>1.5-12" (e.g. "X1.5-12").
+set(EMULATR_VERSION_STAGE "X")
+
+# Render the version header from the one source of truth above.  Generated into
+# the BINARY dir (== source root for the in-source MSVC build; out/build/<cfg>
+# for Ninja hosts); both executable targets add <binary>/generated to their
+# include path.  See config/emulatr_version.h.in.
+configure_file(config/emulatr_version.h.in
+               "${CMAKE_BINARY_DIR}/generated/emulatr_version.h" @ONLY)
 
 # ----------------------------------------------------------------------------
 # Compiler standard
@@ -270,6 +287,7 @@ add_executable(Emulatr ${EMULATR_SOURCES}
 
 target_include_directories(Emulatr PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}/generated
 )
 
 target_link_libraries(Emulatr PRIVATE
@@ -585,6 +603,7 @@ set(EMULATR_TEST_SOURCES
     tests/deviceLib/test_iicpcf8584.cpp
     # 2026-06-07: S1 scsiCoreLib port -- no-media ATAPI CD command layer
     tests/deviceLib/test_scsi_iso.cpp
+    tests/deviceLib/test_version_badge.cpp
     # 2026-07-27: SPEC-SWPCTX-001 C2 -- HWPCB guest I/O + FEN-quad packing
     tests/deviceLib/test_hwpcb_context.cpp
     # 2026-07-27: SPEC-SWPCTX-001 C3 -- faithful VMS SWPCTX leaf (T1-T6)
@@ -684,6 +703,7 @@ add_executable(Emulatr_tests ${EMULATR_TEST_SOURCES})
 target_include_directories(Emulatr_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    ${CMAKE_BINARY_DIR}/generated
 )
 
 target_link_libraries(Emulatr_tests PRIVATE

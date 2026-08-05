@@ -128,6 +128,18 @@ else
     EXE="$BUILD/$TARGET"
 fi
 
+# ---- H&M version sync (badge <-> claudeRV4.hmxp, 2026-08-04) ---------------
+# Mirrors project(Emulatr VERSION x.y.z) into the H&M config-values
+# versionmajor/minor/build.  Sanctioned narrow write (see sync_hm_version.py
+# header).  WARN-loud but NEVER fails the emulator build: exit 3 = project open
+# in Help & Manual (skip, retry after closing), exit 4 = structural error.
+PYBIN="$(command -v python3 || command -v python || echo /c/Users/tim/AppData/Local/Programs/Python/Python313/python)"
+if "$PYBIN" "$SRC/tools/sync_hm_version.py"; then
+    :
+else
+    echo "WARN: H&M version sync did not complete (rc=$?) -- see lines above; build continues."
+fi
+
 echo "=== done ==="
 if [ -f "$EXE" ]; then
     echo "built: $EXE  ($(date -r "$EXE" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' "$EXE" 2>/dev/null | cut -d. -f1))"

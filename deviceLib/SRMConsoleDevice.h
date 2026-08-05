@@ -87,6 +87,11 @@ public:
     explicit SRMConsoleDevice(Config& config, QObject* parent = nullptr);
     ~SRMConsoleDevice() override;
 
+    // Connect-time identity banner (EmulatR's voice, not emulated firmware).
+    // Exposed for the version-badge doctest; content is composed from the
+    // generated emulatr_version.h at compile time.
+    static const char* consoleBanner() noexcept;
+
     // Delete copy/move
     SRMConsoleDevice(const SRMConsoleDevice&) = delete;
     SRMConsoleDevice& operator=(const SRMConsoleDevice&) = delete;
