@@ -157,6 +157,48 @@ starting net-new architectural work in the same area.
   `journals/20260702_ev6translator_harvest_task.md`. SEQUENCE AFTER the ES40 R16
   backtrace -- the ACV loop root is a garbage pointer, not the translator, though
   the alignment-order + VA-form items may correct the fault classification.
+- **File-naming convention audit (project-wide, run-time artifacts)** -- the
+  V5 naming convention is stem-keyed and version-free, but coverage is uneven
+  and LOGGING is an outright gap.
+  THE CONVENTION (the written target the audit conforms to): the STEM is the
+  `--firmware` basename (e.g. `ds20_v7_3`), falling back to the ini model when
+  no firmware is given; where both are present the FIRMWARE STEM WINS and
+  derives the platform.  File NAMES carry no tree-version identifier (V5
+  onward: `Emulatr.ini` not `EmulatrV4.ini`; `ds20_platform.json` not
+  `ds20_v4_platform.json`) -- the version lives in the tree/branch and in file
+  HEADERS.  A vendor firmware revision inside a stem (`ds20_v7_3.exe`) is NOT
+  a tree version and is exempt.
+  AUDIT SCOPE:
+  (a) CONFORMING -- verify only, do not change: `<stem>.exe`, `<stem>.rom`,
+      `<stem>_platform.json`, `<stem>.snap`.  Document the named exceptions
+      `ds10_diag_flash.rom` / `ds20_diag_flash.rom`.
+  (b) UNVERIFIED: TOY/CMOS persistence -- target is `<stem>_toy.bin`; the
+      naming as actually landed in SPEC-TOY-001 (HEAD de6a13d) is unchecked.
+  (c) THE GAP -- LOGGING.  RULE DECIDED 2026-07-31 (architect), LANDING
+      OWED.  Run-dir log naming is ad hoc today:
+      `console_capture_20260729.log`, `emulatr_c1_gate.log`,
+      `run_ds20_showdev_20260725_004804.log`,
+      `putty_console_p10023_20260725004805.log`, `gateB_ds20_sirr_r2.log`
+      -- script-chosen names, date-stamped variants, and port-keyed PuTTY
+      captures, NONE stem-keyed.  THE RULE: PREPEND the stem to the existing
+      run-artifact form, giving `<stem>_<purpose>_<YYYYMMDD>_<HHMMSS>.<ext>`
+      -- e.g. `ds20_v7_3_showdev_20260731_200412.log`.  The PLACEMENT half of
+      the existing rule is UNCHANGED (run/console logs to the run dir's
+      `./logs`, execution/retire/CPU traces to `./traces`); only the NAME
+      gains the stem prefix.  Rationale: parallel multi-platform / per-port
+      instances become separable and greppable, and that parallel workflow is
+      now the intended one.  IN SCOPE TOO: the spdlog application log and the
+      stderr diagnostic stream -- where each lands, and whether either is
+      stem-keyed at all.  LANDING IS TWO EDITS, NOT ONE: (i) the emitting
+      scripts and code, and (ii) the `emulatr-log-trace-output` session skill,
+      whose text still mandates the bare `purpose_YYYYMMDD_HHMMSS.ext` form.
+      Leaving the skill stale puts TWO conventions in force -- the exact
+      two-owners-for-one-fact pattern these SSOT rules exist to prevent.
+  (d) ALSO SWEEP for stem consistency: `snapshots/` contents, `traces/`
+      outputs, and the HWRPB-scan sentinel file.
+  SEQUENCE STRICTLY AFTER the SIRR commit and Gate C -- this is cross-cutting
+  cleanup and MUST NOT ride the interrupt-path commit.  (Captured 2026-07-31
+  from the Gate-B triage session.)
 
 ---
 
