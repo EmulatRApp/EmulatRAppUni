@@ -8,12 +8,12 @@
 
 #include "mmuLib/CboxEventLog.h"
 
+#include "coreLib/LogArtifactPath.h"  // stem-keyed artifact name (2026-07-31)
+
 #include <atomic>
-#include <filesystem>
 #include <fstream>
 #include <ios>
 #include <mutex>
-#include <system_error>
 
 #include <spdlog/spdlog.h>
 
@@ -22,7 +22,11 @@ namespace mmuLib {
 
 namespace {
 
-constexpr char const* kLogPath        = "logs/cbox_csr.log";
+// FILE 5: mmuLib/CboxEventLog.cpp
+// FUNCTION: openIfNeeded -- lazy-open of the CBox CSR access log.
+// CHANGE (2026-07-31): fixed kLogPath ("logs/cbox_csr.log") REMOVED; the
+//   path is now logs/<stem>_cbox_csr.log via coreLib/LogArtifactPath, so
+//   concurrent instances in one run dir no longer truncate each other.
 constexpr uint64_t    kLoudThreshold  = 32;
 constexpr uint64_t    kSummaryStride  = 64ULL * 1024ULL;
 
@@ -34,10 +38,10 @@ bool                  s_streamOpen = false;
 void openIfNeeded()
 {
     if (s_streamOpen) return;
-    std::error_code ec;
-    std::filesystem::create_directories("logs", ec);
-
-    s_stream.open(kLogPath, std::ios::out | std::ios::trunc);
+    // Stem-keyed path; the helper also owns the logs/ create.  See
+    // coreLib/LogArtifactPath.h FILE 1 for the concurrency rationale.
+    s_stream.open(coreLib::logArtifactPath("cbox_csr", "log"),
+                  std::ios::out | std::ios::trunc);
     if (s_stream) {
         s_stream << "# EmulatR V4 CBox CSR (HW_C_DATA / HW_C_SHFT) access log\n";
         s_stream << "# cycle\tpc\top\tipr\tvalue\tcBoxCsr_after\n";

@@ -25,7 +25,7 @@
 //   register that was zeroed by an earlier failure, for example).
 //
 //   This header declares a tiny forensic log that captures one row
-//   per fixup event to logs/unaligned.log (TSV, relative to CWD).
+//   per fixup event to logs/<stem>_unaligned.log (TSV, relative to CWD).
 //   The retire-compact trace file's "cyc=" entries provide the
 //   surrounding context; the unaligned log is the index of cycles
 //   worth investigating.
@@ -56,7 +56,7 @@
 //
 // Cycle correlation workflow:
 //
-//   1. Identify a cycle of interest from logs/unaligned.log.
+//   1. Identify a cycle of interest from logs/<stem>_unaligned.log.
 //   2. Grep the .trc file for "cyc=<that-cycle>" to get the offending
 //      retire line with full register state.
 //   3. Walk backward through the .trc to find the producer of the
