@@ -207,6 +207,8 @@ set(EMULATR_SOURCES
     mmuLib/CboxEventLog.cpp
     coreLib/FaultEventLog.h
     coreLib/FaultEventLog.cpp
+    coreLib/LogArtifactPath.h
+    coreLib/LogArtifactPath.cpp
     pteLib/AlphaPte.h
     pteLib/Ev6PteFormat.h
     pteLib/TlbEntry.h
@@ -654,6 +656,7 @@ set(EMULATR_TEST_SOURCES
     mmuLib/UnalignedEventLog.cpp
     mmuLib/CboxEventLog.cpp
     coreLib/FaultEventLog.cpp
+    coreLib/LogArtifactPath.cpp
     pteLib/SPAMBucket.cpp
     pteLib/SPAMShardManager.cpp
     memoryLib/GuestMemory.cpp

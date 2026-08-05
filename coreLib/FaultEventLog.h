@@ -2,7 +2,7 @@
 // coreLib/FaultEventLog.h -- forensic log of fault deliveries (OPCDEC,
 // unimplemented, privileged, unaligned, ACV, bus error, ...).  One row per
 // fault that PipelineDriver::retire delivers to PALcode, written to
-// logs/faults.log so the demand list of missing / anomalous opcodes is
+// logs/<stem>_faults.log so the demand list of missing / anomalous opcodes is
 // reviewable offline instead of buried in the multi-GB .trc.
 // ============================================================================
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
@@ -28,7 +28,7 @@
 //   # cycle  pc  encoded  opcode  faultCode  faultName  palMode
 //   186581654  0x0000000000013154  0x47ff041f  0x11  3  kFaultUnimplemented  1
 //
-// Correlation workflow: take a cycle from logs/faults.log, grep the .trc
+// Correlation workflow: take a cycle from logs/<stem>_faults.log, grep the .trc
 // for "cyc=<that>" to get the offending retire line + full register state.
 // ============================================================================
 
@@ -39,7 +39,7 @@
 
 namespace coreLib {
 
-// Emit one row in the fault-delivery log.  Lazy-opens logs/faults.log on
+// Emit one row in the fault-delivery log.  Lazy-opens logs/<stem>_faults.log on
 // first call after a reset.  First N faults also emit SPDLOG_WARN for
 // immediate visibility; never throws (I/O failures are tolerated).  The
 // caller is responsible for filtering which fault codes to pass.

@@ -12,14 +12,13 @@
 #include "coreLib/FaultEventLog.h"
 
 #include "coreLib/BoxResult.h"   // kFault* constants for faultName()
+#include "coreLib/LogArtifactPath.h"  // stem-keyed artifact name (2026-07-31)
 
 #include <atomic>
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <ios>
 #include <mutex>
-#include <system_error>
 
 #include <spdlog/spdlog.h>
 
@@ -28,8 +27,12 @@ namespace coreLib {
 
 namespace {
 
-// File path is relative to CWD -- matches the UnalignedEventLog convention.
-constexpr char const* kLogPath       = "logs/faults.log";
+// FILE 3: coreLib/FaultEventLog.cpp
+// FUNCTION: openIfNeeded -- lazy-open of the fault-delivery log.
+// CHANGE (2026-07-31): the fixed kLogPath constant ("logs/faults.log") is
+//   GONE.  It made concurrent same-run-dir instances truncate one another.
+//   The path is now built by coreLib/LogArtifactPath as
+//   logs/<stem>_faults.log, keyed to this run's --firmware stem.
 
 // First N faults emit at WARN level for immediate stderr visibility;
 // subsequent ones are silent on stderr but still written to the file
@@ -43,7 +46,7 @@ constexpr uint64_t    kSummaryStride = 64ULL * 1024ULL;
 
 // JRN-VMB-016 Sec 3.14 probe: the default 64-fault stderr threshold is fully
 // consumed by the powerup burst (~cyc 1.21B), so the LATER handoff faults at
-// cyc ~1.9B are silent on the console (though still in logs/faults.log).  Two
+// cyc ~1.9B are silent on the console (though still in logs/<stem>_faults.log).  Two
 // env-gated overrides make a chosen window loud again, zero-cost when unset:
 //   EMULATR_FAULT_LOUD=<n>              -- raise (or lower) the loud threshold.
 //   EMULATR_FAULT_CYCLO / _CYCHI=<cyc>  -- ALSO emit loud for any fault whose
@@ -101,10 +104,10 @@ void openIfNeeded()
 {
     if (s_streamOpen) return;
 
-    std::error_code ec;
-    std::filesystem::create_directories("logs", ec);
-
-    s_stream.open(kLogPath, std::ios::out | std::ios::trunc);
+    // Stem-keyed path; the helper also owns the logs/ create.  See
+    // coreLib/LogArtifactPath.h FILE 1 for the concurrency rationale.
+    s_stream.open(logArtifactPath("faults", "log"),
+                  std::ios::out | std::ios::trunc);
     if (s_stream) {
         s_stream << "# EmulatR V4 fault-delivery log\n";
         s_stream << "# cycle\tpc\tencoded\topcode\tfaultCode\tfaultName\tpalMode\n";

@@ -9,12 +9,12 @@
 
 #include "mmuLib/UnalignedEventLog.h"
 
+#include "coreLib/LogArtifactPath.h"  // stem-keyed artifact name (2026-07-31)
+
 #include <atomic>
-#include <filesystem>
 #include <fstream>
 #include <ios>
 #include <mutex>
-#include <system_error>
 
 #include <spdlog/spdlog.h>
 
@@ -23,11 +23,15 @@ namespace mmuLib {
 
 namespace {
 
-// File path is relative to CWD.  Build's runtime-layout step creates
-// the logs/ directory next to the executable; if a user launches
-// from a different CWD the file lands in that CWD's logs/ instead.
-// Acceptable; the snapshot subsystem has the same property.
-constexpr char const* kLogPath        = "logs/unaligned.log";
+// File path is relative to CWD, and coreLib/LogArtifactPath creates the
+// logs/ directory on first use; if a user launches from a different CWD
+// the file lands in that CWD's logs/ instead.  Acceptable -- the
+// snapshot subsystem has the same property.
+// FILE 4: mmuLib/UnalignedEventLog.cpp
+// FUNCTION: openIfNeeded -- lazy-open of the unaligned-fixup log.
+// CHANGE (2026-07-31): fixed kLogPath ("logs/unaligned.log") REMOVED; the
+//   path is now logs/<stem>_unaligned.log via coreLib/LogArtifactPath, so
+//   concurrent instances in one run dir no longer truncate each other.
 
 // Loud-event threshold.  First N occurrences emit at WARN level for
 // immediate visibility; subsequent occurrences are silent on stderr
@@ -58,10 +62,10 @@ void openIfNeeded()
 {
     if (s_streamOpen) return;
 
-    std::error_code ec;
-    std::filesystem::create_directories("logs", ec);
-
-    s_stream.open(kLogPath, std::ios::out | std::ios::trunc);
+    // Stem-keyed path; the helper also owns the logs/ create.  See
+    // coreLib/LogArtifactPath.h FILE 1 for the concurrency rationale.
+    s_stream.open(coreLib::logArtifactPath("unaligned", "log"),
+                  std::ios::out | std::ios::trunc);
     if (s_stream) {
         s_stream << "# EmulatR V4 unaligned-access fixup log\n";
         s_stream << "# cycle\tpc\tva\twidth\tpalMode\n";

@@ -56,6 +56,7 @@
 // ways.  No event loop runs on the main thread.
 #include <QCoreApplication>
 
+#include "coreLib/LogArtifactPath.h"
 #include "coreLib/LogSubsystem.h"
 #include "coreLib/PcTrace.h"
 #include "memoryLib/GuestMemory.h"
@@ -193,6 +194,19 @@ int main(int argc, char* argv[])
                      "[ROM] firmwareImage in Emulatr.ini\n");
         return 2;
     }
+
+    // ------------------------------------------------------------------
+    // FILE 6: main.cpp
+    // FUNCTION: main -- startup wiring.
+    // CHANGE (2026-07-31): key this run's diagnostic artifacts to the
+    //   firmware stem, so concurrent instances in one run directory stop
+    //   truncating each other's logs/*.log.  Set ONCE, here, because this
+    //   is the first point where the CLI > ini firmware precedence above
+    //   has settled and no subsystem has emitted yet.  EMULATR_LOG_STEM
+    //   still overrides at resolve time (two same-platform instances).
+    //   See coreLib/LogArtifactPath.h FILE 1.
+    // ------------------------------------------------------------------
+    coreLib::setLogArtifactStem(opts.firmwarePath.stem().string());
 
     // ------------------------------------------------------------------
     // Resolve firmware format.  Auto picks SRM if the file extension
