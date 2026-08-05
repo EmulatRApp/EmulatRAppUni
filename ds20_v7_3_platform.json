@@ -49,7 +49,7 @@
       "comment": "NCR 53C810 SCSI HBA (KZPAA lineage) -> console pka0 + dka disks (JRN-SCSI-001). Bind row: apisrm io_device_list.h 0x00011000 -> n810/pk/PKE; the DS20 v7.3-2 console carries the pke driver (verified live). Slot 8 = minimal-churn placement (Q2: DS20E-faithful slot-7 shuffle deferred). MANIFEST-PINNED (2026-07-25): a disk target EXISTS on the bus only for a storage row below; undeclared ids selection-timeout. unit = SCSI target id 0..6; id 7 = the HBA itself (dka7.img in vStorage cannot attach). SRM unit naming: dka<id*100+lun> -> id 0 = dka0, id 1 = dka100, id 2 = dka200, ...",
       "bars": [ { "index": 0, "kind": "io", "size": "0x100" },
                 { "index": 1, "kind": "mem", "size": "0x100" } ],
-      "option_rom": false, "interrupt_pin": 2,
+      "option_rom": false, "interrupt_pin": 1,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "scsi_disk",
           "model": "EMULATR VIRTUAL DISK", "media": "Alpha/dka0.vdisk", "media_kind": "image",

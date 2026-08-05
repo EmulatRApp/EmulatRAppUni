@@ -5,6 +5,45 @@
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
 // ============================================================================
+//
+// CHANGE HISTORY
+// ----------------------------------------------------------------------------
+// FILE 2: systemLib/Machine.cpp
+//   DATE:     2026-08-02
+//   FUNCTION: manifest PCI wiring block (Named-model loop)
+//   CHANGE:   Batch C1/C2 (JRN-SES-001, architect-approved).  interrupt_pin
+//             is SILICON: routing now resolves slot x MODEL CONSTANT
+//             (Ncr53C810::kInterruptPin, Dec21143Tulip::kInterruptPin); the
+//             manifest declaration is validated and a mismatch warned loud +
+//             ignored (JRN-SCSI-034 Sec 6.1 fabrication-surface rule).  The
+//             tulip joins the board-data seam via setTulipIntxRouting(),
+//             replacing the chipset's hardwired DRIR<32> formula (S3
+//             generalization).
+//   FUNCTION: interval-timer divert printer (BRINGUP_PROBES block)
+//   CHANGE:   P-1 (JRN-SES-001 Sec 4).  Was first-32 + bare count every 64K
+//             (capped inside the console era; VMS-era delivery UNOBSERVED,
+//             R-3).  Now first 32 + a full row every 4096th carrying
+//             ier / EI<2> / cm so the delivery gate is readable per sample.
+//   SEE:      journals/20260802_JRN-SES-001_session_record_pci_gap_closure.md
+// ----------------------------------------------------------------------------
+// FILE 2: systemLib/Machine.cpp
+//   DATE:     2026-08-01
+//   FUNCTION: Machine::tick() -- pre-FIRE warp sites
+//   CHANGE:   REMOVED the EMULATR_IDLEWARP interval-timer idle fast-forward
+//             (lines 1756-1836 of the pre-change file).
+//   RATIONALE: INJECTION.  It jumped m_systemClock and m_cpu.cycleCount to the
+//             next timer edge across the console idle spin.  Guest time is not
+//             ours to fabricate, and because the console UART is driven by
+//             HOST-time TCP arrival rather than the interval timer, the jump
+//             decoupled CPU time from byte-arrival time -- the leading
+//             hypothesis for the console input corruption recorded as DEFECT A
+//             in JRN-BOOT-002 OBS-6 (typed "crash", delivered "car  rash").
+//   BEHAVIOR:  idle spins run literally.  Console input path no longer sees a
+//             clock discontinuity while bytes are in flight.
+//   RETAINED:  EMULATR_UDELAYWARP (the coherent one-tick-edge ES40 LFU
+//             collapse) pending architect decision D-2 in JRN-AUD-002 Sec 9.
+//   SEE:      journals/20260801_JRN-AUD-002_injection_lever_ledger.md Sec 4
+// ----------------------------------------------------------------------------
 
 #include "systemLib/Machine.h"
 
@@ -538,29 +577,78 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
                     h = m_chipset.pciHandlerForModel(e.modelName);
                     if (h) {
                         ++wiredNamed;
-                        // Manifest-driven INTx wiring (JRN-SCSI-003): push the
-                        // declared interrupt_pin into the device's config space
-                        // (the console indexes its routing by the 0x3D read)
-                        // and resolve slot x pin -> DRIR bit via the manifest's
-                        // board table.  No table / unrouted -> warn loud, the
-                        // chipset drops asserts rather than lighting a wrong
-                        // bit.  S3 generalizes to every option-card model.
+                        // Manifest-driven INTx wiring (JRN-SCSI-003; reworked
+                        // Batch C1/C2, 2026-08-02, JRN-SES-001).  The pin is
+                        // SILICON: each named model owns kInterruptPin with
+                        // its datasheet cite; a manifest declaration is only
+                        // VALIDATED against it (mismatch warns loud and is
+                        // ignored -- JRN-SCSI-034 Sec 6.1: a configurable
+                        // field for a value hardware does not get to choose
+                        // is a fabrication surface).  Routing resolves
+                        // slot x CONSTANT pin -> DRIR bit via the manifest's
+                        // board data (pci_irq_map, then the DS20-verbatim
+                        // flat table).  No route -> warn loud, the chipset
+                        // drops asserts rather than lighting a wrong bit.
+                        // Batch C1 completion (architect direction
+                        // 2026-08-02): validate EVERY named model's declared
+                        // pin against the silicon constant, not just the
+                        // routed ones.  Pins are hardware-set; routing/usage
+                        // is manifest data.
+                        {
+                            int const silicon =
+                                TsunamiChipset::modelInterruptPin(e.modelName);
+                            if (silicon >= 0 && e.interruptPin != 0
+                                && int(e.interruptPin) != silicon)
+                                spdlog::warn("PCI manifest: '{}' declares "
+                                             "interrupt_pin {} but model '{}' "
+                                             "hardwires pin {} -- declaration "
+                                             "ignored (silicon wins)",
+                                             e.name, int(e.interruptPin),
+                                             e.modelName, silicon);
+                        }
                         if (e.modelName == "ncr53c810") {
+                            // Validator: device keeps kInterruptPin, warns on
+                            // a disagreeing manifest (Ncr53C810.h Batch C1).
                             m_chipset.setScsiInterruptPin(e.interruptPin);
+                            uint8_t const pin =
+                                deviceLib::Ncr53C810::kInterruptPin;
                             int const drir = mr.manifest.intxDrirBit(
-                                e.slot, e.interruptPin);
+                                e.slot, pin);
                             m_chipset.setScsiIntxRouting(drir);
                             if (drir < 0)
                                 spdlog::warn("PCI manifest: '{}' slot {} pin {} "
-                                             "has no pci_irq_table_hose0 route "
+                                             "has no pci_irq_map / "
+                                             "pci_irq_table_hose0 route "
                                              "-- INTx will be dropped",
-                                             e.name, int(e.slot),
-                                             int(e.interruptPin));
+                                             e.name, int(e.slot), int(pin));
                             else
                                 spdlog::info("PCI manifest: '{}' INTx routed "
                                              "slot {} pin {} -> DRIR {}",
                                              e.name, int(e.slot),
-                                             int(e.interruptPin), drir);
+                                             int(pin), drir);
+                        } else if (e.modelName == "de500"
+                                   || e.modelName == "dec21143") {
+                            // Batch C2: tulip joins the same board-data seam
+                            // (was hardwired DRIR<32> by formula in the
+                            // chipset -- see TsunamiChipset.h Batch C2).
+                            uint8_t const pin =
+                                deviceLib::Dec21143Tulip::kInterruptPin;
+                            // (Pin declaration already validated by the
+                            // generalized check above.)
+                            int const drir = mr.manifest.intxDrirBit(
+                                e.slot, pin);
+                            m_chipset.setTulipIntxRouting(drir);
+                            if (drir < 0)
+                                spdlog::warn("PCI manifest: '{}' slot {} pin {} "
+                                             "has no pci_irq_map / "
+                                             "pci_irq_table_hose0 route "
+                                             "-- INTx will be dropped",
+                                             e.name, int(e.slot), int(pin));
+                            else
+                                spdlog::info("PCI manifest: '{}' INTx routed "
+                                             "slot {} pin {} -> DRIR {}",
+                                             e.name, int(e.slot),
+                                             int(pin), drir);
                         }
                     } else {
                         spdlog::warn("PCI manifest: '{}' at {:02d}.{} declares model "
@@ -572,7 +660,36 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
                 if (h == nullptr) {          // Generic / Passive / unresolved Named
                     m_manifestPci.push_back(std::make_unique<ManifestPciDevice>(
                         synthesizePciConfig(e), e.name));
-                    h = m_manifestPci.back().get();
+                    ManifestPciDevice* stub = m_manifestPci.back().get();
+                    // P-16 (2026-08-02, JRN-AUD-003 addendum): wire the
+                    // stub's inert BAR claims through the same Pchip
+                    // registries the behavioral models use.  A config-
+                    // visible device must decode the windows its BARs
+                    // claim; leaving them unclaimed made every driver poke
+                    // a Batch-D master abort (the DS20 NDS storm at PCI
+                    // 0x0100_1148 -- generic tulip's SRM-assigned window).
+                    stub->setRangeCallbacks(
+                        [this](uint64_t base, uint32_t len, bool isMem,
+                               IIoPortHandler* self) {
+                            if (isMem)
+                                m_chipset.pchip().registerPciMemRange(
+                                    base, base + len, self);
+                            else
+                                m_chipset.pchip().registerIoPortRange(
+                                    static_cast<uint16_t>(base),
+                                    static_cast<uint16_t>(base + len), self);
+                        },
+                        [this](uint64_t base, uint32_t len, bool isMem,
+                               IIoPortHandler* self) {
+                            if (isMem)
+                                m_chipset.pchip().unregisterPciMemRange(
+                                    base, base + len, self);
+                            else
+                                m_chipset.pchip().unregisterIoPortRange(
+                                    static_cast<uint16_t>(base),
+                                    static_cast<uint16_t>(base + len), self);
+                        });
+                    h = stub;
                     ++wiredStub;
                 }
                 m_chipset.pchip().registerPciDevice(e.bus, e.slot, e.func, h);
@@ -737,8 +854,58 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
                                  err, int(st.channel), int(st.unit));
                     continue;
                 }
+                // SPEC-DISK-001 (architect-approved 2026-08-04): a SCSI disk
+                // row's "model" selects an ATOMIC drive profile (identity +
+                // geometry from one DriveProfile.h table entry).  Unknown
+                // mnemonic = attach REFUSED, loud.  Image smaller than the
+                // profile = attach REFUSED (a disk answering READ CAPACITY
+                // with blocks that do not exist is the worst failure mode);
+                // larger = LOUD warn, tail unaddressable (architect call).
+                scsi::DriveProfile const* profile = nullptr;
+                if (isScsi) {
+                    profile = scsi::findDriveProfile(st.model.c_str());
+                    if (profile == nullptr) {
+                        spdlog::error(
+                            "Storage: SCSI unit{} model '{}' is not in the "
+                            "drive-profile table -- attach REFUSED "
+                            "(SPEC-DISK-001; known: RZ28L, RZ29L, RZ40, "
+                            "EMULATR-512M).  Unit left empty.",
+                            int(st.unit), st.model);
+                        continue;
+                    }
+                    if (media && !media->isOpen()) (void) media->open();
+                    uint64_t const mb = media->blockCount();
+                    switch (scsi::checkProfileMedia(*profile, mb)) {
+                    case scsi::ProfileMediaCheck::MediaSmaller:
+                        spdlog::error(
+                            "Storage: SCSI unit{} image '{}' has {} blocks; "
+                            "profile {} requires {} ({} short) -- attach "
+                            "REFUSED (SPEC-DISK-001 Sec 7.2 hard stop).  "
+                            "Unit left empty.",
+                            int(st.unit), mediaSpec,
+                            static_cast<unsigned long long>(mb),
+                            profile->mnemonic,
+                            static_cast<unsigned long long>(profile->blocks),
+                            static_cast<unsigned long long>(profile->blocks - mb));
+                        continue;
+                    case scsi::ProfileMediaCheck::MediaLarger:
+                        spdlog::warn(
+                            "Storage: SCSI unit{} image '{}' has {} blocks; "
+                            "profile {} uses {} -- the {}-block tail is "
+                            "UNADDRESSABLE (SPEC-DISK-001 Sec 7.2: larger "
+                            "warns, per architect decision 2026-08-04).",
+                            int(st.unit), mediaSpec,
+                            static_cast<unsigned long long>(mb),
+                            profile->mnemonic,
+                            static_cast<unsigned long long>(profile->blocks),
+                            static_cast<unsigned long long>(mb - profile->blocks));
+                        break;
+                    case scsi::ProfileMediaCheck::Ok:
+                        break;
+                    }
+                }
                 bool const ok = isScsi
-                    ? m_chipset.setScsiDiskMedia(st.unit, std::move(media))
+                    ? m_chipset.setScsiDiskMedia(st.unit, std::move(media), profile)
                     : isDisk
                         ? m_chipset.setDiskMedia(st.channel, st.unit, std::move(media))
                         : m_chipset.setCdMedia(std::move(media));
@@ -912,11 +1079,14 @@ bool Machine::canAcceptInterrupt(uint8_t irqLevel) const noexcept
         return (m_cpu.ier & mask) != 0;
     }
 
-    // IRQ levels outside the chipset EI range (software interrupts at
-    // IPL 1..14, AST at IPL 2..3, etc.) fall through to "accepted"
-    // for now; their own per-source gates will land alongside SIRR /
-    // ASTRR wiring in a follow-up phase.
-    return true;
+    // IRQ levels outside the chipset EI range are NOT this predicate's
+    // business: software interrupts and ASTs have their own per-source
+    // gate (coreLib::pendingSoftInt composes SIRR/IER.SIEN and
+    // ASTRR/ASTER/IER.ASTEN/mode; the SI/AST deliver block in run()
+    // polls it directly).  The former fall-through "return true" was a
+    // placeholder from before that wiring landed (SPEC-SIRR-AST-001
+    // E5); an unknown level must never mean "deliver anyway".
+    return false;
 }
 
 
@@ -1750,86 +1920,9 @@ bool Machine::systemTick(uint64_t i) noexcept
         // on level CHANGE.
         m_chipset.evalDeviceIrqs();
 
-        // ---- EMULATR_IDLEWARP: interval-timer idle fast-forward (#25) ----------
-        // 2026-06-11/12.  The console's post-GCT/FRU and pre/at-dva0 sleeps idle in
-        // a tick loop near PC 0x7bafc that, between ticks, spins ~one interval-
-        // timer period of cycles per tick -- the ~30-min "initializing GCT/FRU"
-        // and ~20-min dva0 host stalls.  The C970DUMP regs proved 0x7bef0 is only
-        // the once-per-tick counter increment (counter @0x3c970), NOT the spin;
-        // the host cost is the idle wait BETWEEN ticks.  When the CPU is in that
-        // idle wait AND can accept the interval timer (IPL<22, not PAL, post-
-        // relocation), jump cycleCount straight to the next timer-fire edge so
-        // the FIRE/DELIVER below runs the tick ISR and the loop costs O(ticks)
-        // host iterations instead of O(cycles).  FAITHFUL: emulated time still
-        // advances by exactly the skipped amount and the timer fires at the same
-        // emulated cycle it otherwise would; only the host re-execution of the
-        // idle spin is skipped.  Self-terminating -- it jumps at most one tick
-        // per visit and stops the instant the sleep's exit condition is met (PC
-        // leaves the idle window).  Gated OFF by default: the faithful cycle-
-        // accurate path is unchanged; arm EMULATR_IDLEWARP to measure.  SEPARATE
-        // gate from the QUARANTINED RSCC warps (EMULATR_RSCCWARP) -- those jumped
-        // many ticks at once AND rewrote 0x3c970 out-of-band, the confirmed cause
-        // of the overnight 0x7f4xx boot corruption.  THIS warp advances cycleCount
-        // exactly ONE tick edge and lets the real interval-timer ISR increment
-        // 0x3c970 -- no out-of-band rewrite, so counter-polling loops stay coherent.
-        // PC window covers the krn$_idle loop (PCSAMPLE showed ra=0x7bad8 / 0x7bafc /
-        // 0x7bb04); narrow it against the >>> RetireProfiler idle bucket once known.
-        // process-global static (one instance per process); revisit under the
-        // threaded driver, where agent threads would share this getenv result.
-        static bool const s_idleTickWarp = (std::getenv("EMULATR_IDLEWARP") != nullptr);
-        if (s_idleTickWarp) {
-            uint64_t const idlePc = m_cpu.pcAddr();
-            if (idlePc >= 0x000000000007bad0ull && idlePc < 0x000000000007bb10ull
-                && canAcceptInterrupt(22)
-                && !chipsetLib::intervalTimerShouldFire(systemNow())) {
-                // IDLEWARP SEAM (Phase 2): warps the SYSTEM clock past an idle
-                // spin to the next timer edge.  Today systemNow() == this CPU's
-                // PCC so warping m_cpu.cycleCount IS warping the system clock
-                // (behavior-identical).  STEP 3 advances systemNow() by the warp
-                // delta; under policy P-A the running CPU's PCC tracks the warp
-                // (design D-1a) -- keep them moving together.
-                // P2-T3a: the warp targets the SYSTEM clock (skip system time to
-                // the next timer edge); the running CPU's PCC tracks it under P-A.
-                // Base on systemNow() (== this CPU's PCC today) so the multi-CPU-
-                // correct system-clock-primary shape needs no STEP-4 revisit.
-                uint64_t const c0 = systemNow();
-                m_systemClock     = (c0 | Tsunami21272::Spec::kCchipTimerMask) + 1;
-                m_cpu.warpCycles += (m_systemClock - c0);   // WARP accounting: idle skip (2026-06-30)
-                m_cpu.cycleCount  = m_systemClock;
-                // CHANGE 2026-07-13 (RSCC/warp instrumentation, spec
-                // journals/20260713_es40_lfu_rscc_warp_instrumentation_spec.md
-                // EDIT 1): emit an un-throttled warp-ledger row (from/to/delta +
-                // running warpTot) so a warp-on vs warp-off A/B shows every
-                // cycle-count jump baked into the guest-visible RSCC.  Gated at
-                // runtime on EMULATR_RSCC_DIAG -> inert unless armed.
-                {
-                    static bool const s_rsccDiag =
-                        std::getenv("EMULATR_RSCC_DIAG") != nullptr;
-                    if (s_rsccDiag) {
-                        std::fprintf(stderr,
-                            "WARPLEDGER site=idle from=%llu to=%llu delta=%llu "
-                            "warpTot=%llu pc=0x%llx\n",
-                            static_cast<unsigned long long>(c0),
-                            static_cast<unsigned long long>(m_cpu.cycleCount),
-                            static_cast<unsigned long long>(m_cpu.cycleCount - c0),
-                            static_cast<unsigned long long>(m_cpu.warpCycles),
-                            static_cast<unsigned long long>(idlePc));
-                        std::fflush(stderr);
-                    }
-                }
-                // process-global static; revisit under the threaded driver.
-                static uint64_t s_warpLog = 0;
-                if ((s_warpLog++ & 0x3FFull) == 0) {     // throttle 1/1024
-                    std::fprintf(stderr,
-                        "IDLETICKWARP cyc=%llu->%llu pc=0x%llx (skip idle spin to next tick)\n",
-                        static_cast<unsigned long long>(c0),
-                        static_cast<unsigned long long>(m_cpu.cycleCount),
-                        static_cast<unsigned long long>(idlePc));
-                    std::fflush(stderr);
-                }
-            }
-        }
-        // ---- END EMULATR_IDLEWARP idle fast-forward ----------------------------
+        // EMULATR_IDLEWARP REMOVED 2026-08-01 -- injection block excised here.
+        // See the CHANGE HISTORY block at the head of this file and
+        // journals/20260801_JRN-AUD-002_injection_lever_ledger.md Sec 4.
 
         // ---- EMULATR_UDELAYWARP: COHERENT RSCC micro-delay warp at 0x6a514 -----
         // (2026-07-21) The ES40 silicon krn$_micro_delay busy-wait (0x6a4f8-
@@ -1931,14 +2024,21 @@ bool Machine::systemTick(uint64_t i) noexcept
             std::fflush(stderr);
 #endif
             // Throttled stderr -- timer divert at ~954 Hz on a long run would
-            // otherwise drown other diagnostics.  First 32 fires loud, then a
-            // summary every 64K.  Matches the CBOX/UNALIGN throttle policy.
+            // otherwise drown other diagnostics.
+            // P-1 (2026-08-02, JRN-SES-001 Sec 4, architect-approved): the
+            // old policy (first 32 loud, then a bare count every 64K) capped
+            // out inside the CONSOLE era, leaving VMS-era timer delivery
+            // UNOBSERVED (JRN-SES-001 R-3) while EXE$GL_ABSTIM=0 says the
+            // guest never services the tick.  New policy: first 32 loud,
+            // then a FULL row every 4096th, carrying ier + the EI<2>
+            // interval-timer enable + cm so the delivery gate is readable
+            // at the moment of each sampled divert.
 #if EMULATR_BRINGUP_PROBES
             // process-global static; revisit under the threaded driver
             // (shared across agent threads -> contention/correctness).
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
-            if (n < 32) {
+            if (n < 32 || (n & 0xFFFu) == 0) {
                 uint64_t const savedPc =
                     m_cpu.pc;   // pc already carries the PALmode bit (PC<0>)
                 // 2026-05-29: target offset is coreLib::ev6::kEntry_INTERRUPT
@@ -1948,17 +2048,15 @@ bool Machine::systemTick(uint64_t i) noexcept
                 std::fprintf(stderr,
                              "Machine: interval-timer divert[%llu] at "
                              "cyc=%llu savedPc=0x%016llx target=0x%016llx "
+                             "ier=0x%016llx ei2=%d cm=%u "
                              "(palBase + kEntry_INTERRUPT = 0x680)\n",
                              static_cast<unsigned long long>(n),
                              static_cast<unsigned long long>(m_cpu.cycleCount),
                              static_cast<unsigned long long>(savedPc),
-                             static_cast<unsigned long long>(target));
-                std::fflush(stderr);
-            } else if ((n & 0xFFFFu) == 0) {
-                std::fprintf(stderr,
-                             "Machine: %llu interval-timer diverts "
-                             "(loud-stderr muted past 32)\n",
-                             static_cast<unsigned long long>(n + 1));
+                             static_cast<unsigned long long>(target),
+                             static_cast<unsigned long long>(m_cpu.ier),
+                             int((m_cpu.ier >> 35) & 1u),
+                             static_cast<unsigned>(m_cpu.mode));
                 std::fflush(stderr);
             }
 #endif
@@ -2163,6 +2261,70 @@ bool Machine::systemTick(uint64_t i) noexcept
 
             // EI[1] = IRQ_DEV (device / PCI / ISA class); ISUM bit 34.
             stageInterruptDivert(m_cpu, uint64_t{1} << 34);
+            divertedThisCycle = true;
+        }
+
+        // ------------------------------------------------------------------
+        // Software interrupts + ASTs (SPEC-SIRR-AST-001, 2026-07-31).
+        // ------------------------------------------------------------------
+        // The guest posts requests via CALL_PAL MTPR_SIRR (-> HW_MTPR
+        // SIRR, now real storage) and per-mode ASTRR/ASTER via PCTX;
+        // this block is the delivery half -- state and delivery land
+        // together or not at all (spec Sec 2: truthful SIRR without
+        // delivery is a harder hang than the silent no-op was).
+        //
+        // Gate: same relocation + PALmode discipline as the EI blocks
+        // (a divert staged mid-PAL corrupts the flow), then
+        // pendingSoftInt -- the live SI/AST compose (SIRR & IER.SIEN;
+        // ASTRR & ASTER & IER.ASTEN & mode rule).  Enable-bit-only by
+        // design: DEC's PAL maintains IPL by rewriting IER from its
+        // ipl_offset table on every IPL change, so the enable bits ARE
+        // the IPL model (GATE-1 Q2, source-proven).  EI blocks sit
+        // above and win ties via divertedThisCycle -- matching the
+        // PAL's own dispatch order EI -> SI -> AST (ev6_vms_pal.mar
+        // :4742).  A request masked this retire redelivers on a later
+        // poll -- same latch-and-redeliver shape as b_irq<1>.
+        //
+        // D2 staging: isumMask = 0.  SI/AST bits are composed LIVE at
+        // the guest's ISUM read; staging 0 keeps a stale EI cause from
+        // a prior tick out of the SI handler's dispatch.  A spurious
+        // divert (request cleared between poll and read) lands on the
+        // PAL's dismiss leg harmlessly.
+        if (!divertedThisCycle
+            && m_palImageRelocated && m_cpu.palBase != 0
+            && !m_cpu.inPalMode()
+            && coreLib::pendingSoftInt(m_cpu) != 0)
+        {
+#if EMULATR_BRINGUP_PROBES
+            // Throttled stderr -- first 32 loud, then a summary every
+            // 64K; matches the EI divert throttle policy above.
+            // process-global static; revisit under the threaded driver.
+            static std::atomic<uint64_t> s_cnt{ 0 };
+            uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
+            if (n < 32) {
+                std::fprintf(stderr,
+                             "Machine: SOFTINT-DELIVER[%llu] at cyc=%llu "
+                             "savedPc=0x%016llx sw=0x%08llx sirr=0x%08llx "
+                             "ier=0x%016llx astensr=0x%02llx cm=%u\n",
+                             static_cast<unsigned long long>(n),
+                             static_cast<unsigned long long>(m_cpu.cycleCount),
+                             static_cast<unsigned long long>(m_cpu.pc),
+                             static_cast<unsigned long long>(
+                                 coreLib::pendingSoftInt(m_cpu)),
+                             static_cast<unsigned long long>(m_cpu.sirr),
+                             static_cast<unsigned long long>(m_cpu.ier),
+                             static_cast<unsigned long long>(m_cpu.asten_sr),
+                             static_cast<unsigned>(m_cpu.mode));
+                std::fflush(stderr);
+            } else if ((n & 0xFFFFu) == 0) {
+                std::fprintf(stderr,
+                             "Machine: %llu SOFTINT diverts "
+                             "(loud-stderr muted past 32)\n",
+                             static_cast<unsigned long long>(n + 1));
+                std::fflush(stderr);
+            }
+#endif
+            stageInterruptDivert(m_cpu, 0);   // D2: hw cause part empty
             divertedThisCycle = true;
         }
 

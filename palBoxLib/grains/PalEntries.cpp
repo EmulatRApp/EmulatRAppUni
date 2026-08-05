@@ -2310,14 +2310,21 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         break;
     case coreLib::HW_CM:       value = static_cast<uint64_t>(c.cpu->mode); break;
 
-        // HW_ISUM (Interrupt Summary, scbd 0x0D).  Backed by
-        // cpu->isum so the trap delivery path can stage the cause
-        // bits the OSF/1 INTERRUPT entry vector (ev6_osf_pal.mar)
-        // decodes -- SI/PC/CR/SL/EI per EV6__ISUM__*__S in
-        // ev6_defs.mar.  Returning 0 here made the handler take
-        // trap__interrupt_dismiss after every injection, leaving
-        // SRM stuck in the MCHK idle loop.  See CpuState::isum.
-    case coreLib::HW_ISUM:     value = c.cpu->isum;       break;
+        // HW_ISUM (Interrupt Summary, scbd 0x0D).  HARDWARE causes
+        // (EI/SL/CR/PC) come from cpu->isum, staged by the divert
+        // paths so the PAL INTERRUPT entry decodes the right source
+        // (returning 0 here once left SRM stuck in the MCHK idle
+        // loop).  SOFTWARE causes (SI + AST) are derived LIVE from
+        // sirr/ier/asten_sr/mode -- the VMS PAL clears SIRR by
+        // mfpr/bic/mtpr and expects the next ISUM read to show the
+        // bit gone (ev6_vms_pal.mar trap__interrupt_sw_found).
+        // SPEC-SIRR-AST-001 D2; see CpuState::isum.
+    case coreLib::HW_ISUM:
+        value = coreLib::composeIsum(
+            c.cpu->isum,
+            coreLib::composeIsumSw(c.cpu->sirr, c.cpu->ier,
+                                   c.cpu->asten_sr, c.cpu->mode));
+        break;
 
         // ---- Computed VA-form registers (HRM 5.1.4) ----
         // VA_FORM / IVA_FORM return the virtual address of the PTE that maps
@@ -2427,7 +2434,15 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_IER_CM:
         value = coreLib::ierCmCompose(c.cpu->ier, c.cpu->mode);
         break;
-    case coreLib::HW_SIRR:         // software interrupt request
+        // HW_SIRR (HRM 5.2.10): plain R/W -- the VMS PAL's CALL_PAL
+        // MTPR_SIRR/MFPR_SISR do hw_mfpr SIRR and depend on reading
+        // back the stored SIR<15:1>; the MP path even parks a CPU
+        // number here (ev6_vms_callpal.mar :1109/:1139/:7539).  Was
+        // silent-zero, which no-op'd every software interrupt request
+        // (SPEC-SIRR-AST-001 / JRN-BOOT-001 OBS-12).
+    case coreLib::HW_SIRR:
+        value = c.cpu->sirr;
+        break;
     case coreLib::HW_INT_CLR:      // write-only
     case coreLib::HW_EXC_SUM:      // FP exception summary
     case coreLib::HW_IC_FLUSH_ASM: // action
@@ -2876,9 +2891,22 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         c.cpu->itbMgr.invalidateSingle(pteLib::TlbRealm::Itb, c.opB, c.cpu->asn);
         break;
 
+        // HW_SIRR write (HRM 5.2.10): store SIR<15:1> only; reserved
+        // bits dropped, never stored.  No W1C trickery -- the PAL
+        // clears bits by plain full store (hw_mtpr r31, EV6__SIRR at
+        // ev6_vms_pal.mar :4125/:4505) and RMWs via mfpr/bic/mtpr.
+        // Was a silent no-op: MTPR_SIRR requests vanished, so IPL 4
+        // IOPOST / IPL 3 RESCHED / fork dispatch never ran and VMS
+        // hung polling UCB$L_STS after the banner (JRN-BOOT-001
+        // OBS-12/14; SPEC-SIRR-AST-001).  Delivery half: Machine's
+        // run loop polls pendingSoftInt and stages the INTERRUPT
+        // divert -- state and delivery land together (spec Sec 2).
+    case coreLib::HW_SIRR:
+        c.cpu->sirr = c.opB & coreLib::kSirrSirMask;
+        break;
+
         // ---- IBox writes (silent no-op) ----
     case coreLib::HW_IVA_FORM:     // architecturally read-only; permissive
-    case coreLib::HW_SIRR:
     case coreLib::HW_ISUM:         // architecturally read-only; permissive
     case coreLib::HW_INT_CLR:
     case coreLib::HW_EXC_SUM:
@@ -3027,6 +3055,31 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         // serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]).  Full analysis:
         // journals/20260706_0x2d_path_selector_and_three_bug_decomposition.md.
     case coreLib::HW_RESERVED_2D: {
+        // PROBE 2026-08-01 (JRN-AUD-002 decision D-3) -- OBSERVATION ONLY, no
+        // state change.  Captures every arrival at IPR index 0x2D with the
+        // value written, to settle whether that value is always zero.
+        // Static evidence (cl67_decompressed.rom, RA==R31-filtered scan):
+        // 0x2D is the ONLY undocumented index this firmware writes; it is
+        // NEVER read (0 HW_MFPR sites image-wide, vs 35 documented read
+        // indices); of its 3 write sites one stores a literal 0
+        // (LDA R7,0(R31) at 0x13954) and two store a computed R5 inside
+        // NOP-padded blocks (0xe780, 0x1d670) -- the idiom of an erratum or
+        // pipeline-state-clear trigger.  SCBD_MASK=0x40 (scoreboard bit 6)
+        // places it in the Mbox/Cbox execution domain.
+        // TODO(IPR2D-PROBE): bounded to 32 rows; remove when D-3 is decided.
+        {
+            static unsigned s_n2d = 0;
+            if (s_n2d < 32) { ++s_n2d;
+                std::fprintf(stderr,
+                    "IPR2D-WRITE #%u cyc=%llu pc=0x%016llx value=0x%016llx pal=%d\n",
+                    s_n2d,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(c.cpu->pc),
+                    static_cast<unsigned long long>(c.opB),
+                    c.cpu->inPalMode() ? 1 : 0);
+                std::fflush(stderr);
+            }
+        }
         // PHASE SCAFFOLD (DS10 device-model work): EMULATR_2D_NOOP=1 flips 0x2d
         // to the faithful no-op path so DS10 reaches its real 0x13d38 I2C poll.
         // Default = the labeled fault scaffold.  Remove when 0x2d disposition is

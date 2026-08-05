@@ -24,9 +24,10 @@ cd "$BUILD"                    || { echo "FATAL: build dir missing: $BUILD"; exi
 mkdir -p "$TRACEDIR"
 
 # ---- environment: NO WARP, no base-pin watch, predictable profiler dir -----
-unset EMULATR_IDLEWARP      # interval-timer idle fast-forward   -> OFF (no warp)
-unset EMULATR_RSCCWARP      # RSCC/tick warp                     -> OFF (no warp)
-unset EMULATR_TICKWARP      # legacy warp name                   -> OFF
+# 2026-08-01: EMULATR_IDLEWARP / _RSCCWARP / _TICKWARP no longer exist in the
+# engine (removed as injections, JRN-AUD-002 Sec 4).  These unsets are retained
+# as no-ops only to scrub a stale export from an operator shell.
+unset EMULATR_IDLEWARP EMULATR_RSCCWARP EMULATR_TICKWARP EMULATR_DELAYWARP
 unset EMULATR_START_WATCH   # base-pin store/kick watch          -> OFF (not this run)
 unset EMULATR_TIG_TRACE     # TIG unmodeled-reg canary           -> OFF (quiet)
 # EMULATR_PLATFORM left UNSET = ISP model (the working path). Do NOT set =silicon.

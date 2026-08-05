@@ -437,6 +437,30 @@ public:
     {
        // static_assert(bit >= 0 && bit < 64);
         m_drir.fetch_or(1ULL << bit, std::memory_order_release);
+        // PROBE 2026-08-01 (JRN-SCSI-034) -- OBSERVATION ONLY, bounded to 64.
+        // DIR[N] = DRIR & DIM[N].  A device can assert, DRIR can latch the bit,
+        // and the CPU still never see it if the guest has not enabled that bit
+        // in DIM[N].  delivered=0 means exactly that: asserted, latched, masked.
+        // Measured need: the NCR 810 model is confirmed to raise its line
+        // (N810-PHASEMISMATCH armed=1 irq=1) while SYS$PKEDRIVER never receives
+        // an interrupt.  This is the last unexamined link between the two.
+        // TODO(CCHIP-ASSERT-PROBE): remove once the delivery path is resolved.
+        {
+            static unsigned s_nCa = 0;
+            if (s_nCa < 64) { ++s_nCa;
+                uint64_t const drirNow = m_drir.load(std::memory_order_relaxed);
+                uint64_t const dim0    = m_dim[0].load(std::memory_order_relaxed);
+                std::fprintf(stderr,
+                    "CCHIP-ASSERT #%u bit=%d drir=0x%016llx dim0=0x%016llx "
+                    "dir0=0x%016llx delivered=%d\n",
+                    s_nCa, bit,
+                    static_cast<unsigned long long>(drirNow),
+                    static_cast<unsigned long long>(dim0),
+                    static_cast<unsigned long long>(drirNow & dim0),
+                    static_cast<int>(((drirNow & dim0) >> bit) & 1ULL));
+                std::fflush(stderr);
+            }
+        }
     }
 
     /**

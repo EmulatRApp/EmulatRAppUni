@@ -35,6 +35,33 @@
 // buffer, so a multi-block READ is satisfied one logical block per command.
 // Multi-burst streaming is the trace-confirmed follow-up (#32).
 // ============================================================================
+// CHANGE HISTORY
+// ============================================================================
+//   2026-08-02  JRN-AUD-003 Batch G (architect-approved): S-5/S-14 parity
+//               with the disk sibling.
+//               FUNCTION: handleCommand (new LUN arm).
+//               CHANGE:  LUN discipline (SPC/SCSI-2, same shape as the
+//                        2026-07-25 disk fix): LUN != 0 answers INQUIRY
+//                        qualifier 011b/type 1Fh and 05/25/00 otherwise --
+//                        prevents the console minting phantom per-LUN CD
+//                        units.
+//               FUNCTION: doModeSense (new).
+//               CHANGE:  MODE SENSE(6)/(10) header + 8-byte block
+//                        descriptor at 2048 bytes/block, allocation-length
+//                        clamped -- previously ILLEGAL REQUEST, a boot-set
+//                        hole vs the disk sibling.
+//               FUNCTION: doRequestSense.
+//               CHANGE:  Sense now CLEARED on delivery (SCSI-2 8.2.14),
+//                        matching the disk sibling; stale 02/3A/00 no
+//                        longer reported after media becomes ready.
+//               FUNCTION: doInquiry / doRequestSense.
+//               CHANGE:  Allocation-length clamp (S-3 shape).
+//               FUNCTION: doReadToc.
+//               CHANGE:  MSF bit (cdb[1]<1>) honored -- addresses returned
+//                        in minute/second/frame form when requested
+//                        (lba+150 -> 00:M:S:F big-endian per SCSI-2 CD
+//                        addressing); was silently LBA-form always.
+// ============================================================================
 
 #ifndef DEVICELIB_SCSI_VIRTUALISODEVICE_H
 #define DEVICELIB_SCSI_VIRTUALISODEVICE_H
@@ -99,9 +126,46 @@ public:
 
     void handleCommand(ScsiCommand& cmd) noexcept override
     {
+        // LUN discipline (Batch G S-5, 2026-08-02; same SPC/SCSI-2 rule as
+        // the disk sibling's 2026-07-25 fix): LUN 0 only.  Unsupported LUN
+        // answers INQUIRY with qualifier 011b / type 1Fh and 05/25/00 for
+        // everything else -- otherwise the console mints a phantom CD unit
+        // per LUN of this id.
+        if (cmd.lun != 0) {
+            if (cmd.opcode() == ScsiOp::INQUIRY) {
+                uint8_t buf[36] = {};
+                buf[0] = 0x7F;                 // qualifier 011b | type 1Fh
+                buf[2] = 0x02;
+                buf[3] = 0x02;
+                buf[4] = 31;
+                uint32_t n = clampAlloc(sizeof(buf), cmd.cdb[4]);
+                if (n > cmd.dataBufferLength) n = cmd.dataBufferLength;
+                if (cmd.dataBuffer && n) std::memcpy(cmd.dataBuffer, buf, n);
+                cmd.dataTransferred = n;
+                cmd.setGood();
+                return;
+            }
+            if (cmd.opcode() == ScsiOp::REQUEST_SENSE) {
+                ScsiFixedSenseData const s = ScsiFixedSenseData::make(
+                    ScsiSenseKey::IllegalRequest, 0x25, 0x00);
+                uint32_t n = clampAlloc(static_cast<uint32_t>(s.size()),
+                                        cmd.cdb[4]);
+                if (n > cmd.dataBufferLength) n = cmd.dataBufferLength;
+                if (cmd.dataBuffer && n) std::memcpy(cmd.dataBuffer, s.bytes(), n);
+                cmd.dataTransferred = n;
+                cmd.setGood();
+                return;
+            }
+            failCheck(cmd, ScsiFixedSenseData::make(
+                ScsiSenseKey::IllegalRequest, 0x25, 0x00));
+            return;
+        }
         switch (cmd.opcode()) {
         case ScsiOp::INQUIRY:       doInquiry(cmd);      break;
         case ScsiOp::REQUEST_SENSE: doRequestSense(cmd); break;
+
+        case 0x1A: /* MODE SENSE(6)  */ doModeSense(cmd, false); break;
+        case 0x5A: /* MODE SENSE(10) */ doModeSense(cmd, true);  break;
 
         case ScsiOp::TEST_UNIT_READY:
             if (hasMedia()) cmd.setGood(); else failNotReady(cmd);
@@ -170,7 +234,9 @@ private:
         std::memcpy(inq + 16, "RRD46   (C) DEC ", 16);   // product id (16 bytes)
         std::memcpy(inq + 32, "1337", 4);                // product revision (4)
 
-        uint32_t n = cmd.dataBufferLength < 36u ? cmd.dataBufferLength : 36u;
+        // Batch G S-3 shape (2026-08-02): clamp to allocation length too.
+        uint32_t n = clampAlloc(36u, cmd.cdb[4]);
+        if (n > cmd.dataBufferLength) n = cmd.dataBufferLength;
         if (cmd.dataBuffer && n) std::memcpy(cmd.dataBuffer, inq, n);
         cmd.dataTransferred = n;
         cmd.setGood();
@@ -178,10 +244,50 @@ private:
 
     void doRequestSense(ScsiCommand& cmd) noexcept
     {
-        uint32_t n = cmd.dataBufferLength < 18u ? cmd.dataBufferLength : 18u;
+        // Batch G S-3/S-14 (2026-08-02): allocation-length clamp, and sense
+        // is CONSUMED by delivery (SCSI-2 8.2.14) -- matches the disk
+        // sibling.  Previously stale 02/3A/00 persisted after media load.
+        uint32_t n = clampAlloc(18u, cmd.cdb[4]);
+        if (n > cmd.dataBufferLength) n = cmd.dataBufferLength;
         if (cmd.dataBuffer && n) std::memcpy(cmd.dataBuffer, m_lastSense.bytes(), n);
         cmd.dataTransferred = n;
+        m_lastSense = hasMedia() ? ScsiFixedSenseData{}
+                                 : senseNotReadyMediumNotPresent();
         cmd.setGood();                 // REQUEST SENSE itself succeeds
+    }
+
+    // MODE SENSE(6)/(10) -- Batch G S-5 (2026-08-02): header + 8-byte block
+    // descriptor at 2048 bytes/block, zero mode pages; same minimal shape
+    // the disk sibling serves (its comment documents this as the SRM pk
+    // class driver's boot-set need).  Previously ILLEGAL REQUEST.
+    void doModeSense(ScsiCommand& cmd, bool ten) noexcept
+    {
+        uint64_t const blocks = blockCount();
+        uint8_t  buf[16]      = {};
+        uint32_t n;
+        if (!ten) {
+            buf[0] = 11;                       // mode data length (n-1)
+            buf[2] = 0x80;                     // device-specific: write-protected
+            buf[3] = 8;                        // block descriptor length
+            putBe24(&buf[5], blocks > 0xFFFFFFull ? 0u
+                             : static_cast<uint32_t>(blocks));
+            putBe24(&buf[9], kBlockBytes);
+            n = 12;
+        } else {
+            buf[1] = 14;                       // mode data length low (n-2)
+            buf[3] = 0x80;                     // device-specific: write-protected
+            buf[7] = 8;                        // block descriptor length low
+            putBe24(&buf[9],  blocks > 0xFFFFFFull ? 0u
+                              : static_cast<uint32_t>(blocks));
+            putBe24(&buf[13], kBlockBytes);
+            n = 16;
+        }
+        uint32_t const alloc = ten ? be16(cmd.cdb + 7) : uint32_t(cmd.cdb[4]);
+        if (alloc < n) n = alloc;
+        if (n > cmd.dataBufferLength) n = cmd.dataBufferLength;
+        if (cmd.dataBuffer && n) std::memcpy(cmd.dataBuffer, buf, n);
+        cmd.dataTransferred = n;
+        cmd.setGood();
     }
 
     // READ CAPACITY (10): 8-byte big-endian (last-LBA, block-length).
@@ -237,10 +343,14 @@ private:
         cmd.setGood();
     }
 
-    // READ TOC, format 0000b (LBA addressing): header + one data track (track 1
-    // @ LBA 0) + lead-out (track 0xAA @ blockCount).
+    // READ TOC, format 0000b: header + one data track (track 1 @ LBA 0) +
+    // lead-out (track 0xAA @ blockCount).  Batch G S-14 (2026-08-02): the
+    // MSF bit (cdb[1]<1>) is now honored -- addresses returned as
+    // 00:MM:SS:FF (lba+150, 75 frames/sec, 60 sec/min) per SCSI-2 CD
+    // addressing; previously always LBA form regardless of the request.
     void doReadToc(ScsiCommand& cmd) noexcept
     {
+        bool const msf = (cmd.cdb[1] & 0x02u) != 0;
         uint8_t toc[20] = { 0 };
         toc[0] = 0x00; toc[1] = 0x12;          // length = 18 (bytes 2..19)
         toc[2] = 0x01;                          // first track
@@ -248,11 +358,12 @@ private:
         toc[4] = 0x00; toc[5] = 0x14;          // ADR=1, control=0x4 (data track)
         toc[6] = 0x01;                          // track number 1
         toc[7] = 0x00;
-        putBe32(toc + 8, 0u);                   // track start LBA = 0
+        putTocAddr(toc + 8, 0u, msf);           // track start = LBA 0
         toc[12] = 0x00; toc[13] = 0x14;
         toc[14] = 0xAA;                         // lead-out
         toc[15] = 0x00;
-        putBe32(toc + 16, static_cast<uint32_t>(blockCount() & 0xFFFFFFFFu));
+        putTocAddr(toc + 16,
+                   static_cast<uint32_t>(blockCount() & 0xFFFFFFFFu), msf);
 
         uint32_t const alloc = be16(cmd.cdb + 7);
         uint32_t n = 20u;
@@ -278,6 +389,29 @@ private:
         p[1] = static_cast<uint8_t>((v >> 16) & 0xFFu);
         p[2] = static_cast<uint8_t>((v >> 8)  & 0xFFu);
         p[3] = static_cast<uint8_t>( v        & 0xFFu);
+    }
+    static void putBe24(uint8_t* p, uint32_t v) noexcept
+    {
+        p[0] = static_cast<uint8_t>((v >> 16) & 0xFFu);
+        p[1] = static_cast<uint8_t>((v >> 8)  & 0xFFu);
+        p[2] = static_cast<uint8_t>( v        & 0xFFu);
+    }
+    // Batch G S-14: TOC address field, LBA or MSF form (SCSI-2 CD
+    // addressing: frame = lba + 150; 75 frames/sec, 60 sec/min; byte 0
+    // reserved 0, then MM:SS:FF).
+    static void putTocAddr(uint8_t* p, uint32_t lba, bool msf) noexcept
+    {
+        if (!msf) { putBe32(p, lba); return; }
+        uint32_t const f = lba + 150u;
+        p[0] = 0;
+        p[1] = static_cast<uint8_t>( f / (75u * 60u));
+        p[2] = static_cast<uint8_t>((f / 75u) % 60u);
+        p[3] = static_cast<uint8_t>( f % 75u);
+    }
+    // Batch G S-3 shape: SCSI-2 allocation-length clamp.
+    static uint32_t clampAlloc(uint32_t avail, uint32_t alloc) noexcept
+    {
+        return (alloc < avail) ? alloc : avail;
     }
 
     std::unique_ptr<IBlockMedia> m_media;
