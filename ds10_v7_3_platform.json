@@ -18,11 +18,11 @@
   "pci_devices": [
     { "name": "cypress_isa", "model": "cypress_isa", "hose": 0, "bus": 0, "slot": 5, "func": 0,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x060100",
-      "option_rom": false, "interrupt_pin": 0 },
+      "option_rom": false },
     { "name": "cypress_ide", "model": "cypress_ide", "hose": 0, "bus": 0, "slot": 5, "func": 1,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x010100",
       "comment": "Cypress 82C693 IDE func1 (genuine for PC264/DS20). Fixed legacy ports; no relocatable BARs.",
-      "option_rom": false, "interrupt_pin": 0,
+      "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "ata_disk",
           "model": "EMULATR VIRTUAL DISK", "media": "",
@@ -31,11 +31,22 @@
           "model": "EMULATR VIRTUAL CDROM", "media": "",
           "comment": "primary slave = dqa1, ATAPI CD. media empty = no disc loaded." }
       ] },
-    { "name": "de500_tulip", "model": "generic", "hose": 0, "bus": 0, "slot": 7, "func": 0,
+    { "name": "de500_tulip", "model": "de500", "hose": 0, "bus": 0, "slot": 7, "func": 0,
       "vendor": "0x1011", "device": "0x0019", "class_code": "0x020000",
-      "comment": "On-board DE500-AA (DECchip 21143 tulip). DS20E places it at slot 9; slot here _PROVISIONAL.",
+      "comment": "On-board DE500-AA (DECchip 21143 tulip). DS20E places it at slot 9; slot here _PROVISIONAL. Model generic -> de500 + interrupt_pin removed 2026-08-02 (P-16: config stubs never claimed their BAR windows; the named model does, and owns the silicon pin). INTx unrouted on DS10 until a pci_irq_map lands (asserts drop loud).",
       "bars": [ { "index": 0, "kind": "io", "size": "0x80" },
                 { "index": 1, "kind": "mem", "size": "0x80" } ],
-      "option_rom": false, "interrupt_pin": 1 }
+      "option_rom": false },
+    { "name": "pka_53c810", "model": "ncr53c810", "hose": 0, "bus": 0, "slot": 8, "func": 0,
+      "vendor": "0x1000", "device": "0x0001", "class_code": "0x010000",
+      "comment": "NCR 53C810 SCSI HBA (KZPAA lineage) -> console pka0 + dka disks. ADDED 2026-08-06, architect-directed (JRN-SCSI-042 D-1). Before this, DS10 declared NO SCSI at all: SHOW DEV listed only DQA1/DVA0/EWA0 and 'b dka0' answered 'device dka0 is invalid'. Slot 8 MIRRORS ds20_v7_3_platform.json and is _PROVISIONAL: DS10 and DS20 are the same PC264 lineage per this manifest, and matching slots keeps the two boots comparable, which is what the SCSI work needs -- it is NOT a claim about real DS10 IDSEL wiring. interrupt_pin deliberately NOT declared: the 53C8xx hardwires INTA# and the model constant governs (Batch C1, JRN-SCSI-034 Sec 6). MANIFEST-PINNED: a disk target exists on the bus only for a storage row below; undeclared ids selection-timeout. SRM unit naming: dka<id*100+lun>, so id 0 = dka0. NAMED CONSEQUENCE, NOT CLOSED BY THIS EDIT: DS10 carries neither pci_irq_table nor pci_irq_map, so this device's INTA# asserts DROP LOUD. It will enumerate, select and transfer under the console's polled driver; the VMS PKEDRIVER path will never see an interrupt. Routing is the follow-up (JRN-SCSI-042 D-7). ES40 has the identical gap with a 53C810 it has carried since JRN-SCSI-005.",
+      "bars": [ { "index": 0, "kind": "io", "size": "0x100" },
+                { "index": 1, "kind": "mem", "size": "0x100" } ],
+      "option_rom": false,
+      "storage": [
+        { "channel": 0, "unit": 0, "lun": 0, "type": "scsi_disk",
+          "model": "RZ29L", "media": "Alpha/dka0.vdisk", "media_kind": "image",
+          "comment": "SCSI id 0 -> dka0: the VMS system disk. SAME image ds20 and es40 point at (vStorage/Alpha/dka0.vdisk, resolved against [Storage] diskDir). HAZARD, named: three manifests now share one image -- running two platforms against it concurrently will corrupt it. Serialize runs." }
+      ] }
   ]
 }

@@ -1,0 +1,426 @@
+{
+  "schema": 2,
+  "comment": "EmulatR storage device catalog. AUTHORITATIVE at runtime (schema 2 decision, 2026-08-04, architect): the emulator loads this file; deviceLib/scsi/DriveProfile.h reduces to struct definitions. POLICY: EmulatR supports ONLY the devices in 'drives'. A device is admitted when an authoritative reference for its geometry and identity is located and cited -- not before. Devices removed from a prior schema-1 catalog are recorded in 'withdrawn' with the reason and the evidence needed to reinstate them. ASCII(128) only.",
+  "policy": {
+    "admission": "A drive enters 'drives' only when every populated field carries an authority string. No recalled values. See JRN-DISK-002 G-2.",
+    "geometry_absent": "A drive for which no geometry authority is held does NOT get a row with nulls -- it stays in 'withdrawn' until a document is located (architect decision 2026-08-04).",
+    "band_rule": "Geometry sanity is a +/- 2 percent BAND against total_sectors, never an equality assert. These are banded (ZBR) drives whose published sectors_per_track is a flattened average. An equality check hard-stops two of the three DEC profiles.",
+    "last_lba_rule": "EK-SM2DR-PN.B01 'Sectors/drive' is the LAST LBA, not the count. total_sectors = that value PLUS ONE. READ CAPACITY returns last_lba.",
+    "custom_drives": "Entries in 'custom_drives' are ARCHITECT-AUTHORED and hand-editable. They are loaded AFTER 'drives' and may define devices for which no document exists, provided the values come from a MEASURED capture on a non-EmulatR system. 'drives' is the curated, authority-gated whitelist and should not be hand-edited; 'custom_drives' is where manual geometry lives."
+  },
+  "authority_kinds": {
+    "document": "A cited hardware reference. Field 'authority' names document, table, and page.",
+    "measured": "Captured from a running system that is NOT EmulatR (Charon, or real hardware). Field 'authority' names the command, the host, and the capture date. Capturing from EmulatR itself is CIRCULAR and is not an authority.",
+    "synthetic": "An EmulatR-defined device with no real-world counterpart. Coherent by construction; the construction is the authority."
+  },
+  "drives": {
+    "RZ28L": {
+      "class": "disk",
+      "transport": "scsi",
+      "emulated_arch": [
+        "alpha",
+        "vax"
+      ],
+      "identity": {
+        "vendor": "DEC     ",
+        "product": "RZ28L-AA (C)DEC ",
+        "revision": "0000",
+        "inquiry_byte7": 18,
+        "ansi_version": 2,
+        "removable": false,
+        "console_display_name": "RZ28L",
+        "authority": "EK-SM2DR-PN.B01 title page (DS-RZ28L-VA); string form per EK-KZPBA-UG.B01",
+        "fidelity": "PROVISIONAL",
+        "open": [
+          "inquiry_byte7 18 (0x12) asserts CmdQue+Sync which EmulatR does not implement -- PLAN-SCSI-001 D-4 OPEN",
+          "revision string 0000 is a placeholder, no witness"
+        ]
+      },
+      "capacity": {
+        "bytes_per_sector": 512,
+        "total_sectors": 4110480,
+        "last_lba": 4110479,
+        "formatted_capacity": "2.10 GB",
+        "authority": "EK-SM2DR-PN.B01 Table 4",
+        "fidelity": "CONFIRMED"
+      },
+      "geometry": {
+        "sectors_per_track": 86,
+        "tracks_per_cylinder": 16,
+        "cylinders": 3045,
+        "rotation_rate_rpm": 7200,
+        "banded": true,
+        "product_variance_pct": 1.93,
+        "authority": "EK-SM2DR-PN.B01 Table 4 (cylinders, heads) + Table 5 (sectors/track, rpm)",
+        "fidelity": "PROVISIONAL",
+        "note": "Table 4 gives 3045 cylinders; the Solaris format.dat section gives pcyl 2987 / ncyl 2985 / acyl 2. 3045 is used here. The divergence follows from the flattened sectors_per_track, not from a contradiction."
+      },
+      "guest": {
+        "openvms": {
+          "dcdef_symbol": "DT$_RZ28L",
+          "dcdef_code": 172,
+          "dcdef_code_hex": "0xAC",
+          "dcdef_status": "PRESENT",
+          "min_version_vax": null,
+          "min_version_alpha": null,
+          "authority": "JRN-DISK-002 Sec 4 ($DCDEF, OpenVMS Alpha V8.3)"
+        },
+        "tru64": {
+          "identified_by": "inquiry_string",
+          "min_version": null,
+          "authority": null
+        }
+      }
+    },
+    "RZ29L": {
+      "class": "disk",
+      "transport": "scsi",
+      "emulated_arch": [
+        "alpha",
+        "vax"
+      ],
+      "identity": {
+        "vendor": "DEC     ",
+        "product": "RZ29L-AA (C)DEC ",
+        "revision": "LYJ0",
+        "inquiry_byte7": 18,
+        "ansi_version": 2,
+        "removable": false,
+        "console_display_name": "RZ29L",
+        "authority": "EK-SM2DR-PN.B01 Solaris format.dat section (DEC_RZ29L-AA(C)DEC-LYJ0)",
+        "fidelity": "PROVISIONAL",
+        "open": [
+          "inquiry_byte7 -- PLAN-SCSI-001 D-4 OPEN",
+          "revision LYJ0 derived from the Solaris disk_type string; Charon UCB$L_DK_INQUIRY_DATA capture would promote it"
+        ]
+      },
+      "capacity": {
+        "bytes_per_sector": 512,
+        "total_sectors": 8380080,
+        "last_lba": 8380079,
+        "formatted_capacity": "4.29 GB",
+        "authority": "EK-SM2DR-PN.B01 Table 4",
+        "fidelity": "CONFIRMED"
+      },
+      "geometry": {
+        "sectors_per_track": 113,
+        "tracks_per_cylinder": 20,
+        "cylinders": 3708,
+        "rotation_rate_rpm": 7200,
+        "banded": true,
+        "product_variance_pct": 0.0,
+        "authority": "EK-SM2DR-PN.B01 Table 4 + Table 5 + Solaris format.dat (pcyl 3708)",
+        "fidelity": "CONFIRMED",
+        "note": "113 * 20 * 3708 = 8380080 EXACTLY -- the only one of the three that closes. Table 5 prints 3078 for cylinders; that is a digit transposition, corrected to 3708 by Table 4 and the Solaris section. Corroborated by Charon DEVDEPEND 0x0E7C1471 and measured MAXBLOCK 0x007FDEB0."
+      },
+      "guest": {
+        "openvms": {
+          "dcdef_symbol": "DT$_RZ29L",
+          "dcdef_code": null,
+          "dcdef_code_hex": null,
+          "dcdef_status": "ABSENT",
+          "min_version_vax": null,
+          "min_version_alpha": null,
+          "authority": "JRN-DISK-002 F-1: no DT$_RZ29L exists in $DCDEF. OpenVMS cannot name this device type; it resolves to DT$_RZ29 (137/0x89) or DT$_GENERIC_DK (54/0x36)."
+        },
+        "tru64": {
+          "identified_by": "inquiry_string",
+          "min_version": null,
+          "authority": null
+        }
+      }
+    },
+    "RZ40": {
+      "class": "disk",
+      "transport": "scsi",
+      "emulated_arch": [
+        "alpha",
+        "vax"
+      ],
+      "identity": {
+        "vendor": "DEC     ",
+        "product": "RZ40-AA (C)DEC  ",
+        "revision": "0000",
+        "inquiry_byte7": 18,
+        "ansi_version": 2,
+        "removable": false,
+        "console_display_name": "RZ40",
+        "authority": "EK-SM2DR-PN.B01 title page (DS-RZ40-VA); Solaris disk_type DEC_RZ40-AA(C)DEC-LYJ0",
+        "fidelity": "PROVISIONAL",
+        "open": [
+          "inquiry_byte7 -- PLAN-SCSI-001 D-4 OPEN",
+          "revision string 0000 is a placeholder, no witness"
+        ]
+      },
+      "capacity": {
+        "bytes_per_sector": 512,
+        "total_sectors": 17773524,
+        "last_lba": 17773523,
+        "formatted_capacity": "9.10 GB",
+        "authority": "EK-SM2DR-PN.B01 Table 4",
+        "fidelity": "CONFIRMED"
+      },
+      "geometry": {
+        "sectors_per_track": 168,
+        "tracks_per_cylinder": 20,
+        "cylinders": 5273,
+        "rotation_rate_rpm": 7200,
+        "banded": true,
+        "product_variance_pct": -0.32,
+        "authority": "EK-SM2DR-PN.B01 Table 4 + Table 5",
+        "fidelity": "PROVISIONAL"
+      },
+      "guest": {
+        "openvms": {
+          "dcdef_symbol": "DT$_RZ40",
+          "dcdef_code": null,
+          "dcdef_code_hex": null,
+          "dcdef_status": "ABSENT",
+          "min_version_vax": "6.0",
+          "min_version_alpha": "6.2",
+          "authority": "JRN-DISK-002 F-2 (no DT$_RZ40 in $DCDEF); version floors per EK-SM2DR-PN.B01 p.3 'Notes for OpenVMS Users'"
+        },
+        "tru64": {
+          "identified_by": "inquiry_string",
+          "min_version": "3.2D",
+          "authority": "EK-SM2DR-PN.B01 p.3 'Notes for DIGITAL UNIX Users' (3.2D or 4.0)"
+        }
+      },
+      "notes": [
+        "Block descriptor overflow: total_sectors 17773524 exceeds the 3-byte NUMBER OF BLOCKS field (max 16777215). MODE SENSE must report FFFFFFh; READ CAPACITY carries the true value. PLAN-SCSI-001 B-2."
+      ]
+    },
+    "EMULATR-512M": {
+      "class": "disk",
+      "transport": "scsi",
+      "emulated_arch": [
+        "alpha",
+        "vax"
+      ],
+      "identity": {
+        "vendor": "EMULATR ",
+        "product": "VIRTUAL DISK    ",
+        "revision": "0001",
+        "inquiry_byte7": 0,
+        "ansi_version": 2,
+        "removable": false,
+        "console_display_name": "VIRTUAL",
+        "authority": "synthetic -- EmulatR-defined",
+        "fidelity": "SYNTHETIC"
+      },
+      "capacity": {
+        "bytes_per_sector": 512,
+        "total_sectors": 1048576,
+        "last_lba": 1048575,
+        "formatted_capacity": "512 MB",
+        "authority": "synthetic -- sized to the dka1..6 scratch images EXACTLY",
+        "fidelity": "SYNTHETIC"
+      },
+      "geometry": {
+        "sectors_per_track": 64,
+        "tracks_per_cylinder": 16,
+        "cylinders": 1024,
+        "rotation_rate_rpm": 0,
+        "banded": false,
+        "product_variance_pct": 0.0,
+        "authority": "synthetic -- coherent by construction: 64 * 16 * 1024 = 1048576 EXACTLY",
+        "fidelity": "SYNTHETIC"
+      },
+      "guest": {
+        "openvms": {
+          "dcdef_symbol": null,
+          "dcdef_code": null,
+          "dcdef_code_hex": null,
+          "dcdef_status": "ABSENT",
+          "min_version_vax": null,
+          "min_version_alpha": null,
+          "authority": "synthetic -- no DEC part, resolves to DT$_GENERIC_DK (54/0x36) by design"
+        },
+        "tru64": {
+          "identified_by": "inquiry_string",
+          "min_version": null,
+          "authority": null
+        }
+      }
+    }
+  },
+  "withdrawn": {
+    "_comment": "Devices present in schema 1 that do NOT meet the schema 2 admission policy. Not loaded. Each records what would reinstate it.",
+    "RZ28": {
+      "reason": "No held authority. The schema-1 entry carried total_sectors 4110480 (the RZ28L capacity) and the description 'ST32550N class', both uncited. RZ28 is a DIFFERENT product from RZ28L.",
+      "dcdef_code": 128,
+      "dcdef_code_hex": "0x80",
+      "reinstate_with": "A DEC Product Note or Service Manual for the RZ28 giving cylinders, heads, sectors/track and capacity.",
+      "priority": "HIGH -- DT$_RZ28 is one of only two RZ codes DKA0 could realistically present."
+    },
+    "RZ29": {
+      "reason": "No held authority. The schema-1 entry carried total_sectors 8407200, which matches no document we hold and differs from RZ29L's 8380080.",
+      "dcdef_code": 137,
+      "dcdef_code_hex": "0x89",
+      "reinstate_with": "A DEC Product Note or Service Manual for the RZ29.",
+      "priority": "HIGHEST -- DT$_RZ29 is the only RZ29-family code that exists (JRN-DISK-002 F-1), so it is the leading candidate for what DKA0 presents."
+    },
+    "RRD46": {
+      "reason": "No held authority for the ATAPI CD-ROM identity or parameters.",
+      "dcdef_code": null,
+      "reinstate_with": "A DEC RRD46 product note. TOOLING RISK: verify mkdisk.py does not reference this key before removing it from the live catalog.",
+      "priority": "MEDIUM -- not referenced by any platform manifest; the CD path uses the free-text model 'EMULATR VIRTUAL CDROM'."
+    },
+    "ST373405LCV": {
+      "reason": "No held authority. Also out of era for the DS20/ES40 target platforms.",
+      "dcdef_code": null,
+      "reinstate_with": "A Seagate product manual, if this drive is ever actually wanted.",
+      "priority": "LOW"
+    },
+    "EMULATR-DISK-4G": {
+      "reason": "Synthetic ATA target from the schema-1 catalog. Admissible as synthetic, but geometry was never stated -- only total_sectors. Needs a coherent-by-construction geometry before admission.",
+      "reinstate_with": "Choose a geometry whose product equals 8388608 exactly, same treatment as EMULATR-512M.",
+      "priority": "MEDIUM -- TOOLING RISK: verify mkdisk.py usage."
+    },
+    "EMULATR-DISK-9G": {
+      "reason": "As EMULATR-DISK-4G.",
+      "reinstate_with": "Coherent geometry for 18874368 sectors.",
+      "priority": "MEDIUM -- TOOLING RISK: verify mkdisk.py usage."
+    }
+  },
+  "custom_drives": {
+    "_comment": "Hand-editable devices built from measured captures. Loaded after 'drives'; a key here SHADOWS the same key in 'drives'. Every entry must carry an 'origin' block naming the capture command, the host, and the date -- a capture taken from EmulatR itself is CIRCULAR and is not an authority (see authority_kinds.measured).",
+    "_show_device_full_mapping": {
+      "_note": "Field mapping from OpenVMS DCL: SHOW DEVICE/FULL <dev>. Only these lines describe the DEVICE; everything else on that display is filesystem or volume state and must NOT be copied into a drive definition.",
+      "device type <name>": "guest.openvms.presented_type   -- the DT$_ symbol VMS RENDERS, not necessarily the drive's part number",
+      "Total blocks": "capacity.total_sectors         -- last_lba is this MINUS ONE",
+      "Sectors per track": "geometry.sectors_per_track",
+      "Tracks per cylinder": "geometry.tracks_per_cylinder",
+      "Total cylinders": "geometry.cylinders",
+      "Default buffer size": "capacity.bytes_per_sector      -- 512 on every ODS volume seen so far; confirm per capture",
+      "_not_available": [
+        "identity.vendor",
+        "identity.product",
+        "identity.revision",
+        "identity.inquiry_byte7",
+        "geometry.rotation_rate_rpm"
+      ],
+      "_not_available_note": "SHOW DEVICE/FULL does not expose INQUIRY data. Those fields need SDA (UCB$L_DK_INQUIRY_DATA) or a document; leave them null rather than guessing.",
+      "_ignore": [
+        "Volume label",
+        "Free blocks",
+        "Cluster size",
+        "Maximum files allowed",
+        "Mount count",
+        "Owner UIC",
+        "Error count",
+        "Operations completed",
+        "cache sizes",
+        "Volume Status"
+      ],
+      "_coherence_check": "sectors_per_track * tracks_per_cylinder * cylinders vs total_sectors must land inside the +/- 2 percent band (policy.band_rule). If it lands EXACT the capture is self-consistent."
+    },
+    "DEV20-DKA0-RZ29": {
+      "class": "disk",
+      "transport": "scsi",
+      "emulated_arch": [
+        "alpha"
+      ],
+      "origin": {
+        "kind": "measured",
+        "command": "SHOW DEVICE/FULL DEV20$DKA0:  AND  F$GETDVI(\"DKA0\", ...) lexicals",
+        "host": "Charon (non-EmulatR reference system), volume DKA0.vdisk",
+        "captured": "2026-08-04",
+        "captured_by": "architect",
+        "volume_state": "mounted, ODS-5, label ALPHASYS -- the C2 state",
+        "circular": false,
+        "raw_f_getdvi": {
+          "DEVTYPE": 137,
+          "DEVCLASS": 1,
+          "SECTORS": 113,
+          "TRACKS": 20,
+          "CYLINDERS": 3708,
+          "MAXBLOCK": 8380080,
+          "DEVDEPEND": 243012721,
+          "DEVDEPEND_hex": "0x0E7C1471"
+        }
+      },
+      "identity": {
+        "vendor": null,
+        "product": null,
+        "revision": null,
+        "inquiry_byte7": null,
+        "ansi_version": null,
+        "removable": false,
+        "console_display_name": null,
+        "authority": null,
+        "fidelity": "ABSENT",
+        "note": "SHOW DEVICE/FULL carries no INQUIRY data. Promote from SDA UCB$L_DK_INQUIRY_DATA on the same host."
+      },
+      "capacity": {
+        "bytes_per_sector": 512,
+        "total_sectors": 8380080,
+        "last_lba": 8380079,
+        "formatted_capacity": "4.29 GB",
+        "authority": "MEASURED, Charon: F$GETDVI MAXBLOCK 8380080; SHOW DEVICE/FULL Total blocks 8380080",
+        "fidelity": "CONFIRMED"
+      },
+      "geometry": {
+        "sectors_per_track": 113,
+        "tracks_per_cylinder": 20,
+        "cylinders": 3708,
+        "rotation_rate_rpm": null,
+        "banded": true,
+        "product_variance_pct": 0.0,
+        "authority": "MEASURED, Charon: F$GETDVI SECTORS 113 / TRACKS 20 / CYLINDERS 3708, corroborated by DEVDEPEND 243012721 (0x0E7C1471 -> 113/20/3708) and by SHOW DEVICE/FULL",
+        "fidelity": "CONFIRMED",
+        "coherence": "113 * 20 * 3708 = 8380080 == MAXBLOCK EXACTLY. Three independent reads agree (F$GETDVI scalars, DEVDEPEND packed longword, SHOW DEVICE/FULL) and all three match the EK-SM2DR-PN.B01 RZ29L values."
+      },
+      "guest": {
+        "openvms": {
+          "presented_type": "RZ29",
+          "dcdef_symbol": "DT$_RZ29",
+          "dcdef_code": 137,
+          "dcdef_code_hex": "0x89",
+          "dcdef_status": "PRESENT",
+          "min_version_vax": null,
+          "min_version_alpha": null,
+          "authority": "MEASURED, Charon: F$GETDVI DEVTYPE returns 137 decimal (0x89) and DEVCLASS 1. This is UCB$B_DEVTYPE read numerically -- not a rendered name. Symbol per JRN-DISK-002 Sec 4."
+        },
+        "tru64": {
+          "identified_by": "inquiry_string",
+          "min_version": null,
+          "authority": null
+        }
+      },
+      "notes": [
+        "WHAT THIS ESTABLISHES: a device with RZ29L geometry and capacity is assigned DT$_RZ29 137 (0x89) by OpenVMS V8.3. Read NUMERICALLY from the UCB, not inferred from a rendered name. Empirical confirmation of JRN-DISK-002 F-1 and F-4; settles O-2. The marker is DEVTYPE == 137, never the string RZ29L.",
+        "WHAT THIS DOES NOT ESTABLISH: the geometry of a REAL RZ29. The captured geometry is RZ29L's. This is almost certainly an RZ29L (or an emulation of one) resolving to the nearest existing DT$_ code. Do NOT promote these values into a withdrawn/RZ29 reinstatement -- that still needs a document.",
+        "The absent identity block is the reason this lives in custom_drives and not in drives: it does not meet the admission policy."
+      ]
+    },
+    "_f_getdvi_mapping": {
+      "_note": "PREFERRED capture method. OpenVMS DCL F$GETDVI lexicals return NUMERIC values straight out of the UCB -- no rendered names to pattern-match, and DEVDEPEND cross-checks the other three. Run on a NON-EmulatR system (Charon or real hardware); running it against EmulatR reads back our own profile and is circular.",
+      "_dcl": [
+        "$ WRITE SYS$OUTPUT \"DEVTYPE   \" + F$GETDVI(\"DKA0\",\"DEVTYPE\")",
+        "$ WRITE SYS$OUTPUT \"DEVCLASS  \" + F$GETDVI(\"DKA0\",\"DEVCLASS\")",
+        "$ WRITE SYS$OUTPUT \"SECTORS   \" + F$GETDVI(\"DKA0\",\"SECTORS\")",
+        "$ WRITE SYS$OUTPUT \"TRACKS    \" + F$GETDVI(\"DKA0\",\"TRACKS\")",
+        "$ WRITE SYS$OUTPUT \"CYLINDERS \" + F$GETDVI(\"DKA0\",\"CYLINDERS\")",
+        "$ WRITE SYS$OUTPUT \"MAXBLOCK  \" + F$GETDVI(\"DKA0\",\"MAXBLOCK\")",
+        "$ WRITE SYS$OUTPUT \"DEVDEPEND \" + F$GETDVI(\"DKA0\",\"DEVDEPEND\")"
+      ],
+      "DEVTYPE": "guest.openvms.dcdef_code       -- numeric UCB$B_DEVTYPE. 137 = DT$_RZ29, 54 = DT$_GENERIC_DK (identity did not resolve)",
+      "DEVCLASS": "must be 1 (DC$_DISK) for a drive entry",
+      "SECTORS": "geometry.sectors_per_track",
+      "TRACKS": "geometry.tracks_per_cylinder",
+      "CYLINDERS": "geometry.cylinders",
+      "MAXBLOCK": "capacity.total_sectors         -- last_lba is this MINUS ONE",
+      "DEVDEPEND": "CROSS-CHECK ONLY, not a stored field. UCB$L_DEVDEPEND packs the geometry: byte 0 = sectors/track, byte 1 = tracks/cylinder, bytes 2-3 = cylinders. Decode it and it must equal SECTORS/TRACKS/CYLINDERS; if it disagrees the capture is bad, not the drive.",
+      "_not_available": [
+        "identity.vendor",
+        "identity.product",
+        "identity.revision",
+        "identity.inquiry_byte7",
+        "geometry.rotation_rate_rpm"
+      ],
+      "_not_available_note": "F$GETDVI has no INQUIRY item. Identity needs SDA against UCB$L_DK_INQUIRY_DATA on the same host.",
+      "_coherence_check": "SECTORS * TRACKS * CYLINDERS vs MAXBLOCK must land inside the +/- 2 percent band (policy.band_rule). EXACT means the capture is self-consistent."
+    }
+  }
+}

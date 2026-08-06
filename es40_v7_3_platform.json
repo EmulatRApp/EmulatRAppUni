@@ -28,11 +28,11 @@
     { "name": "ali_isa", "model": "ali_m1543c", "hose": 0, "bus": 0, "slot": 15, "func": 0,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x060100",
       "comment": "STAND-IN: real ES40 south bridge is ALi M1543C (vendor 0x10b9, device 0x1533 bridge / 0x1533+0x1543 funcs). EmulatR has no ALi model yet; the Cypress stand-in carries the ISA/UART/PIC console path at standard ports.",
-      "option_rom": false, "interrupt_pin": 0 },
+      "option_rom": false },
     { "name": "ali_ide", "model": "ali_m5229", "hose": 0, "bus": 0, "slot": 15, "func": 1,
       "vendor": "0x1080", "device": "0xc693", "class_code": "0x010100",
       "comment": "STAND-IN IDE/ATAPI (DS10-style). ES40 boots on-board SCSI; this carries dqa0/dqa1 for parity with the DS10 harness.",
-      "option_rom": false, "interrupt_pin": 0,
+      "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "ata_disk",
           "model": "EMULATR VIRTUAL DISK", "media": "",
@@ -43,20 +43,20 @@
       ] },
     { "name": "pka_53c810", "model": "ncr53c810", "hose": 0, "bus": 0, "slot": 3, "func": 0,
       "vendor": "0x1000", "device": "0x0001", "class_code": "0x010000",
-      "comment": "NCR 53C810 SCSI HBA (JRN-SCSI-005 probe 4.1: EmulatR-ES40 same-disk control vs AXPBox-ES40). Slot 3 MIRRORS the AXPBox A4 config (pci0.3) so the two ES40 boots differ only in emulator, not topology. Interrupt pin 2 retained from the PROVEN DS20 wiring (the experiment variable is the console/platform, not our INTx routing).",
+      "comment": "NCR 53C810 SCSI HBA (JRN-SCSI-005 probe 4.1: EmulatR-ES40 same-disk control vs AXPBox-ES40). Slot 3 MIRRORS the AXPBox A4 config (pci0.3) so the two ES40 boots differ only in emulator, not topology. interrupt_pin 2 REMOVED 2026-08-02 (Batch C1; JRN-SCSI-034 Sec 6: the 53C8xx hardwires INTA# -- pin 2 was a value no real 53C810 reports); the model constant governs. INTx ROUTING STILL ABSENT on ES40: the DRIR bit map is documented (ES40 Service Guide Table D-21) but the Pchip0_SLOTn -> PCI device-number pairing is NOT console-grounded; asserts drop loud until a pci_irq_map lands (JRN-SES-001 Batch C3).",
       "bars": [ { "index": 0, "kind": "io", "size": "0x100" },
                 { "index": 1, "kind": "mem", "size": "0x100" } ],
-      "option_rom": false, "interrupt_pin": 2,
+      "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "scsi_disk",
-          "model": "EMULATR VIRTUAL DISK", "media": "Alpha/dka0.vdisk", "media_kind": "image",
+          "model": "RZ29L", "media": "Alpha/dka0.vdisk", "media_kind": "image",
           "comment": "SCSI id 0 -> dka0: THE VMS system disk (same image AXPBox boots to VMS V8.3; JRN-SCSI-005)." }
       ] },
     { "name": "de500_tulip", "model": "de500", "hose": 0, "bus": 0, "slot": 7, "func": 0,
       "vendor": "0x1011", "device": "0x0019", "class_code": "0x020000",
-      "comment": "On-board DE500-AA (DECchip 21143 tulip). Slot _PROVISIONAL (DS10-derived).",
+      "comment": "On-board DE500-AA (DECchip 21143 tulip). Slot _PROVISIONAL (DS10-derived). interrupt_pin REMOVED 2026-08-02 (Batch C1): 21143 hardwires INTA#; the model constant governs.",
       "bars": [ { "index": 0, "kind": "io", "size": "0x80" },
                 { "index": 1, "kind": "mem", "size": "0x80" } ],
-      "option_rom": false, "interrupt_pin": 1 }
+      "option_rom": false }
   ]
 }

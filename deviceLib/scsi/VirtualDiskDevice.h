@@ -21,8 +21,70 @@
 // CHECK CONDITION / ILLEGAL REQUEST with sense retained for REQUEST SENSE
 // -- never silent, per the no-silent-absorbers house rule.
 // ============================================================================
+// TODO TABLE
+// ============================================================================
+//   TODO(DISK-MODEPAGES)  MODE SENSE page coverage is the MEASURED MINIMUM,
+//     not the guest-demanded maximum (architect-directed 2026-08-06,
+//     JRN-SCSI-042 Sec 14 rider).  Coverage vs the AXPBox reference (which
+//     boots this disk) and known consumers:
+//       page  AXPBox  EmulatR  consumer
+//       00h   yes     yes      --
+//       01h   yes     yes      DKDRIVER unit-init (MEASURED, the H-7 root
+//                              cause)
+//       02h   no      no       none observed (disconnect-reconnect)
+//       03h   yes     yes      SRM + DKDRIVER
+//       04h   yes     yes      SRM + DKDRIVER
+//       05h   yes     no       none observed (flexible disk)
+//       08h   yes     no       PLAUSIBLE NEXT ASK (caching; DKDRIVER-era
+//                              drivers read and MODE SELECT it)
+//       3Fh   yes     yes      DKDRIVER template 1A 00 3F 00 FF
+//     PLUS: the PC field (cdb[2]<7:6> current/changeable/default/saved)
+//     returns CURRENT values for all four codes, _PROVISIONAL -- a driver
+//     requesting the CHANGEABLE mask before MODE SELECT gets current
+//     values instead of a bitmask.
+//     EVIDENCE GATE: N810-CHKCOND (unthrottled, H-7 rider) names any
+//     rejected page in one log line -- extend coverage on sighting, or
+//     close wholesale against the 53C895-era RZ family DM.
+//     REMOVAL TRIGGER: a full boot with zero MODE SENSE N810-CHKCOND rows
+//     and the PC field resolved against SCSI-2 8.3.3.
+// ============================================================================
 // CHANGE HISTORY
 // ============================================================================
+//   2026-08-06  Batch H-7 (architect-approved "go"): MODE SENSE page 01h.
+//               ROOT CAUSE, MEASURED END TO END (JRN-SCSI-042 Sec 14): the
+//               2026-08-05 crash dump's failed command is CDB
+//               1A 00 01 00 FF 00 -- MODE SENSE(6), page 01h Read-Write
+//               Error Recovery -- still latched at RAD+25C with status
+//               longword 02 at RAD+258 and SCDRP$B_SENSE_KEY=05.  This
+//               function's page gate (03h/04h/3Fh/00h only) answered
+//               CHECK CONDITION 05/24/00; SYS$DKDRIVER latched ILLEGAL
+//               REQUEST, abandoned device characterization (UCB DEVDEPEND
+//               stuck at 604, never the profile geometry), and dropped
+//               into an EXE$KP_TQE_WAIT timed readiness retry -- the
+//               RC/TUR/RS poll measured at 46,519 operations, which held
+//               the system-disk mount and parked every boot at the
+//               OpenVMS banner.
+//               FUNCTION: cmdModeSense.
+//               CHANGE:  page 01h served: 12 bytes, code 0x01, length
+//                        0x0A, ALL POLICY FIELDS ZERO (no AWRE/ARRE, zero
+//                        retry counts).  The zero layout is DELIBERATE and
+//                        reference-matched: AXPBox Disk.cpp
+//                        SCSIMP_READ_WRITE_ERRREC serves exactly this
+//                        (code+length, rest zero) and boots this same
+//                        dka0.vdisk to V8.3 -- DKDRIVER requires the
+//                        page's EXISTENCE, not its policy.  Page 01h also
+//                        joins the 3Fh composite, ascending page order
+//                        (01, 03, 04) per SCSI-2.  The gate still rejects
+//                        genuinely unknown pages 05/24/00 -- S-12's
+//                        never-truncated-under-GOOD rule stands.
+//               PREDICTION (falsifiable, stated before the run): MODE
+//                        SENSE page 01h returns GOOD, DEVDEPEND
+//                        populates, the RC/TUR/RS poll TERMINATES, the
+//                        boot advances past the banner.  If DKDRIVER then
+//                        wants another page we lack (05h/08h are the
+//                        AXPBox-coverage candidates), the H-7 companion
+//                        row in Ncr53C810.h ledgerCmd names it in one
+//                        line.
 //   2026-08-04  SPEC-DISK-001 (architect-approved): atomic drive profiles.
 //               FUNCTION: setProfile (new) / cmdInquiry / cmdModeSense.
 //               CHANGE:  With a DriveProfile set (manifest "model" ->
@@ -299,9 +361,17 @@ private:
         // vs SCSI-2 X3.131 (recalled field order; see SPEC-DISK-001).
         uint8_t const pageCode = cmd.cdb[2] & 0x3F;
         bool const dbd = (cmd.cdb[1] & 0x08) != 0;
+        // Batch H-7 (2026-08-06): page 01h Read-Write Error Recovery.  The
+        // MEASURED consumer is SYS$DKDRIVER unit init, CDB 1A 00 01 00 FF 00
+        // (crash dump 2026-08-05, RAD+25C); rejecting it cost every boot
+        // since JRN-SCSI-041 -- see the header entry.
+        // TODO(DISK-MODEPAGES): coverage is the measured minimum -- see the
+        // file-header TODO table for the full page matrix and the PC-field
+        // caveat.  N810-CHKCOND names any page this gate rejects.
+        bool const wantP1 = (pageCode == 0x01) || (pageCode == 0x3F);
         bool const wantP3 = (pageCode == 0x03) || (pageCode == 0x3F);
         bool const wantP4 = (pageCode == 0x04) || (pageCode == 0x3F);
-        if (!wantP3 && !wantP4 && pageCode != 0x00) {
+        if (!wantP1 && !wantP3 && !wantP4 && pageCode != 0x00) {
             check(cmd, ScsiSenseKey::IllegalRequest, 0x24, 0x00);
             return;
         }
@@ -316,6 +386,14 @@ private:
                                                    : static_cast<uint32_t>(blocks));
             put24(&buf[pos + 5], bs);
             pos += 8;
+        }
+        if (wantP1) {                          // page 01h R-W Error Recovery
+            // Batch H-7: 12 bytes, policy all-zero -- AXPBox-identical (the
+            // configuration measured to boot); DKDRIVER needs existence,
+            // not policy.  Ascending page order keeps 3Fh well-formed.
+            uint8_t* p = &buf[pos];
+            p[0] = 0x01; p[1] = 0x0A;          // code, page length 10
+            pos += 12;
         }
         if (wantP3) {                          // page 03h Format Device
             uint8_t* p = &buf[pos];

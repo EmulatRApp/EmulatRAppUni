@@ -328,7 +328,7 @@ inline void xlateLogImpl(char stream, char const* path,
     std::fflush(stderr);
 }
 
-AXP_ALWAYS_INLINE inline void xlateLog(char stream, char const* path,
+AXP_ALWAYS_INLINE void xlateLog(char stream, char const* path,
     coreLib::CpuState const& cpu, coreLib::VAType va, coreLib::PAType pa,
     unsigned spe, uint64_t pfn) noexcept
 {
@@ -598,7 +598,7 @@ struct Ev6Translator
         // specifies.  See CpuState::unalignTrapEnabled for rationale.
         //
         // Forensic telemetry: every fixup event (the !aligned && !trap
-        // path) gets one row in logs/unaligned.log via
+        // path) gets one row in logs/<stem>_unaligned.log via
         // logUnalignedEvent.  The .trc file's "cyc=" entries provide
         // the surrounding context; this log is the index of cycles
         // worth investigating.

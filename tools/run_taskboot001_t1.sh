@@ -74,7 +74,9 @@ bash "$TARGET" "$@" || true
 # The newest run log in the newest run dir is this run's (showdev names it
 # run_ds20_showdev_<ts>.log and tee-creates it at launch).
 RUN_DIR="$(ls -dt "$PROJ"/out/build/relwithdebinfo "$PROJ"/RelWithDebInfo 2>/dev/null | head -1)"
-LOG="$(ls -t "$RUN_DIR"/run_ds20_showdev_*.log 2>/dev/null | head -1)"
+# 2026-07-31: stem-keyed logs/ form first, legacy flat form second (FILE 7).
+LOG="$(ls -t "$RUN_DIR"/logs/*_showdev_*.log \
+             "$RUN_DIR"/run_ds20_showdev_*.log 2>/dev/null | head -1)"
 if [[ -n "${LOG:-}" && -f "$LOG" ]]; then
     mkdir -p "$RUN_DIR/traces"
     TRC="$RUN_DIR/traces/t1_apb_retire_$(date +%Y%m%d_%H%M%S).txt"

@@ -24,6 +24,18 @@
 // (I/O or mem) so CSR accesses route here.  Microwire timing is the fiddly bit;
 // validate the MAC read against a CSR9 trace and refine if needed.
 // ============================================================================
+// CHANGE HISTORY
+// ============================================================================
+//   2026-08-02  JRN-SES-001 Batch C1 (architect-approved): interrupt_pin is
+//               SILICON, not configuration.
+//               FUNCTION: (class constant) kInterruptPin (new).
+//               CHANGE:  Config 0x3D is hardwired 01h = INTA# on the 21143
+//                        (21143 datasheet configuration-register section;
+//                        single-function PCI device -> INTA# per PCI spec).
+//                        The model owns the value as a constant; the loader
+//                        validates any manifest declaration against it
+//                        (Machine.cpp Batch C1) instead of obeying it.
+// ============================================================================
 #ifndef DEVICELIB_TSUNAMI_DEC21143TULIP_H
 #define DEVICELIB_TSUNAMI_DEC21143TULIP_H
 
@@ -40,6 +52,11 @@ namespace deviceLib {
 
 class Dec21143Tulip final : public IPciDeviceHandler, public IIoPortHandler {
 public:
+    // Interrupt Pin is SILICON (Batch C1, 2026-08-02; see CHANGE HISTORY):
+    // 21143 hardwires config 0x3D to 01h = INTA# (21143 DS; PCI spec
+    // single-function rule).  Loader validates the manifest against this.
+    static constexpr uint8_t kInterruptPin = 0x1;   // INTA#
+
     // Owner callback: (un)register this model's CSR window at the SRM-assigned
     // BAR base.  isMem selects mem vs I/O space.
     using RangeFn = std::function<void(uint64_t base, uint32_t len,
@@ -318,7 +335,8 @@ private:
         storeCfgLE(0x00, 0x00191011u);  // vendor 0x1011 / device 0x0019
         storeCfgLE(0x08, 0x02000041u);  // rev 0x41 / class 0x020000 (Ethernet)
         m_cfg[0x10] = 0x01;             // BAR0 = I/O; BAR1 (0x14) = mem (bit0=0)
-        m_cfg[0x3D] = 0x01;             // interrupt pin INTA
+        m_cfg[0x3D] = kInterruptPin;    // interrupt pin INTA# -- silicon
+                                        // constant (Batch C1, 21143 DS)
     }
     static bool cfgWritable(uint8_t reg) noexcept
     {

@@ -1,0 +1,89 @@
+; ============================================================================
+; Emulatr.ini -- runtime configuration for this EmulatR system
+; ============================================================================
+; Seeded by EmulatrLaunch from resources/templates/Emulatr.ini.default
+; (SPEC-LAUNCH-001 Rev D.2, Section 5 R3) when this system was created.
+;
+; You may edit this file by hand.  EmulatrLaunch uses a read-modify-write
+; overlay that touches ONLY the keys it owns and preserves every other line,
+; its ordering, and its comments verbatim -- your edits and comments survive.
+; Keys the launcher owns: [System] model, [ROM] firmwareImage,
+; [SRMConsole] port, [Storage] diskDir.
+;
+; Emulatr.exe search order for this file (core: configLib::IniLoader):
+;   1. ./Emulatr.ini            <-- EmulatrLaunch always lands here (cwd = run dir)
+;   2. ./config/Emulatr.ini
+;   3. <exe-dir>/Emulatr.ini
+;   4. <exe-dir>/config/Emulatr.ini
+; The launcher guarantees (1) exists so the <exe-dir> fallbacks -- which would
+; silently pull configuration out of the read-only install directory -- can
+; never be reached.
+; ============================================================================
+
+[System]
+; Target machine identity.  `model` selects <lower(model)>_platform.json and
+; the FDM/HWRPB system identity.  Bound at system creation and IMMUTABLE for
+; the life of this system (Section 4): to change platform, create a new system.
+; Single-socket 21264 parts are cpuCount=1.  Do NOT advertise more CPUs than
+; execute -- SRM/GCT can spin waiting for secondaries (boot hang).
+model       = @MODEL@
+cpuCount    = 1
+activeCpus  = 1
+memorySize  = 4294967296   ; 4 GiB
+
+[ROM]
+; Firmware image, resolved relative to this directory.  Left EMPTY at creation
+; because no firmware ships with EmulatR -- drop your own SRM image into
+; firmware\ and pick it in the launcher's Firmware control, which writes this
+; key.  Until then Emulatr.exe will report "ROM.firmwareImage is required but
+; empty"; the launcher's own --firmware argument takes precedence over this
+; key (core precedence: CLI > ini), so the two can never disagree at launch.
+firmwareImage  =
+; Optional SHA-256 integrity check (empty = skip).
+firmwareSha256 =
+
+[SRMConsole]
+; OPA0 serial console TCP listener -- the path to P00>>>.  A terminal client
+; latches to this PORT, not to the emulator process.  The launcher's
+; "Open Console" button connects PuTTY here.
+;
+; Each registered system must own a DISTINCT port; the launcher refuses to
+; start a system whose port collides with another registered system.
+; Default 10023 (unprivileged).
+port             = @CONSOLEPORT@
+rxBufferSize     = 4096
+defaultTimeoutMs = 30000
+echoEnabled      = true
+
+; The launcher owns console launch via its Open Console button, so the
+; emulator's own auto-launch stays off.  Set true only if you run Emulatr.exe
+; directly from a shell.
+autoLaunchPutty  = false
+puttyPath        = putty.exe
+puttyExtraArgs   =
+
+[Storage]
+; Host directory holding disk / media image files.  The platform manifest
+; names each drive's media as a bare FILENAME, resolved against this
+; directory.  Relative here, so it resolves against the launch CWD -- which
+; EmulatrLaunch always sets to this run directory.
+diskDir = disks
+
+[Trace]
+; Trace mask flags (OR together):
+;   TRACE_INSTR = 0x01  TRACE_PIPELINE = 0x02  TRACE_REGFILE = 0x04
+;   TRACE_FPRFILE = 0x08  TRACE_EVENT = 0x10
+; 0 = off.  Tracing is expensive and its output is measured in gigabytes;
+; leave it off unless a developer asks you to turn it on.
+traceMask    = 0
+traceFile    = traces/cpu_trace.log
+traceLstFile = traces/cpu_trace.lst
+
+[Snapshot]
+enabled      = false
+targetCycle  = 0
+outputPath   = snapshots/
+
+[Logging]
+; spdlog runtime level: trace, debug, info, warn, err, critical, off.
+defaultLevel = warn

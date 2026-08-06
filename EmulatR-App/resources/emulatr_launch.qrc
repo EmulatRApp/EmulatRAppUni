@@ -1,0 +1,25 @@
+<!--
+  =========================================================================
+  resources/emulatr_launch.qrc : compiled-in launcher resources
+  =========================================================================
+  Project: EmulatR / EmulatrLaunch (SPEC-LAUNCH-001 Rev D.2)
+  Version: 1.0.0-alpha   Date: 2026-07-29
+  Spec:    Section 3 (layout)
+
+  Templates and reference data are COMPILED IN rather than installed beside
+  the executable: the install directory is Program Files and therefore
+  read-only, and a tester who lost a loose data file would get a launcher
+  that silently creates half a run directory.
+
+  NOTE ON STYLE: the house em dash is a double hyphen, but a double hyphen is
+  illegal inside an XML comment, so this header uses colons instead.
+  =========================================================================
+-->
+<RCC>
+  <qresource prefix="/">
+    <file>templates/Emulatr.ini.default</file>
+    <file>templates/firmware_readme.txt</file>
+    <file>data/dec_drive_geometries.tsv</file>
+    <file>data/emulatr_env_registry.tsv</file>
+  </qresource>
+</RCC>

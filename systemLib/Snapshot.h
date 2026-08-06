@@ -134,6 +134,13 @@ inline constexpr uint32_t kFormatVersion         = 1;
 //       memoryLib::LockMonitor (the SSOT, reached via GuestMemory::lockMonitor),
 //       not in CpuState.  Shrinks/realigns the raw POD blob; all pre-v10
 //       snapshots are rejected at load.
+//   v10 -> v11 (2026-07-31): sirr uint64 added after ier
+//       (SPEC-SIRR-AST-001 GATE-1 Q1: explicit bump, no reserved-space
+//       trickery).  Grows/realigns the raw POD blob; all pre-v11
+//       snapshots are rejected at load and REGENERABLE (entry
+//       snapshots rebuild on a cold boot; OS-era diagnostic captures
+//       are archival, read by the offline python tools which do not
+//       check the version).
 // Snapshots captured before this point cannot be loaded; cold-boot
 // to re-establish a halt snapshot post-change.
 // Chipset stream versions:
@@ -160,7 +167,7 @@ inline constexpr uint32_t kFormatVersion         = 1;
 //       IDENTITY is re-applied from the platform manifest before restore;
 //       only mutable content travels.  Pre-v5 snapshots rejected (the IIC
 //       block layout changed; not backward-readable).
-inline constexpr uint32_t kCpuStateVersion       = 10; // v10: - reservedCacheLine/hasReservation (LL/SC SSOT = LockMonitor); v9: - mCpuId (T5); v8: + cpuSlot
+inline constexpr uint32_t kCpuStateVersion       = 11; // v11: + sirr (SPEC-SIRR-AST-001); v10: - reservedCacheLine/hasReservation (LL/SC SSOT = LockMonitor); v9: - mCpuId (T5)
 inline constexpr uint32_t kChipsetVersion        = 5;  // v5: manifest-driven IIC content
 inline constexpr char     kSnapshotExtension[]   = ".axpsnap";
 inline constexpr char     kSnapshotDirDefault[]  = "snapshots";

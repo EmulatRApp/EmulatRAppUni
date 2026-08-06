@@ -76,12 +76,16 @@ if   [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
 elif [ -x "./Emulatr"     ]; then EXE="./Emulatr"
 else echo "FATAL: no Emulatr(.exe) in $RUN_DIR"; exit 1; fi
 FW="firmware/es40_v7_3.exe"
+# 2026-07-31: per-instance run environment (FILE 7).  Sourcing this owns
+# STEM/TAG/TS, the log-name helper, and the per-instance flash NVRAM,
+# sentinels and console port -- concurrent instances no longer collide.
+. "$SCRIPT_DIR/emulatr_run_env.sh"
 INI="config/Emulatr.ini"
 MANIFEST="es40_v7_3_platform.json"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
 MAXCYC="${MAXCYC:-2000000000}"
 ATTACH_DISK="${ATTACH_DISK:-1}"
-LOG="run_es40_showdev_$(date +%Y%m%d_%H%M%S).log"
+LOG="$(emulatr_log showdev)"   # logs/<TAG>_showdev_<TS>.log (FILE 7)
 
 # ---- soft stale-binary notice (informational; not a build gate) ------------
 for src in "$PROJ/deviceLib/Tsunami/Cy82C693Ide.h" \

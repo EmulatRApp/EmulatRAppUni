@@ -69,7 +69,7 @@
 // PALcode reads back zeros and gets stuck waiting for a specific
 // revision bit, the fix is to populate the corresponding bits of
 // errorReg at Machine construction (or at HW reset emulation).
-// The cbox_csr.log telemetry will surface the pattern PALcode
+// The <stem>_cbox_csr.log telemetry will surface the pattern PALcode
 // expects, informing what bits to seed.
 //
 // Pipeline-restriction notes (from HRM Appendix D Restriction 30

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>     // std::memset (JRN-PCI-001: DMA master-abort fill)
 #include <string>
 #include <vector>
 #include "TsunamiVariant.h"
@@ -401,8 +402,11 @@ public:
                 // ever asserts (interruptPending == PIN-clear && ENI).  If this
                 // never prints, the verify never set ENI -> the interrupt path
                 // is not the gate.  Throttled.
+                // 2026-08-03 H-2 cap sweep (JRN-SCSI-037): first-N PLUS
+                // every-Mth -- pure first-N goes dark (JRN-SCSI-036 E-5).
                 static unsigned s_n = 0;
-                if (s_n++ < 64) {
+                unsigned const nIic = s_n++;
+                if (nIic < 64 || (nIic & 0x3FFu) == 0) {
                     std::fprintf(stderr, "IIC-IRQ-%s bit=%d\n",
                                  iicLevel ? "ASSERT" : "deassert", s_iicDrirBit);
                     std::fflush(stderr);
@@ -434,6 +438,12 @@ public:
     // is board wiring, NOT fixed by the HRM.  V4 convention (see
     // docs/hrm_deviations.md): Pchip0 INTA-D -> DRIR[35:32], Pchip1 INTA-D
     // -> DRIR[39:36].  DRIR<63> is reserved for the error/NXM interrupt.
+    //
+    // Batch C2 (2026-08-02, JRN-SES-001): DEPRECATED for device routing.
+    // The 2026-07-25 finding established this formula does not match real
+    // board wiring (PC264 option slots); the tulip -- its last consumer --
+    // now routes via the manifest (setTulipIntxRouting).  Kept only because
+    // the "V4 convention" doc still references it; do NOT add consumers.
     static constexpr int pciIntxToDrirBit(int pchipId, int intxLine) noexcept
     {
         return 32 + (pchipId * 4) + (intxLine & 0x3);
@@ -457,12 +467,13 @@ public:
     // Pchip inbound windows (WSBA/WSM/TBA) map those to PAs.  These helpers
     // are the device-facing capability: arbitrary length, byte-accurate,
     // window-translated per 4 KiB chunk so a burst crossing a window/page
-    // boundary re-translates rather than assuming contiguity.  Built on the
-    // existing translateDmaToPa (direct-map; SG walk stays a TODO inside
-    // that seam per JRN-VMB-019 B4 -- consumers are unaffected when it
-    // lands).  GuestMemory accessors are page-crossing-safe (memory.md 2.3).
-    // Returns bytes transferred (== n today; short only if a future SG
-    // fault path needs to report one).
+    // boundary re-translates rather than assuming contiguity.  Built on
+    // TsunamiPchip::translateDma (JRN-PCI-001: direct-map AND TLB-less SG
+    // walk both live; a window MISS performs NO memory access -- reads
+    // observe master-abort all-ones, writes are dropped, per HRM 10.1.4).
+    // GuestMemory accessors are page-crossing-safe (memory.md 2.3).
+    // Returns bytes CONSUMED from the request (== n; a missed chunk is
+    // consumed-but-aborted, mirroring a PCI master abort mid-burst).
     size_t dmaReadBytes(uint64_t pciAddr, void* dst, size_t n) noexcept
     {
         auto* out = static_cast<uint8_t*>(dst);
@@ -471,11 +482,18 @@ public:
             uint64_t const pci   = pciAddr + done;
             size_t const   chunk = static_cast<size_t>(
                 std::min<uint64_t>(n - done, 0x1000ULL - (pci & 0xFFFULL)));
-            uint64_t const paBase = m_pchip.translateDmaToPa(pci, chunk);
-            for (size_t i = 0; i < chunk; ++i) {
-                uint8_t b = 0;
-                (void) m_guestMemory.read1(paBase + i, b);
-                out[done + i] = b;
+            auto const x = m_pchip.translateDma(pci, chunk, /*isWrite=*/false);
+            if (!x.hit) {
+                // JRN-PCI-001 G-3 (HRM 10.1.4): unclaimed DMA address --
+                // the Pchip does not respond; NO memory access.  The
+                // master's read data is all-ones (master abort).
+                std::memset(out + done, 0xFF, chunk);
+            } else {
+                for (size_t i = 0; i < chunk; ++i) {
+                    uint8_t b = 0;
+                    (void) m_guestMemory.read1(x.pa + i, b);
+                    out[done + i] = b;
+                }
             }
             done += chunk;
         }
@@ -490,10 +508,13 @@ public:
             uint64_t const pci   = pciAddr + done;
             size_t const   chunk = static_cast<size_t>(
                 std::min<uint64_t>(n - done, 0x1000ULL - (pci & 0xFFFULL)));
-            uint64_t const paBase = m_pchip.translateDmaToPa(pci, chunk);
-            for (size_t i = 0; i < chunk; ++i) {
-                (void) m_guestMemory.write1(paBase + i, in[done + i]);
+            auto const x = m_pchip.translateDma(pci, chunk, /*isWrite=*/true);
+            if (x.hit) {
+                for (size_t i = 0; i < chunk; ++i) {
+                    (void) m_guestMemory.write1(x.pa + i, in[done + i]);
+                }
             }
+            // JRN-PCI-001 G-3: miss -> chunk dropped, no memory access.
             done += chunk;
         }
         return done;
@@ -519,12 +540,15 @@ public:
         if (m_cchip.miscNxmLatched()) return;
 
         // DIAG (task #3): make the unclaimed-PA decode observable on stderr.
-        // Throttled to the first 64 like the CBOX loud-stderr cap so a deep
-        // run cannot be swamped.  Unconditional (not debug-gated) so it is
-        // visible in release builds too.
+        // Throttled so a deep run cannot be swamped.  Unconditional (not
+        // debug-gated) so it is visible in release builds too.
+        // 2026-08-03 H-2 cap sweep (JRN-SCSI-037, architect-mandated): was
+        // first-64 ONLY -- pure first-N activity probes go permanently dark
+        // before the era that matters (JRN-SCSI-036 E-5); now first 64 PLUS
+        // every 1024th.
         static std::atomic<unsigned> s_nxmSeen{ 0 };
         unsigned const k = s_nxmSeen.fetch_add(1, std::memory_order_relaxed);
-        if (k < 64) {
+        if (k < 64 || (k & 0x3FFu) == 0) {
             std::fprintf(stderr,
                 "reportNxm: NXM pa=0x%016llx src=%d (#%u)\n",
                 static_cast<unsigned long long>(pa), sourceCode, k);
@@ -614,11 +638,58 @@ public:
         return nullptr;
     }
 
+    // Silicon Interrupt Pin per named model (Batch C1 companion, architect
+    // direction 2026-08-02: pins are HARDWARE-SET and live in the model;
+    // routing/usage lives in the platform manifest).  -1 = model unknown
+    // here (no constant to validate against).  Machine validates every
+    // named manifest entry against this and warns loud + ignores a
+    // disagreeing declaration.
+    //   ncr53c810           INTA# (53C895 DM: 0x3D hardwired 01h)
+    //   de500/dec21143      INTA# (21143 DS)
+    //   cypress_isa/_ide    0 -- CY82C693 routes IDE interrupts internally
+    //                       to ISA IRQs, no PCI INTx (Cypress DS).
+    //   ali_m1543c          0 -- bridge function, no INTx.
+    //   ali_m5229           0 TODAY -- datasheet says IP=01h, but the
+    //                       truthful profile is interlocked with the
+    //                       deferred IDE batch (JRN-AUD-003 I-4/Batch K);
+    //                       revisit there, not here.
+    static int modelInterruptPin(const std::string& modelName) noexcept {
+        if (modelName == "ncr53c810")
+            return deviceLib::Ncr53C810::kInterruptPin;
+        if (modelName == "de500" || modelName == "dec21143")
+            return deviceLib::Dec21143Tulip::kInterruptPin;
+        if (modelName == "cypress_isa" || modelName == "cypress_ide"
+            || modelName == "ali_m1543c" || modelName == "ali_m5229")
+            return 0;
+        return -1;
+    }
+
     // Manifest-driven SCSI wiring (JRN-SCSI-003): Machine resolves the DRIR
     // bit from the manifest's board routing table (slot x interrupt_pin) and
     // pushes it + the config-space pin here after manifest load.
+    // Batch C1 (2026-08-02): setScsiInterruptPin now reaches the device's
+    // VALIDATOR (Ncr53C810::setInterruptPin) -- the pin itself is the model
+    // constant kInterruptPin; a disagreeing manifest warns loud and is
+    // ignored.  Routing must be resolved with the CONSTANT, not the
+    // manifest field (Machine.cpp Batch C1).
     void setScsiIntxRouting(int drirBit) noexcept { m_scsiIntxDrir = drirBit; }
     void setScsiInterruptPin(uint8_t pin) noexcept { m_scsi.setInterruptPin(pin); }
+
+    // TODO(N810-GENTIMER) (2026-08-05, JRN-SCSI-041 Sec 14): forward the
+    // periodic tick to the SCSI HBA.  Same forwarding shape as
+    // setScsiInterruptPin above -- Machine does not reach m_scsi directly.
+    // Driven from Machine::systemTick's interval-timer edge, alongside
+    // cchip().fireIntervalTimer() and flash().tryFlush().
+    void scsiPollTick() noexcept { m_scsi.pollTick(); }
+
+    // Batch C2 (2026-08-02, JRN-SES-001): tulip INTx routing, same manifest
+    // seam as SCSI.  Until Machine pushes a routed bit the tulip's assert is
+    // DROPPED loud -- the previous hardwired raisePciInterrupt(0,0) ->
+    // DRIR<32> used exactly the generic formula the 2026-07-25 finding
+    // rejected for PC264 option slots ("the tulip's DRIR32 is equally
+    // suspect on DS20").  S3 generalization: INTx is board DATA for every
+    // option card, never a formula.
+    void setTulipIntxRouting(int drirBit) noexcept { m_tulipIntxDrir = drirBit; }
 
     // SCSI disk media attach (JRN-SCSI-001/-003; mirrors setDiskMedia for
     // IDE).  MANIFEST-PINNED (2026-07-25, per architect direction): a disk
@@ -627,12 +698,18 @@ public:
     // id with no declared media stays empty and the console's selection of
     // it times out (STO), matching an unpopulated bus.  One instance per id
     // (ids 0..6; id 7 = the HBA itself).
+    // SPEC-DISK-001 (2026-08-04): optional atomic drive profile, resolved by
+    // Machine from the manifest storage row's "model" against the
+    // DriveProfile.h table (media-size validation done there BEFORE this
+    // call).  nullptr = legacy EMULATR identity, unchanged.
     bool setScsiDiskMedia(int scsiId,
-                          std::unique_ptr<scsi::IBlockMedia> media) noexcept
+                          std::unique_ptr<scsi::IBlockMedia> media,
+                          scsi::DriveProfile const* profile = nullptr) noexcept
     {
         if (scsiId < 0 || scsiId > 6) return false;   // 7 = HBA
         auto disk = std::make_unique<scsi::VirtualDiskDevice>(std::move(media));
         if (!disk->hasMedia()) return false;
+        disk->setProfile(profile);
         if (!m_scsi.attachTarget(static_cast<unsigned>(scsiId), disk.get()))
             return false;
         m_scsiDisks[scsiId] = std::move(disk);
@@ -819,22 +896,42 @@ private:
                                static_cast<uint16_t>(base + len), self);
             });
         // DMA access for TX/RX descriptor completion.  Descriptor addresses in
-        // CSR3/4 are PCI-DMA addresses; wired direct-to-guest-PA for now (the
-        // tulip's TULIP-TX trace verifies whether a Pchip DMA-window translation
-        // is needed).  read4/write4 bounds-check against DRAM.
+        // CSR3/4 are PCI-DMA addresses, window-translated through the Pchip.
+        // JRN-PCI-001 G-3: a window miss is a master abort -- reads observe
+        // all-ones, writes are dropped; never a raw-PA access.
         m_tulip.setDmaAccess(
             [this](uint64_t dma) -> uint32_t {
-                uint32_t v = 0; m_guestMemory.read4(m_pchip.translateDmaToPa(dma), v); return v;
+                auto const x = m_pchip.translateDma(dma, 4, /*isWrite=*/false);
+                if (!x.hit) return 0xFFFFFFFFu;
+                uint32_t v = 0; m_guestMemory.read4(x.pa, v); return v;
             },
             [this](uint64_t dma, uint32_t v) {
-                m_guestMemory.write4(m_pchip.translateDmaToPa(dma), v);
+                auto const x = m_pchip.translateDma(dma, 4, /*isWrite=*/true);
+                if (x.hit) m_guestMemory.write4(x.pa, v);
             });
-        // Interrupt: DE500 (hose 0 / Pchip0, INTA) -> Cchip DRIR[32].  On an
-        // enabled TX/RX interrupt the tulip asserts INTA so the SRM's ew ISR
-        // runs, signals tu_out's semaphore, and ewa init completes.
+        // Interrupt: tulip INTA -> manifest-routed DRIR bit (Batch C2,
+        // 2026-08-02, JRN-SES-001).  WAS raisePciInterrupt(0,0) -> DRIR<32>,
+        // the generic 32+(pchip*4)+line formula -- the exact convention the
+        // 2026-07-25 finding rejected as board-blind ("the tulip's DRIR32 is
+        // equally suspect on DS20").  INTx is BOARD DATA: the bit comes from
+        // the manifest via setTulipIntxRouting(), delivered by Machine after
+        // manifest load, same seam as the SCSI HBA below.  Unrouted (-1) =
+        // warn once, DROP -- never light a wrong bit.
         m_tulip.setIntrCallback([this](bool level) {
-            if (level) raisePciInterrupt(/*pchip*/0, /*INTA*/0);
-            else       lowerPciInterrupt(0, 0);
+            if (m_tulipIntxDrir < 0) {
+                static bool warned = false;
+                if (!warned) {
+                    warned = true;
+                    std::fprintf(stderr,
+                        "TsunamiChipset: tulip INTx assert DROPPED -- no "
+                        "pci_irq_table_hose0 / pci_irq_map route for the "
+                        "DE500 (manifest board data absent)\n");
+                    std::fflush(stderr);
+                }
+                return;
+            }
+            if (level) m_cchip.assertInterrupt(m_tulipIntxDrir);
+            else       m_cchip.deassertInterrupt(m_tulipIntxDrir);
         });
 
         // NCR 53C810 SCSI HBA (pka; JRN-SCSI-001 P1/P2).  Same three seams as
@@ -860,6 +957,33 @@ private:
         m_scsi.setDmaAccess(
             [this](uint64_t pci, void* dst, size_t n) { dmaReadBytes(pci, dst, n); },
             [this](uint64_t pci, void const* src, size_t n) { dmaWriteBytes(pci, src, n); });
+
+        // JRN-PCI-001 (2026-08-02): the two Pchip fidelity seams.
+        //   SG PTE reader -- the TLB-less scatter-gather walk (HRM 10.1.4.3)
+        //   fetches its page-table entries from guest memory through this
+        //   quadword reader.  Deterministic: a plain synchronous read.
+        //   b_error signal -- PERROR latching asserts/deasserts the Cchip's
+        //   DRIR<62> (HRM Table 6-9, Pchip0 error), which the Machine's
+        //   existing b_irq<0> divert already polls via DIR<63:58> & DIM.
+        m_pchip.setSgPteReader(
+            [this](uint64_t pa) -> uint64_t {
+                uint64_t q = 0;
+                (void) m_guestMemory.read8(pa, q);
+                return q;
+            });
+        m_pchip.setErrorSignal(
+            [this](bool assertLevel) {
+                if (assertLevel) m_cchip.assertInterrupt(62);
+                else             m_cchip.deassertInterrupt(62);
+            });
+        // Batch F-2 (2026-08-02, JRN-AUD-003 Sec 12): every modeled platform
+        // carries a subtractive-decode PCI-to-ISA south bridge on hose 0
+        // (CY82C693 on DS10/DS20, ALi M1543C on DS25/ES40/ES45) -- unclaimed
+        // mem/IO PIO cycles are claimed by the bridge and float to ISA, so
+        // they must NOT latch PERROR<NDS>.  See TsunamiPchip::
+        // setSubtractiveAgent for the full rationale and the SRM
+        // option-ROM-scan evidence.
+        m_pchip.setSubtractiveAgent(true);
         // INTx routing is BOARD DATA, not a formula (2026-07-25 finding: the
         // generic pciIntxToDrirBit(32+..) convention does NOT match PC264
         // option slots; the tulip's DRIR32 is equally suspect on DS20).  The
@@ -1122,6 +1246,7 @@ private:
     // rows (setScsiDiskMedia); id 7 = the HBA.  2026-07-25 manifest-pinning.
     std::array<std::unique_ptr<scsi::VirtualDiskDevice>, 7> m_scsiDisks{};
     int                      m_scsiIntxDrir = -1;  // DRIR bit from manifest routing (JRN-SCSI-003)
+    int                      m_tulipIntxDrir = -1; // DRIR bit from manifest routing (Batch C2, 2026-08-02)
     ITsunamiIde*           m_activeIde = nullptr;  // -> m_ide or m_aliIde; set in wireDevices()
     Smc37c669SuperIo       m_superio;       // FDC37C669 SuperIO: config port + FDC LDN (#22)
 

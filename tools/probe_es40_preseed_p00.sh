@@ -88,7 +88,9 @@ fi
 "$SHOWDEV" || true
 
 # ---- verdict from the newest showdev log ------------------------------------
-LOG="$(ls -t "$RUN_DIR"/run_es40_showdev_*.log 2>/dev/null | head -1 || true)"
+# 2026-07-31: stem-keyed logs/ form first, legacy flat form second (FILE 7).
+LOG="$(ls -t "$RUN_DIR"/logs/*_showdev_*.log \
+             "$RUN_DIR"/run_es40_showdev_*.log 2>/dev/null | head -1 || true)"
 [[ -f "$LOG" ]] || { echo "NOTE: no run log to inspect."; exit 0; }
 echo "=== VERDICT (from $LOG) ==="
 echo "--- reached P00 prompt?"; grep -cE 'P00>>>' "$LOG"

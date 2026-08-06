@@ -335,6 +335,30 @@ if(EMULATR_CHIPSET_DIAG)
 endif()
 
 # ----------------------------------------------------------------------------
+# EMULATR_DIAG_N810 -- 53C810 per-register access census (TODO(N810-CENSUS)).
+# ----------------------------------------------------------------------------
+# Counters, not rows: [off][rd/wr][host/script] plus the DSP of first
+# SCRIPTS-side touch, dumped as ONE table at each stall state and only when it
+# CHANGED.  Answers "which registers does the pke init script actually touch"
+# without the row-storm a per-access ledger would produce.
+# COMPILE-GUARDED, unlike ledgerCmd (Ncr53C810.h:1557 DEVIATION): the census
+# carries 2 KB of state plus two array increments per register access, on a
+# path that runs inside a 100k-instruction budget which executed 76,481 times
+# in run 20260804-213741.  A code-only bounded row cannot become a throughput
+# regression; 2 KB on the hot path can.  Off in Release -- zero state, zero
+# code.  Compiled IN for Debug and RelWithDebInfo so the instrument cannot go
+# dark in the build actually used for diagnosis (JRN-SCSI-041 Sec 12).
+option(EMULATR_DIAG_N810
+       "Enable the 53C810 per-register access census"
+       ON)
+
+if(EMULATR_DIAG_N810)
+    target_compile_definitions(Emulatr PRIVATE
+        $<$<NOT:$<CONFIG:Release>>:EMULATR_DIAG_N810=1>
+    )
+endif()
+
+# ----------------------------------------------------------------------------
 # EMULATR_IRQDIAG -- one-shot interval-timer / HW_IER interrupt-delivery probe.
 # ----------------------------------------------------------------------------
 # TEMP diagnostic (2026-07-07) for the ES40 "lowering IPL" clock-interrupt halt
@@ -590,6 +614,9 @@ set(EMULATR_TEST_SOURCES
     tests/chipsetLib/test_tsunami_tig.cpp
     # 2026-07-24: S1 seam (JRN-SCSI-002 G-B/G-A) -- BAR rebind + bulk DMA
     tests/chipsetLib/test_pci_bar_rebind.cpp
+    # 2026-08-02: JRN-PCI-001 Pchip DMA fidelity (direct-map width, SG walk,
+    # window-miss no-transfer, PCTL HOLE, WSBA3 SG RO, PERROR SGE latch)
+    tests/chipsetLib/test_pchip_dma.cpp
     # 2026-07-24: JRN-SCSI-001 P2 -- NCR 53C810 SCRIPTS engine + disk target
     tests/deviceLib/test_ncr53c810.cpp
     tests/systemLib/test_firmwareloader.cpp
@@ -730,6 +757,15 @@ target_compile_definitions(Emulatr_tests PRIVATE
 if(EMULATR_CHIPSET_DIAG)
     target_compile_definitions(Emulatr_tests PRIVATE
         $<$<NOT:$<CONFIG:Release>>:EMULATR_CHIPSET_DIAG=1>
+    )
+endif()
+
+# Mirror the EMULATR_DIAG_N810 gate onto the test target so any doctest that
+# constructs an Ncr53C810 sees the same compile-time state as the main
+# executable.  Same not-in-Release predicate.
+if(EMULATR_DIAG_N810)
+    target_compile_definitions(Emulatr_tests PRIVATE
+        $<$<NOT:$<CONFIG:Release>>:EMULATR_DIAG_N810=1>
     )
 endif()
 
@@ -1014,6 +1050,49 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../H&M/HMDocs/EmulatRGuide.pdf")
         VERBATIM
     )
 endif()
+
+# ----------------------------------------------------------------------------
+# Visual C++ redistributable -- stage into <run-dir>/redist  (2026-07-29)
+# ----------------------------------------------------------------------------
+# The MSVC runtime installer ships BESIDE the build so an operator taking the
+# run directory to a clean box has the prerequisite in hand.  It is NOT a
+# build-time dependency of Emulatr.exe and is never executed by the build.
+#
+# Source lives OUTSIDE the tree (D:/EmulatR/distribution, a sibling of the V5
+# working tree, like the H&M guide above), so the location is a cache PATH
+# rather than a hardcoded absolute: override with
+#   cmake -DEMULATR_REDIST_DIR=<dir>
+# Windows-only -- VC_redist is meaningless on macOS/Linux hosts.
+#
+# Absent-source policy: WARNING, not FATAL_ERROR.  The redist is a PACKAGING
+# asset, not a runtime input; a clean checkout without the distribution/ dir
+# must still build and boot.  The warning names the expected path and the
+# override, so the miss is loud, not silent.  (Flip to FATAL_ERROR here if the
+# redist should gate every Windows build.)
+if(WIN32)
+    set(EMULATR_REDIST_DIR "D:/EmulatR/distribution" CACHE PATH
+        "Directory holding VC_redist.x64.exe for run-dir staging")
+    set(EMULATR_REDIST_EXE "${EMULATR_REDIST_DIR}/VC_redist.x64.exe")
+
+    if(EXISTS "${EMULATR_REDIST_EXE}")
+        add_custom_command(TARGET Emulatr POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:Emulatr>/redist"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${EMULATR_REDIST_EXE}"
+                    "$<TARGET_FILE_DIR:Emulatr>/redist/VC_redist.x64.exe"
+            COMMENT "[Emulatr] stage redistributable -> redist/VC_redist.x64.exe"
+            VERBATIM
+        )
+        message(STATUS "Redistributable staging configured: ${EMULATR_REDIST_EXE}")
+    else()
+        message(WARNING
+            "VC_redist.x64.exe not found at '${EMULATR_REDIST_EXE}' -- "
+            "redist/ will not be populated.  Override with "
+            "-DEMULATR_REDIST_DIR=<dir>.")
+    endif()
+endif()
+
 
 # PlatformEditor builds WITH the emulator (2026-07-25, user direction).
 # UNCONDITIONAL include (not an option): the 2026-07-18 EMULATR_BUILD_EDITORS

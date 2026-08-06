@@ -22,8 +22,9 @@
 //   3. The same flow against a REAL TsunamiChipset/Pchip moves live decode:
 //      CSR reads route to the new base, the old base floats all-ones.
 //   4. dmaReadBytes/dmaWriteBytes round-trip guest memory across a 4 KiB
-//      chunk boundary (bulk bus-master seam over translateDmaToPa; windows
-//      disabled -> identity mapping is the documented fallback).
+//      chunk boundary through a REAL direct-mapped DMA window (JRN-PCI-001:
+//      the identity fall-through is gone; a window MISS is a master abort
+//      with no memory access -- covered by its own case).
 //
 // Per V4 doctest convention: CHECK only, never REQUIRE.
 // ============================================================================
@@ -179,10 +180,17 @@ TEST_CASE("BAR re-program moves live decode (chipset integration)")
 
 TEST_CASE("dmaWriteBytes/dmaReadBytes round-trip across a 4 KiB chunk boundary")
 {
+    // JRN-PCI-001 (2026-08-02): the old identity fall-through is GONE --
+    // an unclaimed DMA address performs NO memory access (HRM 10.1.4).
+    // This test now programs a real direct-mapped window (HRM Table 10-5),
+    // which is also what the console does before any bus-master runs:
+    //   WSBA0 = base 0x0010.0000, ENA, SG=0;  WSM0 = 1MB;  TBA0 = 0x0010.0000
+    // so PCI 0x0012.3F80 translates 1:1 into DRAM at the same address.
     TsunamiChipset cs(ChipsetVariant::Tsunami, 1, 1ULL << 30);
+    cs.pchip().writeCSR(0x0000, 0x00100001ULL);   // WSBA0: base|ENA
+    cs.pchip().writeCSR(0x0100, 0x00000000ULL);   // WSM0: 1MB window
+    cs.pchip().writeCSR(0x0200, 0x00100000ULL);   // TBA0
 
-    // No DMA window enabled: translateDmaToPa's documented fallback is the
-    // identity mapping (PCI addr used as raw PA), which suits a DRAM target.
     uint64_t const pci = 0x00123F80ULL;         // straddles ...3FFF / ...4000
     uint8_t src[0x100];
     for (unsigned i = 0; i < sizeof src; ++i)
@@ -194,4 +202,26 @@ TEST_CASE("dmaWriteBytes/dmaReadBytes round-trip across a 4 KiB chunk boundary")
     std::memset(dst, 0, sizeof dst);
     CHECK(cs.dmaReadBytes(pci, dst, sizeof dst) == sizeof dst);
     CHECK(std::memcmp(src, dst, sizeof dst) == 0);
+}
+
+TEST_CASE("DMA window miss performs no memory access (JRN-PCI-001 G-3)")
+{
+    // HRM 10.1.4: the Pchip does not respond to an unclaimed address --
+    // a write must not touch DRAM and a read must observe all-ones.
+    TsunamiChipset cs(ChipsetVariant::Tsunami, 1, 1ULL << 30);
+
+    uint64_t const pci = 0x00200000ULL;         // no window programmed
+    uint8_t const src[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+    (void) cs.dmaWriteBytes(pci, src, sizeof src);
+
+    // DRAM at that PA must be untouched (still zero-initialized).
+    uint64_t q = 0xDEADDEADDEADDEADULL;
+    (void) cs.guestMemory().read8(pci, q);
+    CHECK(q == 0x0ULL);
+
+    // A read through the missed window observes master-abort all-ones.
+    uint8_t dst[8];
+    std::memset(dst, 0, sizeof dst);
+    (void) cs.dmaReadBytes(pci, dst, sizeof dst);
+    for (unsigned i = 0; i < sizeof dst; ++i) CHECK(dst[i] == 0xFF);
 }

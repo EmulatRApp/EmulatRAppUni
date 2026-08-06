@@ -78,6 +78,7 @@
 #include "VA_types.h"
 #include "axp_attributes_core.h"
 #include "coreLib/CBoxState.h"
+#include "coreLib/IprFields.h"   // composeIsumSw (pendingSoftInt below)
 #include "coreLib/VA_types.h"
 #include "deviceLib/Hwrpb.h"
 #include "pteLib/SPAMShardManager.h"   // CpuState-resident ITB/DTB managers
@@ -316,15 +317,21 @@ struct CpuState
     // ------------------------------------------------------------------
     // 64-bit register where each bit position enables a specific
     // hardware/software/AST interrupt source.  Bit layout mirrors
-    // HW_ISUM (paired register) per Alpha 21264 HRM Section 5.4:
+    // HW_ISUM (paired register) per Alpha 21264 HRM Section 5.2.9 /
+    // apisrm ev6_defs.mar EV6__IER__* (field-exact, verified
+    // 2026-07-31, SPEC-SIRR-AST-001 Sec 8.2):
     //
-    //   bits 14..28 : SI -- software interrupt enables, IRQ_SW[14..28]
+    //   bit  13     : ASTEN -- AST interrupt enable (master gate over
+    //                 the per-mode PCTX ASTRR/ASTER pairs)
+    //   bits 14..28 : SIEN -- software interrupt enables SIEN<15:1>
     //   bits 29..30 : PC -- performance counter enables
     //   bit  31     : CR -- correctable read error enable
     //   bit  32     : SL -- serial line interrupt enable
     //   bits 33..38 : EI -- external interrupt enables, IRQ_H[0..5]
     //
-    // Of EI: bit 35 = ei[2] = interval timer (IPL 22).
+    // CM<1:0> sits at data bits [4:3] of the combined IER_CM view but
+    // is NOT stored here -- cpu.mode holds it (see IprFields.h
+    // ierCmCompose).  Of EI: bit 35 = ei[2] = interval timer (IPL 22).
     //
     // Reset value 0 (all interrupts masked) so cold boot does not
     // accept spurious chipset interrupts before the firmware has
@@ -336,6 +343,18 @@ struct CpuState
     // Machine's canAcceptInterrupt(irqLevel) consults cpu.ier when
     // arbitrating chipset-driven divert requests.
     uint64_t ier = 0;
+
+    // Software Interrupt Request Register (HW_SIRR, HRM 5.2.10 /
+    // ev6_defs.mar EV6__SIRR).  SIR<15:1> at bits [28:14]; every
+    // other bit reserved and NEVER stored (MTPR masks with
+    // kSirrSirMask).  Plain R/W at the HW level -- the VMS PAL's
+    // CALL_PAL MTPR_SIRR does the read-OR-write itself and clears
+    // taken bits by mfpr/bic/mtpr (ev6_vms_callpal.mar :1109;
+    // ev6_vms_pal.mar trap__interrupt_sw_found), so full round-trip
+    // fidelity within the SIR field is the whole contract.  Pending
+    // SI becomes deliverable when SIRR & IER.SIEN is nonzero (see
+    // composeIsumSw / pendingSoftInt).  SPEC-SIRR-AST-001.
+    uint64_t sirr = 0;
 
     // Interrupt Summary register (HW_ISUM, scbd 0x0D).  Architecturally
     // read-only; reflects the cause of the most recent INTERRUPT-class
@@ -349,11 +368,18 @@ struct CpuState
     //   bit  32     : SL -- serial line interrupt
     //   bits 33..38 : EI -- external interrupts IRQ_H[0..5]
     //
-    // V4 v1 carries this as RW backing storage; the trap delivery path
-    // writes the relevant cause bit before redirecting PC to
-    // (palBase + 0x100), and HW_MFPR(HW_ISUM) returns the stored value.
-    // Real EV6 derives the bits from live pin/IPL state; v1 emulates
-    // the decode contract without modelling the underlying chain.
+    // Carried as staged backing storage for the HARDWARE cause bits
+    // only (EI/SL/CR/PC, kIsumHwMask): the trap delivery path writes
+    // the relevant cause bit before redirecting PC to (palBase +
+    // kEntry_INTERRUPT = 0x680).  The SOFTWARE bits (SI + AST) are
+    // NOT staged -- HW_MFPR(HW_ISUM) derives them LIVE from
+    // sirr/ier/asten_sr/mode via composeIsumSw and ORs them in
+    // (SPEC-SIRR-AST-001 D2: the PAL clears SIRR and expects the next
+    // ISUM read to show it gone).  SI/AST diverts stage isum = 0 so a
+    // stale EI bit from a prior tick cannot leak into the SI
+    // handler's ISUM read and double-dispatch the clock.  Real EV6
+    // derives everything from live pin/IPL state; we emulate the
+    // decode contract without modelling the underlying chain.
     uint64_t isum = 0;
 
     // Memory Management Status.  Written by the MEM-stage drainer on
@@ -665,6 +691,22 @@ struct CpuState
     // it from the BoxResult that caused the stop.
     uint16_t lastFaultCode = 0;
 };
+
+// ---------------------------------------------------------------------------
+// pendingSoftInt -- deliverable software-interrupt/AST summary
+// ---------------------------------------------------------------------------
+// Nonzero iff the CPU has a software interrupt or AST that the guest
+// has both REQUESTED (SIRR / PCTX.ASTRR) and ENABLED (IER.SIEN /
+// IER.ASTEN + PCTX.ASTER + mode rule) -- i.e. the composed SI/AST
+// portion of ISUM (composeIsumSw, IprFields.h).  Machine's run loop
+// polls this after the EI deliver blocks and stages the INTERRUPT
+// divert when nonzero; the guest PAL then reads ISUM, dispatches, and
+// clears its own SIRR bit (SPEC-SIRR-AST-001 Sec 4 S4).  Pure -- no
+// side effects; unit-testable on a bare CpuState.
+[[nodiscard]] inline uint64_t pendingSoftInt(CpuState const& cpu) noexcept
+{
+    return composeIsumSw(cpu.sirr, cpu.ier, cpu.asten_sr, cpu.mode);
+}
 
 } // namespace coreLib
 

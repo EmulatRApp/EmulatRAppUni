@@ -67,28 +67,138 @@
 // Each carries a `// TODO(unwired): ...` line comment at its decode
 // site pointing back here.
 //
-//   WSBA0-3 / WSM0-3 / TBA0-3 -- DMA window storage; no scatter-
-//                   gather translation engine.  PCI DMA cycles bypass
-//                   the window check today (no DMA traffic reaches
-//                   Pchip in current bring-up scope).
-//   PCTL          -- storage RW; bits stored but no enforcement of
-//                   chaindis / hole / mwin / ptevrfy semantics.
-//                   Firmware reads back what it writes.
-//   PLAT          -- storage RW; no master-latency-timer behavior.
-//   PERROR        -- W1C already wired (correct in prior code).
-//                   Error-injection paths are not wired -- nothing
-//                   in V4 asserts NDS, TA, RDPE, PERR, SGE, APE,
-//                   SERR, or DCRTO conditions today.
-//   PERRMASK      -- storage RW; no interrupt routing on error.
-//   PERRSET       -- W1S already wired; diagnostic use only.
-//   TLBIV / TLBIA -- WO; no Pchip TLB model.  Writes are sinks.
-//   PMONCTL       -- storage RW; no perf monitor counter.
+//   WSBA0-3 / WSM0-3 / TBA0-3 -- FULL per JRN-PCI-001 (2026-08-02):
+//                   field-masked writes (HRM Tables 10-35..10-39),
+//                   direct-map AND scatter-gather translation both
+//                   live in translateDma(); WSBA3<SG> is RO=1.
+//   PCTL          -- RW fields masked (Table 10-40); HOLE<5> enforced
+//                   in translateDma; MWIN<6> stored but unreachable
+//                   (no DAC-capable master modeled); RO identity
+//                   fields (PID/RPP/PCLKX/REV/PADM) hardwired 0.
+//   PLAT          -- storage RW (LAT<15:8> masked); no latency-timer
+//                   timing behavior (timing knob, not functional).
+//   PERROR        -- W1C + freeze/LOST/unfreeze per HRM 10.2.5.6;
+//                   SGE source wired (invalid SG PTE); NDS source wired
+//                   (Batch D 2026-08-02: unclaimed dense PCI-mem read/
+//                   write = master abort; config cycles exempt per HRM
+//                   10.1.3.3, ISA-range I/O exempt per subtractive
+//                   decode).  Still unwired sources: TA, RDPE, PERR,
+//                   APE, SERR, DCRTO (need PCI master/target timing
+//                   models).
+//   PERRMASK      -- RW <11:0>; gates latching AND PERRSET per HRM.
+//   PERRSET       -- W1S honoring PERRMASK + freeze/LOST semantics.
+//   TLBIV / TLBIA -- WO no-ops, CORRECT BY ARCHITECTURE: the SG walk
+//                   is TLB-less (walks memory every time), so there
+//                   is never a stale entry to invalidate.  See
+//                   JRN-PCI-001 B-9.
+//   PMONCTL       -- RW <17:0> masked, reset 1 (HRM 8.10 revision
+//                   discriminator), write clears PMONCNT (Batch F D-4);
+//                   still no monitor-signal source behind it.
 //   PMONCNT       -- storage RO; no perf monitor counter source.
 //   SPRST         -- WO; PCI software-reset has no physical effect.
 //
 // ============================================================================
 // CHANGE HISTORY
 // ============================================================================
+//
+//   2026-08-02  Batch F-2 (architect-approved; found live by the DS20 SRM
+//               option-ROM scan -- 66 "No Devsel" reports at 0xC0000-
+//               0xDFFFF stepping 0x800 that real hardware never prints).
+//               FUNCTION: setSubtractiveAgent (new) / read / write.
+//               CHANGE:  Board truth: the CY82C693 / ALi M1543C is a
+//                        SUBTRACTIVE-DECODE PCI-to-ISA bridge -- it claims
+//                        every mem/IO cycle no positive agent claims and
+//                        forwards it to ISA (float all-ones).  On a hose
+//                        with such a bridge an unclaimed PIO access can
+//                        never master-abort, so the Batch D NDS latch is
+//                        gated on !m_subtractiveAgent (chipset sets it at
+//                        wireDevices).  Config cycles are IDSEL-routed,
+//                        never subtractively claimed: the D-1 config-write
+//                        NDS latch is NOT gated.  Bare-Pchip default stays
+//                        false (unit tests exercise master-abort law).
+//
+//   2026-08-02  JRN-AUD-003 Batch F (architect-approved corrections to the
+//               same-week Batch A-D code; audit Sec 5 D-1..D-4).
+//               FUNCTION: writePciConfig0.
+//               CHANGE:  (D-1) master-aborted config WRITES now latch
+//                        PERROR<NDS> (HRM 8.8.2.1 exempts config READS and
+//                        special cycles only; the prior wholesale config
+//                        exemption over-read 10.1.3.3).
+//               FUNCTION: latchPerror / writeCSR(PERRSET).
+//               CHANGE:  (D-2) LOST<0> is now gated on PERRMASK<0>
+//                        (HRM 10.2.5.7); was set unconditionally when
+//                        frozen.
+//               FUNCTION: writeCSR(PCTL).
+//               CHANGE:  (D-3) PADM<19> moved from the RO list into
+//                        kPctlRwMask -- Table 10-40 types it RW.
+//               FUNCTION: reset / writeCSR(PMONCTL).
+//               CHANGE:  (D-4) PMONCTL resets to 1 (HRM 8.10, the Pchip
+//                        revision discriminator); writes masked to <17:0>
+//                        and clear PMONCNT (10.2.5.11).
+//
+//   2026-08-02  JRN-SES-001 Batch D (architect-approved, same-day follow-on
+//               to Batches A+B).
+//               FUNCTION: read (const dropped) / write.
+//               CHANGE:  PERROR<NDS> source wired: an unclaimed dense
+//                        PCI-memory read/write is a Pchip-master master
+//                        abort -- reads float all-ones AND latch NDS, writes
+//                        are discarded AND latch NDS (HRM Table 10-42; PCI
+//                        cmd 0x6/0x7 captured in PERROR<CMD>).  PERRMASK
+//                        gates the latch (init 0), so boot-era BAR sizing
+//                        latches nothing until the guest unmasks.  EXEMPT by
+//                        authority: config-cycle no-DEVSEL (HRM 10.1.3.3
+//                        "do not flag an error") and sub-64K I/O-port misses
+//                        (south-bridge subtractive decode, not a master
+//                        abort).  read() is no longer const because error
+//                        latching on read is real device state.
+//               FUNCTION: readSparseIO / writeSparseIO.
+//               CHANGE:  G-8 forensic counters (first 8 + every 4096th):
+//                        the HRM marks 0x801.4000.0000-0x801.7FFF.FFFF
+//                        Reserved; these rows name whoever still accesses
+//                        the Ticket-6 "SparseIO" route.  Routing UNCHANGED
+//                        until that evidence is read (architect direction:
+//                        investigate first).
+//
+//   2026-08-02  JRN-PCI-001 gap-closure (Batches A+B; architect-directed
+//               "close the gaps to the HRM").
+//               FUNCTION: translateDma (replaces translateDmaToPa).
+//               CHANGE:  (G-2) TBA extraction widened to ADDR<34:10>
+//                        (0x7FFFFFC00; was 0xFFFFFC00, dropping <34:32>).
+//                        (G-3) window MISS no longer identity-maps: returns
+//                        {hit=false}; callers perform NO memory access and
+//                        reads observe master-abort all-ones (HRM 10.1.4:
+//                        the Pchip does not respond to unclaimed addresses).
+//                        (G-1) TLB-less scatter-gather walk per HRM 10.1.4.3
+//                        Tables 10-6/10-7/10-8: PTE area at TBA, PTE<0>=V,
+//                        PA = PTE<22:1><<13 | pci<12:0>; invalid PTE latches
+//                        PERROR<SGE> (HRM 8.8.2.5); PTP PTEs (bits 31|28)
+//                        are unsupported-and-logged (no hose 1).  PTE reads
+//                        go through the chipset-installed m_sgPteRead seam.
+//                        (B-5) PCTL<HOLE> 512K-1MB match inhibit enforced.
+//               FUNCTION: writeCSR.
+//               CHANGE:  (G-9/C-1) HRM field masks on WSBA/WSM/TBA/PCTL/
+//                        PLAT/PERRMASK writes; WSBA3<SG> forced RO=1 and
+//                        DAC<39> storable (Table 10-36); PCTL RO fields
+//                        write-protected; PERROR W1C now unfreezes (clears
+//                        info) when <11:0> reach 0 and deasserts b_error;
+//                        PERRSET honors PERRMASK and freeze/LOST.
+//               FUNCTION: latchPerror (new).
+//               CHANGE:  HRM 10.2.5.6 latch: mask gate, freeze-on-first,
+//                        LOST on subsequent, ADDR/CMD info capture, b_error
+//                        assertion via m_errorSignal -> Cchip DRIR<62>
+//                        (HRM Table 6-9 recommended Pchip0 error bit; the
+//                        Machine b_irq<0> divert already polls DRIR<63:58>).
+//               FUNCTION: readPciConfig0 / writePciConfig0.
+//               CHANGE:  (G-4) bus number cfgOffset<23:16> now decoded
+//                        (HRM Fig 10-3/10-4); bus != 0 reads all-ones /
+//                        drops writes (no PPB modeled) -- ends Type 1
+//                        aliasing onto bus 0.
+//               FUNCTION: read.
+//               CHANGE:  (G-10) dead internal Pchip1 stub aligned to the
+//                        chipset's off-bus all-ones (was 0).
+//               FUNCTION: reset.
+//               CHANGE:  HRM init values: WSBA3=0x2 (SG RO=1), PCTL
+//                        PTPMAX=2/CRQMAX=1/CDQMAX=1 (Table 10-40).
 //
 //   2026-05-17  Phase B uniform-CSR-surface refactor.  Surface: new
 //               readCSR(offset, cpuId) / writeCSR(offset, value,
@@ -114,6 +224,8 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>   // std::getenv (PCICFG-TRACE diagnostic)
+#include <cstring>   // std::memset (JRN-PCI-001: master-abort fill)
+#include <functional> // JRN-PCI-001: SG PTE reader / b_error signal seams
 #include <map>
 #include <memory>
 #include <vector>
@@ -299,11 +411,17 @@ public:
             m_wsm[i]  = 0;
             m_tba[i]  = 0;
         }
-        m_pctl     = 0;
+        // JRN-PCI-001: HRM init values.  WSBA3<SG> is RO=1 (Table 10-36);
+        // PCTL PTPMAX=2, CRQMAX=1, CDQMAX=1 (Table 10-40 Init column).
+        m_wsba[3]  = 0x2ull;
+        m_pctl     = (2ull << 36) | (1ull << 32) | (1ull << 20);
         m_plat     = 0;
         m_perror   = 0;
         m_perrmask = 0;
-        m_pmonctl  = 0;
+        m_pmonctl  = 0x1;  // Batch F D-4: HRM 8.10 "after the deassertion of
+                           // reset, the value of CSR PMONCTL is 1" (SLCT0
+                           // init 1, Table 10-47) -- the documented current-
+                           // vs-previous Pchip revision discriminator.
         m_pmoncnt  = 0;
         // INFO_LOG("TsunamiPchip: reset");
     }
@@ -449,11 +567,11 @@ public:
     // ========================================================================
     // DMA-window translation (PCI DMA address -> guest PA).
     // ------------------------------------------------------------------------
-    // Bus-master devices (DE500 tulip TX/RX, future SCSI HBA) issue DMA using
+    // Bus-master devices (DE500 tulip TX/RX, NCR 53C810 SCSI) issue DMA using
     // PCI addresses that the Pchip maps to system memory via WSBA/WSM/TBA
-    // (21272 HRM 10.1.4).  Direct-mapped (WSBA<1>=SG=0) translation only; a
-    // scatter-gather map walk (SG=1) is still TODO.  Returns the input
-    // unchanged if no enabled window matches (caller reads it as a raw PA).
+    // (21272 HRM 10.1.4).  JRN-PCI-001 (2026-08-02): BOTH direct-mapped and
+    // scatter-gather translation are live (TLB-less SG walk); an unclaimed
+    // address is a MISS with no memory access (master abort), never a raw PA.
     // ========================================================================
 #if defined(EMULATR_BRINGUP_PROBES)
     // ------------------------------------------------------------------------
@@ -463,12 +581,11 @@ public:
     //
     // WHY EVERY write, not a one-shot dump: dumpWindowsOnce() reports the
     // CONSOLE-era window config, but the OS reprograms the Pchip when it takes
-    // over.  If VMS enables a SCATTER-GATHER window (WSBA<1>), every DMA after
-    // that point takes the untranslated `return pci` path in translateDmaToPa
-    // below -- correct bytes delivered to the WRONG physical pages, which is
-    // indistinguishable at the device layer from a healthy transfer (the
-    // payload and the SCRIPTS tiling both verify clean).  This probe is the
-    // only thing that would show it, so it must survive into the OS era.
+    // over.  HISTORY: before JRN-PCI-001 an SG-enabled window hit took an
+    // untranslated `return pci` path -- correct bytes delivered to the WRONG
+    // physical pages, invisible at the device layer.  The SG walk is live
+    // now; this probe remains the visibility into WHICH windows the OS
+    // programs, so it still survives into the OS era.
     //
     // 21272 HRM Sec 10.1.4.3 / Fig 8-4 (the DS20 chipset -- Titan 21274 is the
     // DS15/DS25/ES45 part and is NOT the authority here): an enabled SG window
@@ -488,7 +605,7 @@ public:
             int(value & 0x1ull), int((value >> 1) & 0x1ull),
             static_cast<unsigned long long>(value & 0xFFF00000ull),
             ((value & 0x3ull) == 0x3ull)
-                ? "   <== SG WINDOW ENABLED: DMA through here is UNTRANSLATED"
+                ? "   <== SG WINDOW ENABLED (TLB-less walk live, JRN-PCI-001)"
                 : "");
         std::fflush(stderr);
     }
@@ -498,39 +615,192 @@ public:
     static void wsbaWriteProbe(int, uint64_t) noexcept {}
 #endif
 
-    // `sz` is the transfer chunk size, carried only so a WINDOW MISS can be
-    // logged with the full tuple (JRN-SCSI-028 amendment): a bare miss COUNT
-    // cannot distinguish "fall-through PA coincidentally equals the intended
-    // PA" (benign by luck) from "fall-through PA diverges" (corruption with an
-    // address attached).  Defaulted so existing callers are unaffected.
-    uint64_t translateDmaToPa(uint64_t pci, size_t sz = 0) const noexcept {
+    // ------------------------------------------------------------------------
+    // translateDma -- JRN-PCI-001 (2026-08-02) full-fidelity replacement for
+    // the old translateDmaToPa.  Contract change: a translation can FAIL.
+    //
+    //   hit=true  : an enabled window claimed the address and produced `pa`
+    //               (direct-mapped per Table 10-5, or SG-walked per 10.1.4.3).
+    //   hit=false : HRM 10.1.4 -- the Pchip does not respond (no b_devsel_l).
+    //               The caller must perform NO memory access; a read master
+    //               sees all-ones (master abort), a write is dropped.  The
+    //               old identity fall-through (a corruption route) is GONE.
+    //
+    // `isWrite` feeds the PERROR<CMD> capture on an SGE latch (memory write
+    // = 0x7, memory read = 0x6 PCI commands).  `sz` is trace-only.
+    // ------------------------------------------------------------------------
+    struct DmaXlate {
+        bool     hit;
+        uint64_t pa;
+    };
+
+    // HRM field extraction masks (JRN-PCI-001 Sec 4; Tables 10-35/10-37/10-38).
+    static constexpr uint64_t kWsbaAddrMask = 0x00000000FFF00000ull; // ADDR<31:20>
+    static constexpr uint64_t kTbaAddrMask  = 0x00000007FFFFFC00ull; // ADDR<34:10>
+                              // ^ G-2 fix: was 0xFFFFFC00 (<31:10>), silently
+                              //   dropping TBA<34:32> -- any translated base
+                              //   above 4GB truncated into low memory.
+
+    DmaXlate translateDma(uint64_t pci, size_t sz = 0,
+                          bool isWrite = false) noexcept {
         dumpWindowsOnce();
-        for (int i = 0; i < 4; ++i) {
-            if (!(m_wsba[i] & 0x1ull)) continue;                 // W_EN
-            uint64_t const maskAM = m_wsm[i]  & 0xFFF00000ull;   // window size mask
-            uint64_t const base   = m_wsba[i] & 0xFFF00000ull;   // window base <31:20>
-            if ((pci & 0xFFF00000ull & ~maskAM) != (base & ~maskAM)) continue;
-            uint64_t const inWin = pci & (maskAM | 0x000FFFFFull);       // offset in window
-            if (m_wsba[i] & 0x2ull) {                            // SG: TODO (page map walk)
-                dmaTraceOnce(pci, pci, i, /*sg=*/true);
-                return pci;
+        // 10.1.4.1 window hole: PCTL<HOLE> inhibits matching in ALL windows
+        // for PCI 0008.0000 - 000F.FFFF (512KB..1MB-1), PTP or not.
+        bool const hole = ((m_pctl >> 5) & 0x1ull) != 0
+                       && (pci & 0xFFFFFFFFull) >= 0x00080000ull
+                       && (pci & 0xFFFFFFFFull) <= 0x000FFFFFull;
+        if (!hole) {
+            for (int i = 0; i < 4; ++i) {
+                if (!(m_wsba[i] & 0x1ull)) continue;               // ENA
+                uint64_t const maskAM = m_wsm[i]  & kWsbaAddrMask; // AM<31:20>
+                uint64_t const base   = m_wsba[i] & kWsbaAddrMask; // ADDR<31:20>
+                if ((pci & kWsbaAddrMask & ~maskAM) != (base & ~maskAM))
+                    continue;
+                uint64_t const inWin = pci & (maskAM | 0x000FFFFFull);
+                if (m_wsba[i] & 0x2ull) {                          // SG window
+                    uint64_t pa = 0;
+                    if (sgWalk(pci, i, maskAM, inWin, isWrite, pa)) {
+                        dmaTraceOnce(pci, pa, i, /*sg=*/true);
+                        return {true, pa};
+                    }
+                    return {false, 0};   // invalid PTE / PTP / no reader
+                }
+                // Direct-mapped (Table 10-5): TBA<34:n>:ad<n-1:2>.
+                uint64_t const tbaBase =
+                    (m_tba[i] & kTbaAddrMask) & ~(maskAM | 0x000FFFFFull);
+                uint64_t const pa = tbaBase | inWin;
+                dmaTraceOnce(pci, pa, i, /*sg=*/false);
+                return {true, pa};
             }
-            uint64_t const tbaBase = (m_tba[i] & 0xFFFFFC00ull) & ~(maskAM | 0x000FFFFFull);
-            uint64_t const pa = tbaBase | inWin;                 // direct-mapped
-            dmaTraceOnce(pci, pa, i, false);
-            return pa;
         }
-        // WINDOW MISS.  No enabled window claims this PCI address, so the
-        // address falls through and is used as a RAW physical address.  On real
-        // hardware the Pchip would not silently identity-map: an unclaimed DMA
-        // address is an error condition (21272 HRM Ch.8.8 error model).  This
-        // silent fall-through is therefore a corruption ROUTE, not just a gap
-        // -- and it is invisible at the device layer, exactly like the SG TODO.
-        // ALWAYS logged (never capped): a miss is the whole question.
+        // WINDOW MISS (or hole inhibit): no response, no memory access.
+        // ALWAYS logged under the probe build: a miss is the whole question.
         dmaMissProbe(pci, sz);
-        dmaTraceOnce(pci, pci, -1, false);
-        return pci;
+        return {false, 0};
     }
+
+private:
+    // ------------------------------------------------------------------------
+    // sgWalk -- TLB-less scatter-gather walk, HRM 10.1.4.3.
+    //
+    // Table 10-6: a window of 2^n bytes has an SG PTE area of (2^n/8KB)*8
+    // bytes at TBA; the PTE index is the 8KB-page index within the window.
+    // Figure 10-7: PTE<0>=V, PTE<22:1>=PA<34:13>, PTE<31>|<28>=PTP.
+    // Figure 10-8: PA = PTE<22:1><<13 | pci<12:0>.
+    //
+    // TLB-less by design (JRN-PCI-001 B-9): every translation walks memory,
+    // so the walk is always coherent with guest PTE writes and TLBIV/TLBIA
+    // are architecturally correct no-ops.  Deterministic; no timing model.
+    // ------------------------------------------------------------------------
+    bool sgWalk(uint64_t pci, int win, uint64_t maskAM, uint64_t inWin,
+                bool isWrite, uint64_t& paOut) noexcept
+    {
+        if (!m_sgPteRead) {
+            static bool s_warned = false;
+            if (!s_warned) {
+                s_warned = true;
+                std::fprintf(stderr,
+                    "TsunamiPchip: SG window %d hit with NO PTE reader "
+                    "installed -- treated as window miss (wire "
+                    "setSgPteReader in TsunamiChipset)\n", win);
+                std::fflush(stderr);
+            }
+            return false;
+        }
+        uint64_t const winBytes = maskAM + 0x00100000ull;      // AM + 1MB
+        uint64_t const pteArea  = winBytes >> 10;              // (win/8KB)*8
+        uint64_t const pteBase  = (m_tba[win] & kTbaAddrMask) & ~(pteArea - 1ull);
+        uint64_t const pteAddr  = pteBase + ((inWin >> 13) << 3);
+        uint64_t const pte      = m_sgPteRead(pteAddr);
+        if ((pte & ((1ull << 31) | (1ull << 28))) != 0) {
+            // PTP: peer-to-peer PTE (HRM Fig 10-7).  Target would be the
+            // other hose; no hose 1 is modeled.  Logged once, no transfer.
+            static bool s_warned = false;
+            if (!s_warned) {
+                s_warned = true;
+                std::fprintf(stderr,
+                    "TsunamiPchip: SG PTE with PTP bit set (pte=0x%016llx "
+                    "pci=0x%016llx) -- peer-to-peer unsupported, no "
+                    "transfer\n",
+                    static_cast<unsigned long long>(pte),
+                    static_cast<unsigned long long>(pci));
+                std::fflush(stderr);
+            }
+            return false;
+        }
+        if (!(pte & 0x1ull)) {
+            // Invalid PTE: PERROR<SGE> (HRM 8.8.2.5), no transfer.
+            latchPerror(kPerrSge, pci, isWrite ? 0x7u : 0x6u);
+            return false;
+        }
+        paOut = (((pte >> 1) & 0x3FFFFFull) << 13) | (pci & 0x1FFFull);
+        return true;
+    }
+
+public:
+    // ------------------------------------------------------------------------
+    // PERROR machinery, HRM 10.2.5.6/7/8 (JRN-PCI-001 G-3/G-6).
+    // ------------------------------------------------------------------------
+    // PERROR error-bit positions (Table 10-42).
+    static constexpr unsigned kPerrLost  = 0;
+    static constexpr unsigned kPerrSerr  = 1;
+    static constexpr unsigned kPerrPerr  = 2;
+    static constexpr unsigned kPerrDcrto = 3;
+    static constexpr unsigned kPerrSge   = 4;
+    static constexpr unsigned kPerrApe   = 5;
+    static constexpr unsigned kPerrTa    = 6;
+    static constexpr unsigned kPerrRdpe  = 7;
+    static constexpr unsigned kPerrNds   = 8;
+    static constexpr unsigned kPerrUecc  = 10;
+    static constexpr unsigned kPerrCre   = 11;
+
+    // latchPerror -- HRM semantics: PERRMASK gates setting entirely; the
+    // first latched error freezes the register and captures INFO (<63:16>:
+    // ADDR<47:18> = starting PCI address <31:2>, <17:16>=00 no-DAC,
+    // CMD<55:52> = PCI command, INV clear); while frozen only LOST<0> can
+    // set.  b_error asserts to the Cchip -> DRIR<62> (Table 6-9), which the
+    // Machine's existing b_irq<0> divert polls via DIR<63:58>.
+    void latchPerror(unsigned bit, uint64_t pciAddr, unsigned pciCmd) noexcept
+    {
+        if (!(m_perrmask & (1ull << bit))) return;       // masked: never sets
+        if (m_perror & 0xFFFull) {                       // frozen
+            // Batch F D-2 (2026-08-02, JRN-AUD-003): LOST is itself gated by
+            // PERRMASK<0> -- HRM 10.2.5.7: a 0 mask bit prevents setting the
+            // corresponding PERROR bit "regardless of the detection of
+            // errors or writing to PERRSET".  Was unconditional.
+            if (m_perrmask & (1ull << kPerrLost))
+                m_perror |= (1ull << kPerrLost);
+            return;
+        }
+        uint64_t info = ((pciAddr >> 2) & 0x3FFFFFFFull) << 18;   // ADDR<47:18>
+        info |= (static_cast<uint64_t>(pciCmd) & 0xFull) << 52;   // CMD<55:52>
+        m_perror = info | (1ull << bit);
+        if (m_errorSignal) m_errorSignal(true);          // b_error -> DRIR<62>
+    }
+
+    // Chipset-installed seams (JRN-PCI-001): guest-memory quadword reader
+    // for SG PTE fetches, and the b_error level signal to the Cchip.
+    void setSgPteReader(std::function<uint64_t(uint64_t)> fn) noexcept
+    { m_sgPteRead = std::move(fn); }
+    void setErrorSignal(std::function<void(bool)> fn) noexcept
+    { m_errorSignal = std::move(fn); }
+
+    // Batch F-2 (2026-08-02, JRN-AUD-003 Sec 12): BOARD TRUTH -- this hose
+    // carries a SUBTRACTIVE-DECODE agent (the CY82C693 / ALi M1543C
+    // PCI-to-ISA bridge).  A subtractive bridge claims EVERY memory/IO
+    // cycle no positive agent claims (that is how ISA option-ROM space
+    // 0xC0000-0xDFFFF is reachable at all), so on this hose an unclaimed
+    // PIO access can NEVER master-abort: it forwards to ISA and floats
+    // all-ones.  With the flag set, unclaimed dense-mem accesses float /
+    // absorb WITHOUT latching PERROR<NDS>; with it clear (bare Pchip,
+    // future hose 1) the Batch D master-abort semantics stand.  Config
+    // cycles are IDSEL-routed and never subtractively claimed -- the
+    // config-write NDS latch (Batch F D-1) is NOT gated by this.
+    // Found live: the DS20 SRM's 2KB-step option-ROM scan of
+    // 0xC0000-0xDFFFF printed 66 "No Devsel" reports that real hardware
+    // never shows -- the Cypress eats that scan silently.
+    void setSubtractiveAgent(bool present) noexcept
+    { m_subtractiveAgent = present; }
 
 #if defined(EMULATR_BRINGUP_PROBES)
     static void dmaMissProbe(uint64_t pci, size_t sz) noexcept
@@ -540,10 +810,9 @@ public:
         if (!on) return;
         static unsigned long seq = 0;
         std::fprintf(stderr,
-            "PCHIP-DMA MISS seq=%lu pci=0x%016llx size=%zu -> falls through to "
-            "RAW pa=0x%016llx (no enabled window claims it)\n",
-            seq++, static_cast<unsigned long long>(pci), sz,
-            static_cast<unsigned long long>(pci));
+            "PCHIP-DMA MISS seq=%lu pci=0x%016llx size=%zu -> NO TRANSFER "
+            "(master abort; no enabled window claims it)\n",
+            seq++, static_cast<unsigned long long>(pci), sz);
         std::fflush(stderr);
     }
 #else
@@ -582,7 +851,16 @@ public:
     // #
     // # ============================================================================
 
-    inline auto read(uint64_t offset, uint8_t width) const noexcept -> uint64_t
+    // Batch D (2026-08-02, JRN-SES-001): no longer const -- an unclaimed
+    // dense PCI-memory READ is a Pchip-master master abort and latches
+    // PERROR<NDS> (HRM Table 10-42), which is real device state.  Config
+    // READS are exempt BY THE HRM (10.1.3.3: no-DEVSEL config reads
+    // "do not flag an error"; 8.8.2.1 exempts "configuration READS and
+    // special cycles" ONLY -- config WRITES latch, see writePciConfig0,
+    // Batch F D-1); sub-64K I/O-port misses are exempt because the south
+    // bridge claims ISA ranges subtractively on these boards (the ISA
+    // float, not a Pchip master abort).
+    inline auto read(uint64_t offset, uint8_t width) noexcept -> uint64_t
     {
         // ================================================================
         // UARTBP#4 -- Pchip::read entry, diagnostic 2026-05-28
@@ -624,10 +902,13 @@ public:
         if (offset >= 0x100000000ULL && offset < 0x140000000ULL)
             return 0x0ULL;  // unpopulated TIGbus -> 0
 
-        // Pchip1 stub -- no second PCI hose present
+        // Pchip1 stub -- no second PCI hose present.  Off-bus reads float
+        // all-ones (master-abort data), matching the chipset-level intercept
+        // in TsunamiChipset::mmioRead which normally claims this range first
+        // (JRN-PCI-001 G-10: the two stubs previously disagreed, 0 vs -1).
         if (offset >= 0x200000000ULL && offset < 0x400000000ULL)
         {
-            return 0;  // read: no device; write: discard
+            return 0xFFFFFFFFFFFFFFFFULL;
         }
 
         // PCI sparse I/O: offset 0x140000000 - 0x17FFFFFFF
@@ -706,6 +987,17 @@ public:
             TRACE_LOG(QString("TsunamiPchip: PCI memory read at offset 0x%1")
                 .arg(offset, 10, 16, QChar('0')));
                 */
+            // Batch D (2026-08-02, JRN-SES-001; JRN-PCI-001 D-5/O-5): an
+            // unclaimed dense PCI-memory read is a Pchip-master master
+            // abort: data floats all-ones AND PERROR<NDS> latches (HRM
+            // Table 10-42; PCI cmd 0x6 = memory read).  PERRMASK gates the
+            // latch (init 0 = all masked), so SRM-era BAR sizing probes
+            // latch nothing until the guest unmasks -- HRM-faithful.
+            // Batch F-2: UNLESS a subtractive-decode bridge sits on this
+            // hose -- then the cycle is CLAIMED (forwarded to ISA, float),
+            // and no master abort exists to latch.  See setSubtractiveAgent.
+            if (!m_subtractiveAgent)
+                latchPerror(kPerrNds, offset, 0x6u);
             return 0xFFFFFFFFFFFFFFFFULL;
         }
 
@@ -773,6 +1065,15 @@ public:
                     return;
                 }
             }
+            // Batch D (2026-08-02, JRN-SES-001; JRN-PCI-001 D-5/O-5):
+            // unclaimed dense PCI-memory WRITE = master abort: data
+            // discarded and PERROR<NDS> latches (HRM Table 10-42; PCI cmd
+            // 0x7 = memory write).  PERRMASK-gated as on read.  NOT a
+            // return -- the write still falls through to the UNHANDLED
+            // OUTER WRITE forensic below (rule A: no silent absorbers).
+            // Batch F-2: subtractive-bridge gate, same as the read side.
+            if (!m_subtractiveAgent)
+                latchPerror(kPerrNds, offset, 0x7u);
         }
 
         // PCI sparse memory -- absorb writes
@@ -918,8 +1219,8 @@ public:
             return m_tba[3];
 
         // ----------------------------------------------------------
-        // PCI control / latency -- storage only.
-        // TODO(unwired): enforce chaindis / hole / mwin / ptevrfy.
+        // PCI control / latency.  Field-masked storage (JRN-PCI-001);
+        // HOLE enforced in translateDma; RO identity fields read 0.
         // ----------------------------------------------------------
         case Pchip::PCTL:
             CSR_LOG_R("Pchip", "PCTL", m_pctl, offset, cpuId, kPhaseBNoCycle);
@@ -929,8 +1230,9 @@ public:
             return m_plat;
 
         // ----------------------------------------------------------
-        // Error registers -- PERROR W1C is wired in writeCSR.
-        // TODO(unwired): no error-injection paths assert these bits.
+        // Error registers -- full HRM 10.2.5.6 latch/freeze/LOST wired
+        // (JRN-PCI-001); SGE source live.  Remaining unwired sources:
+        // NDS/TA/RDPE/PERR/APE/SERR/DCRTO (see header TODO table).
         // ----------------------------------------------------------
         case Pchip::PERROR:
             CSR_LOG_R("Pchip", "PERROR", m_perror, offset, cpuId, kPhaseBNoCycle);
@@ -1023,96 +1325,149 @@ public:
         // DMA window writes -- storage only.
         // TODO(unwired): scatter-gather translation engine.
         // ----------------------------------------------------------
+        // JRN-PCI-001 G-9/C-1: HRM field masks enforced on write so MBZ
+        // bits read back 0 (Tables 10-35/10-36/10-37/10-38/10-39).  The
+        // readback-to-confirm protocol of HRM 10.2.5.1 makes stored MBZ
+        // junk guest-visible; silicon stores only the defined fields.
+        //   WSBA0-2 : ADDR<31:20> | SG<1> | ENA<0>          (0xFFF00003)
+        //   WSBA3   : DAC<39> | ADDR<31:20> | ENA<0>, SG RO=1 (forced)
+        //   WSMn    : AM<31:20>                              (0xFFF00000)
+        //   TBAn    : ADDR<34:10>                            (kTbaAddrMask)
         case Pchip::WSBA0:
             CSR_LOG_W("Pchip", "WSBA0", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[0] = value;  wsbaWriteProbe(0, value);
+            m_wsba[0] = value & 0xFFF00003ull;  wsbaWriteProbe(0, m_wsba[0]);
             break;
         case Pchip::WSBA1:
             CSR_LOG_W("Pchip", "WSBA1", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[1] = value;  wsbaWriteProbe(1, value);
+            m_wsba[1] = value & 0xFFF00003ull;  wsbaWriteProbe(1, m_wsba[1]);
             break;
         case Pchip::WSBA2:
             CSR_LOG_W("Pchip", "WSBA2", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[2] = value;  wsbaWriteProbe(2, value);
+            m_wsba[2] = value & 0xFFF00003ull;  wsbaWriteProbe(2, m_wsba[2]);
             break;
         case Pchip::WSBA3:
+            // Table 10-36: window 3 is ALWAYS scatter-gather -- SG is RO=1.
             CSR_LOG_W("Pchip", "WSBA3", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsba[3] = value;  wsbaWriteProbe(3, value);
+            m_wsba[3] = (value & ((1ull << 39) | 0xFFF00001ull)) | 0x2ull;
+            wsbaWriteProbe(3, m_wsba[3]);
             break;
         case Pchip::WSM0:
             CSR_LOG_W("Pchip", "WSM0", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsm[0] = value;
+            m_wsm[0] = value & 0xFFF00000ull;
             break;
         case Pchip::WSM1:
             CSR_LOG_W("Pchip", "WSM1", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsm[1] = value;
+            m_wsm[1] = value & 0xFFF00000ull;
             break;
         case Pchip::WSM2:
             CSR_LOG_W("Pchip", "WSM2", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsm[2] = value;
+            m_wsm[2] = value & 0xFFF00000ull;
             break;
         case Pchip::WSM3:
             CSR_LOG_W("Pchip", "WSM3", value, offset, cpuId, kPhaseBNoCycle);
-            m_wsm[3] = value;
+            m_wsm[3] = value & 0xFFF00000ull;
             break;
         case Pchip::TBA0:
             CSR_LOG_W("Pchip", "TBA0", value, offset, cpuId, kPhaseBNoCycle);
-            m_tba[0] = value;
+            m_tba[0] = value & kTbaAddrMask;
             break;
         case Pchip::TBA1:
             CSR_LOG_W("Pchip", "TBA1", value, offset, cpuId, kPhaseBNoCycle);
-            m_tba[1] = value;
+            m_tba[1] = value & kTbaAddrMask;
             break;
         case Pchip::TBA2:
             CSR_LOG_W("Pchip", "TBA2", value, offset, cpuId, kPhaseBNoCycle);
-            m_tba[2] = value;
+            m_tba[2] = value & kTbaAddrMask;
             break;
         case Pchip::TBA3:
             CSR_LOG_W("Pchip", "TBA3", value, offset, cpuId, kPhaseBNoCycle);
-            m_tba[3] = value;
+            m_tba[3] = value & kTbaAddrMask;
             break;
 
         // ----------------------------------------------------------
-        // PCI control / latency -- storage only.
-        // TODO(unwired): enforce chaindis / hole / mwin / ptevrfy.
+        // PCI control / latency (JRN-PCI-001).  PCTL RW fields masked per
+        // Table 10-40; RO fields (PID<47:46>, RPP<45>, PCLKX<41:40>,
+        // REV<31:24>) are write-protected and hardwired 0 (single-hose,
+        // Pchip0, rev 0).  PADM<19> is RW per Table 10-40 (pin-
+        // initialized, then software-writable) -- Batch F D-3
+        // (2026-08-02, JRN-AUD-003) corrected it from the RO list.
+        // HOLE<5> is ENFORCED in translateDma; MWIN<6> stored but
+        // unreachable (no DAC master).  Timing knobs (FBTB/TGTLAT/
+        // CHAINDIS/FDSC/PLAT<LAT>) are stored without a timing model --
+        // not guest-observable functionally.
         // ----------------------------------------------------------
-        case Pchip::PCTL:
+        case Pchip::PCTL: {
             CSR_LOG_W("Pchip", "PCTL", value, offset, cpuId, kPhaseBNoCycle);
-            m_pctl = value;
+            static constexpr uint64_t kPctlRwMask =
+                  (1ull << 44)            // PTEVRFY
+                | (1ull << 43)            // FDWDIS
+                | (1ull << 42)            // FDSDIS
+                | (0xFull << 36)          // PTPMAX
+                | (0xFull << 32)          // CRQMAX
+                | (0xFull << 20)          // CDQMAX
+                | (1ull << 19)            // PADM (RW, Table 10-40; Batch F D-3)
+                | (1ull << 18)            // ECCEN
+                | (1ull << 15)            // PPRI
+                | (0x7Full << 8)          // PRIGRP
+                | 0xFFull;                // ARBENA/MWIN/HOLE/TGTLAT/
+                                          // CHAINDIS/THDIS/FBTB/FDSC
+            m_pctl = (m_pctl & ~kPctlRwMask) | (value & kPctlRwMask);
             break;
+        }
         case Pchip::PLAT:
             CSR_LOG_W("Pchip", "PLAT", value, offset, cpuId, kPhaseBNoCycle);
-            m_plat = value;
+            m_plat = value & 0xFF00ull;   // LAT<15:8> (Table 10-41)
             break;
 
         // ----------------------------------------------------------
-        // Error registers.
-        //   PERROR   W1C -- write 1 to clear matching bit.
-        //   PERRSET  W1S -- write 1 to set matching bit (diagnostic).
-        //   PERRMASK RW.
+        // Error registers (JRN-PCI-001, HRM 10.2.5.6/7/8).
+        //   PERROR   W1C on <11:0>; register frozen while any error bit
+        //            set; when all clear, info releases and b_error
+        //            deasserts.
+        //   PERRSET  W1S gated by PERRMASK (mask 0 overrides set 1);
+        //            frozen register takes only LOST.
+        //   PERRMASK RW <11:0>.
         // ----------------------------------------------------------
         case Pchip::PERROR:
             CSR_LOG_W("Pchip", "PERROR", value, offset, cpuId, kPhaseBNoCycle);
-            m_perror &= ~value;   // W1C
+            m_perror &= ~(value & 0xFFFull);        // W1C, error bits only
+            if ((m_perror & 0xFFFull) == 0) {
+                m_perror = 0;                       // unfreeze: drop info
+                if (m_errorSignal) m_errorSignal(false);
+            }
             break;
-        case Pchip::PERRSET:
+        case Pchip::PERRSET: {
             CSR_LOG_W("Pchip", "PERRSET", value, offset, cpuId, kPhaseBNoCycle);
-            m_perror |= value;    // W1S (diagnostic)
+            uint64_t const setBits = value & m_perrmask & 0xFFFull;
+            if (setBits == 0) break;                // mask overrides set
+            if (m_perror & 0xFFFull) {              // already frozen
+                // Batch F D-2: LOST gated by PERRMASK<0> (HRM 10.2.5.7),
+                // matching latchPerror above.
+                if (m_perrmask & (1ull << kPerrLost))
+                    m_perror |= (1ull << kPerrLost);
+                break;
+            }
+            m_perror = (value & 0xFFFFFFFFFFFF0000ull) | setBits;  // INFO+bits
+            if (m_errorSignal) m_errorSignal(true);
             break;
+        }
         case Pchip::PERRMASK:
             CSR_LOG_W("Pchip", "PERRMASK", value, offset, cpuId, kPhaseBNoCycle);
-            m_perrmask = value;
+            m_perrmask = value & 0xFFFull;          // MASK<11:0> (Table 10-43)
             break;
 
         // ----------------------------------------------------------
-        // TLB invalidates -- WO sinks; no Pchip TLB model in V4.
-        // TODO(unwired): scatter-gather TLB.
+        // TLB invalidates -- WO no-ops, CORRECT BY ARCHITECTURE
+        // (JRN-PCI-001 B-9): the SG walk is TLB-less (walks guest
+        // memory on every translation), so there is never a cached
+        // entry to invalidate.  Guest-visible semantics are identical
+        // to a TLB that is always coherent.
         // ----------------------------------------------------------
         case Pchip::TLBIV:
-            CSR_LOG_W("Pchip", "TLBIV(sink)", value, offset, cpuId, kPhaseBNoCycle);
+            CSR_LOG_W("Pchip", "TLBIV(no-op, TLB-less)", value, offset, cpuId, kPhaseBNoCycle);
             break;
         case Pchip::TLBIA:
-            CSR_LOG_W("Pchip", "TLBIA(sink)", value, offset, cpuId, kPhaseBNoCycle);
+            CSR_LOG_W("Pchip", "TLBIA(no-op, TLB-less)", value, offset, cpuId, kPhaseBNoCycle);
             break;
 
         // ----------------------------------------------------------
@@ -1122,8 +1477,14 @@ public:
             CSR_LOG_W("Pchip", "RES(ignored)", value, offset, cpuId, kPhaseBNoCycle);
             break;
         case Pchip::PMONCTL:
+            // Batch F D-4 (2026-08-02, JRN-AUD-003): field mask <17:0>
+            // (STKDIS1/0 + SLCT1/0, Table 10-47; <63:18> MBZ,RAZ) and the
+            // HRM side effect "Writing any value to PMONCTL clears both
+            // fields of PMONCNT" (10.2.5.11).  Was raw 64-bit store with
+            // no counter clear.
             CSR_LOG_W("Pchip", "PMONCTL", value, offset, cpuId, kPhaseBNoCycle);
-            m_pmonctl = value;
+            m_pmonctl = value & 0x3FFFFull;
+            m_pmoncnt = 0;
             break;
         case Pchip::PMONCNT:
             // RO per HRM -- writes logged but discarded.
@@ -1202,6 +1563,27 @@ public:
         (void)byteLane;
         uint16_t port = static_cast<uint16_t>(pciAddr & 0xFFFF);
 
+        // G-8 forensic (2026-08-02, JRN-SES-001, architect: investigate
+        // first).  The 21272 HRM marks 0x801.4000.0000-0x801.7FFF.FFFF
+        // RESERVED; this "SparseIO" route is CIA-era vocabulary kept by
+        // Ticket 6 for the UART/ISA path.  JRN-PCI-001 G-8 asks WHO still
+        // accesses it.  Throttled counter (first 8 + every 4096th) so the
+        // next boot names the accessor -- routing deliberately UNCHANGED
+        // until that evidence is read.
+        {
+            static std::atomic<uint64_t> s_cnt{ 0 };
+            uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
+            if (n < 8 || (n & 0xFFFu) == 0) {
+                std::fprintf(stderr,
+                    "TsunamiPchip: SPARSEIO-G8 R[%llu] sparseOff=0x%09llx "
+                    "port=0x%04x (HRM-Reserved window 0x801.4xxx)\n",
+                    static_cast<unsigned long long>(n),
+                    static_cast<unsigned long long>(sparseOffset),
+                    static_cast<unsigned>(port));
+                std::fflush(stderr);
+            }
+        }
+
         return readIoPort(port, SparseSpace::xferLenToBytes(
                               SparseSpace::decodeXferLen(sparseOffset)));
     }
@@ -1217,6 +1599,23 @@ public:
         uint8_t  byteLane = SparseSpace::decodeByteLane(sparseOffset);
         (void)byteLane;
         uint16_t port = static_cast<uint16_t>(pciAddr & 0xFFFF);
+
+        // G-8 forensic -- write twin of the readSparseIO counter above.
+        {
+            static std::atomic<uint64_t> s_cnt{ 0 };
+            uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
+            if (n < 8 || (n & 0xFFFu) == 0) {
+                std::fprintf(stderr,
+                    "TsunamiPchip: SPARSEIO-G8 W[%llu] sparseOff=0x%09llx "
+                    "port=0x%04x val=0x%llx (HRM-Reserved window "
+                    "0x801.4xxx)\n",
+                    static_cast<unsigned long long>(n),
+                    static_cast<unsigned long long>(sparseOffset),
+                    static_cast<unsigned>(port),
+                    static_cast<unsigned long long>(value));
+                std::fflush(stderr);
+            }
+        }
 
         writeIoPort(port, value, SparseSpace::xferLenToBytes(
                         SparseSpace::decodeXferLen(sparseOffset)));
@@ -1297,16 +1696,29 @@ private:
             std::fprintf(stderr, "PCHIP-DMA xlate pci=0x%llx -> pa=0x%llx win=%d sg=%d%s\n",
                 static_cast<unsigned long long>(pci),
                 static_cast<unsigned long long>(pa), win, sg ? 1 : 0,
-                sg ? "   <== UNTRANSLATED (SG map walk is TODO)" : "");
+                sg ? "   (SG walk)" : "");
             std::fflush(stderr);
         }
     }
 
     inline auto readPciConfig0(uint64_t cfgOffset, uint8_t width) const noexcept -> uint64_t
     {
+        // JRN-PCI-001 G-4: cfgOffset<23:16> is the BUS NUMBER (HRM Fig
+        // 10-3/10-4).  Bus != 0 selects a Type 1 cycle toward a PCI-PCI
+        // bridge; none is modeled, so the cycle master-aborts and reads
+        // all-ones (HRM 10.1.3.3: "Configuration read cycles that do not
+        // receive a b_devsel_l return all 1s data ... and do not flag an
+        // error").  Previously the bus field was IGNORED, aliasing every
+        // Type 1 probe onto bus 0 -- phantom duplicate devices.
+        const uint8_t bus      = static_cast<uint8_t>((cfgOffset >> 16) & 0xFF);
         const uint8_t device   = static_cast<uint8_t>((cfgOffset >> 11) & 0x1F);
         const uint8_t function = static_cast<uint8_t>((cfgOffset >> 8) & 0x07);
         const uint8_t reg      = static_cast<uint8_t>(cfgOffset & 0xFF);
+        if (bus != 0) {
+            cfgTrace('R', cfgOffset, device, function, reg, width,
+                     0xFFFFFFFFu, /*hit=*/false);
+            return 0xFFFFFFFFULL;
+        }
         uint32_t      key      = makeBDF(0, device, function);
         auto          it       = m_pciDevices.find(key);
         const bool     hit = (it != m_pciDevices.end() && it->second);
@@ -1320,15 +1732,32 @@ private:
 
     inline auto writePciConfig0(uint64_t cfgOffset, uint32_t value, uint8_t width) noexcept -> void
     {
+        // JRN-PCI-001 G-4: bus != 0 master-aborts -- write dropped.  See
+        // readPciConfig0.
+        // Batch F D-1 (2026-08-02, JRN-AUD-003): a master-aborted config
+        // WRITE latches PERROR<NDS>.  HRM 8.8.2.1: "For all transactions,
+        // except configuration READS and special cycles, the Pchip sets
+        // PERROR<NDS>" -- the read-side exemption of 10.1.3.3 does NOT
+        // cover writes.  PCI cmd 0xB = config write.  PERRMASK-gated as
+        // always (init 0), so SRM-era probing latches nothing.
+        const uint8_t bus      = static_cast<uint8_t>((cfgOffset >> 16) & 0xFF);
         const uint8_t device   = static_cast<uint8_t>((cfgOffset >> 11) & 0x1F);
         const uint8_t function = static_cast<uint8_t>((cfgOffset >> 8) & 0x07);
         const uint8_t reg      = static_cast<uint8_t>(cfgOffset & 0xFF);
-
+        if (bus != 0) {
+            cfgTrace('W', cfgOffset, device, function, reg, width, value,
+                     /*hit=*/false);
+            latchPerror(kPerrNds, cfgOffset, 0xBu);   // Batch F D-1
+            return;
+        }
         uint32_t key = makeBDF(0, device, function);
         auto     it  = m_pciDevices.find(key);
         const bool hit = (it != m_pciDevices.end() && it->second);
         cfgTrace('W', cfgOffset, device, function, reg, width, value, hit);
-        if (!hit) return;
+        if (!hit) {
+            latchPerror(kPerrNds, cfgOffset, 0xBu);   // Batch F D-1
+            return;
+        }
         it->second->pciConfigWrite(reg, value, width);
     }
 
@@ -1513,6 +1942,19 @@ private:
 
     uint64_t m_pmonctl{0};
     uint64_t m_pmoncnt{0};
+
+    // JRN-PCI-001 seams, installed by TsunamiChipset (not snapshotted --
+    // pure wiring, like m_pciDevices / m_ioPortRegistry):
+    //   m_sgPteRead   -- quadword read of guest memory for SG PTE fetches.
+    //   m_errorSignal -- b_error level to the Cchip (assert/deassert
+    //                    DRIR<62>, HRM Table 6-9 Pchip0 error bit).
+    std::function<uint64_t(uint64_t)> m_sgPteRead;
+    std::function<void(bool)>         m_errorSignal;
+    // Batch F-2: subtractive-decode bridge present on this hose (set by
+    // the chipset when the south bridge wires; default false = bare Pchip
+    // master-abort semantics, which is what the unit tests exercise).
+    // NOT snapshotted: rewired at construction like the seams above.
+    bool                              m_subtractiveAgent = false;
     // ========================================================================
     // PCI device registry
     // ========================================================================

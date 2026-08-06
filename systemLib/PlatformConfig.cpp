@@ -21,6 +21,22 @@
 // manifest may carry a "comment" string field for documentation; the loader
 // ignores unknown fields.
 // ============================================================================
+// CHANGE HISTORY
+// ============================================================================
+//   2026-08-02  JRN-SES-001 Batch C2 (architect-approved): slot-keyed INTx
+//               routing form.
+//               FUNCTION: loadFromJson (new pci_irq_map parse block after the
+//               pci_irq_table_hose0 parse).
+//               CHANGE:  New optional manifest key "pci_irq_map":
+//                        [{"slot": N, "drir": [a,b,c,d]}, ...] -- INTx
+//                        routing keyed by PCI device number, so boards whose
+//                        IDSEL wiring differs from PC264 (ES40: 53C810 at
+//                        device 3) can route at all.  drir values 0..63;
+//                        -1 or 255 = not routed.  The flat table remains the
+//                        DS20 console-verbatim form; DeviceManifest::
+//                        intxDrirBit consults the map first (PlatformConfig.h
+//                        Batch C2 block).
+// ============================================================================
 
 #include "PlatformConfig.h"
 
@@ -304,6 +320,54 @@ ManifestLoadResult PlatformConfig::loadFromString(const std::string& json)
     if (!m.pciIrqTableHose0.empty() && m.pciIrqTableHose0.size() > 28)
         issues.push_back("WARN: pci_irq_table_hose0 longer than 28 entries "
                          "(slots 5..11 x 4 pins)");
+
+    // BOARD DATA, slot-keyed form (Batch C2, 2026-08-02, JRN-SES-001):
+    // "pci_irq_map": [{"slot": N, "drir": [a,b,c,d]}, ...].  Keyed by PCI
+    // device number so non-PC264 IDSEL wirings can route (see CHANGE
+    // HISTORY).  drir entries: 0..63 = DRIR bit; -1 or 255 = not routed.
+    // Duplicate slots are an error (first one would win silently otherwise).
+    {
+        std::set<int> seenSlots;
+        const QJsonArray mapArr = root.value("pci_irq_map").toArray();
+        for (const QJsonValue& v : mapArr) {
+            const QJsonObject mo = v.toObject();
+            PciIrqMapEntry e;
+            int const slot = mo.value("slot").toInt(-1);
+            if (slot < 0 || slot > 31) {
+                issues.push_back("pci_irq_map: bad or missing 'slot' "
+                                 "(expected 0..31)");
+                continue;
+            }
+            if (!seenSlots.insert(slot).second) {
+                issues.push_back("pci_irq_map: duplicate slot "
+                                 + std::to_string(slot));
+                continue;
+            }
+            e.slot = static_cast<uint8_t>(slot);
+            const QJsonArray drirArr = mo.value("drir").toArray();
+            if (drirArr.size() != 4) {
+                issues.push_back("pci_irq_map: slot "
+                                 + std::to_string(slot)
+                                 + ": 'drir' must have exactly 4 entries "
+                                   "(INTA..INTD)");
+                continue;
+            }
+            for (int p = 0; p < 4; ++p) {
+                int const b = drirArr.at(p).toInt(-1);
+                if (b == -1 || b == 255) { e.drir[size_t(p)] = -1; continue; }
+                if (b < 0 || b > 63) {
+                    issues.push_back("pci_irq_map: slot "
+                                     + std::to_string(slot)
+                                     + " pin " + std::to_string(p + 1)
+                                     + ": DRIR bit out of range (0..63)");
+                    e.drir[size_t(p)] = -1;
+                    continue;
+                }
+                e.drir[size_t(p)] = static_cast<int16_t>(b);
+            }
+            m.pciIrqMap.push_back(e);
+        }
+    }
 
     const bool valid = validate(m, issues);
     if (!valid) {

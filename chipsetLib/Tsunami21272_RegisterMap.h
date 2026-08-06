@@ -112,9 +112,10 @@ namespace Tsunami21272 {
         //   CPU count, memory config, revision
         constexpr uint64_t MTR = 0x0040;  // Reg 01  RW   Memory Timing Register
         constexpr uint64_t MISC = 0x0080;  // Reg 02  RW   Miscellaneous Control
-        //   NXM detect, ABW, revision, error status
-        //   Bits [47:44]: NXM source
-        //   Bits [39:32]: Chip revision
+        //   NXM detect, arbitration (ABT/ABW), IPI, ITINTR, revision.
+        //   Bits <31:29>: NXS (NXM source) -- corrected 2026-08-02, Batch F
+        //   doc sweep (was mislabeled <47:44>); Bits <39:32>: REV.
+        //   Authoritative field map: Tsunami21272_CsrSpec.h (Table 10-12).
         constexpr uint64_t MPD = 0x00C0;  // Reg 03  RW   Memory Presence Detect (SPD/I2C)
 
         // Memory Array Address Registers ++ define memory bank sizes/bases
@@ -718,13 +719,18 @@ namespace Tsunami21272 {
         //   Bits [35:32]: Cchip revision
         constexpr uint64_t kCSC_1CPU_32GB = 0x0000000000000000ULL;  // Placeholder ++ set per config
 
-        // Cchip MISC
-        //   Bits [39:32]: Chip revision (0x10 typical)
-        //   Bit 28:       ABW (address bus width, 0 = 34-bit, 1 = 44-bit)
-        constexpr uint64_t kMISC_Default = 0x0000001000000000ULL;  // Rev 1.0, 44-bit
+        // Cchip MISC -- HISTORIC constant, UNUSED (Batch F doc sweep,
+        // 2026-08-02, JRN-AUD-003 A-17): the old field notes here were
+        // WRONG (HRM Table 10-12: REV<39:32> = 1 for 21272 / 8 for 21274,
+        // not 0x10; bit 28 is NXM, not an address-bus-width flag; NXS is
+        // <31:29>).  Live reset uses variantInfo()->crev in
+        // TsunamiCchip::reset().  Tombstone -- do not consume.
+        constexpr uint64_t kMISC_Default = 0x0000001000000000ULL;
 
-        // Dchip DREV
-        constexpr uint64_t kDREV_Default = 0x10ULL;               // Revision 1.0
+        // Dchip DREV -- HISTORIC constant, UNUSED: correct encoding is
+        // byte-sliced 0x0101010101010101 (Table 10-34), which is what
+        // TsunamiDchip::reset() uses.  Tombstone -- do not consume.
+        constexpr uint64_t kDREV_Default = 0x10ULL;
 
         // Pchip PCTL ++ default after reset
         constexpr uint64_t kPCTL_Default = 0x0000000000000000ULL;  // All features disabled

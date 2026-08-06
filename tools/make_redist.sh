@@ -32,6 +32,17 @@
 #   HMXP=<path>     Help & Manual project file to read the version from
 #   VERSION=x.y.z   force the version string (skips reading the .hmxp)
 #   OUTDIR=<path>   output directory (default <root>/redist)
+#   NO_CHECKSUM=1   skip SHA-256 generation (default: always generate)
+#
+# Checksums (2026-07-29): every archive gets a sibling <archive>.sha256 in the
+# standard "<hash>  <basename>" form, and the line is folded into a rolling
+# SHA256SUMS.txt in OUTDIR covering every release published from this directory.
+# The archive is UNSIGNED by deliberate decision, so the hash is the integrity
+# check testers have. Honest scope: a hash published beside the download detects
+# corruption and mirror substitution; it is NOT a substitute for a code
+# signature, because an attacker who can replace the .zip can replace the hash
+# alongside it. Publish the hash on a channel the archive does not travel on
+# (release notes, guide, mail) to get real value from it.
 # ============================================================================
 set -euo pipefail
 
@@ -67,6 +78,37 @@ else
     echo "       Install zip (MSYS2/GnuWin32) or run on Win10+ for bsdtar."
     exit 1
 fi
+
+# ---- hasher detection: sha256sum preferred, shasum, then certutil -----------
+# 2026-07-29: Git for Windows DOES ship sha256sum (coreutils), so the first
+# branch is the normal PC path. shasum -a 256 covers macOS. certutil is the
+# last-resort Windows built-in -- its output is a 3-line report, not the
+# standard format, so it needs post-processing (see sha256_of below).
+CERTUTIL=/c/Windows/System32/certutil.exe
+if command -v sha256sum >/dev/null 2>&1; then
+    HASHER=sha256sum
+elif command -v shasum >/dev/null 2>&1; then
+    HASHER=shasum
+elif [[ -x "$CERTUTIL" ]]; then
+    HASHER=certutil
+else
+    HASHER=none
+fi
+
+# Echo the lowercase hex digest of "$1" on stdout, or return non-zero.
+sha256_of() {
+    case "$HASHER" in
+        sha256sum) sha256sum    "$1" | cut -d' ' -f1 ;;
+        shasum)    shasum -a 256 "$1" | cut -d' ' -f1 ;;
+        certutil)
+            # certutil prints: header line / hash (maybe spaced) / status line.
+            # Strip everything that is not a hex digit from the middle line and
+            # lowercase it so the output matches sha256sum's form exactly.
+            "$CERTUTIL" -hashfile "$(cygpath -w "$1")" SHA256 \
+                | sed -n '2p' | tr -d ' \r' | tr 'A-F' 'a-f' ;;
+        *) return 1 ;;
+    esac
+}
 
 # ---- version string (match the documentation) ------------------------------
 # Read versionmajor/minor/build from the H&M project file so the archive name
@@ -162,3 +204,45 @@ esac
 
 SIZE="$(du -h "$ZIP" | cut -f1)"
 echo "done. wrote $ZIP ($SIZE, $COUNT files)."
+
+# ---- checksum --------------------------------------------------------------
+# Two artifacts, both in OUTDIR:
+#   <archive>.sha256   one line, verifiable with `sha256sum -c` from OUTDIR
+#   SHA256SUMS.txt     rolling index of every release published from OUTDIR
+# The basename (not the full path) is written so verification works wherever
+# the pair is unpacked. A re-run for the same version REPLACES that version's
+# line rather than appending a duplicate.
+if [[ "${NO_CHECKSUM:-0}" != "1" ]]; then
+    if [[ "$HASHER" == "none" ]]; then
+        echo "WARN: no SHA-256 tool found (sha256sum / shasum / certutil) --"
+        echo "      skipping checksum. Set NO_CHECKSUM=1 to silence this."
+    else
+        ZIP_BASE="$(basename "$ZIP")"
+        SUM="$(sha256_of "$ZIP")"
+        if [[ ! "$SUM" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "FATAL: $HASHER produced an unexpected digest for $ZIP_BASE: [$SUM]"
+            exit 1
+        fi
+
+        # Per-archive sidecar. Two spaces between fields = coreutils format.
+        printf '%s  %s\n' "$SUM" "$ZIP_BASE" > "$ZIP.sha256"
+
+        # Rolling index: drop any prior line for this exact archive name, then
+        # append the fresh one and keep the file sorted by archive name.
+        SUMS="$OUTDIR/SHA256SUMS.txt"
+        TMPSUMS="$(mktemp)"
+        if [[ -f "$SUMS" ]]; then
+            grep -v "  ${ZIP_BASE}\$" "$SUMS" > "$TMPSUMS" || true
+        else
+            : > "$TMPSUMS"
+        fi
+        printf '%s  %s\n' "$SUM" "$ZIP_BASE" >> "$TMPSUMS"
+        sort -k2 "$TMPSUMS" > "$SUMS"
+        rm -f "$TMPSUMS"
+
+        echo "  sha256   : $SUM"
+        echo "  sidecar  : $ZIP.sha256"
+        echo "  index    : $SUMS  ($(wc -l < "$SUMS" | tr -d ' ') releases)"
+        echo "  verify   : cd $(dirname "$ZIP") && sha256sum -c $ZIP_BASE.sha256"
+    fi
+fi

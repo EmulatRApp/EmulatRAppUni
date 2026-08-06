@@ -18,6 +18,7 @@
 #include <QStringList>
 #include <QVariant>
 
+#include <cstdlib>   // EMULATR_INI override (2026-07-31)
 #include <stdexcept>
 
 namespace emulatr::config {
@@ -215,10 +216,27 @@ IniLoader::LoadResult IniLoader::load(const std::filesystem::path& iniPath) {
     return result;
 }
 
+// FILE 8: config/IniLoader.cpp
+// FUNCTION: IniLoader::defaultSearchPaths -- ini discovery order.
+// CHANGE (2026-07-31): EMULATR_INI now takes precedence over the fixed
+//   cwd/exe-dir search.  Concurrent instances sharing one run directory
+//   previously had NO way to differ on config: tools/run_ds20_putty.sh
+//   had to mutate the SHARED config/Emulatr.ini in place and restore it
+//   on exit, so two overlapping runs raced on both the file and the
+//   single .puttybak.  With this override each instance points at its
+//   own ini and the shared file is never written.  Absent or empty
+//   EMULATR_INI leaves the legacy order exactly as it was.
 std::vector<std::filesystem::path> IniLoader::defaultSearchPaths() {
     std::vector<std::filesystem::path> paths;
 
     namespace fs = std::filesystem;
+
+    // Highest precedence: explicit per-instance ini from the launcher.
+    if (char const* const envIni = std::getenv("EMULATR_INI");
+        envIni != nullptr && *envIni != '\0') {
+        paths.push_back(fs::path(envIni));
+    }
+
     fs::path cwd = fs::current_path();
     paths.push_back(cwd / "Emulatr.ini");
     paths.push_back(cwd / "config" / "Emulatr.ini");
