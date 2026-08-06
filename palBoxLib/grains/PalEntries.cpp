@@ -2516,17 +2516,19 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_CC_CTL:       // counter control + offset
         value = 0; break;
 
-        // ---- Unassigned IPR index 0x2d -- FAULT (do NOT silent-zero) ----
-        // 0x2d is an unassigned EV6 IPR index (table ends at C_SHFT=0x2c).  The
-        // 21264 HRM is SILENT on HW_MFPR/HW_MTPR to an unassigned index (its
-        // "writes ignored" rule is for reserved BIT-FIELDS within a register,
-        // not an unassigned INDEX).  The decisive evidence is the guest PAL: the
-        // DS10/DS20 SRM issues HW_MTPR R31->0x2d (encoded 0x77e72d40) once in its
-        // register-init sweep and RELIES on it faulting -- treating it as a no-op
-        // freezes DS10 in a DtbMiss loop at 0x13d38; restoring kFaultUnimplemented
-        // lets DS10 advance to the console region (verified 2026-07-06,
-        // journals/20260706_0x2d_rollback_experiment.md).  So fault, do not
-        // silent-zero.  (NOT the serial line: SL_XMIT/SL_RCV are I_CTL[13]/[14].)
+        // ---- IPR index 0x2d READ -- FAULT LOUD (never fabricate) ----
+        // COMMENT CORRECTED 2026-08-02 (O-6 landing; supersedes the old
+        // "unassigned / SRM relies on it faulting" story -- see
+        // journals/20260801_JRN-IPR-001_hw_mtpr_0x2d_identification.md).
+        // 0x2d is an UNDOCUMENTED, WRITE-ONLY Mbox/Cbox-domain register the
+        // OpenVMS SRM PAL writes deliberately and NEVER reads: zero HW_MFPR
+        // 0x2d sites exist image-wide (vs 35 documented read indices).  The
+        // WRITE side is now the unconditional faithful accept (see the
+        // HW_MTPR arm).  This READ arm is unreachable by real firmware; a
+        // read arriving here means new/unknown code is probing a register
+        // whose read semantics NO authority documents -- fault loud rather
+        // than fabricate a value (the _PROVISIONAL rule).  (NOT the serial
+        // line: SL_XMIT/SL_RCV are I_CTL[13]/[14].)
     case coreLib::HW_RESERVED_2D:
         r.faultCode = coreLib::kFaultUnimplemented;
         return r;
@@ -3040,19 +3042,25 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_VA_FORM:       // architecturally read-only; permissive
         break;
 
-        // Unassigned IPR index 0x2d (SRM register-init sweep, HW_MTPR R31->0x2d,
-        // encoded 0x77e72d40).  V4 raises kFaultUnimplemented here.  IMPORTANT --
-        // this is a KEPT-AND-LABELED SCAFFOLD, not a proven-correct choice: 0x2d
-        // is a PATH-SELECTOR.  Faulting vs no-op'ing it routes each platform to a
-        // DIFFERENT, independent downstream defect (DS10 -> a device-model poll at
-        // 0x13d38; ES40 -> a virtual-MMIO DtbMiss at 0x1b7dd4; DS20 -> a benign
-        // 300M settling delay).  Delivery itself is FAITHFUL (correct OPCDEC
-        // vector 0x8400, clean saved excAddr, no shadow-bank artifact) -- the old
-        // "ES40 mis-delivers this fault" claim is WITHDRAWN.  Silicon most likely
-        // IGNORES the write (no-op); the fault is kept only because it currently
-        // routes DS10/DS20 to `>>>`.  Final disposition is an open architect
-        // decision (going no-op REQUIRES fixing DS10's device bit first).  NOT the
-        // serial line (SL_XMIT/SL_RCV are I_CTL[13]/[14]).  Full analysis:
+        // IPR index 0x2d -- UNCONDITIONAL FAITHFUL ACCEPT (O-6 landed
+        // 2026-08-02, architect-directed: "unset must mean faithful" /
+        // "we should handle 0x2d by default").  Identification record:
+        // journals/20260801_JRN-IPR-001_hw_mtpr_0x2d_identification.md --
+        // 0x2d is NOT unassigned; it is an UNDOCUMENTED, WRITE-ONLY
+        // register in the Mbox/Cbox hazard domain (SCBD_MASK=0x40) that
+        // the real OpenVMS SRM PAL writes deliberately (once at CPU init,
+        // repeatedly from a context-restore epilogue reloading a saved
+        // +0x3d8 slot) and NEVER reads (0 HW_MFPR sites image-wide).  The
+        // HRM's OPCDEC condition list is exhaustive and does not cover an
+        // unimplemented IPR index for opcode 0x1D in PALmode, so the old
+        // kFaultUnimplemented scaffold was provably unfaithful -- and its
+        // env gate (EMULATR_2D_NOOP) made emulated ARCHITECTURE a launcher
+        // choice: run_ds20_putty.sh (unset) reset the guest at the VMB
+        // handoff while run_ds20_bplus.sh (set) booted (JRN-IPR-001
+        // Sec 10; reproduced live 2026-08-02).  Value storage is DEFERRED
+        // until any read site exists (write-only today; adding a CpuState
+        // field costs a snapshot version bump for an unobservable value).
+        // History of the fault-vs-noop path-selector analysis:
         // journals/20260706_0x2d_path_selector_and_three_bug_decomposition.md.
     case coreLib::HW_RESERVED_2D: {
         // PROBE 2026-08-01 (JRN-AUD-002 decision D-3) -- OBSERVATION ONLY, no
@@ -3080,15 +3088,15 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                 std::fflush(stderr);
             }
         }
-        // PHASE SCAFFOLD (DS10 device-model work): EMULATR_2D_NOOP=1 flips 0x2d
-        // to the faithful no-op path so DS10 reaches its real 0x13d38 I2C poll.
-        // Default = the labeled fault scaffold.  Remove when 0x2d disposition is
-        // finalized (journals/20260706_0x2d_path_selector_and_three_bug_*.md).
-        static int const noop2d =
-            (std::getenv("EMULATR_2D_NOOP") != nullptr) ? 1 : 0;
-        if (noop2d) break;
-        r.faultCode = coreLib::kFaultUnimplemented;
-        return r;
+        // O-6 (2026-08-02): the EMULATR_2D_NOOP gate and the fault scaffold
+        // are DELETED -- the faithful accept is unconditional.  Stale shell
+        // exports of EMULATR_2D_NOOP are now inert (JRN-AUD-002 Sec 11
+        // tiering marks the name for the denied/strip list).  DS10's old
+        // dependency on the fault (routing to `>>>` before its 0x13d38 I2C
+        // poll was answerable) was resolved by the TIGbus readSparseMem
+        // fix (JRN-IPR-001 Sec 8); the owed DS10 verification run remains
+        // on the ledger but no longer holds the default hostage.
+        break;
     }
 
     default:

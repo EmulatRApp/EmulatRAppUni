@@ -1990,6 +1990,18 @@ bool Machine::systemTick(uint64_t i) noexcept
             // cycles (D1).  Cheap; polled at the ~2^18-cycle timer cadence.
             m_chipset.flash().tryFlush(systemNow());
 
+            // TODO(N810-GENTIMER) (2026-08-05, JRN-SCSI-041 Sec 14): the
+            // 53C810 general-purpose timer rides this same edge.  The device
+            // had NO time source -- it is driven only by MMIO and the SCRIPTS
+            // executor -- so SIST1<GEN> could never be raised and a driver
+            // waiting on it waited forever (SIST1 polled 1,733 times in run
+            // 20260805_151827 while STIME1 was armed twice).  AXPBox raises
+            // the same interrupt from its own periodic walk
+            // (System.cpp:270 -> Sym53C810.cpp:1457).
+            // SECOND CONSUMER, planned: budgeted SCRIPTS stepping (H-4,
+            // JRN-SCSI-038 Sec 5) hangs off this call, not a new seam.
+            m_chipset.scsiPollTick();
+
 #if EMULATR_IRQDIAG
             // TEMP IRQDIAG (2026-07-07): on each interval-timer FIRE, snapshot the
             // DELIVER gate so we see WHICH of the four canAcceptInterrupt(22)

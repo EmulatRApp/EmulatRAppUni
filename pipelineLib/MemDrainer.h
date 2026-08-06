@@ -265,7 +265,7 @@ private:
 #if EMULATR_BRINGUP_PROBES
     // DTBM-DOUBLE probe arm-countdown (2026-07-19, A-vs-B fork).  Set at the
     // OS-PAL double-miss reclassification; decremented as the handler's next
-    // PAL-mode memory ops are logged (its §17.6.1 physical PTE fetches).
+    // PAL-mode memory ops are logged (its Sec 17.6.1 physical PTE fetches).
     // Runtime-gated via EMULATR_DTBM_PROBE; zero cost when the env is unset
     // (the arm site never fires, so this stays 0 and every log guard is false).
     static inline int s_dtbmArmed = 0;
@@ -382,7 +382,7 @@ private:
             }
 #if EMULATR_BRINGUP_PROBES
             // ---- DTBM-DOUBLE probe (A-vs-B fork, 2026-07-19) --------------------
-            // Answers whether the OS-PAL §17.6.1 physical fallback walk can even
+            // Answers whether the OS-PAL Sec 17.6.1 physical fallback walk can even
             // begin: does PTBR hold a real page-table base, and do the handler's
             // L1/L2/L3 PTE fetches get the S_PhysAddr physical bypass?  Runtime-
             // gated on EMULATR_DTBM_PROBE (silent + free when unset).
@@ -409,7 +409,7 @@ private:
                             static_cast<unsigned long long>(cpu.ptbr));
                     }
                     // (2) If THIS fault IS the double-miss, (re)arm and dump the base
-                    //     state that governs §17.6.1: PTBR (IPR side), the faulting
+                    //     state that governs Sec 17.6.1: PTBR (IPR side), the faulting
                     //     VA, VA_CTL[VPTB], VPTB, MM_STAT.  The next armed LOAD lines
                     //     expose impure PT__PTBR + the level1/2/3 PTE values.
                     if (r.faultCode == coreLib::kFaultDtbMissDouble

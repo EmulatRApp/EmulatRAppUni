@@ -36,9 +36,250 @@
 //      completes immediately; reselection never occurs.
 //   D3 Single-step mode (DCNTL<SSM>) raises SSI after every instruction as
 //      documented but is untested (the pke driver's SSM path is #if'd out).
+//   D4 SBCL models the ATN line ONLY (bit 3, from the SOCL<3> latch).
+//      REQ<7> ACK<6> BSY<5> SEL<4> and MSG<2> C_D<1> I_O<0> still read 0:
+//      the phase engine owns phase and no bus-level arbitration is modeled.
+//      Named 2026-08-06 when ATN was wired; the residue is deliberate.
 // ============================================================================
 // CHANGE HISTORY
 // ============================================================================
+//   2026-08-06  Batch H-7 rider (with the VirtualDiskDevice.h page-01h
+//               fix; architect-approved "go").
+//               FUNCTION: ledgerCmd.
+//               CHANGE:  every CHECK CONDITION row is UNTHROTTLED
+//               (N810-CHKCOND: opcode, CDB byte 2, sense key/ASC/ASCQ).
+//               The root-cause MODE SENSE rejection hid between this
+//               ledger's every-256th samples for four days; rare events
+//               must never share a throttle with bulk traffic.
+//
+//   2026-08-06  Batch H-6 -- SELECT faithful to the DM: table-indirect ID
+//               (N-17 closed) and post-selection phase (N810-SELPHASE
+//               resolved).  AUTHORITY: 53C895 Data Manual (Processor
+//               Support/53C895_Data_Manual_Ver_3_Sep98.txt), "Instruction
+//               Set of the I/O Processor": bit 24 Select-with-ATN ("SATN/
+//               ... asserted during the selection phase"; illegal on any
+//               other I/O instruction), bit 25 Table Indirect, bits 19:16
+//               Encoded SCSI Destination ID (the NON-table form).
+//               Corroboration: axpbox/src/Sym53C810.cpp:1758-1773 -- entry
+//               address = DSA + sext24(w0<23:0>) & ~3, ONE dword read, id
+//               = entry<19:16>.
+//               MEASURED MOTIVATION (JRN-SCSI-042 Sec 10.6): the live pke
+//               SELECT is w0=4700002C -- bits 24 AND 25 set.  Our inline
+//               id read was therefore decoding bits 19:16 OF THE TABLE
+//               OFFSET (0x02C), not an ID at all; it resolved to 0 by the
+//               DOUBLE coincidence that the offset's bits 19:16 are zero
+//               and target 0 exists.
+//               FUNCTION: execSelect.
+//               CHANGE:  w0<25> honored.  Table form: entry = DSA +
+//                        sext24(w0<23:0>), &~3 (810 alignment, AXPBox
+//                        corroborated), one dword via m_dmaRead, id =
+//                        entry<19:16>.  Entry SCNTL3/SXFER config bytes
+//                        (sync/wide negotiation values) are read but NOT
+//                        applied -- no sync model exists to apply them to;
+//                        noted at the site, not a new deviation (transfer
+//                        timing is not modeled at all).
+//               CHANGE:  post-selection phase now honors ATN: with ATN ->
+//                        MSG OUT (unchanged, the exercised path); without
+//                        ATN -> COMMAND phase.  The DM ties SATN/ to the
+//                        selection itself; a target selected without ATN
+//                        proceeds to command.  The no-ATN arm has NEVER
+//                        been observed live (every pke/console SELECT
+//                        carries bit 24) -- it is therefore LOUD when it
+//                        first fires (N810-SELNOATN, first 8), because an
+//                        untested arm exercising silently is how S-10
+//                        class surprises are made.
+//               FUNCTION: selTableRow / selNoAtnRow (new).
+//               CHANGE:  bounded rows.  N810-SELTABLE (first 16 + every
+//                        256th) carries entry address, entry dword,
+//                        resolved id, AND the legacy inline id; any
+//                        LEGACY-MISMATCH (table id != w0<19:16>) prints
+//                        UNTHROTTLED (cap 32) -- each such row is a
+//                        command the pre-H-6 model sent to the WRONG
+//                        TARGET, the direct detector for the latent bug
+//                        this batch closes.
+//               REMOVAL TRIGGER: none -- fidelity.  Rows go when a boot
+//                        shows zero LEGACY-MISMATCH and the arm is
+//                        declared routine.
+//
+//   2026-08-06  Batch H-5 Edit A -- the ATN latch (architect-directed after
+//               the LAPTRACE read; JRN-SCSI-042 Sec 10).  MEASURED
+//               JUSTIFICATION, not a datasheet transcription: lap 0 of run
+//               20260805_173619 shows the pke script issuing SELECT WITH
+//               ATN (:26, w0=4700002C, bit 24 set) and CLEAR ATN twice
+//               (:38 and :147, w0=60000008, flag bit 3), then reading SBCL
+//               (:150, w0=760B0000) and branching on it (:151,
+//               w0=8084F700 -- mask 0xF7 isolates bit 3).  That is live
+//               ATN traffic against a register the model never drove.
+//               BIT POSITIONS ARE MEASURED FROM THE GUEST, not taken from
+//               AXPBox: the guest's own mask 0xF7 fixes SBCL<ATN> = 0x08,
+//               and SOCL mirrors SBCL, so SOCL<ATN> = 0x08.  AXPBox
+//               defines R_SOCL_ATN 0x20 against its own R_SBCL_ATN 0x08
+//               (Sym53C810.cpp:88 vs :101) -- an internal disagreement
+//               that never bites it because nothing there reads SOCL.
+//               PREDICTED BEHAVIOURAL EFFECT ON THE PARK LAP: NONE.  The
+//               single SBCL read sits three instructions after a CLEAR
+//               ATN, so silicon reads 0x00 there and so do we, before and
+//               after this edit.  H-A was REFUTED by the lap listing
+//               (JRN-SCSI-042 Sec 10) and this edit does not revive it.
+//               It closes a fidelity gap with measured traffic; a lap that
+//               CHANGES after this lands is itself a finding and must be
+//               chased, not welcomed.
+//               FUNCTION: execIoOrRw (SET/CLEAR arm).
+//               CHANGE:  SET ATN / CLEAR ATN latch SOCL<3> instead of
+//                        returning silently.  ACK (flag 0x40) and carry
+//                        (flag 0x400) remain unmodeled and are now LOUD
+//                        rather than silently dropped.
+//               FUNCTION: execSelect.
+//               CHANGE:  w0<24> (select-with-ATN) is honored and asserts
+//                        SOCL<3>.  It was discarded.  The phase choice is
+//                        deliberately NOT touched: setPhase(kPhMsgOut) is
+//                        still unconditional, which is wrong when bit 24
+//                        is clear -- [CONFIRM] and TODO(N810-SELPHASE),
+//                        held out of this batch because it moves every
+//                        SELECT path in the model.
+//               FUNCTION: regRead8 (new kSBCL arm) / reset.
+//               CHANGE:  SBCL composes bit 3 from the SOCL latch.  All
+//                        other SBCL bits still read 0 -- deviation D4,
+//                        named at the top of this file.  reset() clears
+//                        SOCL explicitly beside the other bus latches.
+//               FUNCTION: atnRow / selAtnRow / setClrUnmodeledRow / sbclRow
+//                        (all new).
+//               CHANGE:  bounded instrumentation.  N810-SBCLCHG is the one
+//                        that matters: it fires only when a SBCL read
+//                        returns a DIFFERENT value than the previous read,
+//                        unthrottled to 32 rows.  Across the whole of the
+//                        08-05 boot that would have printed exactly once,
+//                        at 0x00.  A second row means the branch input
+//                        finally moved.  Raw SBCL reads are first 16 +
+//                        every 4096th (they ran 63,507 per boot).
+//               REMOVAL TRIGGER: none -- this is fidelity, not a probe.
+//                        The instrumentation rows go when D4 closes.
+//
+//   2026-08-06  TODO(N810-LAPTRACE) (architect-approved 2026-08-06,
+//               JRN-SCSI-042 Sec 5).  The park lap is the whole remaining
+//               question: the script parks in WAIT RESELECT at 0xC000132C,
+//               the host writes ISTAT<SIGP>, the script resumes at the
+//               alternate 0xC0001578, and 63,509 laps later nothing has
+//               advanced.  Four hypotheses (JRN-SCSI-042 Sec 4, H-A..H-D)
+//               all collapse to ONE listing of the instructions actually
+//               executed between two parks.
+//               FUNCTION: scriptsTrace.
+//               CHANGE:  the legacy free-running trace keeps its exact
+//                        behaviour, but its counter moves from a
+//                        function-local static to a member (it was shared
+//                        across instances and could not be reset) and it
+//                        now tail-calls lapTrace.  Its 4000-row cap is
+//                        consumed by the console era long before VMS
+//                        starts -- the SCRIPTDUMP 6-slot species -- which
+//                        is why a second, separately targeted arm exists
+//                        rather than a bigger cap.
+//               FUNCTION: lapTrace (new) / lapArm (new) / insnClass (new).
+//               CHANGE:  one row per SCRIPTS instruction executed between
+//                        two WAIT RESELECT parks, carrying dsp, w0, w1,
+//                        the decoded instruction class and SFBR.  SFBR is
+//                        sampled AT FETCH, i.e. BEFORE the instruction
+//                        executes: this AMENDS JRN-SCSI-042 Sec 5, which
+//                        specified "after".  Before is the better datum
+//                        and needs no restructuring -- a conditional
+//                        transfer's row then carries exactly the byte
+//                        that transfer is testing, which is the entire
+//                        purpose of the instrument.  The preceding rw row
+//                        shows a stale SFBR; the loaded value appears on
+//                        the very next row.
+//               FUNCTION: execIoOrRw (WAIT RESELECT arm).
+//               CHANGE:  lapArm() beside the existing censusDump call.
+//                        The FIRST park arms the trace; each later park
+//                        closes a window and opens the next.  The
+//                        N810-LAP END row carries that window's
+//                        instruction count, so "does the lap vary" is
+//                        answerable without reading one instruction row.
+//               BOUNDS:  kLapTraceLaps 3 x kLapTraceInsns 2048 = 6,144
+//                        rows per boot, hard, plus the framing rows.
+//                        Guard EMULATR_DIAG_N810 (already wired in
+//                        CMakeLists :351/:355/:766) -- NO build-system
+//                        change in this edit.  The lap arm deliberately
+//                        does NOT require EMULATR_SCSI_TRACE: an
+//                        instrument that needs an env var is how the last
+//                        one got missed (I-1, run 20260802_212601).
+//               NOT RESET: the arm is once per process and SURVIVES
+//                        reset() on purpose.  A chip reset mid-boot would
+//                        re-arm and spend the budget on the console era --
+//                        the W-8 lesson (JRN-SCSI-041 Sec 12).
+//               REMOVAL TRIGGER: the lap is decoded and JRN-SCSI-042
+//                        Sec 6 P1 is resolved.
+//
+//   2026-08-05  Batch I-3 register census (architect-approved 2026-08-05,
+//               JRN-SCSI-041 Sec 12).  The dead-constant sweep found the
+//               ENTIRE bit-level SCSI bus surface unwired: SOCL 0x09,
+//               SSID 0x0A, SBCL 0x0B, SSTAT2 0x0F, SIDL 0x50, SODL 0x54,
+//               SBDL 0x58 -- declared at :448-462, referenced nowhere.
+//               Coverage pass applied (a constant whose byte falls inside
+//               a 32-bit access through a lower neighbour IS reachable):
+//               the only 32-bit bases are kDSA/kTEMP/kDBC/kDNAD/kDSP/
+//               kDSPS, none of which reach those seven.  kDCMD 0x27 WAS a
+//               false positive -- covered by setReg32(kDBC) at :929/:1056
+//               -- and is the reason the coverage pass exists.
+//               ONE coherent architectural gap, not seven oversights: the
+//               model implements the phase engine and the transfer
+//               machinery, and omits the layer that lets a SCRIPTS program
+//               OBSERVE the bus directly.  PKEDRIVER's init script reaches
+//               through it (JRN-SCSI-038 I-2).
+//               FUNCTION: regRead8 / regWrite8 / censusHit (new) /
+//               censusDump (new).
+//               CHANGE:  TODO(N810-CENSUS): per-register access census --
+//                        COUNTERS, not rows: [off][rd/wr][host/script]
+//                        plus the DSP of first SCRIPT-side touch.  Dumped
+//                        as ONE table, and only when it CHANGED since the
+//                        last dump.  A per-access ledger of the poll loop
+//                        would emit one row per SCRIPTS instruction, and
+//                        the H-1d cap would then hide the row that
+//                        mattered -- the I-1 species, which cost run
+//                        20260802_212601 its wake identity.  A table that
+//                        STOPS changing is itself the finding: the
+//                        script's register working set has closed, which
+//                        is the signature of a converged spin.
+//                        COST, stated so the next hot-path instrument does
+//                        not re-derive it: 2 KB of state plus two array
+//                        increments per register access, on a path that
+//                        runs inside a 100k-instruction budget which
+//                        executed 76,481 times in run 20260804-213741.
+//                        That measurable perturbation is why this one IS
+//                        compile-guarded where W-1's ledgerCmd
+//                        deliberately is not (:1557 DEVIATION): a
+//                        code-only bounded row cannot become a throughput
+//                        regression; 2 KB on the hot path can.
+//                        GUARD: EMULATR_DIAG_N810 -- defined for Debug and
+//                        RelWithDebInfo, absent in Release, wired in
+//                        CMakeLists on the EMULATR_CHIPSET_DIAG pattern in
+//                        THIS edit (a guard defined nowhere compiles to
+//                        silence in every config, which is the exact
+//                        failure this batch exists to end).  Release
+//                        carries neither the arrays nor the code.
+//                        NAMED BLIND SPOT (seam C): SCRIPTS writes reach
+//                        m_reg[] directly from execRw opc 5/7 (:1235-1236)
+//                        and never enter regWrite8, so the scrW column is
+//                        STRUCTURALLY ZERO.  The dump header says so in
+//                        the table itself.  A zero there means NOT
+//                        MEASURED, not "did not happen" -- the
+//                        STRAY_INT_CNT species (JRN-SCSI-041 Sec 9.2).
+//                        Routing script writes through regWrite8 is the
+//                        follow-up that kills the seam; this header line
+//                        is a mitigation, not a fix.
+//                        ALIASING: registers 0x00-0x5F are real.  A
+//                        nonzero row at 0x60-0x7F is an ALIAS artifact of
+//                        the & 0x7F mask and is itself a decode finding,
+//                        not traffic.
+//               FUNCTION: (doc) TODO(N810-SBCL) narrowed to
+//               TODO(N810-DFIFO).
+//               CHANGE:  the SBCL clause is struck -- SBCL is now a named
+//                        census subject whose fix scope will be set by
+//                        MEASUREMENT rather than by the 038 mask decode.
+//                        The residue half survives and is retagged: SSTAT0
+//                        and DFIFO still read 0, so pke's DATA OUT
+//                        mismatch fixup (dfifo - byte_count) would compute
+//                        garbage on a data-out short (JRN-AUD-003 S-8).
+//               REMOVAL TRIGGER: the PKE port-init stall is root-caused.
+//
 //   2026-08-03  BRIEF-SCSI-040 batch (architect-approved; corrections and
 //               revised diagnosis in JRN-SCSI-041).  The 140935 run's
 //               45,341-op storm decoded: 45,340 failed SS$_TOOMUCHDATA
@@ -373,6 +614,7 @@ public:
         m_reg[kCTEST0] = 0;
         m_reg[kSSTAT0] = 0;
         m_reg[kSSTAT1] = 0;   // phase latch clears with the bus
+        m_reg[kSOCL]   = 0;   // Edit A: ATN latch clears with the bus too
         m_dstatPend = 0; m_sist0Pend = 0; m_sist1Pend = 0;
         m_running = false;
         m_sigp = false; m_parked = false; m_parkedAlt = 0;   // H-2d state
@@ -440,7 +682,61 @@ public:
             wakeFromPollPark(static_cast<uint8_t>(off & 0x7F), value, width);
     }
 
+    // TODO(N810-GENTIMER) _PROVISIONAL (2026-08-05, JRN-SCSI-041 Sec 14).
+    // THE POLLTICK SEAM.  This device had NO time source: it is driven only
+    // by ioRead/ioWrite and the SCRIPTS executor, so a timer had nowhere to
+    // live.  Machine::systemTick already carries this exact pattern for the
+    // Cchip interval timer and the flash debounce (Machine.cpp:1983-1990,
+    // "rides the interval-timer tick ... ~2^18-cycle timer cadence").
+    // AXPBox reached the same design independently: check_state() is a
+    // SystemComponent virtual (SystemComponent.hpp:48) walked over every
+    // device from System.cpp:270, and its SCSI gen-timer is one consumer.
+    //
+    // FIRST CONSUMER is the general-purpose timer only.  Budgeted SCRIPTS
+    // stepping (H-4, JRN-SCSI-038 Sec 5) is the intended SECOND consumer of
+    // this same call -- that is why the seam is named pollTick and not
+    // genTimerTick.  Landing it here means H-4 needs no new architecture.
+    //
+    // RATE AUTHORITY [CONFIRM]: kGenTicks = 1 fires on the NEXT interval
+    // tick after arming.  AXPBox uses (STIME1 & 0x0F) * 30, but 30 is 30
+    // units of ITS check_state cadence, which is NOT our ~2^18-cycle tick --
+    // the multiplier cannot be carried across.  1 answers the question that
+    // matters first (does GEN unblock the driver AT ALL); the true period is
+    // worth deriving only if it does.
+    void pollTick() noexcept
+    {
+        if (m_genTimer == 0) return;              // disarmed
+        if (--m_genTimer != 0) return;            // still counting
+        m_genTimer   = kGenTicks;                 // periodic, re-arm
+        m_sist1Pend |= kSist1Gen;
+        bool const enabled = (m_reg[kSIEN1] & kSist1Gen) != 0;
+        bool const before  = m_irq;
+        updateIrq();                              // gates on m_reg[kSIEN1]
+        uint64_t const n = m_genRows++;
+        if (n < 64 || (n & 0xFFu) == 0) {
+            std::fprintf(stderr,
+                "N810-GENTIMER[%llu] FIRE sist1pend=0x%02X sien1=0x%02X "
+                "enabled=%u irq %u->%u _PROVISIONAL\n",
+                static_cast<unsigned long long>(n),
+                unsigned(m_sist1Pend), unsigned(m_reg[kSIEN1]),
+                unsigned(enabled ? 1 : 0),
+                unsigned(before ? 1 : 0), unsigned(m_irq ? 1 : 0));
+            std::fflush(stderr);
+        }
+    }
+
 private:
+    static constexpr uint32_t kGenTicks = 1;   // [CONFIRM] rate authority
+    // Batch H-5 Edit A (2026-08-06): ATN bit positions, MEASURED from the
+    // guest's own compare mask 0xF7 at 0xC00006A4 (isolates bit 3).  SOCL
+    // mirrors SBCL, so both carry ATN at 0x08.  The SET/CLEAR instruction
+    // flag field is separate: ATN 0x08, ACK 0x40, carry 0x400 in w0.
+    static constexpr uint8_t  kSoclAtn  = 0x08, kSbclAtn  = 0x08;
+    static constexpr uint32_t kSetAtn   = 0x00000008, kSetAck = 0x00000040,
+                              kSetCarry = 0x00000400;
+    // TODO(N810-LAPTRACE) bounds (2026-08-06, JRN-SCSI-042 Sec 5).
+    static constexpr unsigned kLapTraceLaps  = 3;     // park-to-park windows
+    static constexpr unsigned kLapTraceInsns = 2048;  // rows per window
     // ---- register offsets (n810_def.h struct n810_csr) --------------------
     static constexpr uint8_t kSCNTL0 = 0x00, kSCNTL1 = 0x01, kSCNTL2 = 0x02,
                              kSCNTL3 = 0x03, kSCID   = 0x04, kSXFER  = 0x05,
@@ -458,6 +754,7 @@ private:
                              kSIEN1  = 0x41, kSIST0  = 0x42, kSIST1  = 0x43,
                              kMACNTL = 0x46, kGPCNTL = 0x47, kSTIME0 = 0x48,
                              kSTIME1 = 0x49, kRESPID = 0x4A, kSTEST0 = 0x4C,
+                             kSTEST1 = 0x4D, kSTEST2 = 0x4E,  // 2026-08-05
                              kSTEST3 = 0x4F, kSIDL   = 0x50, kSODL   = 0x54,
                              kSBDL   = 0x58, kSCRATCHB = 0x5C;
 
@@ -499,7 +796,13 @@ private:
     // storming b_irq<1>.  (2026-08-02, JRN-SCSI-034.)
     static constexpr uint8_t kSstat1PhaseMask = 0x07;
     static constexpr uint8_t kSist0Ma  = 0x80,
-                             kSist0Rst = 0x02, kSist1Sto = 0x04;
+                             kSist0Rst = 0x02, kSist1Sto = 0x04,
+                             // TODO(N810-GENTIMER) (2026-08-05): the
+                             // general-purpose timer.  SIST1<1> GEN is
+                             // armed from STIME1<3:0>; AXPBox
+                             // src/Sym53C810.cpp:253/270/878/1457 is the
+                             // corroborating implementation.
+                             kSist1Gen = 0x02, kStime1GenMask = 0x0F;
     // DCNTL: SSM 0x10, IRQM 0x08, STD 0x04, SA 0x02, COM 0x01
     static constexpr uint8_t kDcntlSsm = 0x10, kDcntlStd = 0x04;
     // SCNTL1: EXC 0x80? (n810_scntl1_exc), RST 0x08 (assert SCSI RST)
@@ -521,6 +824,7 @@ private:
     // ========================================================================
     uint8_t regRead8(uint8_t off) noexcept
     {
+        censusHit(off, 0);            // TODO(N810-CENSUS)
         switch (off) {
         case kISTAT: {
             uint8_t v = 0;
@@ -581,6 +885,15 @@ private:
             m_sigp = false;
             return v;
         }
+        case kSBCL: {                        // Edit A (2026-08-06): D4
+            // The pke script reads this once per park lap (0xC000069C) and
+            // branches on bit 3 at 0xC00006A4 with compare mask 0xF7.  Bit 3
+            // now mirrors the SOCL<3> latch; every other bit still reads 0
+            // (deviation D4, named at the top of this file).
+            uint8_t const v = static_cast<uint8_t>(m_reg[kSOCL] & kSoclAtn);
+            sbclRow(v);                      // TODO(N810-ATN)
+            return v;
+        }
         case kDFIFO: return 0;               // no residue modeled (D1)
         case kDSA:      case kDSA + 1:      case kDSA + 2:      case kDSA + 3:
         case kSCRATCHA: case kSCRATCHA + 1: case kSCRATCHA + 2: case kSCRATCHA + 3:
@@ -619,6 +932,7 @@ private:
 
     void regWrite8(uint8_t off, uint8_t v) noexcept
     {
+        censusHit(off, 1);            // TODO(N810-CENSUS)
         // TODO(N810-LEDGER): control-register write ledger (see ledgerCtl).
         // I-3 (H-3.3, JRN-SCSI-039 Sec 6): DSA/SCRATCHA/SCRATCHB are the
         // MAILBOX the pke script polls -- they were dark channels while the
@@ -672,6 +986,27 @@ private:
             // and cleared ONLY by a CTEST2 read -- NOT on resume; a driver
             // polling ISTAT to confirm its signal took must still see it.
             if (v & kIstatSigp) {
+                // N-12 PROBE (2026-08-05, JRN-SCSI-041 Sec 13.2).  The
+                // host wrote ISTAT 63,533 times in run 20260805_132410 and
+                // NEVER read it -- ~63,520 of those are SIGP (only 13
+                // carried ABRT/RST via N810-ISTATCTL).  Neither stalled KP
+                // can issue that many writes, so a THIRD host-side actor
+                // is driving SIGP once per park.  Naming it names the
+                // likely home of the missing EXE$KP_RESTART (Sec 11.7).
+                // SCOPE LIMIT, stated: this model has NO access to the
+                // guest PC -- ioWrite carries no CPU context.  True caller
+                // identity needs a CPU/pipeline-layer change.  This row
+                // uses the project's standing correlation instead: the
+                // nearest preceding PCSAMPLE cyc names the era, exactly as
+                // every other bounded row in this file does.
+                uint64_t const nsig = m_sigpRows++;
+                if (nsig < 64 || (nsig & 0xFFu) == 0) {
+                    std::fprintf(stderr,
+                        "N810-SIGP[%llu] parked=%u dsp=0x%08X alt=0x%08X\n",
+                        static_cast<unsigned long long>(nsig),
+                        unsigned(m_parked ? 1 : 0), reg32(kDSP), m_parkedAlt);
+                    std::fflush(stderr);
+                }
                 m_sigp = true;
                 if (m_parked) resumeFromPark();
             }
@@ -695,6 +1030,24 @@ private:
                 updateIrq();
             }
             return;
+        case kSTIME1: {
+            // TODO(N810-GENTIMER): arm the general-purpose timer.
+            // AXPBox Sym53C810.cpp:878 does the same on this write.
+            m_reg[off] = v;
+            uint32_t const was = m_genTimer;
+            m_genTimer = (v & kStime1GenMask) ? kGenTicks : 0u;
+            uint64_t const n = m_genArmRows++;
+            if (n < 64 || (n & 0xFFu) == 0) {
+                std::fprintf(stderr,
+                    "N810-GENTIMER[%llu] ARM stime1=0x%02X gen=0x%02X "
+                    "ticks %u->%u sien1=0x%02X _PROVISIONAL\n",
+                    static_cast<unsigned long long>(n), unsigned(v),
+                    unsigned(v & kStime1GenMask), was, m_genTimer,
+                    unsigned(m_reg[kSIEN1]));
+                std::fflush(stderr);
+            }
+            return;
+        }
         case kDSTAT: case kSIST0: case kSIST1:
             return;                           // read-only status
         case kCTEST3:
@@ -840,6 +1193,7 @@ private:
                              static_cast<unsigned long long>(m_pollWakes));
                 std::fflush(stderr);
             }
+            censusDump("pollpark");        // TODO(N810-CENSUS)
         }
     }
 
@@ -889,7 +1243,12 @@ private:
         if (!m_dmaRead) return;
         for (unsigned i = 0; i < m_dumpCount; ++i)
             if (m_dumpedDsp[i] == dsp) return;    // already dumped
-        if (m_dumpCount >= 6) return;             // slot cap
+        // Cap 6 -> 32 (2026-08-05, Sec 13.4): six slots were consumed by
+        // the console-era script before the PKE init script ran, so the
+        // DSPs the census names were never captured.  32 covers every
+        // distinct firstDsp the 20260805_132410 census recorded (48
+        // offsets, far fewer distinct DSPs) with headroom.
+        if (m_dumpCount >= 32) return;            // slot cap
         m_dumpedDsp[m_dumpCount++] = dsp;
         // Window 0x400 (2026-08-03, second capture): the 0x100 first cut
         // proved too small -- the PKE dispatch ladder relative-jumps to
@@ -1163,13 +1522,27 @@ private:
                 "N810-PARK session=%u alt=0x%08X (WAIT RESELECT)\n",
                 m_scriptSession, alt);
             std::fflush(stderr);
+            censusDump("waitresel");               // TODO(N810-CENSUS)
+            lapArm();                              // TODO(N810-LAPTRACE)
             return;                                // no interrupt, no STO
         }
-        case 3:                                    // SET ATN/ACK
-        case 4:                                    // CLEAR ATN/ACK
-            // Bus signal bookkeeping only; the phase engine sequences on
-            // moves, so ATN/ACK need no side effects here.
+        case 3:                                    // SET   ATN/ACK/carry
+        case 4: {                                  // CLEAR ATN/ACK/carry
+            // Batch H-5 Edit A (2026-08-06): ATN is a LATCH with a measured
+            // consumer, not bookkeeping.  The pke script CLEARs it twice per
+            // park lap and reads SBCL three instructions later.  ACK and
+            // carry stay unmodeled -- but LOUD, never silently dropped.
+            bool const set = (opcode == 3);
+            if ((w0 & kSetAtn) != 0) {             // Edit A: SOCL<3> latch
+                uint8_t const before = m_reg[kSOCL];
+                if (set) m_reg[kSOCL] = static_cast<uint8_t>(before |  kSoclAtn);
+                else     m_reg[kSOCL] = static_cast<uint8_t>(before & ~kSoclAtn);
+                atnRow(set, before, m_reg[kSOCL]);          // TODO(N810-ATN)
+            }
+            if ((w0 & (kSetAck | kSetCarry)) != 0)
+                setClrUnmodeledRow(set, w0);                // TODO(N810-ATN)
             return;
+        }
         default:
             raiseDma(kDstatIid, 0);
             return;
@@ -1179,7 +1552,27 @@ private:
     void execSelect(uint32_t w0, uint32_t w1) noexcept
     {
         (void) w1;                                 // alternate addr (resel) unused (D2)
-        unsigned const id = (w0 >> 16) & 0xF;
+        // Batch H-5 Edit A (2026-08-06): w0<24> = SELECT WITH ATN (DM bit 24,
+        // confirmed against the 895 DM text in Batch H-6).
+        bool const withAtn  = ((w0 >> 24) & 1u) != 0;
+        // Batch H-6 (2026-08-06): N-17 CLOSED.  w0<25> = table indirect (DM
+        // bit 25): entry = DSA + sext24(w0<23:0>), &~3 (810), id =
+        // entry<19:16> (AXPBox Sym53C810.cpp:1758-1773 corroborates).  The
+        // old inline read decoded bits of the TABLE OFFSET as an id and
+        // worked only because offset 0x02C has zero in 19:16.  Entry
+        // SCNTL3/SXFER bytes are not applied: no sync/wide model exists.
+        bool const tableInd = ((w0 >> 25) & 1u) != 0;
+        unsigned const inlineId = (w0 >> 16) & 0xF;    // legacy decode, kept
+        unsigned id = inlineId;                        // for the mismatch row
+        if (tableInd) {
+            uint32_t const tAddr =
+                (reg32(kDSA) + sext24(w0 & 0x00FFFFFFu)) & ~3u;
+            uint8_t tb[4];
+            m_dmaRead(tAddr, tb, 4);
+            uint32_t const t0 = le32(&tb[0]);
+            id = (t0 >> 16) & 0xF;
+            selTableRow(tAddr, t0, id, inlineId);      // Batch H-6 rows
+        }
         scsi::VirtualScsiDevice* t = (id < 8) ? m_targets[id] : nullptr;
         if (t == nullptr) {
             // Selection timeout -- how the pk driver learns an ID is empty.
@@ -1191,7 +1584,22 @@ private:
         m_conn = Conn{};
         m_conn.active   = true;
         m_conn.targetId = static_cast<uint8_t>(id);
-        setPhase(kPhMsgOut);               // selected with ATN
+        if (withAtn) m_reg[kSOCL] =         // Edit A: SELECT WITH ATN asserts
+            static_cast<uint8_t>(m_reg[kSOCL] | kSoclAtn);
+        selAtnRow(id, withAtn, m_reg[kSOCL]);          // TODO(N810-ATN)
+        // Batch H-6 (2026-08-06): N810-SELPHASE RESOLVED against the 895 DM
+        // (bit 24 ties SATN/ to the selection phase itself).  With ATN the
+        // target enters MSG OUT (identify follows); without ATN it proceeds
+        // straight to COMMAND.  The no-ATN arm is UNEXERCISED by every
+        // observed guest (pke and console both select with ATN) -- loud on
+        // first use, because a silently-exercising untested arm is how
+        // S-10-class surprises are made.
+        if (withAtn) {
+            setPhase(kPhMsgOut);           // selected with ATN -> message out
+        } else {
+            selNoAtnRow(w0);               // Batch H-6: LOUD, first 8
+            setPhase(kPhCmd);              // plain select -> command phase
+        }
         return;
     }
 
@@ -1373,14 +1781,18 @@ private:
                 // residual is read from DBC -- the manual states DSP is NOT
                 // valid for this use during a phase mismatch.
                 //
-                // TODO(N810-SBCL): SSTAT1<2:0> IS maintained now (setPhase
-                // keeps it in lockstep at every transition -- validated on
-                // the interrupt-ack path, JRN-SES-001 R-1); SBCL is the
-                // remaining unlatched half, plus SSTAT0/DFIFO stay 0, so
-                // pke's DATA OUT mismatch fixup (dfifo - byte_count) would
-                // compute garbage if a data-out short ever occurs
-                // (JRN-AUD-003 S-8).  Comment corrected 2026-08-02 (Batch F
-                // doc sweep) -- the old text predated the SSTAT1 fix.
+                // TODO(N810-DFIFO): SSTAT1<2:0> IS maintained (setPhase keeps
+                // it in lockstep at every transition -- validated on the
+                // interrupt-ack path, JRN-SES-001 R-1).  SSTAT0 and DFIFO
+                // still read 0, so pke's DATA OUT mismatch fixup
+                // (dfifo - byte_count) would compute garbage if a data-out
+                // short ever occurs (JRN-AUD-003 S-8).
+                // NARROWED 2026-08-05 from TODO(N810-SBCL): the SBCL clause
+                // is struck.  SBCL is not an isolated unlatched half -- it
+                // is one member of the seven-register bit-level bus surface
+                // (SOCL/SSID/SBCL/SSTAT2/SIDL/SODL/SBDL) that the census
+                // now measures, and its fix scope will be set by that
+                // measurement rather than by the JRN-SCSI-038 mask decode.
                 if (have > 0) {
                     m_dmaWrite(addr, m_conn.data.data() + m_conn.dataPos, have);
                     m_reg[kSFBR] = m_conn.data[m_conn.dataPos];
@@ -1562,6 +1974,26 @@ private:
     void ledgerCmd(scsi::ScsiCommand const& cmd) noexcept
     {
         uint64_t const n = m_cmdRows++;
+        // Batch H-7 rider (2026-08-06, JRN-SCSI-042 Sec 12 DO-REGARDLESS,
+        // value since proven): every CHECK CONDITION prints UNTHROTTLED,
+        // with the CDB head and full sense triple.  The page-01h MODE SENSE
+        // rejection that held every boot at the banner hid for four days
+        // between the every-256th samples of THIS function -- one early
+        // 0x02 status, never sampled.  CHECK CONDITIONs are rare by nature;
+        // unbounded is safe and "rare event under a sampled ledger" is the
+        // named species this row retires (JRN-SCSI-041 Sec 9.2 kin).
+        if (cmd.status == scsi::ScsiStatus::CheckCondition) {
+            std::fprintf(stderr, "N810-CHKCOND[%llu] op=0x%02X cdb2=0x%02X "
+                         "key=0x%02X asc=0x%02X ascq=0x%02X ret=%u\n",
+                         static_cast<unsigned long long>(n),
+                         unsigned(cmd.opcode()),
+                         unsigned(cmd.cdbLength > 2 ? cmd.cdb[2] : 0u),
+                         unsigned(cmd.senseValid ? (cmd.senseData.data[2] & 0x0F) : 0u),
+                         unsigned(cmd.senseValid ? cmd.senseData.data[12] : 0u),
+                         unsigned(cmd.senseValid ? cmd.senseData.data[13] : 0u),
+                         cmd.dataTransferred);
+            std::fflush(stderr);
+        }
         if (n >= 64 && (n & 0xFFu) != 0) return;
         uint8_t const op = cmd.opcode();
         long alloc = -1;                          // -1 = no alloc field
@@ -1661,13 +2093,226 @@ private:
         if (!traceOn()) return;
         std::fprintf(stderr, "N810: %s 0x%08X\n", msg, v);
     }
+    // Batch H-6 (2026-08-06): SELECT decode rows.  The LEGACY-MISMATCH arm
+    // is the detector for the N-17 latent bug -- a row means the pre-H-6
+    // model selected the WRONG target for this command.
+    void selTableRow(uint32_t tAddr, uint32_t t0, unsigned id,
+                     unsigned inlineId) noexcept
+    {
+        if (id != inlineId) {
+            uint64_t const m = m_selMismatchRows++;
+            if (m < 32) {
+                std::fprintf(stderr, "N810-SELTABLE LEGACY-MISMATCH[%llu] "
+                             "table id=%u inline id=%u entry=0x%08X "
+                             "t0=0x%08X dsp=0x%08X\n",
+                             static_cast<unsigned long long>(m), id,
+                             inlineId, tAddr, t0, reg32(kDSP));
+                std::fflush(stderr);
+            }
+        }
+        uint64_t const n = m_selTableRows++;
+        if (n < 16 || (n & 0xFFu) == 0) {
+            std::fprintf(stderr, "N810-SELTABLE[%llu] entry=0x%08X "
+                         "t0=0x%08X id=%u dsp=0x%08X\n",
+                         static_cast<unsigned long long>(n), tAddr, t0, id,
+                         reg32(kDSP));
+            std::fflush(stderr);
+        }
+    }
+
+    void selNoAtnRow(uint32_t w0) noexcept
+    {
+        uint64_t const n = m_selNoAtnRows++;
+        if (n < 8) {
+            std::fprintf(stderr, "N810-SELNOATN[%llu] w0=0x%08X -> COMMAND "
+                         "phase (first live use of the no-ATN arm -- "
+                         "UNTESTED path, verify against 895 DM)\n",
+                         static_cast<unsigned long long>(n), w0);
+            std::fflush(stderr);
+        }
+    }
+
+    // TODO(N810-ATN) (2026-08-06, Batch H-5 Edit A): bounded rows for the
+    // ATN latch.  sbclChgRow is the one that decides anything -- it fires
+    // ONLY when a SBCL read returns a value different from the previous
+    // read.  Over the whole 2026-08-05 boot that is one row, at 0x00.
+    void atnRow(bool set, uint8_t before, uint8_t after) noexcept
+    {
+        uint64_t const n = m_atnRows++;
+        if (n < 16 || (n & 0xFFu) == 0) {
+            std::fprintf(stderr, "N810-ATN[%llu] %s socl 0x%02X -> 0x%02X "
+                         "dsp=0x%08X\n",
+                         static_cast<unsigned long long>(n),
+                         set ? "SET  " : "CLEAR",
+                         unsigned(before), unsigned(after), reg32(kDSP));
+            std::fflush(stderr);
+        }
+    }
+
+    void selAtnRow(unsigned id, bool withAtn, uint8_t socl) noexcept
+    {
+        uint64_t const n = m_selAtnRows++;
+        if (n < 16 || (n & 0xFFu) == 0) {
+            std::fprintf(stderr, "N810-SELATN[%llu] id=%u withAtn=%u "
+                         "socl=0x%02X dsp=0x%08X\n",
+                         static_cast<unsigned long long>(n), id,
+                         unsigned(withAtn ? 1 : 0), unsigned(socl),
+                         reg32(kDSP));
+            std::fflush(stderr);
+        }
+    }
+
+    void setClrUnmodeledRow(bool set, uint32_t w0) noexcept
+    {
+        uint64_t const n = m_setClrRows++;
+        if (n < 8) {
+            std::fprintf(stderr, "N810-SETCLR-UNMODELED[%llu] %s w0=0x%08X "
+                         "(ACK/carry flags NOT modeled) dsp=0x%08X\n",
+                         static_cast<unsigned long long>(n),
+                         set ? "SET" : "CLEAR", w0, reg32(kDSP));
+            std::fflush(stderr);
+        }
+    }
+
+    void sbclRow(uint8_t v) noexcept
+    {
+        if (!m_sbclSeen || v != m_sbclLast) {
+            uint64_t const c = m_sbclChgRows++;
+            if (c < 32) {
+                std::fprintf(stderr, "N810-SBCLCHG[%llu] 0x%02X -> 0x%02X "
+                             "atn=%u dsp=0x%08X parks=%llu\n",
+                             static_cast<unsigned long long>(c),
+                             unsigned(m_sbclSeen ? m_sbclLast : 0u),
+                             unsigned(v),
+                             unsigned((v & kSbclAtn) ? 1 : 0), reg32(kDSP),
+                             static_cast<unsigned long long>(m_parkCount));
+                std::fflush(stderr);
+            }
+            m_sbclSeen = true;
+            m_sbclLast = v;
+        }
+        uint64_t const n = m_sbclRows++;
+        if (n < 16 || (n & 0xFFFu) == 0) {
+            std::fprintf(stderr, "N810-SBCL[%llu] v=0x%02X dsp=0x%08X\n",
+                         static_cast<unsigned long long>(n), unsigned(v),
+                         reg32(kDSP));
+            std::fflush(stderr);
+        }
+    }
+
     void scriptsTrace(uint32_t dsp, uint32_t w0, uint32_t w1) noexcept
     {
-        if (!traceOn()) return;
-        static int n = 0;
-        if (n++ < 4000)
+        // TODO(N810-LAPTRACE) (2026-08-06): the counter moved off a
+        // function-local static -- it was shared across instances and could
+        // never be reset.  This arm's behaviour is otherwise unchanged.
+        if (traceOn() && m_traceRows < 4000) {
+            ++m_traceRows;                     // TODO(N810-LAPTRACE)
             std::fprintf(stderr, "N810-SCRIPT dsp=0x%08X w0=0x%08X w1=0x%08X "
                                  "phase=%u\n", dsp, w0, w1, m_conn.phase);
+        }
+        lapTrace(dsp, w0, w1);                 // TODO(N810-LAPTRACE)
+    }
+
+    // TODO(N810-LAPTRACE) (2026-08-06, JRN-SCSI-042 Sec 5): decoded class of
+    // a SCRIPTS instruction, for the lap listing only.  MIRRORS the dispatch
+    // in stepScripts and execIoOrRw -- if that dispatch changes, this changes
+    // with it, or the listing starts lying.
+    static char const* insnClass(uint32_t w0) noexcept
+    {
+        unsigned const t = (w0 >> 30) & 0x3;
+        unsigned const o = (w0 >> 27) & 0x7;
+        switch (t) {
+        case 0: return "BMOV";
+        case 1:
+            if (o >= 5) return "RW";
+            switch (o) {
+            case 0:  return "SELECT";
+            case 1:  return "WAITDISC";
+            case 2:  return "WAITRESEL";
+            case 3:  return "SET";
+            default: return "CLEAR";
+            }
+        case 2:
+            switch (o) {
+            case 0:  return "JUMP";
+            case 1:  return "CALL";
+            case 2:  return "RETURN";
+            case 3:  return "INT";
+            default: return "TC?";
+            }
+        default: return ((w0 >> 29) & 1u) ? "LOADSTORE" : "MM";
+        }
+    }
+
+    // TODO(N810-LAPTRACE): one row per instruction inside an armed park-to-
+    // park window.  SFBR is sampled AT FETCH, BEFORE execution -- deliberate,
+    // and it amends JRN-SCSI-042 Sec 5; see the 2026-08-06 header entry.  A
+    // conditional transfer's row therefore carries the exact byte that
+    // transfer tests.  Hard bound: kLapTraceLaps x kLapTraceInsns rows.
+    void lapTrace(uint32_t dsp, uint32_t w0, uint32_t w1) noexcept
+    {
+#ifdef EMULATR_DIAG_N810
+        if (!m_lapArmed)                return;
+        if (m_lapLap >= kLapTraceLaps)  return;
+        if (m_lapInsn >= kLapTraceInsns) {
+            if (!m_lapCapped) {                // cap notice exactly once
+                m_lapCapped = true;
+                std::fprintf(stderr, "N810-LAP CAP lap=%u at %u insns -- "
+                             "window TRUNCATED, not a completed lap\n",
+                             m_lapLap, kLapTraceInsns);
+                std::fflush(stderr);
+            }
+            return;
+        }
+        std::fprintf(stderr, "N810-LAP[%u,%u] dsp=0x%08X w0=%08X w1=%08X "
+                     "cls=%-9s sfbr=0x%02X phase=%u\n",
+                     m_lapLap, m_lapInsn, dsp, w0, w1, insnClass(w0),
+                     unsigned(m_reg[kSFBR]), unsigned(m_conn.phase));
+        std::fflush(stderr);
+        ++m_lapInsn;
+#else
+        (void) dsp; (void) w0; (void) w1;
+#endif
+    }
+
+    // TODO(N810-LAPTRACE): lap framing, called from the WAIT RESELECT park
+    // (execIoOrRw case 2).  The FIRST park arms; each later park closes the
+    // current window and opens the next.  The END row's instruction count is
+    // by itself the answer to "does the lap vary".
+    void lapArm() noexcept
+    {
+        ++m_parkCount;                         // TODO(N810-LAPTRACE)
+#ifdef EMULATR_DIAG_N810
+        if (!m_lapArmed) {
+            m_lapArmed  = true;
+            m_lapLap    = 0;
+            m_lapInsn   = 0;
+            m_lapCapped = false;
+            std::fprintf(stderr, "N810-LAP ARM park=%llu dsp=0x%08X "
+                         "alt=0x%08X laps=%u cap=%u\n",
+                         static_cast<unsigned long long>(m_parkCount),
+                         reg32(kDSP), m_parkedAlt, kLapTraceLaps,
+                         kLapTraceInsns);
+            std::fflush(stderr);
+            return;
+        }
+        if (m_lapLap >= kLapTraceLaps) return;
+        std::fprintf(stderr, "N810-LAP END lap=%u insns=%u capped=%u "
+                     "re-park park=%llu dsp=0x%08X\n",
+                     m_lapLap, m_lapInsn, unsigned(m_lapCapped ? 1 : 0),
+                     static_cast<unsigned long long>(m_parkCount),
+                     reg32(kDSP));
+        std::fflush(stderr);
+        ++m_lapLap;
+        m_lapInsn   = 0;
+        m_lapCapped = false;
+        if (m_lapLap >= kLapTraceLaps) {
+            std::fprintf(stderr, "N810-LAP DONE after %u laps, parks=%llu\n",
+                         kLapTraceLaps,
+                         static_cast<unsigned long long>(m_parkCount));
+            std::fflush(stderr);
+        }
+#endif
     }
 
     // TODO(N810-LEDGER) (2026-08-03, architect-approved): bounded ledger of
@@ -1693,6 +2338,122 @@ private:
                          m_running ? " (script)" : "");
             std::fflush(stderr);
         }
+    }
+
+    // TODO(N810-CENSUS) (2026-08-05, architect-approved, JRN-SCSI-041
+    // Sec 12): per-register access census.  Counters, not rows -- rationale
+    // and cost in the 2026-08-05 header entry.  censusHit is the ONLY hot
+    // path addition; it compiles out entirely in Release.
+    // TODO(N810-CENSUS) naming table (2026-08-05, Sec 13.8 item 2).  The
+    // census printed bare hex, so 0x4E read 254,028 times by the script
+    // sat unidentified until the DM was opened by hand.  Every offset the
+    // 20260805_132410 census recorded is named here; anything else reads
+    // "?" so an UNEXPECTED offset is visibly unexpected rather than silent.
+    // Offsets marked UNIDENT are MEASURED HOST TRAFFIC with no grounded
+    // identity yet -- 0x56 (hostW 12) and 0x5A (hostW 3).  [CONFIRM] both
+    // against the 53C895 DM register map before naming them.
+    static char const* regName(uint8_t o) noexcept
+    {
+        switch (o) {
+        case kSCNTL0: return "SCNTL0";   case kSCNTL1: return "SCNTL1";
+        case kSCNTL2: return "SCNTL2";   case kSCNTL3: return "SCNTL3";
+        case kSCID:   return "SCID";     case kSXFER:  return "SXFER";
+        case kSDID:   return "SDID";     case kGPREG:  return "GPREG";
+        case kSFBR:   return "SFBR";     case kSOCL:   return "SOCL";
+        case kSSID:   return "SSID";     case kSBCL:   return "SBCL";
+        case kDSTAT:  return "DSTAT";    case kSSTAT0: return "SSTAT0";
+        case kSSTAT1: return "SSTAT1";   case kSSTAT2: return "SSTAT2";
+        case kISTAT:  return "ISTAT";    case kCTEST0: return "CTEST0";
+        case kCTEST1: return "CTEST1";   case kCTEST2: return "CTEST2";
+        case kCTEST3: return "CTEST3";   case kDFIFO:  return "DFIFO";
+        case kCTEST4: return "CTEST4";   case kCTEST5: return "CTEST5";
+        case kCTEST6: return "CTEST6";   case kDCMD:   return "DCMD";
+        case kDMODE:  return "DMODE";    case kDIEN:   return "DIEN";
+        case kDWT:    return "DWT";      case kDCNTL:  return "DCNTL";
+        case kADDER:  return "ADDER";    case kSIEN0:  return "SIEN0";
+        case kSIEN1:  return "SIEN1";    case kSIST0:  return "SIST0";
+        case kSIST1:  return "SIST1";    case kMACNTL: return "MACNTL";
+        case kGPCNTL: return "GPCNTL";   case kSTIME0: return "STIME0";
+        case kSTIME1: return "STIME1";   case kRESPID: return "RESPID";
+        case kSTEST0: return "STEST0";   case kSTEST1: return "STEST1";
+        case kSTEST2: return "STEST2";   case kSTEST3: return "STEST3";
+        case kSIDL:   return "SIDL";     case kSODL:   return "SODL";
+        case kSBDL:   return "SBDL";
+        case 0x56:    return "UNIDENT56";
+        case 0x5A:    return "UNIDENT5A";
+        default: break;
+        }
+        if (o >= kDSA      && o <= kDSA      + 3) return "DSA";
+        if (o >= kTEMP     && o <= kTEMP     + 3) return "TEMP";
+        if (o >= kDBC      && o <= kDBC      + 2) return "DBC";
+        if (o >= kDNAD     && o <= kDNAD     + 3) return "DNAD";
+        if (o >= kDSP      && o <= kDSP      + 3) return "DSP";
+        if (o >= kDSPS     && o <= kDSPS     + 3) return "DSPS";
+        if (o >= kSCRATCHA && o <= kSCRATCHA + 3) return "SCRATCHA";
+        if (o >= kSCRATCHB && o <= kSCRATCHB + 3) return "SCRATCHB";
+        return "?";
+    }
+
+    inline void censusHit(uint8_t off, unsigned wr) noexcept
+    {
+#ifdef EMULATR_DIAG_N810
+        unsigned const who = m_running ? 1u : 0u;   // 1 = SCRIPTS engine
+        uint8_t  const o   = off & 0x7F;
+        ++m_regCensus[o][wr][who];
+        // W-8 FIX (2026-08-05, JRN-SCSI-041 Sec 12.6): dirty on FIRST
+        // TOUCH of an offset only.  Counters always change; the WORKING
+        // SET is the signal, and a set that stops growing IS the finding.
+        // The previous unconditional dirty made the gate a no-op --
+        // 4,318,558 census rows at ~46 MB/min in run 20260805_132410.
+        if (!m_regSeen[o]) { m_regSeen[o] = true; m_censusDirty = true; }
+        if (who == 1u && m_regFirstDsp[o] == 0) {
+            m_regFirstDsp[o] = reg32(kDSP);
+            // E3 (Sec 13.4): CENSUS-TARGETED SCRIPTDUMP.  The first-six
+            // cap spent every slot on the console-era 0xBFF42380 script,
+            // so neither 0xC0000DF8 (STEST2) nor 0xC00006A4 (SBCL) was
+            // ever dumped and the consumer decode was NOT free.  Dumping
+            // here makes the decode a byproduct of the census.
+            scriptDump(m_regFirstDsp[o]);
+        }
+#else
+        (void) off; (void) wr;
+#endif
+    }
+
+    // Dumped at the two STALL states (poll-park and WAIT RESELECT park) and
+    // only when the table CHANGED since the last dump: an identical table
+    // repeated 8,000 times is noise, and a table that stops changing is the
+    // finding.  Nonzero rows only.
+    void censusDump(char const* why) noexcept
+    {
+#ifdef EMULATR_DIAG_N810
+        if (!m_censusDirty) return;
+        m_censusDirty = false;
+        uint64_t const n = m_censusDumps++;
+        std::fprintf(stderr,
+            "N810-CENSUS[%llu] why=%s session=%u cols: hostR hostW scrR scrW\n"
+            "N810-CENSUS   scrW is STRUCTURALLY ZERO -- SCRIPTS writes bypass\n"
+            "N810-CENSUS   regWrite8 (execRw opc 5/7, seam C).  A zero in that\n"
+            "N810-CENSUS   column means NOT MEASURED, not \"did not happen.\"\n"
+            "N810-CENSUS   regs 0x00-0x5F are real.  A nonzero row at 0x60-0x7F\n"
+            "N810-CENSUS   is an ALIAS artifact of the & 0x7F mask and is itself\n"
+            "N810-CENSUS   a decode finding, not traffic.\n",
+            static_cast<unsigned long long>(n), why, m_scriptSession);
+        for (unsigned o = 0; o < 0x80; ++o) {
+            uint32_t const hr = m_regCensus[o][0][0], hw = m_regCensus[o][1][0];
+            uint32_t const sr = m_regCensus[o][0][1], sw = m_regCensus[o][1][1];
+            if ((hr | hw | sr | sw) == 0) continue;
+            std::fprintf(stderr,
+                "N810-CENSUS   off=0x%02X %-9s hostR=%u hostW=%u scrR=%u"
+                " scrW=%u firstDsp=0x%08X%s\n",
+                o, regName(static_cast<uint8_t>(o)),
+                hr, hw, sr, sw, m_regFirstDsp[o],
+                (o >= 0x60) ? "  <-- ALIAS REGION, decode finding" : "");
+        }
+        std::fflush(stderr);
+#else
+        (void) why;
+#endif
     }
 
     // TODO(N810-V1-PROBE): JRN-AUD-003 V-1 (2026-08-02, architect-approved;
@@ -1830,6 +2591,13 @@ private:
     std::array<uint8_t, 256>  m_cfg{};
     std::array<uint8_t, 0x80> m_reg{};
     uint8_t  m_dstatPend = 0, m_sist0Pend = 0, m_sist1Pend = 0;
+    // TODO(N810-GENTIMER) state (2026-08-05).  Unguarded: the timer is
+    // FUNCTION, not diagnostics -- only its rows would be guardable, and
+    // they are bounded, so they follow ledgerCmd's unconditional precedent
+    // (:1557 DEVIATION) rather than the census's compile gate.
+    uint32_t m_genTimer   = 0;          // 0 = disarmed
+    uint64_t m_genRows    = 0;          // bounded FIRE rows
+    uint64_t m_genArmRows = 0;          // bounded ARM rows
     bool     m_running = false;
     // TODO(N810-V1-PROBE) state (JRN-AUD-003 V-1): sessions counted at
     // every SCRIPTS start; one loud row per first-seen construct.
@@ -1839,7 +2607,7 @@ private:
     // TODO(N810-LEDGER) state: control-register traffic row counter.
     uint64_t m_ledgerRows     = 0;
     // TODO(N810-SCRIPTDUMP) state: distinct DSPs already dumped (max 6).
-    uint32_t m_dumpedDsp[6]   = {};
+    uint32_t m_dumpedDsp[32]  = {};
     unsigned m_dumpCount      = 0;
     unsigned m_idReads        = 0;   // identity-register read rows (cap 16)
     // Batch H-2 state (JRN-SCSI-037):
@@ -1852,9 +2620,42 @@ private:
     uint64_t m_pollParks      = 0;      // park row counter (first 8 + 256th)
     uint64_t m_pollWakes      = 0;      // wake row counter
     uint64_t m_istatCritRows  = 0;      // I-5 (H-3.3): ABRT/RST write rows
+    uint64_t m_sigpRows       = 0;      // N-12: bounded ISTAT<SIGP> rows
     uint64_t m_intRows        = 0;      // I-6: DSPS-at-INT rows (raiseDma)
     uint64_t m_dstatEats      = 0;      // I-7: script DSTAT read w/ pend
     uint64_t m_cmdRows        = 0;      // W-1: per-command ledger rows
+    // Batch H-6 state (2026-08-06):
+    uint64_t m_selTableRows   = 0;      // table-indirect SELECT rows
+    uint64_t m_selMismatchRows= 0;      // LEGACY-MISMATCH rows (cap 32)
+    uint64_t m_selNoAtnRows   = 0;      // no-ATN SELECT rows (cap 8)
+    // TODO(N810-ATN) state (2026-08-06, Batch H-5 Edit A):
+    uint64_t m_atnRows        = 0;      // SET/CLEAR ATN latch rows
+    uint64_t m_selAtnRows     = 0;      // SELECT WITH ATN rows
+    uint64_t m_setClrRows     = 0;      // unmodeled ACK/carry flag rows
+    uint64_t m_sbclRows       = 0;      // raw SBCL reads (first 16 + 4096th)
+    uint64_t m_sbclChgRows    = 0;      // SBCL value CHANGES (cap 32)
+    uint8_t  m_sbclLast       = 0;      // previous SBCL value returned
+    bool     m_sbclSeen       = false;  // m_sbclLast is valid
+    // TODO(N810-LAPTRACE) state (2026-08-06, JRN-SCSI-042 Sec 5):
+    uint64_t m_traceRows      = 0;      // was a static local in scriptsTrace
+    uint64_t m_parkCount      = 0;      // WAIT RESELECT parks this boot
+    // TODO(N810-CENSUS) state (2026-08-05, JRN-SCSI-041 Sec 12).  Guarded:
+    // see the 2026-08-05 header entry for why this one is compile-gated
+    // where ledgerCmd (:1557) deliberately is not.
+#ifdef EMULATR_DIAG_N810
+    uint32_t m_regCensus[0x80][2][2] = {};  // [off][0=rd,1=wr][0=host,1=script]
+    uint32_t m_regFirstDsp[0x80]     = {};  // DSP at first SCRIPT-side touch
+    bool     m_regSeen[0x80]         = {};  // W-8: working-set membership
+    bool     m_censusDirty           = false;
+    uint64_t m_censusDumps           = 0;
+    // TODO(N810-LAPTRACE): armed at the FIRST park and NOT cleared by
+    // reset() on purpose -- a chip reset mid-boot would re-arm and spend the
+    // whole budget on the console era (the W-8 lesson, JRN-SCSI-041 Sec 12).
+    bool     m_lapArmed              = false;
+    bool     m_lapCapped             = false;  // per-window cap notice sent
+    unsigned m_lapLap                = 0;      // current park-to-park window
+    unsigned m_lapInsn               = 0;      // rows emitted in this window
+#endif
     bool     m_irq = false;
     Conn     m_conn{};
     std::array<scsi::VirtualScsiDevice*, 8> m_targets{};

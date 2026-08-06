@@ -163,6 +163,18 @@ struct PciDeviceEntry {
 };
 
 // ---------------------------------------------------------------------------
+// One slot's INTx -> DRIR routing (Batch C2, 2026-08-02, JRN-SES-001).
+// BOARD DATA keyed by PCI device number, replacing the flat-array-only form
+// whose (slot-5)*4 index baked in the PC264 IDSEL wiring (AD<16..21> =
+// devices 5..10) and could NEVER route the ES40's 53C810 at device 3.
+// drir[pin-1] = DRIR bit for INTA..INTD; -1 = not routed.
+// ---------------------------------------------------------------------------
+struct PciIrqMapEntry {
+    uint8_t                slot = 0;               // PCI device number
+    std::array<int16_t, 4> drir = { -1, -1, -1, -1 };
+};
+
+// ---------------------------------------------------------------------------
 // The parsed, validated platform manifest.
 // ---------------------------------------------------------------------------
 struct DeviceManifest {
@@ -176,11 +188,29 @@ struct DeviceManifest {
     // pc264_io.c:727).  Indexed ((slot - 5) * 4) + (pin - 1); value = DRIR
     // bit, 255 = not routed (ISA-special or absent).  Empty = manifest did
     // not provide one (devices needing INTx then warn loud at wire-up).
+    // KEPT for the DS20 manifest, whose table is console-VERBATIM; the
+    // (slot-5) base is that board's IDSEL wiring (pc264_io.c: bridge AD<16>
+    // = device 5, options AD<18..20> = devices 7..9).  New platforms use
+    // pciIrqMap below (Batch C2) -- do NOT add flat tables for boards whose
+    // IDSEL wiring differs from PC264.
     std::vector<uint8_t>         pciIrqTableHose0;
 
+    // BOARD DATA, slot-keyed form (Batch C2, 2026-08-02): manifest key
+    // "pci_irq_map".  Consulted FIRST; the flat table is the fallback.
+    // Handles any device number (ES40 53C810 at device 3).
+    std::vector<PciIrqMapEntry>  pciIrqMap;
+
     // Look up the DRIR bit for (slot, pin 1..4); -1 when unrouted/unknown.
+    // Batch C2: slot-keyed map first (any slot), then the flat PC264-form
+    // table (slots >= 5 only, its index convention).
     int intxDrirBit(uint8_t slot, uint8_t pin) const {
-        if (pin < 1 || pin > 4 || slot < 5) return -1;
+        if (pin < 1 || pin > 4) return -1;
+        for (PciIrqMapEntry const& e : pciIrqMap) {
+            if (e.slot != slot) continue;
+            int const v = e.drir[pin - 1u];
+            return (v < 0 || v >= 64) ? -1 : v;
+        }
+        if (slot < 5) return -1;                    // flat form is PC264-wired
         size_t const idx = (size_t(slot) - 5u) * 4u + (pin - 1u);
         if (idx >= pciIrqTableHose0.size()) return -1;
         uint8_t const v = pciIrqTableHose0[idx];

@@ -55,11 +55,15 @@ namespace coreLib {
 //   bit  [31]     CREN        -- corrected read error interrupt enable
 //   bits [30:29]  PCEN<1:0>   -- performance counter interrupt enables
 //   bits [28:14]  SIEN<15:1>  -- software interrupt enables
-//   bit  [13]     RES (IGN/RAZ)
-//   bits [12:5]   SIEN cont. / reserved (varies by edition)
+//   bit  [13]     ASTEN       -- AST interrupt enable (master gate)
+//   bits [12:5]   IGN (reserved)
 //   bits [4:3]    CM<1:0>     -- Current Processor Mode
-//   bit  [2]      ASTEN       -- AST interrupt enable
-//   bits [1:0]    IGN
+//   bits [2:0]    IGN
+//
+// (An earlier revision of this block placed ASTEN at bit 2 "varies by
+// edition" -- WRONG for EV6.  apisrm ev6_defs.mar :544-563 puts
+// ASTEN__S = 0xD = bit 13; corrected 2026-07-31, SPEC-SIRR-AST-001
+// Sec 8.2.  No code ever consumed the bad position.)
 //
 // CM at bits [4:3] is the 21264 layout (21164 had CM at [1:0]; the
 // architecture moved it to make room for other field placements).
@@ -95,6 +99,82 @@ constexpr int      kIerCmModeShift = 3;
 {
     return ierCmIerPortion(ierStorage)
          | ((static_cast<uint64_t>(mode) & uint64_t{0x3}) << kIerCmModeShift);
+}
+
+
+// ---------------------------------------------------------------------------
+// SIRR / ISUM -- HRM Sections 5.2.10 / 5.2.11 (SPEC-SIRR-AST-001).
+// ---------------------------------------------------------------------------
+//
+// Field positions per apisrm ev6_defs.mar (verified 2026-07-31, spec
+// Sec 8.2):
+//
+//   SIRR: SIR<15:1> at [28:14]; all other bits reserved (never stored).
+//   ISUM: EI [38:33], SL [32], CR [31], PC [30:29], SI [28:14],
+//         ASTU [10], ASTS [9], ASTE [4], ASTK [3].
+//
+// ISUM is architecturally read-only and DERIVED.  EmulatR splits it:
+// the HARDWARE causes (EI/SL/CR/PC, kIsumHwMask) are staged into
+// cpu.isum by the divert paths; the SOFTWARE causes (SI + AST) are
+// composed LIVE from SIRR/IER/PCTX state at read time -- the guest
+// PAL clears SIRR and expects the next ISUM read to reflect it.
+//
+// Derivation (HRM 5.2.10 / Table 5-7):
+//   SI[n]  = SIRR[n] AND IER.SIEN[n]      (both registers at [28:14])
+//   AST[m] = ASTRR[m] AND ASTER[m] AND IER.ASTEN AND (CM >= m)
+//     where m = 0 K, 1 E, 2 S, 3 U.  "CM >= m" is the less-privileged-
+//     or-equal rule: a kernel AST is deliverable from any mode; a user
+//     AST only while already in user mode (AARM Part II-A).
+//
+// ASTRR/ASTER storage: cpu.asten_sr, the HWPCB-layout composite --
+// ASTSR (request) nibble at <7:4>, ASTEN (enable) nibble at <3:0>,
+// K = LSB of each nibble (same order as the PCTX ASTRR[12:9] /
+// ASTER[8:5] fields; see composePctx in PalEntries.cpp -- single
+// source of truth, no separate IPR storage).
+
+constexpr uint64_t kSirrSirMask = uint64_t{0x1FFFC000};  // SIR<15:1> at [28:14]
+constexpr uint64_t kIerAstenBit = uint64_t{1} << 13;     // IER ASTEN (master gate)
+
+// Staged-hardware portion of ISUM: EI [38:33] | SL [32] | CR [31] | PC [30:29].
+constexpr uint64_t kIsumHwMask  = uint64_t{0x7FE0000000};
+
+// ISUM AST summary bit positions, indexed by mode m = 0 K, 1 E, 2 S, 3 U.
+constexpr uint64_t kIsumAstBit[4] = {
+    uint64_t{1} << 3,    // ASTK
+    uint64_t{1} << 4,    // ASTE
+    uint64_t{1} << 9,    // ASTS
+    uint64_t{1} << 10,   // ASTU
+};
+
+// Software (SI + AST) portion of ISUM, derived live per the rules
+// above.  astenSr is the cpu.asten_sr composite (ASTSR<7:4> request,
+// ASTEN<3:0> enable).  Pure; no CpuState dependency by convention --
+// coreLib::pendingSoftInt (CpuState.h) is the state-taking wrapper.
+[[nodiscard]] constexpr uint64_t composeIsumSw(uint64_t sirr,
+                                               uint64_t ier,
+                                               uint64_t astenSr,
+                                               Mode_Privilege mode) noexcept
+{
+    uint64_t sw = sirr & ier & kSirrSirMask;
+    if ((ier & kIerAstenBit) != 0) {
+        // Per-mode pending = request AND enable, K at bit 0.
+        uint64_t const pend = (astenSr >> 4) & astenSr & uint64_t{0xF};
+        uint8_t  const cm   = static_cast<uint8_t>(mode);
+        for (uint8_t m = 0; m <= cm && m < 4; ++m) {
+            if ((pend >> m) & 1u) {
+                sw |= kIsumAstBit[m];
+            }
+        }
+    }
+    return sw;
+}
+
+// Full ISUM view: staged hardware causes OR'd with the live software
+// portion.  HW_MFPR HW_ISUM returns this (spec D2).
+[[nodiscard]] constexpr uint64_t composeIsum(uint64_t stagedIsum,
+                                             uint64_t sw) noexcept
+{
+    return (stagedIsum & kIsumHwMask) | sw;
 }
 
 

@@ -134,6 +134,9 @@ constexpr GrainSem kHwMtprFlags = GrainSem::S_HwFormat
 // offset).  The leaf adds 0x0100 back when matching against HW_IPR.
 constexpr uint8_t kScbdExcAddr = 0x06;   // -> HW_EXC_ADDR
 constexpr uint8_t kScbdCm      = 0x09;   // -> HW_CM
+constexpr uint8_t kScbdIer     = 0x0A;   // -> HW_IER
+constexpr uint8_t kScbdSirr    = 0x0C;   // -> HW_SIRR
+constexpr uint8_t kScbdIsum    = 0x0D;   // -> HW_ISUM
 constexpr uint8_t kScbdICtl    = 0x11;   // -> HW_I_CTL
 constexpr uint8_t kScbdPctrCtl = 0x14;   // -> HW_PCTR_CTL (silent-zero stub)
 constexpr uint8_t kScbdMmStat  = 0x27;   // -> HW_MM_STAT
@@ -1175,4 +1178,201 @@ TEST_CASE("palBox::execCallPalDispatch -- preserves palBase high bits above 32K 
     // entry = (0x4000060000 & ~0x7FFF) | 0x2000 = 0x4000060000 | 0x2000
     //       = 0x4000062000
     CHECK(r.divertTarget == 0x4000062001ULL);
+}
+
+
+// ============================================================================
+// SIRR / ISUM / pendingSoftInt -- the software-interrupt + AST tier
+// (SPEC-SIRR-AST-001 T4-T7).  MTPR SIRR was a silent no-op and MFPR
+// SIRR/ISUM(SW) silent-zero until 2026-07-31 -- every VMS software
+// interrupt (IPL 4 IOPOST, IPL 3 RESCHED, fork dispatch, ASTs)
+// vanished, hanging boot at the post-banner UCB$L_STS poll
+// (JRN-BOOT-001 OBS-12/14).  These cases pin the storage contract the
+// VMS PAL depends on (ev6_vms_callpal.mar :1109/:1139/:7539) and the
+// request -> deliverable -> clear -> quiescent loop.
+// ============================================================================
+
+namespace {
+
+// SIR[n] sits at bit 13+n (SIR<15:1> at [28:14], ev6_defs.mar).
+constexpr uint64_t sirBit(unsigned n) { return uint64_t{1} << (13 + n); }
+
+} // anonymous namespace
+
+TEST_CASE("palBox HW_SIRR -- MTPR drops reserved bits; MFPR round-trips SIR<15:1> (T4)")
+{
+    CpuState cpu{};
+    ExecCtx ctx{};
+    ctx.cpu = &cpu;
+
+    // All-ones store: only SIR<15:1> may land (reserved bits are
+    // dropped at the store, never masked at read).
+    InstructionGrain gMt = makeHwGrain(0x1D, /*ra*/ 31, kScbdSirr,
+                                       kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = ~uint64_t{0};
+    BoxResult rMt = palBox::execHwMtpr(gMt, ctx);
+    CHECK(rMt.faultCode == kNoFault);
+    CHECK(cpu.sirr == coreLib::kSirrSirMask);
+
+    // Arbitrary in-field pattern round-trips exactly -- the VMS MP
+    // path parks a CPU number in SIRR and reads it back later
+    // (ev6_vms_callpal.mar :7539/:7869); partial fidelity corrupts it.
+    uint64_t const parked = sirBit(3) | sirBit(4) | sirBit(15);
+    ctx.opB = parked;
+    palBox::execHwMtpr(gMt, ctx);
+    CHECK(cpu.sirr == parked);
+
+    InstructionGrain gMf = makeHwGrain(0x19, /*ra*/ 7, kScbdSirr,
+                                       kHwMfprFlags, &palBox::execHwMfpr);
+    BoxResult rMf = palBox::execHwMfpr(gMf, ctx);
+    CHECK(rMf.faultCode == kNoFault);
+    CHECK(rMf.regWriteIdx == 7);
+    CHECK(rMf.regWriteValue == parked);
+
+    // Plain full store clears -- hw_mtpr r31, EV6__SIRR semantics
+    // (ev6_vms_pal.mar :4125/:4505): no W1C trickery.
+    ctx.opB = 0;
+    palBox::execHwMtpr(gMt, ctx);
+    CHECK(cpu.sirr == 0);
+}
+
+TEST_CASE("palBox HW_ISUM -- derived read; MTPR stays a permissive no-op (T5)")
+{
+    CpuState cpu{};
+    ExecCtx ctx{};
+    ctx.cpu = &cpu;
+    InstructionGrain gMf = makeHwGrain(0x19, /*ra*/ 5, kScbdIsum,
+                                       kHwMfprFlags, &palBox::execHwMfpr);
+
+    // Staged hardware cause (EI[2], interval timer) passes through.
+    constexpr uint64_t ei2 = uint64_t{1} << 35;
+    cpu.isum = ei2;
+    BoxResult r1 = palBox::execHwMfpr(gMf, ctx);
+    CHECK(r1.regWriteValue == ei2);
+
+    // Live SW derivation: SIRR request + IER.SIEN enable appears in
+    // the SAME read, OR'd beside the staged EI bit.
+    cpu.sirr = sirBit(4);
+    cpu.ier  = sirBit(4);
+    BoxResult r2 = palBox::execHwMfpr(gMf, ctx);
+    CHECK(r2.regWriteValue == (ei2 | sirBit(4)));
+
+    // A stale SI bit in the STAGED word is filtered (kIsumHwMask):
+    // only the live compose may assert SI.
+    cpu.sirr = 0;
+    cpu.ier  = 0;
+    cpu.isum = ei2 | sirBit(4);
+    BoxResult r3 = palBox::execHwMfpr(gMf, ctx);
+    CHECK(r3.regWriteValue == ei2);
+
+    // ISUM is architecturally read-only: MTPR swallows with no fault
+    // and mutates NOTHING the read derives from.
+    InstructionGrain gMt = makeHwGrain(0x1D, /*ra*/ 31, kScbdIsum,
+                                       kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = ~uint64_t{0};
+    BoxResult rMt = palBox::execHwMtpr(gMt, ctx);
+    CHECK(rMt.faultCode == kNoFault);
+    CHECK(cpu.isum == (ei2 | sirBit(4)));   // staged word untouched
+    CHECK(cpu.sirr == 0);                   // sirr untouched
+}
+
+TEST_CASE("pendingSoftInt + the run-loop delivery gate shape (T6)")
+{
+    CpuState cpu{};
+
+    // Quiescent CPU wants nothing.
+    CHECK(coreLib::pendingSoftInt(cpu) == 0);
+
+    // SI requested + enabled -> wants delivery, at the right bit.
+    cpu.sirr = sirBit(4);
+    cpu.ier  = sirBit(4);
+    CHECK(coreLib::pendingSoftInt(cpu) == sirBit(4));
+
+    // The run-loop condition defers while in PALmode (PC<0>) -- the
+    // #70 gate must still hold for SI exactly as it does for EI; the
+    // request stays latched in SIRR and redelivers after HW_REI.
+    cpu.pc |= 1;                        // enter PALmode
+    CHECK(cpu.inPalMode());
+    bool const wantsInPal = !cpu.inPalMode()
+                         && coreLib::pendingSoftInt(cpu) != 0;
+    CHECK_FALSE(wantsInPal);
+    CHECK(coreLib::pendingSoftInt(cpu) == sirBit(4));   // still latched
+
+    cpu.pc &= ~uint64_t{1};             // back to native
+    bool const wantsNative = !cpu.inPalMode()
+                          && coreLib::pendingSoftInt(cpu) != 0;
+    CHECK(wantsNative);
+
+    // AST leg through the REAL guest path: the VMS PAL programs
+    // ASTRR/ASTER via the PCTX index aliases (EV6__ASTRR = 0x44 ->
+    // field-select ASTRR from data [12:9]; EV6__ASTER = 0x42 -> ASTER
+    // from [8:5]).  Kernel request+enable, ASTEN master gate on,
+    // kernel mode -> ISUM ASTK (bit 3).
+    CpuState cpu2{};
+    ExecCtx ctx{};
+    ctx.cpu = &cpu2;
+    InstructionGrain gAstrr = makeHwGrain(0x1D, /*ra*/ 31, /*scbd*/ 0x44,
+                                          kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = uint64_t{1} << 9;                        // ASTRR[K]
+    palBox::execHwMtpr(gAstrr, ctx);
+    InstructionGrain gAster = makeHwGrain(0x1D, /*ra*/ 31, /*scbd*/ 0x42,
+                                          kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = uint64_t{1} << 5;                        // ASTER[K]
+    palBox::execHwMtpr(gAster, ctx);
+    cpu2.ier  = coreLib::kIerAstenBit;
+    cpu2.mode = Mode_Privilege::Kernel;
+    CHECK(coreLib::pendingSoftInt(cpu2) == (uint64_t{1} << 3));   // ASTK
+
+    // Ack-path read fidelity: trap__interrupt_ack_ast RMWs through
+    // EV6__ASTRR -- the MFPR must return the full PCTX view with
+    // ASTRR at [12:9].
+    InstructionGrain gPctxRd = makeHwGrain(0x19, /*ra*/ 6, /*scbd*/ 0x44,
+                                           kHwMfprFlags, &palBox::execHwMfpr);
+    BoxResult rPctx = palBox::execHwMfpr(gPctxRd, ctx);
+    CHECK(((rPctx.regWriteValue >> 9) & 0xFULL) == 1u);   // ASTRR[K] visible
+}
+
+TEST_CASE("SIRR liveness loop: request -> deliverable -> clear -> quiescent (T7)")
+{
+    // The Sec 2 hazard as a test: the full loop the guest PAL closes
+    // once state AND delivery exist.  If any leg breaks -- request
+    // lost (the old no-op), deliverable never true (no delivery), or
+    // clear not honored (poller hangs forever) -- this case fails.
+    CpuState cpu{};
+    ExecCtx ctx{};
+    ctx.cpu = &cpu;
+
+    // Guest enables IPL 3 (RESCHED) + IPL 4 (IOPOST) -- the hot VMS pair.
+    cpu.ier = sirBit(3) | sirBit(4);
+
+    // 1. REQUEST: driver fork posts IPL 4 via CALL_PAL MTPR_SIRR's
+    //    hw_mtpr (the PAL software already OR'd; HW sees a full store).
+    InstructionGrain gMt = makeHwGrain(0x1D, /*ra*/ 31, kScbdSirr,
+                                       kHwMtprFlags, &palBox::execHwMtpr);
+    ctx.opB = sirBit(4);
+    palBox::execHwMtpr(gMt, ctx);
+
+    // 2. DELIVERABLE: the run-loop predicate fires and the handler's
+    //    ISUM read decodes the cause.
+    CHECK(coreLib::pendingSoftInt(cpu) == sirBit(4));
+    InstructionGrain gMf = makeHwGrain(0x19, /*ra*/ 4, kScbdIsum,
+                                       kHwMfprFlags, &palBox::execHwMfpr);
+    BoxResult rIsum = palBox::execHwMfpr(gMf, ctx);
+    CHECK(rIsum.regWriteValue == sirBit(4));
+
+    // 3. CLEAR: trap__interrupt_sw_found clears the taken bit by
+    //    mfpr/bic/mtpr -- emulate the RMW through the leaves.
+    InstructionGrain gSirrRd = makeHwGrain(0x19, /*ra*/ 8, kScbdSirr,
+                                           kHwMfprFlags, &palBox::execHwMfpr);
+    BoxResult rSirr = palBox::execHwMfpr(gSirrRd, ctx);
+    ctx.opB = rSirr.regWriteValue & ~sirBit(4);
+    palBox::execHwMtpr(gMt, ctx);
+
+    // 4. QUIESCENT: the next ISUM read shows the bit GONE (live
+    //    derivation -- a staged copy would still show it) and the
+    //    delivery predicate stands down.
+    CHECK(cpu.sirr == 0);
+    CHECK(coreLib::pendingSoftInt(cpu) == 0);
+    BoxResult rIsum2 = palBox::execHwMfpr(gMf, ctx);
+    CHECK(rIsum2.regWriteValue == 0);
 }

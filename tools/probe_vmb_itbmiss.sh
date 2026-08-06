@@ -33,12 +33,16 @@ cd "$RUN_DIR"
 
 EXE="./Emulatr.exe"
 FW="firmware/ds20_v7_3.exe"
+# 2026-07-31: per-instance run environment (FILE 7).  Sourcing this owns
+# STEM/TAG/TS, the log-name helper, and the per-instance flash NVRAM,
+# sentinels and console port -- concurrent instances no longer collide.
+. "$SCRIPT_DIR/emulatr_run_env.sh"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
 MAXCYC="${MAXCYC:-22000000000}"
 PROBE_VA="${PROBE_VA:-0x20000000}"
 mkdir -p logs traces
 STAMP="$(date +%Y%m%d_%H%M%S)"
-LOG="logs/probe_vmb_itbmiss_${STAMP}.log"
+LOG="$(emulatr_log probe_itbmiss)"   # logs/<TAG>_probe_itbmiss_<TS>.log (FILE 7)
 
 [[ -x "$EXE" ]] || { echo "FATAL: $EXE not found in $RUN_DIR"; exit 1; }
 [[ -f "$FW"  ]] || { echo "FATAL: $FW not found (DS20 firmware)"; exit 1; }

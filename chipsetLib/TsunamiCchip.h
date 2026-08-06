@@ -56,25 +56,34 @@
 //   0x0100    AAR0     RW     Array Address Register 0
 //   0x0140    AAR1     RW     Array Address Register 1
 //   0x0180    AAR2     RW     Array Address Register 2
-//   0x01C0    AAR3     RO     Array Address Register 3
+//   0x01C0    AAR3     RW     Array Address Register 3
 //   0x0200    DIM0     RW     Device Interrupt Mask (CPU 0)
 //   0x0240    DIM1     RW     Device Interrupt Mask (CPU 1)
 //   0x0280    DIR0     RO     Device Interrupt Request (CPU 0) [computed]
 //   0x02C0    DIR1     RO     Device Interrupt Request (CPU 1) [computed]
 //   0x0300    DRIR     RO*    Device Raw Interrupt Request
 //   0x0340    PRBEN    RW     Probe Enable
-//   0x0380    IIC0     RW     Inter-processor Interrupt Control (CPU 0)
-//   0x03C0    IIC1     RW     Inter-processor Interrupt Control (CPU 1)
-//   0x0400    MPR0     RO     Memory Port Status 0
-//   0x0440    MPR1     RO     Memory Port Status 1
-//   0x0480    MPR2     RO     Memory Port Status 2
-//   0x04C0    MPR3     RO     Memory Port Status 3
-//   0x0500    DIM2     RW     Device Interrupt Mask (CPU 2)
-//   0x0540    DIM3     RW     Device Interrupt Mask (CPU 3)
-//   0x0580    DIR2     RO     Device Interrupt Request (CPU 2) [computed]
-//   0x05C0    DIR3     RO     Device Interrupt Request (CPU 3) [computed]
-//   0x0600    IIC2     RW     Inter-processor Interrupt Control (CPU 2)
-//   0x0640    IIC3     RW     Inter-processor Interrupt Control (CPU 3)
+//   0x0380    IIC0     RW     Interval Ignore Count (CPU 0)
+//   0x03C0    IIC1     RW     Interval Ignore Count (CPU 1)
+//   0x0400    MPR0     WO     Memory Programming Register 0
+//   0x0440    MPR1     WO     Memory Programming Register 1
+//   0x0480    MPR2     WO     Memory Programming Register 2
+//   0x04C0    MPR3     WO     Memory Programming Register 3
+//   0x0580    TTR      RW     TIGbus Timing Register
+//   0x05C0    TDR      RW     TIGbus Device Timing Register
+//   0x0600    DIM2     RW     Device Interrupt Mask (CPU 2)   [Typhoon]
+//   0x0640    DIM3     RW     Device Interrupt Mask (CPU 3)   [Typhoon]
+//   0x0680    DIR2     RO     Device Interrupt Request (CPU 2) [computed]
+//   0x06C0    DIR3     RO     Device Interrupt Request (CPU 3) [computed]
+//   0x0700    IIC2     RW     Interval Ignore Count (CPU 2)   [Typhoon]
+//   0x0740    IIC3     RW     Interval Ignore Count (CPU 3)   [Typhoon]
+//
+//   (Comment table corrected 2026-08-02, Batch F doc sweep, JRN-AUD-003
+//   A-17: prior text placed DIM2/3-DIR2/3 at 0x500-0x5C0 and IIC2/3 at
+//   0x600/0x640, colliding with TTR/TDR, labeled AAR3 RO, and misnamed
+//   IIC "Inter-processor Interrupt Control" -- IICn is the interval-timer
+//   IGNORE COUNT (HRM Table 10-20); IPIs go through MISC<IPREQ>.  Offsets
+//   above now match HRM Tables 10-7/10-8 and the code's RegisterMap.)
 //
 //   * DRIR is written by devices via assertInterrupt()/deassertInterrupt(),
 //     not by CPU MMIO writes. CPU writes to DRIR offset are ignored.
@@ -145,6 +154,29 @@
 // ============================================================================
 // CHANGE HISTORY
 // ============================================================================
+//
+//   2026-08-03  Batch H-2 rider (JRN-SCSI-037, architect-mandated cap fix).
+//               FUNCTION: assertInterrupt (CCHIP-ASSERT probe gate).
+//               CHANGE:  Probe cap widened from first-64 ONLY to first 64
+//                        PLUS every 1024th assert.  The pure first-N form
+//                        spent all 64 rows in the console era of the
+//                        2026-08-02 ledger run and left VMS-era interrupt
+//                        assertion DARK (JRN-SCSI-036 E-5) -- the second
+//                        bounded probe in two days to go permanently
+//                        silent before the era that mattered.  Sweep note:
+//                        the UNKNOWN read/write probes in this file
+//                        already carry every-0x10000th keep-alive arms and
+//                        were left as-is.  Observation only.
+//
+//   2026-08-02  P-2 diagnostic (JRN-SES-001 Sec 4, architect-approved).
+//               FUNCTION: miscWriteW1C (ITINTR clear block).
+//               CHANGE:  Bounded ITINTR-ack counter (first 8 loud + every
+//                        1024th): a W1C of MISC<ITINTR> comes only from the
+//                        guest timer ISR, so these rows answer "is VMS
+//                        servicing b_irq<2>" directly -- the co-equal
+//                        blocker of JRN-SCSI-035 Sec 3 (EXE$GL_ABSTIM=0).
+//                        Observation only; no behavior change.  REMOVAL
+//                        TRIGGER: the clock blocker is root-caused.
 //
 //   2026-05-17  Phase B uniform-CSR-surface refactor.  Storage:
 //               m_misc switched to std::atomic<uint64_t> for CAS-loop
@@ -437,17 +469,26 @@ public:
     {
        // static_assert(bit >= 0 && bit < 64);
         m_drir.fetch_or(1ULL << bit, std::memory_order_release);
-        // PROBE 2026-08-01 (JRN-SCSI-034) -- OBSERVATION ONLY, bounded to 64.
+        // PROBE 2026-08-01 (JRN-SCSI-034) -- OBSERVATION ONLY.
         // DIR[N] = DRIR & DIM[N].  A device can assert, DRIR can latch the bit,
         // and the CPU still never see it if the guest has not enabled that bit
         // in DIM[N].  delivered=0 means exactly that: asserted, latched, masked.
         // Measured need: the NCR 810 model is confirmed to raise its line
         // (N810-PHASEMISMATCH armed=1 irq=1) while SYS$PKEDRIVER never receives
         // an interrupt.  This is the last unexamined link between the two.
+        // 2026-08-03 Batch H-2 rider (JRN-SCSI-037, architect-mandated):
+        // cap widened from first-64-ONLY to first 64 PLUS every 1024th.
+        // The pure first-N form went dark before the VMS era in the
+        // 2026-08-02 ledger run (JRN-SCSI-036 E-5) -- the second bounded
+        // probe in two days to go permanently silent before the era that
+        // mattered.  First-N-plus-every-Mth is now the required shape for
+        // ACTIVITY probes (one-shot CAPTURE probes like N810-SCRIPTDUMP
+        // are a different class and stay first-N by design).
         // TODO(CCHIP-ASSERT-PROBE): remove once the delivery path is resolved.
         {
             static unsigned s_nCa = 0;
-            if (s_nCa < 64) { ++s_nCa;
+            ++s_nCa;
+            if (s_nCa <= 64 || (s_nCa & 0x3FFu) == 0) {
                 uint64_t const drirNow = m_drir.load(std::memory_order_relaxed);
                 uint64_t const dim0    = m_dim[0].load(std::memory_order_relaxed);
                 std::fprintf(stderr,
@@ -993,6 +1034,8 @@ public:
 #if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
+            // (H-2 cap sweep 2026-08-03: NOT widened -- the else-arm below
+            // already keeps this alive every 0x10000th event.)
             if (n < 32) {
                 std::fprintf(stderr,
                              "TsunamiCchip: UNKNOWN READ offset=0x%08llx "
@@ -1212,6 +1255,8 @@ public:
 #if EMULATR_BRINGUP_PROBES
             static std::atomic<uint64_t> s_cnt{ 0 };
             uint64_t const n = s_cnt.fetch_add(1, std::memory_order_relaxed);
+            // (H-2 cap sweep 2026-08-03: NOT widened -- the else-arm below
+            // already keeps this alive every 0x10000th event.)
             if (n < 32) {
                 std::fprintf(stderr,
                              "TsunamiCchip: UNKNOWN WRITE offset=0x%08llx "
@@ -1449,6 +1494,27 @@ private:
         // -----------------------------------------------------------------
         uint64_t const itintrClears = writeVal & mask(MISC::ITINTR);
         if (itintrClears != 0) {
+            // P-2 (2026-08-02, JRN-SES-001 Sec 4, architect-approved):
+            // bounded ITINTR-ack counter, first 8 loud + every 1024th.
+            // Direct answer to "is VMS servicing b_irq<2>": a W1C of
+            // MISC<ITINTR> can only come from the guest's timer ISR path.
+            // Decode matrix (JRN-SES-001 Sec 4): diverts continuing + acks
+            // continuing = fault is past the ISR; diverts without acks =
+            // PAL ISUM/SCB dispatch; neither = our delivery gate.
+            {
+                static std::atomic<uint64_t> s_ack{ 0 };
+                uint64_t const a =
+                    s_ack.fetch_add(1, std::memory_order_relaxed);
+                if (a < 8 || (a & 0x3FFu) == 0) {
+                    std::fprintf(stderr,
+                        "TsunamiCchip: ITINTR-ACK[%llu] W1C cpumask=0x%llx "
+                        "(guest timer ISR acknowledged b_irq<2>)\n",
+                        static_cast<unsigned long long>(a),
+                        static_cast<unsigned long long>(
+                            itintrClears >> MISC::ITINTR.lsb));
+                    std::fflush(stderr);
+                }
+            }
             // ITINTR is a 4-bit field at lsb=4.  Bit (4+n) corresponds
             // to CPU n; iterate and clear the per-CPU latch for any bit
             // the writer set.

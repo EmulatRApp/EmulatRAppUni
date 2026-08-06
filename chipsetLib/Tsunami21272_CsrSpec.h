@@ -450,14 +450,27 @@ namespace Dchip {
 
 namespace Pchip {
 
-    // TODO(spec-extract): WSBA0-3, WSM0-3, TBA0-3, PCTL, PLAT,
-    // PERROR (W1C), PERRMASK, PERRSET (WO), TLBIV (WO), TLBIA (WO),
-    // PMONCTL, PMONCNT, SPRST (WO).  HRM Chapter 11.
-    //
-    // Known so far (existing V4 code in TsunamiPchip.h):
-    //   PCTL reset = 0x0 (all features disabled).
-    //   PERROR is W1C.
-    //   WSBA*<0> = window enable, WSBA*<1> = scatter-gather enable.
+    // Spec-extract DISCHARGED 2026-08-02 (JRN-PCI-001 Sec 4; HRM Ch 10.2.5,
+    // Tables 10-35..10-48).  Field masks are ENFORCED at the write seam in
+    // TsunamiPchip::writeCSR; recorded here as the authority:
+    //   WSBA0-2 : ADDR<31:20>, SG<1>, ENA<0>; rest MBZ.        (10-35)
+    //   WSBA3   : DAC<39>, ADDR<31:20>, ENA<0>; SG<1> RO = 1.  (10-36)
+    //   WSM0-3  : AM<31:20>; rest MBZ.                         (10-37)
+    //   TBA0-3  : ADDR<34:10>; rest MBZ.                       (10-38/39)
+    //   PCTL    : RW mask 0x1CF3F0F0FF (PTEVRFY<44> FDWDIS<43>
+    //             FDSDIS<42> PTPMAX<39:36> CRQMAX<35:32> CDQMAX<23:20>
+    //             ECCEN<18> PPRI<15> PRIGRP<14:8> <7:0>); RO: PID<47:46>
+    //             RPP<45> PCLKX<41:40> REV<31:24> PADM<19>.
+    //             Init: PTPMAX=2 CRQMAX=1 CDQMAX=1.            (10-40)
+    //   PLAT    : LAT<15:8>.                                   (10-41)
+    //   PERROR  : W1C <11:0>; freeze-on-first + LOST<0> + INFO
+    //             capture <63:16>; unfreeze deasserts b_error. (10-42)
+    //   PERRMASK: MASK<11:0>; 0 gates latching AND PERRSET.    (10-43)
+    //   PERRSET : WO; honors PERRMASK and freeze/LOST.         (10-44)
+    //   TLBIV/TLBIA: WO; architectural no-ops under the TLB-less
+    //             SG walk (JRN-PCI-001 B-9).                   (10-45/46)
+    //   PMONCTL/PMONCNT: storage stub (perf monitor).          (10-47/48)
+    //   SPRST   : WO sink (no PCI RST# fanout modeled).
 
 } // namespace Pchip
 

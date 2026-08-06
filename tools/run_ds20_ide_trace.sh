@@ -40,10 +40,14 @@ if   [ -x "./Emulatr.exe" ]; then EXE="./Emulatr.exe"
 elif [ -x "./Emulatr"     ]; then EXE="./Emulatr"
 else echo "FATAL: no Emulatr(.exe) in $RUN_DIR"; exit 1; fi
 FW="firmware/ds20_v7_3.exe"
+# 2026-07-31: per-instance run environment (FILE 7).  Sourcing this owns
+# STEM/TAG/TS, the log-name helper, and the per-instance flash NVRAM,
+# sentinels and console port -- concurrent instances no longer collide.
+. "$SCRIPT_DIR/emulatr_run_env.sh"
 PORT="${EMULATR_CONSOLE_PORT:-10023}"
 MAXCYC="${MAXCYC:-22000000000}"
 mkdir -p logs
-LOG="logs/ds20_ide_trace_$(date +%Y%m%d_%H%M%S).log"
+LOG="$(emulatr_log ide_trace)"   # logs/<TAG>_ide_trace_<TS>.log (FILE 7)
 
 [[ -x "$EXE" ]] || { echo "FATAL: $EXE not found in $RUN_DIR"; exit 1; }
 [[ -f "$FW"  ]] || { echo "FATAL: $FW not found (DS20 firmware)"; exit 1; }
