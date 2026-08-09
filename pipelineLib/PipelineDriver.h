@@ -380,8 +380,52 @@ struct PipelineDriver
                 std::fflush(stderr);
             }
         }
+        // (WP-SPIN/WP-POLL probe removed 2026-08-07, BRIEF-N810-RESEL-001
+        // Edit 3: JRN-SCSI-043 marked it spent; its measurement -- the
+        // UCB$L_STS busy-wait, awaited mask 0x10000 -- is on the record in
+        // JRN-SCSI-043 Sec 3.4.)
 #endif
         // ---- END periodic PC sampler ----
+
+        // ---- P-AST-1 spin-PC sampler (JRN-AST-001 Sec 6 E1; REMOVE after
+        // capture).  The crash dump proved an exec-mode AST sits queued +
+        // pending on SYSINIT's PCB while $SYNCH polls at
+        // EXE_STD$SYNCH_LOOP_C+94; this samples every term of
+        //   AST[E] = ASTRR[E] & ASTER[E] & IER.ASTEN & (CM >= E)
+        // at the spin PC to name the false one.  Runtime-gated on
+        // EMULATR_AST_PROBE=<hex spin pc> (e.g. FFFFFFFF8016E394); first 8
+        // hits then every 4096th, capped at 256 rows.
+        {
+            static uint64_t const s_astProbePc = [] {
+                char const* e = std::getenv("EMULATR_AST_PROBE");
+                return e ? std::strtoull(e, nullptr, 16) : 0ull;
+            }();
+            if (s_astProbePc != 0 && cpu.pcAddr() == s_astProbePc) {
+                static uint64_t s_astHits = 0;
+                static uint64_t s_astRows = 0;
+                if (s_astRows < 256 &&
+                    (s_astHits < 8 || (s_astHits & 0xFFFull) == 0)) {
+                    std::fprintf(stderr,
+                        "AST-PROBE cyc=%llu pc=0x%llx hit=%llu mode=%d pal=%d "
+                        "asten_sr=0x%02llx ier13=%d ier=0x%llx sirr=0x%llx "
+                        "isumSw=0x%llx\n",
+                        static_cast<unsigned long long>(cpu.cycleCount),
+                        static_cast<unsigned long long>(cpu.pcAddr()),
+                        static_cast<unsigned long long>(s_astHits),
+                        static_cast<int>(cpu.mode),
+                        cpu.inPalMode() ? 1 : 0,
+                        static_cast<unsigned long long>(cpu.asten_sr),
+                        static_cast<int>((cpu.ier >> 13) & 1),
+                        static_cast<unsigned long long>(cpu.ier),
+                        static_cast<unsigned long long>(cpu.sirr),
+                        static_cast<unsigned long long>(coreLib::pendingSoftInt(cpu)));
+                    std::fflush(stderr);
+                    ++s_astRows;
+                }
+                ++s_astHits;
+            }
+        }
+        // ---- END P-AST-1 sampler ----
 
 #if EMULATR_MEMDIAG
         // TEMP DIAG 2026-05-30 (clock-return fetch source) -- REMOVE BEFORE COMMIT.

@@ -167,7 +167,10 @@ enum HW_IPR : uint16_t {
                                 // write = HW_REI return target.  Bit[0]
                                 // = PAL mode of interrupted context.
     HW_IVA_FORM     = 0x0107,   // Instruction VA Format (read-only).
-    HW_CM           = 0x0109,   // Current Mode (PS<CM>); 00=K,01=E,10=S,11=U.
+    HW_CM           = 0x0109,   // PS (Current Mode); DATA CM at bits [4:3]
+                                // (ev6_defs EV6__PS__CM__S=3); 00=K,01=E,
+                                // 10=S,11=U.  Decode fixed 2026-08-09
+                                // (JRN-AST-001; was read at [1:0]).
     HW_IER          = 0x010A,   // Interrupt Enable Register.
     HW_IER_CM       = 0x010B,   // IER + CM combined write.
     HW_SIRR         = 0x010C,   // Software Interrupt Request Register.

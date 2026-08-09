@@ -358,13 +358,43 @@ struct Ev6Translator
     //     4. Kseg detection
     //     5.TODO (page walk -- not yet implemented) -> DtbMiss
     // -------------------------------------------------------------
+    //   forceKernelChecks (added 2026-08-09, JRN-AST-001 OBS-4): HW_LD
+    //   TYPE=010 Virtual/VPTE performs KERNEL access checks regardless
+    //   of current mode (21264 HRM Table 6-3: "Kernel mode access
+    //   checks are performed").  Unreachable divergence while CM was
+    //   stuck kernel (pre-fix); with real modes, an exec-context DTB
+    //   miss whose VPTE load was checked as EXEC hit the kernel-only
+    //   page-table PTE -> dfault-of-ld_vpte -> the VMS PAL's
+    //   trap__ldvpte_dfault (ev6_vms_pal.mar:5689) -> HALT 4 "invalid
+    //   PTBR".  The flag applies to BOTH the kseg privilege gate and
+    //   the PTE protection check -- the HRM sentence governs the
+    //   access, not one check.
+    //
+    //   TRANSITIONAL HEDGE, on the record (architect ruling 2026-08-09):
+    //   the DEFAULTED bool preserves the ambient-authority pattern (the
+    //   translator fishing cpu.mode from ambient state) that produced
+    //   this defect family (CM decode / VPTE check / no-op'd ALT_MODE
+    //   -- one conflation, three surfacings).  REMOVAL TRIGGER: the
+    //   accessMode refactor -- translation takes a REQUIRED access-mode
+    //   parameter computed at ONE site (the drainer) from instruction +
+    //   CpuState; on Alpha the access mode is a property of THE ACCESS,
+    //   not of the CPU.  Refactor preconditions (both cheap, both
+    //   REQUIRED first): (1) the Virtual/Alt arm must consume a MODELED
+    //   DTB_ALT_MODE IPR or assert -- never silently fall back to
+    //   cpu.mode; (2) the PAL-mode-vs-CM effective-mode rule must be
+    //   confirmed against the ARM/HRM, not asserted from memory.  Do
+    //   NOT add further callers relying on the default.
     AXP_HOT AXP_FLATTEN
     static TranslationResult translateData(
         coreLib::CpuState const& cpu,
         coreLib::VAType va,
         coreLib::AccessKind access,
-        coreLib::PAType& pa_out) noexcept
+        coreLib::PAType& pa_out,
+        bool forceKernelChecks = false) noexcept
     {
+        coreLib::Mode_Privilege const chkMode = forceKernelChecks
+            ? coreLib::Mode_Privilege::Kernel
+            : cpu.mode;
         // C5 (2026-05-27): the blanket PAL-mode physical bypass is REMOVED.
         // EV6 PAL mode does NOT disable D-stream translation -- only the
         // explicitly-physical accesses (HW_LD / HW_ST / LDQP / STQP, tagged
@@ -404,7 +434,7 @@ struct Ev6Translator
         // VA matches an enabled SPE region; NotKseg otherwise.
         coreLib::PAType ksegPa = 0;
         TranslationResult kr = tryKsegTranslate(
-            va, cpu.mode, cpu.m_spe, ksegPa);
+            va, chkMode, cpu.m_spe, ksegPa);
         if (kr == TranslationResult::Success) {
             pa_out = ksegPa & kEv6PaMask;
 #if defined(EMULATR_BRINGUP_PROBES)
@@ -414,6 +444,39 @@ struct Ev6Translator
             return TranslationResult::Success;
         }
         if (kr == TranslationResult::AccessViolation) {
+            // ---- P-AST-1 E4 kseg-ACV probe (JRN-AST-001 OBS-3; REMOVE
+            // after capture).  With the CM decode fixed, PAL handlers can
+            // now run while cpu.mode = interrupted EXEC/USER; kseg here is
+            // gated on Kernel alone (no PALmode term).  Logs every kseg-
+            // shaped ACV so the invalid-PTBR halt's mechanism is named.
+            {
+                static bool const s_astProbe =
+                    std::getenv("EMULATR_AST_PROBE") != nullptr;
+                if (s_astProbe) {
+                    static unsigned long s_kacv = 0;
+                    if (s_kacv < 32) { ++s_kacv;
+                        // chk = the mode the gate actually ran with; fk =
+                        // forceKernelChecks.  (External review 2026-08-09:
+                        // the original row printed cpu.mode only, which
+                        // misreports the forced-kernel case -- the body was
+                        // copied from the I-side, where cpu.mode IS the
+                        // checked mode.)
+                        std::fprintf(stderr,
+                            "AST-KACV D cyc=%llu pc=0x%llx va=0x%llx mode=%d "
+                            "chk=%d fk=%d pal=%d spe=%u\n",
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(cpu.pc),
+                            static_cast<unsigned long long>(va),
+                            static_cast<int>(cpu.mode),
+                            static_cast<int>(chkMode),
+                            forceKernelChecks ? 1 : 0,
+                            cpu.inPalMode() ? 1 : 0,
+                            static_cast<unsigned>(cpu.m_spe));
+                        std::fflush(stderr);
+                    }
+                }
+            }
+            // ---- END P-AST-1 E4 (D-side) ----
             return TranslationResult::AccessViolation;
         }
 
@@ -450,7 +513,7 @@ struct Ev6Translator
 #endif
         if (r.isHit()) {
             TranslationResult const hit =
-                applyTlbHit(r.pte, va, access, cpu.mode, pa_out);
+                applyTlbHit(r.pte, va, access, chkMode, pa_out);
 #if defined(EMULATR_BRINGUP_PROBES)
             // ACVPROBE Hook B (2026-07-09): the ES40 memtest ACV (task: ES40
             // memtest ACV, PC 0x1b7dd4 LDQ probe on VA 0xFFFFFFFF_7F827F5F) is
@@ -586,7 +649,8 @@ struct Ev6Translator
         coreLib::VAType va,
         uint8_t accessSize,
         coreLib::AccessKind access,
-        coreLib::PAType& pa_out) noexcept
+        coreLib::PAType& pa_out,
+        bool forceKernelChecks = false) noexcept
     {
         // Alignment check is uniform across PAL / non-PAL modes (it runs
         // here, before translateData; a misaligned PAL-mode access trips the
@@ -609,7 +673,7 @@ struct Ev6Translator
             logUnalignedEvent(cpu.cycleCount, cpu.pcAddr(), va,
                               accessSize, cpu.inPalMode());
         }
-        return translateData(cpu, va, access, pa_out);
+        return translateData(cpu, va, access, pa_out, forceKernelChecks);
     }
 
 
@@ -681,6 +745,26 @@ struct Ev6Translator
             return TranslationResult::Success;
         }
         if (kr == TranslationResult::AccessViolation) {
+            // P-AST-1 E4, I-side twin (JRN-AST-001 OBS-3; REMOVE after capture).
+            {
+                static bool const s_astProbe =
+                    std::getenv("EMULATR_AST_PROBE") != nullptr;
+                if (s_astProbe) {
+                    static unsigned long s_kacvI = 0;
+                    if (s_kacvI < 32) { ++s_kacvI;
+                        std::fprintf(stderr,
+                            "AST-KACV I cyc=%llu pc=0x%llx va=0x%llx mode=%d "
+                            "pal=%d spe=%u\n",
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(cpu.pc),
+                            static_cast<unsigned long long>(va),
+                            static_cast<int>(cpu.mode),
+                            cpu.inPalMode() ? 1 : 0,
+                            static_cast<unsigned>(cpu.i_spe));
+                        std::fflush(stderr);
+                    }
+                }
+            }
             return TranslationResult::AccessViolation;
         }
 

@@ -339,8 +339,21 @@ private:
             coreLib::AccessKind const access = r.memIsStore
                 ? coreLib::AccessKind::DataWrite
                 : coreLib::AccessKind::DataRead;
+            // HW_LD TYPE=010 Virtual/VPTE performs KERNEL access checks
+            // regardless of current mode (21264 HRM Table 6-3) -- the
+            // PALcode's page-table fetch must not be gated by the
+            // interrupted context's mode.  Checked as EXEC it hits the
+            // kernel-only page-table PTE -> dfault-of-ld_vpte -> the VMS
+            // PAL's HALT 4 "invalid PTBR" (trap__ldvpte_dfault,
+            // ev6_vms_pal.mar:5689).  Fixed 2026-08-09, JRN-AST-001
+            // OBS-4.  (HW_LD/HW_ST Virtual/Alt -- TYPE 11x, checks via
+            // DTB_ALT_MODE -- remains unmodeled: DTB_ALT_MODE writes are
+            // silent no-ops today.  Separate item, same defect family.)
+            bool const vpteKernel =
+                slot.grain.primaryOp == 0x1Bu
+                && ((slot.grain.encoded >> 13) & 0x7u) == 0x2u;
             tr = mmuLib::Ev6Translator::translateDataAligned(
-                cpu, r.memAddr, r.memSize, access, pa);
+                cpu, r.memAddr, r.memSize, access, pa, vpteKernel);
         }
 
 #if EMULATR_MEMDIAG

@@ -301,20 +301,30 @@ TEST_CASE("palBox::execHwMtpr -- writes HW_VA_CTL into CpuState::va_ctl")
     CHECK(cpu.va_ctl == 0x2ULL);
 }
 
-TEST_CASE("palBox::execHwMtpr -- writes HW_CM clamps to bottom 2 bits")
+TEST_CASE("palBox::execHwMtpr -- HW_CM (PS) takes CM from DATA bits [4:3]")
 {
+    // EV6 PS data format: CM<4:3> (ev6_defs.mar EV6__PS__CM__S = 3; the
+    // VMS PAL's `ASSUME EV6__PS__CM__S eq 3` before its `hw_mtpr EV6__PS
+    // ; write new cm` REI sites).  Fixed 2026-08-09, JRN-AST-001 -- the
+    // old decode read bits [1:0], turning every guest mode change into
+    // kernel and blocking exec/super/user AST delivery.
     InstructionGrain g = makeHwGrain(0x1D, /*ra*/ 31, kScbdCm,
                                       kHwMtprFlags, &palBox::execHwMtpr);
     CpuState cpu{};
     cpu.mode = Mode_Privilege::Kernel;
     ExecCtx ctx{};
     ctx.cpu = &cpu;
-    ctx.opB = 0xFFFFFFFFFFFFFFFCULL | 2ULL;   // bits[1:0] = 10b -> Supervisor
+    ctx.opB = (2ULL << 3) | 0x3ULL;   // CM<4:3> = 10b Supervisor; [1:0] noise ignored
 
     BoxResult r = palBox::execHwMtpr(g, ctx);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.mode == Mode_Privilege::Supervisor);
+
+    // Executive via the same field; and the PS read returns CM at [4:3].
+    ctx.opB = 1ULL << 3;
+    (void)palBox::execHwMtpr(g, ctx);
+    CHECK(cpu.mode == Mode_Privilege::Executive);
 }
 
 TEST_CASE("palBox::execHwMtpr -- unknown selector raises kFaultUnimplemented")

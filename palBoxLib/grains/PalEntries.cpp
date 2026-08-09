@@ -99,6 +99,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>   // getenv -- P-AST-1 E2 gate (JRN-AST-001 Sec 6)
 
 // MEMDIAG -- temporary TB-fill probe.  Shares the on/off switch name with
 // MemDrainer.h but is defined locally because this TU does not include that
@@ -223,6 +224,7 @@ AXP_HOT AXP_FLATTEN
 inline void applyPctxWrite(coreLib::CpuState& cpu, uint8_t fieldMask,
                            uint64_t value) noexcept
 {
+    uint64_t const astBefore = cpu.asten_sr;   // P-AST-1 E2 (JRN-AST-001)
     if (fieldMask & 0x01u) {                   // ASN
         cpu.asn = static_cast<coreLib::ASNType>((value >> 39) & 0xFFULL);
     }
@@ -238,6 +240,36 @@ inline void applyPctxWrite(coreLib::CpuState& cpu, uint8_t fieldMask,
     if (fieldMask & 0x10u) {                   // FPE
         cpu.fen = (value >> 2) & 1ULL;
     }
+
+    // ---- P-AST-1 asten_sr transition log (JRN-AST-001 Sec 6 E2; REMOVE
+    // after capture).  Logs every ASTER/ASTRR change so the run shows
+    // SCH$QAST's exec-request arriving -- and any later write that CLEARS
+    // the exec bits (the halt-time AST{SR/EN}=0 explanation).  Gated on
+    // the same EMULATR_AST_PROBE env as the E1 sampler.  First 512
+    // changes; exec-bit (0x22) changes always logged, hard cap 4096.
+    {
+        static bool const s_astProbe = std::getenv("EMULATR_AST_PROBE") != nullptr;
+        if (s_astProbe && (fieldMask & 0x06u) != 0 &&
+            cpu.asten_sr != astBefore) {
+            static uint64_t s_rows = 0;
+            bool const eBits = ((astBefore ^ cpu.asten_sr) & 0x22ULL) != 0;
+            if (s_rows < 512 || (eBits && s_rows < 4096)) {
+                std::fprintf(stderr,
+                    "AST-PCTX cyc=%llu pc=0x%llx mode=%d mask=0x%02x "
+                    "asten_sr=0x%02llx->0x%02llx%s\n",
+                    static_cast<unsigned long long>(cpu.cycleCount),
+                    static_cast<unsigned long long>(cpu.pc),
+                    static_cast<int>(cpu.mode),
+                    static_cast<unsigned>(fieldMask),
+                    static_cast<unsigned long long>(astBefore),
+                    static_cast<unsigned long long>(cpu.asten_sr),
+                    eBits ? " EBIT" : "");
+                std::fflush(stderr);
+                ++s_rows;
+            }
+        }
+    }
+    // ---- END P-AST-1 E2 ----
 }
 
 [[nodiscard]] AXP_HOT AXP_FLATTEN
@@ -2308,7 +2340,16 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
               | ((c.cpu->cycleCount * coreLib::CpuState::kCcMultiplier)
                  & 0xFFFFFFFFULL);
         break;
-    case coreLib::HW_CM:       value = static_cast<uint64_t>(c.cpu->mode); break;
+        // FIXED 2026-08-09 (JRN-AST-001, with the write-side fix): a PS
+        // read returns CM in its architected DATA position, bits [4:3]
+        // (ev6_defs.mar EV6__PS__CM__S = 3).  The old form returned the
+        // enum at [1:0].  No PAL read site exists today (the VMS PAL
+        // shadows PS internally -- zero hw_mfpr EV6__PS sites in
+        // ev6_vms_pal/callpal.mar), so this is faithfulness hardening,
+        // not a behavior change.
+    case coreLib::HW_CM:
+        value = (static_cast<uint64_t>(c.cpu->mode) & 0x3ULL) << 3;
+        break;
 
         // HW_ISUM (Interrupt Summary, scbd 0x0D).  HARDWARE causes
         // (EI/SL/CR/PC) come from cpu->isum, staged by the divert
@@ -2794,6 +2835,33 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 #endif
         break;
     case coreLib::HW_IER_CM:
+        // ---- P-AST-1 E3 CM-transition log (JRN-AST-001; REMOVE after
+        // capture).  The E1 sampler proved cpu.mode reads KERNEL at the
+        // $SYNCH spin while an exec AST waits (the false term of the
+        // delivery equation).  This logs every IER_CM write that CHANGES
+        // CM (plus the first 16 regardless), naming who sets mode and
+        // whether a nonzero CM ever lands.  Gated on EMULATR_AST_PROBE.
+        {
+            static bool const s_astProbe =
+                std::getenv("EMULATR_AST_PROBE") != nullptr;
+            if (s_astProbe) {
+                auto const newMode = coreLib::ierCmExtractMode(c.opB);
+                static uint64_t s_rows = 0;
+                if ((newMode != c.cpu->mode || s_rows < 16) && s_rows < 1024) {
+                    std::fprintf(stderr,
+                        "AST-CM cyc=%llu pc=0x%llx ier_cm opB=0x%llx "
+                        "mode %d->%d\n",
+                        static_cast<unsigned long long>(c.cpu->cycleCount),
+                        static_cast<unsigned long long>(c.cpu->pc),
+                        static_cast<unsigned long long>(c.opB),
+                        static_cast<int>(c.cpu->mode),
+                        static_cast<int>(newMode));
+                    std::fflush(stderr);
+                    ++s_rows;
+                }
+            }
+        }
+        // ---- END P-AST-1 E3 (IER_CM arm) ----
         c.cpu->ier = coreLib::ierCmIerPortion(c.opB);
         c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
 #if EMULATR_IRQDIAG
@@ -2851,7 +2919,48 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_CC: {
         c.cpu->ccOffset = (c.opB >> 32) & 0xFFFFFFFFULL;
     }                                       break;
-    case coreLib::HW_CM:       c.cpu->mode = static_cast<coreLib::Mode_Privilege>(c.opB & 0x3ULL); break;
+    case coreLib::HW_CM: {
+        // FIXED 2026-08-09 (JRN-AST-001): CM extraction was `opB & 0x3`
+        // (bits [1:0]); the EV6 PS DATA format carries CM at bits [4:3]
+        // -- ev6_defs.mar EV6__PS__CM__S = 3, and the VMS PALcode's own
+        // guard `ASSUME EV6__PS__CM__S eq 3` (ev6_vms_callpal.mar:3959)
+        // directly above its `hw_mtpr p4, EV6__PS ; write new cm` REI
+        // sites (:4098/:4357/:8150).  With the old decode EVERY guest
+        // mode change read as kernel; harmless for protection (kernel
+        // only loosens) and for kernel-AST delivery (mode K delivers K),
+        // but it blocked ALL exec/super/user AST delivery via the
+        // composeIsumSw `CM >= m` rule -- SYSINIT's XQP exec-mode AST
+        // was the first consumer to expose it (crash-dump + live-probe
+        // record in JRN-AST-001).  ierCmExtractMode is the same [4:3]
+        // field decode IER_CM uses (identical CM placement, ev6_defs
+        // EV6__IER_CM__CM__S = 3).
+        //
+        // P-AST-1 E3 log (REMOVE after the payoff run): now reports the
+        // corrected decode so the fix's first run shows real mode
+        // transitions.
+        {
+            static bool const s_astProbeCm =
+                std::getenv("EMULATR_AST_PROBE") != nullptr;
+            if (s_astProbeCm) {
+                auto const newMode = coreLib::ierCmExtractMode(c.opB);
+                static uint64_t s_rowsCm = 0;
+                if ((newMode != c.cpu->mode || s_rowsCm < 16) && s_rowsCm < 1024) {
+                    std::fprintf(stderr,
+                        "AST-CM cyc=%llu pc=0x%llx cm     opB=0x%llx "
+                        "mode %d->%d\n",
+                        static_cast<unsigned long long>(c.cpu->cycleCount),
+                        static_cast<unsigned long long>(c.cpu->pc),
+                        static_cast<unsigned long long>(c.opB),
+                        static_cast<int>(c.cpu->mode),
+                        static_cast<int>(newMode));
+                    std::fflush(stderr);
+                    ++s_rowsCm;
+                }
+            }
+        }
+        c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
+        break;
+    }
 
         // ---- ITB fill / invalidate (C2b: software-managed TLB) ----
         // ITB_TAG is write-only staging; the VA it holds is consumed when
