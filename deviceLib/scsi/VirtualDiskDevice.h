@@ -35,8 +35,8 @@
 //       03h   yes     yes      SRM + DKDRIVER
 //       04h   yes     yes      SRM + DKDRIVER
 //       05h   yes     no       none observed (flexible disk)
-//       08h   yes     no       PLAUSIBLE NEXT ASK (caching; DKDRIVER-era
-//                              drivers read and MODE SELECT it)
+//       08h   yes     yes      DKDRIVER SYSINIT caching probe (MEASURED,
+//                              the H-8 root cause)
 //       3Fh   yes     yes      DKDRIVER template 1A 00 3F 00 FF
 //     PLUS: the PC field (cdb[2]<7:6> current/changeable/default/saved)
 //     returns CURRENT values for all four codes, _PROVISIONAL -- a driver
@@ -50,6 +50,27 @@
 // ============================================================================
 // CHANGE HISTORY
 // ============================================================================
+//   2026-08-07  Batch H-8: MODE SENSE page 08h (Caching).  Same species as
+//               H-7, one page further into the boot.  After H-7 cleared the
+//               OpenVMS banner, the DS20 advanced through the date/time
+//               prompt and stalled in SYSINIT.  The N810-CHKCOND rider named
+//               the block: run_ds20_20260805_214228.log rows 2119 and 6768,
+//               op=0x1A cdb2=0x08 key=0x05 asc=0x24 ascq=0x00 -- MODE
+//               SENSE(6) page 08h rejected 05/24/00, the last disk activity
+//               before the operator-induced halt (Current Process: SYSINIT).
+//               FUNCTION: cmdModeSense.
+//               CHANGE:  page 08h served: 20 bytes, code 0x08, length 0x12,
+//                        byte 2 = 0x0A, remainder zero -- reference-matched
+//                        to AXPBox Disk.cpp SCSIMP_CACHING (which boots this
+//                        same dka0.vdisk to V8.3).  Joins the 3Fh composite
+//                        in ascending order (01, 03, 04, 08); buf grown to
+//                        112 for the full composite (96 bytes).  The gate
+//                        still rejects genuinely unknown pages 05/24/00.
+//               PREDICTION (falsifiable, stated before the run): page 08h
+//                        returns GOOD, the 08h N810-CHKCOND rows stop, and
+//                        SYSINIT advances past its current stall (toward the
+//                        login prompt, subject to any further missing page
+//                        the rider then names).
 //   2026-08-06  Batch H-7 (architect-approved "go"): MODE SENSE page 01h.
 //               ROOT CAUSE, MEASURED END TO END (JRN-SCSI-042 Sec 14): the
 //               2026-08-05 crash dump's failed command is CDB
@@ -371,12 +392,15 @@ private:
         bool const wantP1 = (pageCode == 0x01) || (pageCode == 0x3F);
         bool const wantP3 = (pageCode == 0x03) || (pageCode == 0x3F);
         bool const wantP4 = (pageCode == 0x04) || (pageCode == 0x3F);
-        if (!wantP1 && !wantP3 && !wantP4 && pageCode != 0x00) {
+        bool const wantP8 = (pageCode == 0x08) || (pageCode == 0x3F);
+        if (!wantP1 && !wantP3 && !wantP4 && !wantP8 && pageCode != 0x00) {
             check(cmd, ScsiSenseKey::IllegalRequest, 0x24, 0x00);
             return;
         }
 
-        uint8_t buf[80] = {};
+        // Full 3Fh composite: hdr(8) + block desc(8) + 01h(12) + 03h(24)
+        // + 04h(24) + 08h(20) = 96 bytes.  buf sized above that.
+        uint8_t buf[112] = {};
         uint32_t const hdr = ten ? 8u : 4u;
         uint32_t pos = hdr;
         if (!dbd) {                            // 8-byte block descriptor
@@ -413,6 +437,20 @@ private:
             p[20] = uint8_t(m_profile->rotationRateRpm >> 8);
             p[21] = uint8_t(m_profile->rotationRateRpm);
             pos += 24;
+        }
+        if (wantP8) {                          // page 08h Caching
+            // Batch H-8: 20 bytes, code 0x08, page length 0x12.  Byte 2 =
+            // 0x0A (RCD=0/WCE=0, prefetch+abort bits) per AXPBox Disk.cpp
+            // SCSIMP_CACHING; remainder zero.  Same species as H-7 one page
+            // on: the 2026-08-05 SYSINIT stall's last disk activity was
+            // MODE SENSE(6) 08h rejected 05/24/00 (run_ds20_214228 rows
+            // 2119/6768, N810-CHKCOND op=0x1A cdb2=0x08).  DKDRIVER needs
+            // the page's EXISTENCE, not its policy.  Ascending order after
+            // 04h keeps the 3Fh composite well-formed.
+            uint8_t* p = &buf[pos];
+            p[0] = 0x08; p[1] = 0x12;          // code, page length 18
+            p[2] = 0x0A;                       // AXPBox-identical flag byte
+            pos += 20;
         }
         // Header LAST: the mode-data-length field always describes the FULL
         // response, so the driver's SHORT first probe (header peek) reads

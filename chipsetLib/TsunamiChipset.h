@@ -315,11 +315,20 @@ public:
     //   uart_int_pending -> PIC IRQ4 -> [IMR + in-service + priority]
     //                    -> Cchip DRIR<55>
     //
-    // Called once per Machine::run iteration (the design doc Section 5
-    // storm guard: at most one interrupt edge per step boundary).  The
-    // DRIR mirror writes only on LEVEL CHANGE -- m_lastPicLevel caches
-    // the previous output so the hot path is two cheap computed reads
-    // and a compare, no atomics, until something actually transitions.
+    // 2026-08-08 (JRN-SCSI-045 OBS-3, architect-approved): the design
+    // doc Section 5 "one edge per step boundary" throttle is RETIRED.
+    // Under run-to-completion it collapsed every in-chunk UART edge to
+    // one delivery -- console TX drained at the step cadence (measured:
+    // 202 ETBEI enables -> ~3 serviced THRE interrupts per 2M-insn
+    // window).  The storm the throttle predated is prevented
+    // ARCHITECTURALLY by the 8259 model (IRR edge capture + in-service
+    // suppression, Pic8259Pair.h MODEL CONTRACT).  mirrorIsaIrqs() is
+    // now ALSO invoked event-driven from the UART irq-sink at the guest
+    // access that changes the line; this per-step call remains as an
+    // idempotent backstop (and still serves FDC/8042, which have no
+    // event path yet).  The DRIR mirror writes only on LEVEL CHANGE --
+    // m_lastPicLevel caches the previous output so the hot path is
+    // cheap computed reads and a compare until something transitions.
     //
     // DRIR<55> is the ISA/SIO bridge output line, firmware-source-
     // confirmed: pc264_io.c:533 unmasks DIM0 bit 55 itself.
@@ -328,6 +337,26 @@ public:
     // both inputs are evaluated; only COM1 matters to the milestone).
     // --------------------------------------------------------------------
     static constexpr int kIsaBridgeDrirBit = 55;   // pc264_io.c:533
+
+    // The factored ISA interrupt mirror (2026-08-08): device lines ->
+    // PIC inputs -> PIC output level -> Cchip DRIR<55> on level change.
+    // Callable from BOTH the per-step sweep and the UART event sink;
+    // idempotent by construction (setIrqInput edge-detects internally,
+    // the DRIR write is level-change-gated).
+    void mirrorIsaIrqs() noexcept
+    {
+        m_pic.setIrqInput(4, m_com1.intPending());   // COM1 = ISA IRQ4
+        m_pic.setIrqInput(3, m_com2.intPending());   // COM2 = ISA IRQ3
+        m_pic.setIrqInput(6, m_superio.fdcInterruptPending()); // FDC = ISA IRQ6 (F5)
+        m_pic.setIrqInput(1, m_kbd8042.irq1Pending()); // 8042 KBD = ISA IRQ1 (JRN-VMB-006)
+
+        bool const level = m_pic.outputAsserted();
+        if (level != m_lastPicLevel) {
+            m_lastPicLevel = level;
+            if (level) m_cchip.assertInterrupt(kIsaBridgeDrirBit);
+            else       m_cchip.deassertInterrupt(kIsaBridgeDrirBit);
+        }
+    }
 
     // Pchip0 PCI interrupt-acknowledge window (chipset offset; PA =
     // kMMIO_Start + this).  Firmware-observed (run 20260604-152214);
@@ -356,17 +385,9 @@ public:
             }
         }
 
-        m_pic.setIrqInput(4, m_com1.intPending());   // COM1 = ISA IRQ4
-        m_pic.setIrqInput(3, m_com2.intPending());   // COM2 = ISA IRQ3
-        m_pic.setIrqInput(6, m_superio.fdcInterruptPending()); // FDC = ISA IRQ6 (F5)
-        m_pic.setIrqInput(1, m_kbd8042.irq1Pending()); // 8042 KBD = ISA IRQ1 (JRN-VMB-006)
-
-        bool const level = m_pic.outputAsserted();
-        if (level != m_lastPicLevel) {
-            m_lastPicLevel = level;
-            if (level) m_cchip.assertInterrupt(kIsaBridgeDrirBit);
-            else       m_cchip.deassertInterrupt(kIsaBridgeDrirBit);
-        }
+        mirrorIsaIrqs();   // per-boundary sweep (idempotent backstop --
+                           // the event-driven path below delivers the
+                           // edges that matter at their causing access)
 
         // ----------------------------------------------------------------
         // IIC completion interrupt (DS20 badge root-cause fix, 2026-06-29).
@@ -838,6 +859,15 @@ private:
 
         m_pchip.registerIoPortRange(0x3F8, 0x400, &m_com1); // COM1
         m_pchip.registerIoPortRange(0x2F8, 0x300, &m_com2); // COM2
+
+        // 2026-08-08 (JRN-SCSI-045 OBS-3 fix): event-driven interrupt
+        // mirroring -- the UART pushes its line change into the ISA
+        // mirror at the causing guest access, instead of waiting for
+        // the per-step sweep (which remains as backstop).  Deterministic:
+        // both trigger classes (register access, feedRxByte) execute on
+        // the run-loop thread at instruction/step boundaries.
+        m_com1.setIrqSink([this]() noexcept { mirrorIsaIrqs(); });
+        m_com2.setIrqSink([this]() noexcept { mirrorIsaIrqs(); });
 
         // 2026-05-28 unblocker: minimal stubs for the two ISA legacy devices
         // the SRM firmware polls in the early console-init phase, between

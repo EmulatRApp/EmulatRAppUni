@@ -91,9 +91,15 @@
 //     0x02  THR empty           (lower; cleared by this read)
 //     0x01  no interrupt pending
 //
-//   The line is consumed by TsunamiChipset::step(), which mirrors it
-//   into the Cypress 8259 IRQ4 input once per step boundary (one
-//   interrupt edge per boundary = the design's storm guard).
+//   The line is consumed TWO ways (2026-08-08, JRN-SCSI-045 OBS-3):
+//   EVENT-DRIVEN -- the guest access that changes intPending() pushes
+//   the new level into the 8259 immediately via the m_irqSink callback
+//   (the wire is continuous on silicon; the old once-per-step-boundary
+//   mirror collapsed every in-chunk edge to one delivery and starved
+//   console TX to the step cadence) -- and by TsunamiChipset::step()'s
+//   retained per-boundary sweep (idempotent backstop).  Storm safety
+//   is the 8259 model's architectural job (IRR edge capture +
+//   in-service suppression), no longer a delivery throttle.
 //
 // ============================================================================
 // TODO Register Table -- unwired or partially-wired behavior
@@ -152,6 +158,7 @@
 #include <cstdlib>                              // std::getenv (console-snapshot gate)
 #include <cstring>                              // std::memcmp (badge suffix match)
 #include <deque>
+#include <functional>                           // 2026-08-08: event-driven IRQ sink
 #include <string>
 #include <QDataStream>                          // snapshot serialize seam (v2)
 #include "chipsetLib/IDeviceHandlers.h"         // IIoPortHandler
@@ -310,14 +317,40 @@ public:
      *
      * Recomputed from live state on every call, so every register
      * event that changes an operand is reflected at the next
-     * evaluation -- the design doc Section 1 requirement.  Consumed by
-     * TsunamiChipset::step() once per boundary (storm guard).
+     * evaluation -- the design doc Section 1 requirement.  Consumed
+     * BOTH by the event-driven sink below (at the guest access that
+     * changes the level -- 2026-08-08) and by TsunamiChipset::step()'s
+     * per-boundary sweep (retained, idempotent).
      */
     [[nodiscard]] bool intPending() const noexcept
     {
         bool const rx   = ((m_ier & kIER_ERBFI) != 0) && !m_rxFifo.empty();
         bool const thre = ((m_ier & kIER_ETBEI) != 0) && m_threLatch;
         return rx || thre;
+    }
+
+    /**
+     * @brief Event-driven interrupt-line sink (2026-08-08, JRN-SCSI-045
+     * OBS-3 fix, architect-approved).
+     *
+     * The old model mirrored intPending() into the 8259 ONLY at the
+     * chipset step boundary ("one edge per boundary" storm guard).
+     * Under run-to-completion that collapsed every enable/THR edge
+     * inside a chunk to ONE delivery -- console TX drained at the
+     * step cadence (~chars/sec; the measured 202-enables -> 3-serviced
+     * starvation).  The storm the guard predated is now prevented
+     * ARCHITECTURALLY by the 8259 model itself (IRR edge capture +
+     * in-service suppression -- Pic8259Pair.h MODEL CONTRACT), so the
+     * line is pushed at the moment it changes: readRegister /
+     * writeRegister / feedRxByte compare intPending() before/after
+     * and invoke this sink on change.  All trigger points are guest
+     * register accesses or the step-quantized RX seam -- deterministic;
+     * no new thread boundary.  The per-step sweep in evalDeviceIrqs
+     * remains as an idempotent backstop.
+     */
+    void setIrqSink(std::function<void()> sink) noexcept
+    {
+        m_irqSink = std::move(sink);
     }
 
     /**
@@ -331,6 +364,7 @@ public:
      */
     void feedRxByte(uint8_t byte) noexcept
     {
+        bool const before = intPending();   // 2026-08-08: event-driven sink
         snapshotWatch(byte);            // Option-A console-snapshot marker watch
                                         // (env-gated, non-consuming; tracks every
                                         //  injected byte regardless of FIFO state)
@@ -339,6 +373,7 @@ public:
             return;                     // byte lost
         }
         m_rxFifo.push_back(byte);
+        if (m_irqSink && intPending() != before) m_irqSink();
     }
 
     /// RX FIFO occupancy (doctest observability).
@@ -446,8 +481,22 @@ public:
     // ========================================================================
     // NOT const: RBR pops the RX FIFO, IIR clears the THRE source, LSR
     // clears the sticky error bits -- 16550 reads have side effects.
+    //
+    // 2026-08-08: readRegister/writeRegister are thin wrappers around the
+    // *Core bodies -- they compare intPending() across the access and fire
+    // the event-driven IRQ sink on any level change (rise OR fall: the
+    // 8259 needs the deassert too).  Wrapping at the funnel covers every
+    // current and future leaf (IER/THR/IIR/RBR/FCR/...) by construction.
 
     uint8_t readRegister(uint8_t reg) noexcept
+    {
+        bool const before = intPending();
+        uint8_t const v = readRegisterCore(reg);
+        if (m_irqSink && intPending() != before) m_irqSink();
+        return v;
+    }
+
+    uint8_t readRegisterCore(uint8_t reg) noexcept
     {
         const bool dlab = (m_lcr & kLCR_DLAB) != 0;
 
@@ -513,6 +562,13 @@ public:
     // ========================================================================
 
     void writeRegister(uint8_t reg, uint8_t value) noexcept
+    {
+        bool const before = intPending();
+        writeRegisterCore(reg, value);
+        if (m_irqSink && intPending() != before) m_irqSink();
+    }
+
+    void writeRegisterCore(uint8_t reg, uint8_t value) noexcept
     {
         const bool dlab = (m_lcr & kLCR_DLAB) != 0;
 
@@ -1133,6 +1189,10 @@ private:
     bool     m_threLatch;        // THRE interrupt source latch (see header)
     uint8_t  m_lsrSticky;        // sticky LSR error bits (OE); clear on read
     std::deque<uint8_t> m_rxFifo;// internal RX FIFO (fed via feedRxByte only)
+    // Event-driven IRQ sink (2026-08-08): invoked on any intPending()
+    // level change at the causing guest access.  NOT serialized in
+    // snapshots (re-wired by the chipset on construction/restore).
+    std::function<void()> m_irqSink;
 };
 
 #endif // UART_16550_H

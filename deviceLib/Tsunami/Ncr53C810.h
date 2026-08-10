@@ -43,6 +43,38 @@
 // ============================================================================
 // CHANGE HISTORY
 // ============================================================================
+//   2026-08-07  BRIEF-N810-RESEL-001 -- N-1 ground-truth capture for H-8b
+//               attempt 2 (JRN-SCSI-043 Sec 8 N-1).  OBSERVATION-ONLY:
+//               every new line is under EMULATR_DIAG_N810; no semantic
+//               change is possible from this pass.
+//               FUNCTION: reconnectGraphDump (new).
+//               CHANGE:  Edit 1 -- one-shot hex dump of script RAM
+//                        0xC0000900..0xC0001700 (224 rows, ABSOLUTE
+//                        addresses) at the FIRST WAIT RESELECT park, via
+//                        m_dmaRead exactly as scriptDump.  Captures the
+//                        reconnect-handler listing downstream of the
+//                        0xC0001334 fall-through -- code that has NEVER
+//                        executed and so cannot appear in any execution
+//                        trace.  Authority for the attempt-2 choreography
+//                        (the thing attempt 1 guessed wrong).
+//               FUNCTION: lapTrace / lapArm.
+//               CHANGE:  Edit 2 OPTION A (architect pick at sign-off) --
+//                        SELECT-seeking lap capture.  Window 0 = first lap
+//                        after arm, captured as today (idle baseline;
+//                        retires JRN-SCSI-042 S-3).  Windows 1-2 emission
+//                        HELD (count laps, emit nothing) until a lap
+//                        fetches a SELECT (insnClass, the single decode
+//                        authority); emission begins AT that row and runs
+//                        through that lap's END plus one full successor
+//                        lap.  The pre-SELECT head of the command lap is
+//                        sacrificed; window 0 already covers the shared
+//                        dispatch ladder.  Bound UNCHANGED: <= 3 windows x
+//                        2048 rows.  New rows: N810-LAP HOLD (once, when
+//                        window 0 closes), N810-LAP SEEK-HIT lap=<n>.
+//               REMOVAL TRIGGER: one-shot capture species (H-2 R-4) --
+//                        remove when H-8b attempt 2 lands and its journal
+//                        records the decoded listing.
+//
 //   2026-08-06  Batch H-7 rider (with the VirtualDiskDevice.h page-01h
 //               fix; architect-approved "go").
 //               FUNCTION: ledgerCmd.
@@ -619,6 +651,9 @@ public:
         m_running = false;
         m_sigp = false; m_parked = false; m_parkedAlt = 0;   // H-2d state
         m_pollParked = false;                                // H-3 state
+        m_discPriv = false; m_discPending = false;           // H-8b resel state
+        m_disc = Conn{}; m_msgInQ.clear();
+        m_sessionFromPark = false; m_reconnMsgs = false;     // RESEL-002 Cond 1
         m_conn = Conn{};
         updateIrq();
     }
@@ -1017,6 +1052,15 @@ private:
             if (v & kScntl1Rst) {             // SCSI bus reset -> SIST0<RST>
                 m_sist0Pend |= kSist0Rst;
                 m_conn = Conn{};
+                // BRIEF-N810-RESEL-002 Condition 1 (latch hygiene): a SCSI
+                // bus reset kills EVERY nexus, including a disconnected one
+                // awaiting reselection -- a stale m_disc surviving the
+                // reset would reconnect a nexus the initiator abandoned.
+                // (ISTAT<ABRT> intentionally does NOT clear m_disc: a chip
+                // abort stops the SCRIPTS processor, not the targets; the
+                // driver's recovery bus-resets right after, landing here.)
+                m_disc = Conn{}; m_discPending = false;
+                m_msgInQ.clear(); m_reconnMsgs = false;
                 // W-4 (2026-08-04): RST on the bus is a TARGET-visible
                 // event -- every attached target re-latches UNIT ATTENTION.
                 // SEAM SCOPE (architect review): this fires on HOST MMIO
@@ -1096,13 +1140,27 @@ private:
         // reporting was invisible (DSPS never logged).  Bounded: first 32
         // + every 1024th.  REMOVAL TRIGGER: rides TODO(N810-LEDGER).
         uint64_t const n = m_intRows++;
-        if (n < 32 || (n & 0x3FFu) == 0) {
+        // RESEL-002 Condition 2 (D-LEDGER): the H-8b decisive vectors
+        // (JRN-SCSI-044 taxonomy -- reconnect 0F79, disconnect 70/72,
+        // restore-ptrs 91, SDTR 31, protocol-fatal 0FA8, abort-done 0FA0)
+        // are RARE by construction and must never fall into the throttle
+        // gap during the park flood: they print UNTHROTTLED.  High-rate
+        // completion vectors keep the first-32 + every-1024th cadence.
+        bool const decisive =
+            dsps == 0x0F79u || dsps == 0x70u  || dsps == 0x72u  ||
+            dsps == 0x91u   || dsps == 0x31u  || dsps == 0x0FA8u ||
+            dsps == 0x0FA0u;
+        if (n < 32 || (n & 0x3FFu) == 0 || decisive) {
             std::fprintf(stderr, "N810-INT[%llu] dstat=0x%02X dsps=0x%08X "
                          "dsp=0x%08X\n",
                          static_cast<unsigned long long>(n), unsigned(bit),
                          dsps, reg32(kDSP));
             std::fflush(stderr);
         }
+#ifdef EMULATR_DIAG_N810
+        if (dsps == 0x0F79u) m_dumpAnswerAtStart = true;  // E6: answer dump
+                                                          // at next session
+#endif
         setReg32(kDSPS, dsps);
         m_dstatPend |= bit;
         m_running = false;
@@ -1148,6 +1206,28 @@ private:
         scriptDump(reg32(kDSP));
         m_parked = false;                         // a fresh DSP write
         m_pollParked = false;                     // supersedes any park (H-3)
+        // BRIEF-N810-RESEL-002 T-A: a host-DSP-write session is SRM/console/
+        // driver-restart provenance -- the defer predicate is structurally
+        // false until this session (or a later one) resumes from a park.
+        m_sessionFromPark = false;
+#ifdef EMULATR_DIAG_N810
+        // RESEL-002 E6: the host's INT 0F79 answer (JRN-SCSI-044 Sec 3.3) --
+        // dump the ECC command mailbox and EC4 resume DSA at the first
+        // session start after a reconnect notification (R6 evidence).
+        if (m_dumpAnswerAtStart) {
+            m_dumpAnswerAtStart = false;
+            uint8_t mb[12] = {};
+            m_dmaRead(0xC0010ECCu, &mb[0], 4);
+            m_dmaRead(0xC0010EC4u, &mb[4], 4);
+            m_dmaRead(0xC0010EC8u, &mb[8], 4);   // data-descriptor DSA: the
+                                                 // ladder reloads it for the
+                                                 // post-accept data phase
+            std::fprintf(stderr, "N810-NEXUS answer ecc=0x%08X ec4=0x%08X "
+                         "ec8=0x%08X dsp=0x%08X\n", le32(&mb[0]),
+                         le32(&mb[4]), le32(&mb[8]), reg32(kDSP));
+            std::fflush(stderr);
+        }
+#endif
         runScriptsLoop();
     }
 
@@ -1225,6 +1305,7 @@ private:
     void resumeFromPark() noexcept
     {
         m_parked = false;
+        m_sessionFromPark = true;   // RESEL-002 T-A: VMS-work provenance
         setReg32(kDSP, m_parkedAlt);
         std::fprintf(stderr, "N810-RESUME session=%u alt=0x%08X (SIGP)\n",
                      m_scriptSession, m_parkedAlt);
@@ -1276,6 +1357,58 @@ private:
                 le32(&buf[row + 0x8]), le32(&buf[row + 0xC]));
         }
         std::fflush(stderr);
+    }
+
+    // TODO(N810-RESELDUMP) (2026-08-07, BRIEF-N810-RESEL-001 Edit 1): one-shot
+    // hex dump of the reconnect-handler script region at the FIRST WAIT
+    // RESELECT park.  The instructions downstream of the 0xC0001334 fall-
+    // through have NEVER EXECUTED and therefore cannot appear in any
+    // execution trace -- this dump is the only way to read them.  Windows
+    // (widened 2026-08-07 for the JRN-SCSI-044 Sec 6 gap closure):
+    //   0xC0000000..0xC0000900  GAP-1 (C000084C tagged-test subroutine head),
+    //                           GAP-2 (C00002D4 general message handler),
+    //                           GAP-3 (C00007AC/BC/F4 save-pointers /
+    //                           restore-pointers / disconnect branches)
+    //   0xC0000900..0xC0001700  the JRN-SCSI-044 decoded region, re-captured
+    //                           for alignment cross-check (covers C00009A4,
+    //                           C00009FC, C0000DE8, C0001334, C00013A4)
+    //   0xC0008250..0xC0008270  GAP-4 (abort/retry msg-out constants at
+    //                           C0008258 / C000825C / C0008264)
+    // Addresses are ABSOLUTE, not dsp-relative: the decode works against the
+    // jump graph, not a session entry.  Park is a quiescent, deterministic
+    // capture point and the script RAM is fully populated by then; m_dmaRead
+    // at script addresses is the proven live-read path (scriptDump, H-1).
+    // Bounded by construction: 370 rows, once per boot.
+    // REMOVAL TRIGGER: one-shot capture species (H-2 R-4) -- remove when
+    // H-8b attempt 2 lands and its journal records the decoded listing.
+    void reconnectGraphDump() noexcept
+    {
+#ifdef EMULATR_DIAG_N810
+        if (m_reselDumpDone || !m_dmaRead) return;
+        m_reselDumpDone = true;
+        // Three windows (JRN-SCSI-044 Sec 6 gap closure, architect-approved
+        // 2026-08-07): 0xC0000000..0x900 closes GAP-1 (C000084C subroutine
+        // head), GAP-2 (C00002D4 message handler), GAP-3 (C00007AC/BC/F4
+        // disconnect branches); 0xC0000900..0x1700 re-captures the decoded
+        // window for alignment cross-check; 0xC0008250..0x8270 closes GAP-4
+        // (msg-out constants).  370 rows total, once per boot.
+        struct { uint32_t lo, len; } const kWin[] = {
+            { 0xC0000000u, 0x0900u },
+            { 0xC0000900u, 0x0E00u },
+            { 0xC0008250u, 0x0020u },
+        };
+        for (auto const& w : kWin) {
+            std::vector<uint8_t> buf(w.len);
+            m_dmaRead(w.lo, buf.data(), w.len);
+            for (uint32_t row = 0; row + 0x10 <= w.len; row += 0x10)
+                std::fprintf(stderr,
+                    "N810-RESELDUMP 0x%08X: %08X %08X %08X %08X\n",
+                    w.lo + row,
+                    le32(&buf[row + 0x0]), le32(&buf[row + 0x4]),
+                    le32(&buf[row + 0x8]), le32(&buf[row + 0xC]));
+        }
+        std::fflush(stderr);
+#endif
     }
 
     void stepScripts() noexcept
@@ -1461,8 +1594,21 @@ private:
         uint32_t count = w0 & 0x00FFFFFF;
         uint32_t addr  = w1;
         if (tab) {                                // table indirect off DSA
+            // RESEL-002 fix (2026-08-07, architect-ruled): this table-entry
+            // fetch is the SAME engine as SELECT's -- 895 DM table indirect
+            // addressing: SIGN-EXTENDED 24-bit offset from DSA, DWORD-
+            // ALIGNED fetch -- so mask and sign-extend exactly as the H-6
+            // execSelect site does (AXPBox-corroborated there).  The prior
+            // raw unmasked read silently no-opped the select-path MSG OUT
+            // under the pke script's |1-tagged engagement DSA (the count
+            // field re-read one byte shifted -> 0 -> silent return, SFBR
+            // untouched), eating VMS's IDENTIFY/DiscPriv grant while every
+            // other table move ran after the ladder's aligned DSA <- EC4
+            // reload and was never corrupted.  Evidence chain + correction
+            // ripple: JRN-SCSI-044 OBS-3.  Bisect order if Gate A ever
+            // surprises: mask first, sext24 second (architect condition).
             uint8_t ent[8];
-            m_dmaRead(reg32(kDSA) + (w1 & 0x00FFFFFF), ent, 8);
+            m_dmaRead((reg32(kDSA) + sext24(w1 & 0x00FFFFFFu)) & ~3u, ent, 8);
             count = le32(&ent[0]) & 0x00FFFFFF;
             addr  = le32(&ent[4]);
         }
@@ -1495,6 +1641,12 @@ private:
         switch (opcode) {
         case 0: execSelect(w0, w1);  return;      // SELECT (ATN via bit 24)
         case 1:                                    // WAIT DISCONNECT
+            // Bus-free.  NOT always final (JRN-SCSI-044 Sec 9.4): the pke
+            // script executes this at THREE sites -- C00007DC (completion
+            // consumed: final), C0000804 (mid-command DISCONNECT: m_disc
+            // holds the deferred nexus, reselection follows at the next
+            // park), C00004DC / C0000B04 (select-phase / abort epilogues).
+            // m_disc survives by construction; only the live nexus dies.
             m_conn = Conn{};                      // D2: immediate bus-free
             return;
         case 2: {                                  // WAIT RESELECT (H-2d)
@@ -1508,10 +1660,64 @@ private:
             // w0<26> = relative alternate (n810_def.h:665 n810_io_rel).
             bool const rel = (w0 >> 26) & 1u;
             uint32_t const alt = rel ? reg32(kDSP) + sext24(w1) : w1;
+            // H-8b (SCSI-2 RESELECTION): a target holding a disconnected
+            // completion reconnects HERE.  Unlike the SIGP abort (which jumps
+            // to the alternate), a real reselection makes WAIT RESELECT
+            // complete by FALLING THROUGH to the script's reconnect handler --
+            // and stepScripts has already advanced DSP past this instruction,
+            // so we simply do not park.  Zero-latency arbitration at the park
+            // execution (JRN-SCSI-042 P2 determinism class).
+            // Checked before SIGP: an in-progress reselection owns the bus.
+            if (m_discPending) {
+                m_conn         = m_disc;            // reconnected nexus (data+status)
+                m_disc         = Conn{};
+                m_discPending  = false;
+                m_conn.dataPos = 0;
+                // BRIEF-N810-RESEL-002 E2 (authority JRN-SCSI-044 Sec 3.1):
+                // IDENTIFY ONLY.  The UNTAGGED reconnect path reads exactly
+                // ONE message byte (C0001488 bit<LUN> clear -> straight to
+                // nexus publish + INT 0F79); the RESTORE DP byte attempt 1
+                // queued would go stale and later be delivered where COMMAND
+                // COMPLETE is expected (code 43 -> spurious INT 91).
+                // m_reconnMsgs arms the E4 phase handoff.
+                m_msgInQ.assign({ static_cast<uint8_t>(0x80 | (m_conn.lun & 0x07)) });
+                m_reconnMsgs   = true;
+                m_reg[kSSID]   =                    // reselecting id, valid<7>
+                    static_cast<uint8_t>(0x80 | (m_conn.targetId & 0x07));
+                setPhase(kPhMsgIn);                 // target sends IDENTIFY next
+                std::fprintf(stderr,
+                    "N810-RESELECT session=%u target=%u lun=%u (reconnect)\n",
+                    m_scriptSession, m_conn.targetId, m_conn.lun);
+                std::fflush(stderr);
+#ifdef EMULATR_DIAG_N810
+                {
+                    // RESEL-002 E6: R1 evidence -- the EE4+4*ID bitmask slot
+                    // and the EE0 nexus mailbox at reselect keying (script-
+                    // specific mailbox addresses, observation only).
+                    uint8_t mb[8] = {};
+                    m_dmaRead(0xC0010EE4u + 4u * (m_conn.targetId & 0x07u),
+                              &mb[0], 4);
+                    m_dmaRead(0xC0010EE0u, &mb[4], 4);
+                    std::fprintf(stderr, "N810-NEXUS keying slot=0x%08X "
+                                 "ee0=0x%08X\n", le32(&mb[0]), le32(&mb[4]));
+                    // Gate C acceptance trace: re-arm the lap machinery for
+                    // a fresh window from the reconnect fall-through.
+                    m_lapArmed = true;  m_lapLap = 0; m_lapInsn = 0;
+                    m_lapCapped = false; m_lapHolding = false;
+                    std::fprintf(stderr, "N810-LAP RECONNECT-ARM next-dsp="
+                                 "0x%08X\n", reg32(kDSP));
+                    std::fflush(stderr);
+                }
+#endif
+                return;                             // fall through -- do NOT park
+            }
             if (m_sigp) {
                 // SIGP already pending at execution: jump immediately,
                 // never park.  SIGP is NOT cleared here -- only the
                 // CTEST2 read clears it (the script does that itself).
+                m_sessionFromPark = true;   // RESEL-002 T-A: same provenance
+                                            // as resumeFromPark -- SIGP-
+                                            // signalled dispatch at the park
                 setReg32(kDSP, alt);
                 return;
             }
@@ -1524,6 +1730,7 @@ private:
             std::fflush(stderr);
             censusDump("waitresel");               // TODO(N810-CENSUS)
             lapArm();                              // TODO(N810-LAPTRACE)
+            reconnectGraphDump();                  // TODO(N810-RESELDUMP)
             return;                                // no interrupt, no STO
         }
         case 3:                                    // SET   ATN/ACK/carry
@@ -1584,6 +1791,13 @@ private:
         m_conn = Conn{};
         m_conn.active   = true;
         m_conn.targetId = static_cast<uint8_t>(id);
+        m_discPriv      = false;   // H-8b: re-established per IDENTIFY (MSG OUT)
+        // RESEL-002 rider (architect, 2026-08-07): a NEW nexus never inherits
+        // queued MSG IN bytes -- retires the stale-byte species E2 fixed one
+        // instance of (any future queue mismatch dies at the next selection
+        // instead of leaking across nexuses).
+        m_msgInQ.clear();
+        m_reconnMsgs = false;
         if (withAtn) m_reg[kSOCL] =         // Edit A: SELECT WITH ATN asserts
             static_cast<uint8_t>(m_reg[kSOCL] | kSoclAtn);
         selAtnRow(id, withAtn, m_reg[kSOCL]);          // TODO(N810-ATN)
@@ -1721,9 +1935,20 @@ private:
         case kPhMsgOut: {
             std::vector<uint8_t> buf(count);
             m_dmaRead(addr, buf.data(), count);
-            // IDENTIFY (0x80|dis|lun) is byte 0; LUN consumed (D2:
-            // disconnect priv ignored).
-            if (count > 0 && (buf[0] & 0x80)) m_conn.lun = buf[0] & 0x07;
+            // IDENTIFY (0x80|dis|lun) is byte 0; LUN consumed.  H-8b: the
+            // DISCONNECT-privilege bit (0x40, SCSI-2 6.6.7) is captured --
+            // when the initiator grants it the target may disconnect after
+            // the command and reconnect via RESELECTION.  CORRECTED
+            // 2026-08-07 (JRN-SCSI-044 OBS-3): BOTH initiators grant it --
+            // the SRM measurably (attempt-1 regression), and VMS too, but
+            // VMS's grant was invisible for months because the select-path
+            // MSG OUT table fetch mis-read under the |1-tagged DSA (see the
+            // execBlockMove alignment fix).  The old claim here ("VMS does;
+            // the SRM does not") reasoned over that broken channel.
+            if (count > 0 && (buf[0] & 0x80)) {
+                m_conn.lun = buf[0] & 0x07;
+                m_discPriv = (buf[0] & 0x40) != 0;
+            }
             m_reg[kSFBR] = buf[0];
             // Batch G S-4 (2026-08-02, JRN-AUD-003): scan the message bytes
             // for an extended negotiation message (0x01 <len> <code>; code
@@ -1907,6 +2132,31 @@ private:
                 setPhase(kPhCmd);
                 return;
             }
+            // H-8b: queued disconnect/reconnect messages (SAVE DP 0x02,
+            // DISCONNECT 0x04, IDENTIFY 0x80|lun, RESTORE DP 0x03) are
+            // delivered one per MSG IN, ahead of the terminal COMMAND
+            // COMPLETE.  The script reads and ACKs each before the next.
+            if (!m_msgInQ.empty()) {
+                uint8_t const mb = m_msgInQ.front();
+                m_msgInQ.erase(m_msgInQ.begin());
+                m_dmaWrite(addr, &mb, 1);
+                m_reg[kSFBR] = mb;
+                m_conn.msgInDone = true;
+                // RESEL-002 E4: reconnect phase handoff.  Once the reconnect
+                // IDENTIFY is consumed the untagged script reads no further
+                // message bytes (JRN-SCSI-044 Sec 3.1: C0001488 bit<LUN>
+                // clear jumps straight to publish + INT 0F79) -- present the
+                // deferred data/status now so the accept path's phase-routed
+                // jumps (C0001568 -> ladder C0000F60) find the real phase.
+                // Safe: no phase-sensitive instruction executes between the
+                // IDENTIFY move and those jumps on the untagged path.
+                if (m_msgInQ.empty() && m_reconnMsgs) {
+                    m_reconnMsgs = false;
+                    setPhase(m_conn.dataPos < m_conn.data.size() ? kPhDatIn
+                                                                 : kPhSts);
+                }
+                return;
+            }
             m_dmaWrite(addr, &m_conn.msgIn, 1);
             m_reg[kSFBR] = m_conn.msgIn;
             m_conn.msgInDone = true;
@@ -1958,6 +2208,50 @@ private:
         m_conn.dataPos = 0;
         m_conn.status  = static_cast<uint8_t>(cmd.status);
         ledgerCmd(cmd);                           // W-1 (BRIEF-SCSI-040)
+        // H-8b attempt 2 (BRIEF-N810-RESEL-002, architect-approved 2026-08-07,
+        // picks P-1A / P-2 bare-04 / P-3 untagged; authority JRN-SCSI-044).
+        // Attempt 1 (DiscPriv-gated, guessed choreography) regressed SRM and
+        // was reverted here the same day.  REFINEMENT (OBS-3): the SRM/VMS
+        // asymmetry attempt 1 reasoned about was never the privilege bit --
+        // both initiators grant DiscPriv; the differences were inline-vs-
+        // choreography and a broken IDENTIFY channel under the VMS script's
+        // tagged-DSA idiom (execBlockMove alignment fix).  The predicate is
+        // now session
+        // PROVENANCE (m_sessionFromPark): VMS work arrives EXCLUSIVELY via
+        // park-resume; SRM and console CSERVE sessions start from host DSP
+        // writes and are structurally excluded PER SESSION (architect
+        // amendment over the era-latch).  DiscPriv stays as the SCSI-2
+        // correctness term.  Opcode class P-1A = read-class medium access
+        // (READ6 08 / READ10 28) -- covers the frontier mount-verification
+        // READ; non-data polls stay on the proven inline path.
+        // EXPECTED RESIDUAL, on the record: the first post-VALID WRITE may
+        // park us again ONE OPCODE CLASS OVER -- same signature, planned
+        // next pass, not a new mystery.  Single-nexus this pass (P-3
+        // untagged): a defer while m_disc is occupied stays inline.
+        if (m_sessionFromPark && m_discPriv && !m_discPending
+            && (m_conn.cdb[0] == 0x08 || m_conn.cdb[0] == 0x28)) {
+            cmdTrace(cmd);
+            m_disc        = m_conn;             // completed nexus, deferred
+            m_discPending = true;
+            // Bare DISCONNECT (04), P-2: pre-data disconnect means current
+            // pointer == saved pointer, and the script's 04-branch
+            // (C00006CC -> C00007F4 -> WAITDISC C0000804 -> INT 72) takes
+            // it unconditionally.  SAVE DP omitted -- measurement-justified
+            // deviation, recorded in the brief.
+            m_msgInQ.assign({ static_cast<uint8_t>(0x04) });
+            setPhase(kPhMsgIn);
+            uint64_t const nd = m_deferRows++;  // Condition 2: D-LEDGER
+            if (nd < 64 || (nd & 0xFFu) == 0) {
+                std::fprintf(stderr,
+                    "N810-DEFER[%llu] op=0x%02X t=%u lun=%u session=%u "
+                    "fromPark=1\n",
+                    static_cast<unsigned long long>(nd),
+                    unsigned(m_conn.cdb[0]), unsigned(m_conn.targetId),
+                    unsigned(m_conn.lun), m_scriptSession);
+                std::fflush(stderr);
+            }
+            return;
+        }
         setPhase(cmd.dataTransferred > 0 ? kPhDatIn : kPhSts);
         cmdTrace(cmd);
     }
@@ -2254,6 +2548,19 @@ private:
 #ifdef EMULATR_DIAG_N810
         if (!m_lapArmed)                return;
         if (m_lapLap >= kLapTraceLaps)  return;
+        // BRIEF-N810-RESEL-001 Edit 2 OPTION A: while HELD (window 0 closed,
+        // no SELECT seen yet) emit nothing until this lap fetches a SELECT;
+        // then begin emitting AT that row.  insnClass is the single decode
+        // authority -- no second SELECT decode exists to drift.
+        if (m_lapHolding) {
+            if (std::strcmp(insnClass(w0), "SELECT") != 0) return;
+            m_lapHolding = false;
+            std::fprintf(stderr, "N810-LAP SEEK-HIT lap=%u dsp=0x%08X -- "
+                         "emission begins at this SELECT; pre-SELECT head "
+                         "sacrificed (window 0 covers the shared ladder)\n",
+                         m_lapSeekLap, dsp);
+            std::fflush(stderr);
+        }
         if (m_lapInsn >= kLapTraceInsns) {
             if (!m_lapCapped) {                // cap notice exactly once
                 m_lapCapped = true;
@@ -2297,6 +2604,13 @@ private:
             return;
         }
         if (m_lapLap >= kLapTraceLaps) return;
+        // BRIEF-N810-RESEL-001 Edit 2 OPTION A: a HELD lap closing without a
+        // SELECT emitted nothing -- no END row for it, just count it and keep
+        // seeking.  The emitted-window budget (m_lapLap) is untouched.
+        if (m_lapHolding) {
+            ++m_lapSeekLap;
+            return;
+        }
         std::fprintf(stderr, "N810-LAP END lap=%u insns=%u capped=%u "
                      "re-park park=%llu dsp=0x%08X\n",
                      m_lapLap, m_lapInsn, unsigned(m_lapCapped ? 1 : 0),
@@ -2306,10 +2620,23 @@ private:
         ++m_lapLap;
         m_lapInsn   = 0;
         m_lapCapped = false;
+        ++m_lapSeekLap;
         if (m_lapLap >= kLapTraceLaps) {
             std::fprintf(stderr, "N810-LAP DONE after %u laps, parks=%llu\n",
                          kLapTraceLaps,
                          static_cast<unsigned long long>(m_parkCount));
+            std::fflush(stderr);
+            return;
+        }
+        // OPTION A: window 0 (the idle baseline) just closed -> HOLD windows
+        // 1-2 until a lap fetches a SELECT (lapTrace clears the hold).  After
+        // the SELECT window closes, no re-hold: window 2 is one FULL
+        // successor lap, captured from its first instruction.
+        if (m_lapLap == 1) {
+            m_lapHolding = true;
+            std::fprintf(stderr, "N810-LAP HOLD after window 0 -- seeking a "
+                         "lap with a SELECT; idle laps counted, not "
+                         "emitted\n");
             std::fflush(stderr);
         }
 #endif
@@ -2615,6 +2942,31 @@ private:
     bool     m_sigp           = false;  // H-2d ISTAT<SIGP>, CTEST2 clears
     bool     m_parked         = false;  // H-2d WAIT RESELECT parked
     uint32_t m_parkedAlt      = 0;      // H-2d resume (alternate) address
+    // ---- Batch H-8b: SCSI-2 disconnect/reconnect (RESELECTION) -------------
+    // Corrects deviation D2 ("reselection never occurs").  VMS SYS$PKEDRIVER
+    // grants the target DISCONNECT privilege in IDENTIFY (msg bit 0x40,
+    // pke_driver.c:602) and its SCRIPTS parks in WAIT RESELECT waiting for the
+    // target to reconnect and deliver the result; the SRM's driver does NOT
+    // grant it (non-disconnecting), so the whole disconnect/reconnect path is
+    // GATED on m_discPriv and the SRM boot is unaffected.  EmulatR is
+    // synchronous, so the disconnect interval is zero wall-time: the command
+    // is executed, its result stashed in m_disc, the target DISCONNECTs
+    // (SAVE DP + DISCONNECT in MSG IN, then bus-free), and it reconnects the
+    // instant the script executes WAIT RESELECT (IDENTIFY + RESTORE DP in
+    // MSG IN, then the deferred DATA IN / STATUS / COMMAND COMPLETE).  Stays
+    // deterministic: no threads, no timing (D2's intent preserved).
+    bool     m_discPriv       = false;  // current IDENTIFY granted DISCONNECT
+    bool     m_discPending    = false;  // a disconnected nexus awaits reselect
+    Conn     m_disc;                    // the stashed nexus (data + status)
+    std::vector<uint8_t> m_msgInQ;      // queued MSG IN bytes, one per kPhMsgIn
+    // BRIEF-N810-RESEL-002 (architect-approved 2026-08-07, provenance
+    // amendment adopted): T-A defer predicate discriminates by SESSION
+    // PROVENANCE, not privilege or era.  VMS work arrives EXCLUSIVELY via
+    // park-resume (SIGP); SRM and console CSERVE sessions start from host
+    // DSP writes (startScripts) and are structurally excluded per session.
+    bool     m_sessionFromPark = false; // session began via park-resume
+    bool     m_reconnMsgs      = false; // reconnect IDENTIFY in flight (E4)
+    uint64_t m_deferRows       = 0;     // N810-DEFER D-LEDGER counter
     // TODO(N810-POLLPARK) state (H-3 _PROVISIONAL shim, JRN-SCSI-038):
     bool     m_pollParked     = false;  // budget exhausted mid-poll-loop
     uint64_t m_pollParks      = 0;      // park row counter (first 8 + 256th)
@@ -2655,6 +3007,14 @@ private:
     bool     m_lapCapped             = false;  // per-window cap notice sent
     unsigned m_lapLap                = 0;      // current park-to-park window
     unsigned m_lapInsn               = 0;      // rows emitted in this window
+    // BRIEF-N810-RESEL-001 Edit 2 OPTION A (SELECT-seeking) state:
+    bool     m_lapHolding            = false;  // emission held, seeking SELECT
+    unsigned m_lapSeekLap            = 0;      // lap ordinal since arm
+    // BRIEF-N810-RESEL-001 Edit 1 one-shot latch:
+    bool     m_reselDumpDone         = false;  // reconnect-graph dump emitted
+    // BRIEF-N810-RESEL-002 E6: INT 0F79 fired; dump the host's ECC/EC4
+    // answer at the next session start (self-clearing).
+    bool     m_dumpAnswerAtStart     = false;
 #endif
     bool     m_irq = false;
     Conn     m_conn{};
