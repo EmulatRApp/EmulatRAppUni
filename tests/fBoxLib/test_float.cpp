@@ -1,6 +1,14 @@
 // ============================================================================
 // tests/fBoxLib/test_float.cpp -- doctest cases for fBox v1 leaves
 // ============================================================================
+//
+// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
+//   FILE:     tests/fBoxLib/test_float.cpp
+//   FUNCTION: every direct leaf invocation
+//   CHANGE:   leaf ABI is now out-parameter: calls became
+//             `BoxResult r{}; leaf(g, ctx, r);`.  The test is the caller
+//             and therefore OWNS the latch reset -- the `{}` value-init is
+//             load-bearing (coreLib/BoxResult.h ownership contract).
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -126,7 +134,9 @@ TEST_CASE("fBox::execCpys -- sign of Fa onto magnitude of Fb")
     ctx.opA = bitsOf(-1.0);   // sign = 1
     ctx.opB = bitsOf( 5.0);   // magnitude = 5.0
 
-    BoxResult r = fBox::execCpys(g, ctx);
+    BoxResult r{};
+
+    fBox::execCpys(g, ctx, r);
 
     CHECK(r.regWriteIdx == 3);
     CHECK(r.regWriteIsFp);
@@ -142,7 +152,9 @@ TEST_CASE("fBox::execCpys -- positive sign carries through")
     ctx.opA = bitsOf( 1.0);   // sign = 0
     ctx.opB = bitsOf(-3.0);   // magnitude = 3.0
 
-    BoxResult r = fBox::execCpys(g, ctx);
+    BoxResult r{};
+
+    fBox::execCpys(g, ctx, r);
 
     CHECK(r.regWriteIdx == 7);
     CHECK(doubleOf(r.regWriteValue) == 3.0);
@@ -157,7 +169,9 @@ TEST_CASE("fBox::execCpysn -- negated sign of Fa onto Fb")
     ctx.opA = bitsOf( 1.0);   // sign = 0; flipped = 1
     ctx.opB = bitsOf( 7.0);
 
-    BoxResult r = fBox::execCpysn(g, ctx);
+    BoxResult r{};
+
+    fBox::execCpysn(g, ctx, r);
 
     CHECK(r.regWriteIdx == 4);
     CHECK(doubleOf(r.regWriteValue) == -7.0);
@@ -172,7 +186,9 @@ TEST_CASE("fBox::execCpysn -- negative Fa flips to positive on Fb")
     ctx.opA = bitsOf(-1.0);   // sign = 1; flipped = 0
     ctx.opB = bitsOf(-2.5);
 
-    BoxResult r = fBox::execCpysn(g, ctx);
+    BoxResult r{};
+
+    fBox::execCpysn(g, ctx, r);
 
     CHECK(doubleOf(r.regWriteValue) == 2.5);
 }
@@ -190,7 +206,9 @@ TEST_CASE("fBox::execCpyse -- sign+exp of Fa, fraction of Fb")
     ctx.opA = bitsOf(-8.0);
     ctx.opB = bitsOf( 1.5);
 
-    BoxResult r = fBox::execCpyse(g, ctx);
+    BoxResult r{};
+
+    fBox::execCpyse(g, ctx, r);
 
     CHECK(r.regWriteIdx == 5);
     CHECK(doubleOf(r.regWriteValue) == -12.0);
@@ -210,7 +228,9 @@ TEST_CASE("fBox::execAddt -- 1.5 + 2.5 = 4.0")
     ctx.opA = bitsOf(1.5);
     ctx.opB = bitsOf(2.5);
 
-    BoxResult r = fBox::execAddt(g, ctx);
+    BoxResult r{};
+
+    fBox::execAddt(g, ctx, r);
 
     CHECK(r.regWriteIdx == 3);
     CHECK(r.regWriteIsFp);
@@ -226,7 +246,9 @@ TEST_CASE("fBox::execAddt -- additive inverse cancels to zero")
     ctx.opA = bitsOf( 7.25);
     ctx.opB = bitsOf(-7.25);
 
-    BoxResult r = fBox::execAddt(g, ctx);
+    BoxResult r{};
+
+    fBox::execAddt(g, ctx, r);
 
     CHECK(doubleOf(r.regWriteValue) == 0.0);
 }
@@ -240,7 +262,9 @@ TEST_CASE("fBox::execSubt -- 5.0 - 2.0 = 3.0")
     ctx.opA = bitsOf(5.0);
     ctx.opB = bitsOf(2.0);
 
-    BoxResult r = fBox::execSubt(g, ctx);
+    BoxResult r{};
+
+    fBox::execSubt(g, ctx, r);
 
     CHECK(r.regWriteIdx == 8);
     CHECK(doubleOf(r.regWriteValue) == 3.0);
@@ -255,7 +279,9 @@ TEST_CASE("fBox::execMult -- 2.0 * 3.0 = 6.0")
     ctx.opA = bitsOf(2.0);
     ctx.opB = bitsOf(3.0);
 
-    BoxResult r = fBox::execMult(g, ctx);
+    BoxResult r{};
+
+    fBox::execMult(g, ctx, r);
 
     CHECK(r.regWriteIdx == 9);
     CHECK(doubleOf(r.regWriteValue) == 6.0);
@@ -270,7 +296,9 @@ TEST_CASE("fBox::execMult -- zero times finite is zero")
     ctx.opA = bitsOf(0.0);
     ctx.opB = bitsOf(42.0);
 
-    BoxResult r = fBox::execMult(g, ctx);
+    BoxResult r{};
+
+    fBox::execMult(g, ctx, r);
 
     CHECK(doubleOf(r.regWriteValue) == 0.0);
 }
@@ -284,7 +312,9 @@ TEST_CASE("fBox::execDivt -- 10.0 / 2.0 = 5.0")
     ctx.opA = bitsOf(10.0);
     ctx.opB = bitsOf( 2.0);
 
-    BoxResult r = fBox::execDivt(g, ctx);
+    BoxResult r{};
+
+    fBox::execDivt(g, ctx, r);
 
     CHECK(r.regWriteIdx == 10);
     CHECK(doubleOf(r.regWriteValue) == 5.0);
@@ -299,7 +329,9 @@ TEST_CASE("fBox::execDivt -- 1.0 / 0.0 yields IEEE +infinity")
     ctx.opA = bitsOf(1.0);
     ctx.opB = bitsOf(0.0);
 
-    BoxResult r = fBox::execDivt(g, ctx);
+    BoxResult r{};
+
+    fBox::execDivt(g, ctx, r);
 
     double const result = doubleOf(r.regWriteValue);
     CHECK(std::isinf(result));
@@ -320,7 +352,9 @@ TEST_CASE("fBox::execCmpteq -- equal operands -> 2.0")
     ctx.opA = bitsOf(3.14);
     ctx.opB = bitsOf(3.14);
 
-    BoxResult r = fBox::execCmpteq(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmpteq(g, ctx, r);
 
     CHECK(r.regWriteIdx == 3);
     CHECK(r.regWriteIsFp);
@@ -336,7 +370,9 @@ TEST_CASE("fBox::execCmpteq -- unequal operands -> 0.0")
     ctx.opA = bitsOf(1.0);
     ctx.opB = bitsOf(2.0);
 
-    BoxResult r = fBox::execCmpteq(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmpteq(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -350,7 +386,9 @@ TEST_CASE("fBox::execCmpteq -- NaN compares unordered (false) -> 0.0")
     ctx.opA = kQuietNan;
     ctx.opB = bitsOf(1.0);
 
-    BoxResult r = fBox::execCmpteq(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmpteq(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -364,7 +402,9 @@ TEST_CASE("fBox::execCmptlt -- 1.0 < 2.0 -> 2.0")
     ctx.opA = bitsOf(1.0);
     ctx.opB = bitsOf(2.0);
 
-    BoxResult r = fBox::execCmptlt(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmptlt(g, ctx, r);
 
     CHECK(r.regWriteValue == kPos20Bits);
 }
@@ -378,7 +418,9 @@ TEST_CASE("fBox::execCmptlt -- 2.0 < 1.0 is false -> 0.0")
     ctx.opA = bitsOf(2.0);
     ctx.opB = bitsOf(1.0);
 
-    BoxResult r = fBox::execCmptlt(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmptlt(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -392,7 +434,9 @@ TEST_CASE("fBox::execCmptlt -- equal operands are not less than -> 0.0")
     ctx.opA = bitsOf(1.0);
     ctx.opB = bitsOf(1.0);
 
-    BoxResult r = fBox::execCmptlt(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmptlt(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -406,7 +450,9 @@ TEST_CASE("fBox::execCmptle -- 1.0 <= 1.0 -> 2.0")
     ctx.opA = bitsOf(1.0);
     ctx.opB = bitsOf(1.0);
 
-    BoxResult r = fBox::execCmptle(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmptle(g, ctx, r);
 
     CHECK(r.regWriteValue == kPos20Bits);
 }
@@ -420,7 +466,9 @@ TEST_CASE("fBox::execCmptle -- 2.0 <= 1.0 is false -> 0.0")
     ctx.opA = bitsOf(2.0);
     ctx.opB = bitsOf(1.0);
 
-    BoxResult r = fBox::execCmptle(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmptle(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -434,7 +482,9 @@ TEST_CASE("fBox::execCmptle -- NaN -> 0.0 (unordered)")
     ctx.opA = kQuietNan;
     ctx.opB = bitsOf(1.0);
 
-    BoxResult r = fBox::execCmptle(g, ctx);
+    BoxResult r{};
+
+    fBox::execCmptle(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -453,7 +503,9 @@ TEST_CASE("fBox::execCpys -- explicit sign bit comparison")
     ctx.opA = kSignBit;       // -0.0 (only sign bit set)
     ctx.opB = bitsOf(2.0);
 
-    BoxResult r = fBox::execCpys(g, ctx);
+    BoxResult r{};
+
+    fBox::execCpys(g, ctx, r);
 
     CHECK((r.regWriteValue & kSignBit) == kSignBit);
     CHECK(doubleOf(r.regWriteValue) == -2.0);
@@ -476,7 +528,9 @@ TEST_CASE("fBox::execCvtqlV -- in-range quadword: repositioned, no IOV")
     ctx.cpu = &fpTestCpu();
     ctx.opB = 0x0000000012345678ULL;
 
-    BoxResult r = fBox::execCvtqlV(g, ctx);
+    BoxResult r{};
+
+    fBox::execCvtqlV(g, ctx, r);
 
     // 0x12345678<31:30> = 0; <29:0> << 29 = 0x12345678 * 2^29.
     CHECK(r.regWriteValue == 0x02468ACF00000000ULL);
@@ -491,7 +545,9 @@ TEST_CASE("fBox::execCvtqlV -- 2**31 overflows: truncated result + IOV sticky")
     ctx.cpu = &fpTestCpu();
     ctx.opB = 0x0000000080000000ULL;   // 2**31 > INT32_MAX
 
-    BoxResult r = fBox::execCvtqlV(g, ctx);
+    BoxResult r{};
+
+    fBox::execCvtqlV(g, ctx, r);
 
     // Truncated low 32 repositioned: <31:30> = 0b10 -> bit 63 of Fc.
     CHECK(r.regWriteValue == 0x8000000000000000ULL);
@@ -507,7 +563,9 @@ TEST_CASE("fBox::execCvtqlV -- negative in-range longword does not overflow")
     ctx.cpu = &fpTestCpu();
     ctx.opB = 0xFFFFFFFF80000000ULL;   // -2**31: the most negative in-range
 
-    BoxResult r = fBox::execCvtqlV(g, ctx);
+    BoxResult r{};
+
+    fBox::execCvtqlV(g, ctx, r);
 
     CHECK(r.regWriteValue == 0x8000000000000000ULL);
     CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) == 0u);
@@ -521,7 +579,9 @@ TEST_CASE("fBox::execCvtqlSv -- overflow above 32 bits: IOV recorded")
     ctx.cpu = &fpTestCpu();
     ctx.opB = 0x0000000100000000ULL;   // 2**32: low 32 are zero
 
-    BoxResult r = fBox::execCvtqlSv(g, ctx);
+    BoxResult r{};
+
+    fBox::execCvtqlSv(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);      // truncated low 32 repositioned
     CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) != 0u);
@@ -539,7 +599,9 @@ TEST_CASE("fBox::execCvtql -- plain variant records sticky IOV too (AARM 4.7.5)"
     ctx.cpu = &fpTestCpu();
     ctx.opB = 0x0000000100000000ULL;
 
-    BoxResult r = fBox::execCvtql(g, ctx);
+    BoxResult r{};
+
+    fBox::execCvtql(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
     CHECK((ctx.cpu->fpcr & AlphaFPCR::IOV) != 0u);

@@ -1,6 +1,17 @@
 // ============================================================================
 // palBoxLib/grains/PalEntries.cpp -- palBox HW_xxx and CALL_PAL leaves (v1)
 // ============================================================================
+//
+// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
+//   FILE:     palBoxLib/grains/PalEntries.cpp
+//   FUNCTION: every executor leaf in this file
+//   CHANGE:   leaf ABI return-by-value -> caller-supplied out-parameter.
+//             Signatures gain `BoxResult& out` and return void; body head
+//             `BoxResult r;` -> `BoxResult& r = out;` (field writes stay
+//             byte-identical); `return r;` -> `return;`; helper tail-returns
+//             (fpWrite / execCallPalDispatch) became braced call-then-return
+//             statements.  The caller owns the latch reset -- ownership
+//             contract in coreLib/BoxResult.h.
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -94,6 +105,8 @@
 #include "deviceLib/Hwrpb.h"          // deviceLib::hwrpb::Hwpcb layout (SWPCTX)
 #include "deviceLib/HwpcbContext.h"   // loadCpuFromHwpcb / storeCpuToHwpcb (SWPCTX)
 #include "memoryLib/GuestMemory.h"   // CSERVE PUTS reads its buffer via ExecCtx::memory
+#include "traceLib/DecListingSink.h" // P-SUP-2 CHMS-armed retire window (JRN-SUPMODE-001 Sec 12; REMOVE with probe)
+#include "coreLib/SupModeProbeRing.h" // P-SUP-3 CM-transition ring (JRN-SUPMODE-001 Sec 13.7; REMOVE with probe)
 // 2026-07-08: ToyRtc.h include removed with the CSERVE 0x66 get_time case (its
 // only user).  Time is read via the internal get_timestamp bsr, not a CSERVE.
 
@@ -137,7 +150,7 @@ using coreLib::InstructionGrain;
 // bulk-delegating S_PalEntry leaves).  Declaring it here gives those
 // earlier leaves a visible name to call without reordering the file.
 AXP_HOT AXP_FLATTEN
-auto execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult;
+auto execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void;
 
 
 // ---------------------------------------------------------------------------
@@ -287,12 +300,12 @@ constexpr uint8_t raIndex(InstructionGrain const& g) noexcept
 // surface lands; for now stub at kFaultUnimplemented.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBpt_tru64(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
+auto execBpt_tru64(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags  = g.semFlags;
     r.faultCode = coreLib::kFaultUnimplemented;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -301,12 +314,12 @@ auto execBpt_tru64(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c)
 // differs between personalities.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBpt_vms(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
+auto execBpt_vms(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags  = g.semFlags;
     r.faultCode = coreLib::kFaultUnimplemented;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -319,9 +332,9 @@ auto execBpt_vms(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) n
 // inline-execute (S_PalIntrinsic) semantics.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execChme_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execChme_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    return execCallPalDispatch(g, c);
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 // ----------------------------------------------------------------------------
@@ -329,12 +342,12 @@ auto execChme_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxRe
 // stub shape as CHME.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execChmk_tru64(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
+auto execChmk_tru64(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags  = g.semFlags;
     r.faultCode = coreLib::kFaultUnimplemented;
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL Stubs (PalVectorTable prerequisite)
@@ -419,9 +432,9 @@ auto execChmk_tru64(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c
 //   they land incrementally as the trace surfaces them.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCserve(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     // R16 carries the CSERVE function code in the low 8 bits.  Read
@@ -536,13 +549,13 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             // Enable hardware error reporting/machine-check controls.
             // Real PAL touches per-CPU/system error state.
             // V4: currently ignored.
-            return r;
+            return;
         }
 
         case 0x09: {   // CSERVE$CLEAR_HWE
             // Disable/clear hardware error reporting state.
             // V4: currently ignored.
-            return r;
+            return;
         }
         case 0x10: {   // CSERVE$LDLP -- load longword physical
             // sys__cserve cfw_ldlp: `mb; hw_ldl/p r0, 0(r17); mb`.
@@ -556,7 +569,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             r.regWriteIsFp  = false;
             r.regWriteValue = static_cast<uint64_t>(
                 static_cast<int64_t>(static_cast<int32_t>(v)));  // sext32
-            return r;
+            return;
         }
 
         case 0x11: {   // CSERVE$STLP -- store longword physical
@@ -567,7 +580,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     static_cast<coreLib::PAType>(c.cpu->intReg[17]),
                     static_cast<uint32_t>(c.cpu->intReg[18] & 0xFFFFFFFFu));
             }
-            return r;                // R0 untouched
+            return;                // R0 untouched
         }
 
         case 0x12: {   // CSERVE$LDBP -- load byte physical
@@ -581,7 +594,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             r.regWriteIdx   = 0;     // R0
             r.regWriteIsFp  = false;
             r.regWriteValue = static_cast<uint64_t>(v);          // zext8
-            return r;
+            return;
         }
 
         case 0x13: {   // CSERVE$STBP -- store byte physical
@@ -592,7 +605,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     static_cast<coreLib::PAType>(c.cpu->intReg[17]),
                     static_cast<uint8_t>(c.cpu->intReg[18] & 0xFFu));
             }
-            return r;                // R0 untouched
+            return;                // R0 untouched
         }
         case 0x46: {   // CSERVE$IIC_WRITE -- ev6_vms_pc264_pal.mar sys__iic_write (:5208)
             // JRN-VMB-006.  The VMS PAL packs a PCF8584 I2C write into R17:
@@ -653,7 +666,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                 }
             }
 #endif
-            return r;
+            return;
         }
         case 0x44: {   // CSERVE$MTPR_EXC_ADDR -- console hand-off continuation
             // huf_decom switch: (ev6_huf_decom.m64 l.308-311)
@@ -678,19 +691,19 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             c.cpu->excAddr = targetVector;     // MTPR EXC_ADDR (bit 0 = PALmode)
             r.divertTarget = targetVector;     // return-in-PAL to R17, applied at WB
             r.divert       = true;
-            return r;
+            return;
         }
 
         case 0x3F: {   // CSERVE$GET_BASE
             r.faultCode = coreLib::kFaultHalt;
-            return r;
+            return;
         }
         case 0x40: {   // CSERVE$HALT -- machine halt
             // sys__cserve cfw_halt: sets HALT__HW_HALT and enters the
             // console.  V4: deliver kFaultHalt; the run loop stops with
             // StopReason::HaltedClean.
             r.faultCode = coreLib::kFaultHalt;
-            return r;
+            return;
         }
 
         case 0x41: {   // CSERVE$WHAMI -- get current CPU id
@@ -701,7 +714,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             r.regWriteIdx   = 0;     // R0
             r.regWriteIsFp  = false;
             r.regWriteValue = c.cpu->cpuSlot;
-            return r;
+            return;
         }
 
         case 0x42: {   // CSERVE$START -- start / release a secondary CPU
@@ -872,7 +885,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                         static_cast<unsigned long long>(s_exitConsolePc),
                         static_cast<unsigned long long>(c.cpu->cycleCount));
                     std::fflush(stderr);
-                    return r;
+                    return;
                 }
                 // TRIPWIRE (JRN-SCSI-010 P4): a silent no-op here strands the
                 // console->APB handoff at halt_pc with halt code 0 -- say so.
@@ -881,7 +894,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     "handoff will strand at halt_pc (halt code 0).  cyc=%llu\n",
                     static_cast<unsigned long long>(c.cpu->cycleCount));
                 std::fflush(stderr);
-                return r;   // scan failed: safe no-op
+                return;   // scan failed: safe no-op
             }
 
             // ================================================================
@@ -1158,7 +1171,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                 c.cpu->excAddr = haltPc;         // native restart PC (bit 0 = 0)
                 r.divertTarget = haltPc;
                 r.divert       = true;
-                return r;
+                return;
             }
 #endif // --- end OPTION B (kStartCpp) DEAD END ---
             // Option B (cpp) is compiled out; if selected it now falls through to
@@ -1182,7 +1195,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     std::fflush(stderr);
                 }
             }
-            return r;                // default: SMP-secondary start -- no-op on UP
+            return;                // default: SMP-secondary start -- no-op on UP
         }
 
         // case 0x43 CSERVE$CALLBACK -- REMOVED as an explicit no-op
@@ -1234,7 +1247,7 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             r.regWriteIdx   = 0;     // R0
             r.regWriteIsFp  = false;
             r.regWriteValue = (c.cpu->palBase >> 21) << 21;   // PAL_BASE, 2MB-aligned
-            return r;
+            return;
         }
 
         default: {
@@ -1440,12 +1453,12 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                             (int)c.cpu->inPalMode());
                     }
                     std::fflush(stderr);
-                    return r;
+                    return;
                 }
                 // scan failed: fall through to the safe no-op below.
             }
 
-            return r;                // R0 untouched, no fault (no-op when routing
+            return;                // R0 untouched, no fault (no-op when routing
                                      // is OFF or the scan failed)
         }
     }
@@ -1481,9 +1494,9 @@ auto execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execLdqp_vms([[maybe_unused]] InstructionGrain const& g,
-                  ExecCtx const&                            c) noexcept -> BoxResult
+                  ExecCtx const&                            c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     uint64_t const ea = c.cpu->intReg[16];   // R16 (a0)
@@ -1502,7 +1515,7 @@ auto execLdqp_vms([[maybe_unused]] InstructionGrain const& g,
     if ((ea & 0x7ULL) != 0 && c.cpu->unalignTrapEnabled) {
         r.faultCode = coreLib::kFaultUnaligned;
         c.cpu->mm_stat = ea;
-        return r;
+        return;
     }
 
     // Carry S_PhysAddr + S_Load forward so MEM-drainer (a) bypasses
@@ -1515,7 +1528,7 @@ auto execLdqp_vms([[maybe_unused]] InstructionGrain const& g,
     r.memIsStore   = false;
     r.regWriteIdx  = 0;                   // R0 (v0) receives the fill
     r.regWriteIsFp = false;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -1527,9 +1540,9 @@ auto execLdqp_vms([[maybe_unused]] InstructionGrain const& g,
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execStqp_vms([[maybe_unused]] InstructionGrain const& g,
-                  ExecCtx const&                            c) noexcept -> BoxResult
+                  ExecCtx const&                            c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     uint64_t const ea = c.cpu->intReg[16];   // R16 (a0)
@@ -1538,7 +1551,7 @@ auto execStqp_vms([[maybe_unused]] InstructionGrain const& g,
     if ((ea & 0x7ULL) != 0 && c.cpu->unalignTrapEnabled) {
         r.faultCode = coreLib::kFaultUnaligned;
         c.cpu->mm_stat = ea;
-        return r;
+        return;
     }
 
     r.semFlags     = r.semFlags
@@ -1548,7 +1561,7 @@ auto execStqp_vms([[maybe_unused]] InstructionGrain const& g,
     r.memData      = c.cpu->intReg[17];   // R17 (a1) -- value to store
     r.memSize      = 8;
     r.memIsStore   = true;
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL LDQP / STQP intrinsics (physical-address load/store)
@@ -1577,14 +1590,14 @@ auto execStqp_vms([[maybe_unused]] InstructionGrain const& g,
 // S_PalVms-only; same codegen suffix-match fix class as execLdqp_vms).
 AXP_HOT AXP_FLATTEN
 auto execMfprVptb_vms([[maybe_unused]] InstructionGrain const& g,
-                      ExecCtx const&                            c) noexcept -> BoxResult
+                      ExecCtx const&                            c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = 0;            // R0 (v0) -- Alpha PAL "function read" convention
     r.regWriteIsFp  = false;
     r.regWriteValue = c.cpu->vptb;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -1595,9 +1608,9 @@ auto execMfprVptb_vms([[maybe_unused]] InstructionGrain const& g,
 // 2026-06-05: renamed execMtprVptb -> execMtprVptb_vms (see MFPR_VPTB note).
 AXP_HOT AXP_FLATTEN
 auto execMtprVptb_vms([[maybe_unused]] InstructionGrain const& g,
-                      ExecCtx const&                            c) noexcept -> BoxResult
+                      ExecCtx const&                            c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
     c.cpu->vptb = c.cpu->intReg[16];   // R16 (a0) is the standard CALL_PAL arg
 
@@ -1697,7 +1710,7 @@ auto execMtprVptb_vms([[maybe_unused]] InstructionGrain const& g,
         }
     }
 #endif
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL VPTB intrinsics (MFPR_VPTB / MTPR_VPTB)
@@ -1730,13 +1743,13 @@ auto execMtprVptb_vms([[maybe_unused]] InstructionGrain const& g,
 // no longer emits the conflicting stub.  Body unchanged.
 AXP_HOT AXP_FLATTEN
 auto execMfprScbb_vms([[maybe_unused]] InstructionGrain const& g,
-                      ExecCtx const&                            c) noexcept -> BoxResult
+                      ExecCtx const&                            c, BoxResult& out) noexcept -> void
 {
     // 2026-05-31: was a broken intrinsic (returned cpu.scbb, which the VMS
     // PAL never reads back -- the interrupt dispatch reads PT__SCBB from
     // guest memory at p21+0x170).  Now an S_PalEntry leaf that delegates to
     // the guest PAL MFPR_SCBB handler, like execMfprPcbb_vms et al.
-    return execCallPalDispatch(g, c);
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 // ----------------------------------------------------------------------------
@@ -1751,13 +1764,13 @@ auto execMfprScbb_vms([[maybe_unused]] InstructionGrain const& g,
 // no longer emits the conflicting stub.  Body unchanged.
 AXP_HOT AXP_FLATTEN
 auto execMtprScbb_vms([[maybe_unused]] InstructionGrain const& g,
-                      ExecCtx const&                            c) noexcept -> BoxResult
+                      ExecCtx const&                            c, BoxResult& out) noexcept -> void
 {
     // 2026-05-31: was a broken intrinsic (stored R16 into cpu.scbb, which the
     // VMS PAL dispatch never reads).  Now an S_PalEntry leaf that delegates to
     // the guest PAL MTPR_SCBB handler, which does hw_stq/p p6,PT__SCBB(p_temp)
     // -- writing the value to the guest memory the dispatch actually reads.
-    return execCallPalDispatch(g, c);
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 #pragma endregion CALL_PAL SCBB intrinsics (MFPR_SCBB / MTPR_SCBB)
@@ -1782,14 +1795,14 @@ auto execMtprScbb_vms([[maybe_unused]] InstructionGrain const& g,
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execWtint([[maybe_unused]] InstructionGrain const& g,
-               [[maybe_unused]] ExecCtx const&          c) noexcept -> BoxResult
+               [[maybe_unused]] ExecCtx const&          c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = 0;     // R0 (v0)
     r.regWriteIsFp  = false;
     r.regWriteValue = 0;     // "interrupt arrived"
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL WTINT intrinsic
@@ -1812,14 +1825,14 @@ auto execWtint([[maybe_unused]] InstructionGrain const& g,
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
 auto execMfprWhami([[maybe_unused]] InstructionGrain const& g,
-                   ExecCtx const&                           c) noexcept -> BoxResult
+                   ExecCtx const&                           c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = 0;     // R0 (v0)
     r.regWriteIsFp  = false;
     r.regWriteValue = c.cpu->cpuSlot;   // real SMP slot (0 for agent0)
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL MFPR_WHAMI intrinsic
@@ -1915,7 +1928,7 @@ auto execMfprWhami([[maybe_unused]] InstructionGrain const& g,
 //      guest memory at boot (Machine orchestrator memcpy).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // Faithful VMS SWPCTX (SPEC-SWPCTX-001 C3).  Design record: the GATE-1
     // answers doc (journals/SPEC-SWPCTX-001_GATE1_ANSWERS.md); ground truth
@@ -1936,12 +1949,12 @@ auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Box
     // architecturally reserved-operand -> SCB ILLOP); UNQ/SCT untouched
     // (RD/WR_UNQ own UNQ).  No R0 output: apisrm writes no result register
     // (the prior body's R0 = old PTBR followed SimH, a secondary source).
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     // Bare unit harness with no memory bus: no-op (harness convention,
     // matches the other PAL-intrinsic leaves).
-    if (c.memory == nullptr) return r;
+    if (c.memory == nullptr) return;
 
     using deviceLib::hwrpb::Hwpcb;
     using deviceLib::hwrpb::loadCpuFromHwpcb;
@@ -1956,7 +1969,7 @@ auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Box
     // No state is touched on the fault path.
     if ((newPcbb & 0x7FULL) != 0) {
         r.faultCode = coreLib::kFaultOpcDec;      // named deviation, see header
-        return r;
+        return;
     }
 
     // (1) SAVE the outgoing context through the CURRENT PCBB.  Field-set
@@ -1981,7 +1994,7 @@ auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Box
                               static_cast<coreLib::PAType>(c.cpu->pcbb),
                               save) != memoryLib::MemStatus::Ok) {
             r.faultCode = coreLib::kFaultBusError;   // NXM -> machine check (AARM)
-            return r;
+            return;
         }
     }
 
@@ -1995,7 +2008,7 @@ auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Box
                            static_cast<coreLib::PAType>(newPcbb),
                            img) != memoryLib::MemStatus::Ok) {
         r.faultCode = coreLib::kFaultBusError;
-        return r;
+        return;
     }
     loadCpuFromHwpcb(*c.cpu, img);                 // SPs/PTBR/ASN/AST/FEN+PME+DAT/CC
     c.cpu->pcbb       = newPcbb;
@@ -2075,7 +2088,7 @@ auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Box
     }
 #endif
 
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -2093,15 +2106,15 @@ auto execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Box
 // and this leaf is a forward-looking stub.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execSwpctxOsf(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
+auto execSwpctxOsf(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // Body deferred (see execSwpctx_vms for the VMS one); separate symbol so the
     // codegen can wire it to the 0x30 dispatch slot when personality fan-
     // out lands.
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags  = g.semFlags;
     r.faultCode = coreLib::kFaultUnimplemented;
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL SWPCTX intrinsic (process-context swap)
@@ -2114,12 +2127,12 @@ auto execSwpctxOsf(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c)
 // terminates the run cleanly.  No register or memory effect.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execHalt(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
+auto execHalt(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
     r.faultCode = coreLib::kFaultHalt;
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL HALT (real)
@@ -2164,9 +2177,9 @@ auto execHalt(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noex
 // dispatch table (HALT, CSERVE, ...) take priority over the default.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     // Function code is the low 26 bits of the encoding (bits[25:0]).
@@ -2216,7 +2229,7 @@ auto execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c) noexcept -
 
     r.divertTarget = entryPC | uint64_t{1};   // enter PAL: PC<0>=1 (else handler runs native)
     r.divert       = true;
-    return r;
+    return;
 }
 
 #pragma endregion CALL_PAL generic dispatch (divert into PALcode)
@@ -2259,15 +2272,15 @@ auto execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c) noexcept -
 // firmware reading the FEN bit shortly after the write.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execMfprFen_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMfprFen_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    return execCallPalDispatch(g, c);
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprFen_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMtprFen_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    return execCallPalDispatch(g, c);
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 #pragma endregion CALL_PAL FEN pair (VMS)
@@ -2310,9 +2323,9 @@ auto execMtprFen_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Bo
 //   captures it at the stop boundary too.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     coreLib::HW_IPR const sel = iprSelector(g);
@@ -2572,20 +2585,20 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         // line: SL_XMIT/SL_RCV are I_CTL[13]/[14].)
     case coreLib::HW_RESERVED_2D:
         r.faultCode = coreLib::kFaultUnimplemented;
-        return r;
+        return;
 
     default:
         // Truly unknown selector -- raw scbd is not in the V1
         // HW_IPR enum.  Halt with a fault; the lookback ring
         // captures the failing encoding for diagnosis.
         r.faultCode = coreLib::kFaultUnimplemented;
-        return r;
+        return;
     }
 
     r.regWriteIdx = raIndex(g);
     r.regWriteIsFp = false;
     r.regWriteValue = value;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -2606,9 +2619,9 @@ auto execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 // enum raise kFaultUnimplemented and halt with the lookback intact.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     coreLib::HW_IPR const sel = iprSelector(g);
@@ -2862,6 +2875,20 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             }
         }
         // ---- END P-AST-1 E3 (IER_CM arm) ----
+        // P-SUP-3 ring feed (JRN-SUPMODE-001 Sec 13.7; REMOVE with the
+        // probe family).  Uncapped by design -- the stderr census's
+        // 1024-row cap is what blinded Sec 10.1/11.1 (Sec 13.4).
+        {
+            static bool const s_supRing =
+                std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+            if (s_supRing) {
+                coreLib::supmode_probe::push(
+                    c.cpu->cycleCount, g.pc, c.opB,
+                    static_cast<uint8_t>(c.cpu->mode),
+                    static_cast<uint8_t>(coreLib::ierCmExtractMode(c.opB)),
+                    1u);
+            }
+        }
         c.cpu->ier = coreLib::ierCmIerPortion(c.opB);
         c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
 #if EMULATR_IRQDIAG
@@ -2956,6 +2983,47 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     std::fflush(stderr);
                     ++s_rowsCm;
                 }
+            }
+        }
+        // P-SUP-3 ring feed (JRN-SUPMODE-001 Sec 13.7; REMOVE with the
+        // probe family).  This is the corridor's own write site (PAL
+        // 0x11181, raw index 0x09) -- Sec 13.3.
+        {
+            static bool const s_supRingCm =
+                std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+            if (s_supRingCm) {
+                coreLib::supmode_probe::push(
+                    c.cpu->cycleCount, g.pc, c.opB,
+                    static_cast<uint8_t>(c.cpu->mode),
+                    static_cast<uint8_t>(coreLib::ierCmExtractMode(c.opB)),
+                    0u);
+            }
+        }
+        // P-SUP-5 (JRN-SUPMODE-001 Sec 14.5; REMOVE with the probe
+        // family): arm the retire window at the RARE supervisor->user
+        // CM write (measured ~8-10/boot, all at the 0xFD90 frame-pop
+        // REI).  The window then covers the REI tail, the entire user
+        // era, the Species-A fault, and its handling.  Env
+        // EMULATR_PROBE_SUPMODE_ARM23=<retire count>; requires
+        // EMULATR_TRACE_WINDOW=1.  No site filter on purpose: a 2->3
+        // from an unexpected site would be its own finding.
+        {
+            static long long const s_arm23 = [] {
+                char const* const v =
+                    std::getenv("EMULATR_PROBE_SUPMODE_ARM23");
+                return v ? std::strtoll(v, nullptr, 0) : 0LL;
+            }();
+            if (s_arm23 > 0
+                && c.cpu->mode == coreLib::Mode_Privilege::Supervisor
+                && coreLib::ierCmExtractMode(c.opB)
+                       == coreLib::Mode_Privilege::User) {
+                traceLib::DecListingSink::setTraceWindowCountdown(s_arm23);
+                std::fprintf(stderr,
+                    "SUPMODE ARM23 window=%lld cyc=%llu pc=0x%llx\n",
+                    s_arm23,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc));
+                std::fflush(stderr);
             }
         }
         c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
@@ -3211,10 +3279,10 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     default:
         // Truly unknown selector outside the V1 HW_IPR enum.
         r.faultCode = coreLib::kFaultUnimplemented;
-        return r;
+        return;
     }
 
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -3306,9 +3374,9 @@ void sdeLog(char const* tag, coreLib::CpuState const& cpu) noexcept
 // relevant.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execHwRei(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags = g.semFlags;
 
     // HW_REI / HW_RET (opcode 0x1E).  Per Alpha 21264 EV6 HRM:
@@ -3508,7 +3576,7 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
     }
     // ---- END DIVERT-REI EXACT compare ----
 
-    return r;
+    return;
 }
 
 #pragma endregion HW_xxx Stubs (CpuState prerequisite)
@@ -3524,7 +3592,8 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
 // handwritten.tsv so the codegen drops its kFaultUnimplemented stub.
 //
 // Why one big region instead of one #pragma per leaf:
-//   - All bodies are identical -- 'return execCallPalDispatch(g, c);'
+//   - All bodies are identical -- '{ execCallPalDispatch(g, c, out); return; }'
+//     (out-parameter ABI, BRIEF-EXEC-ABI-001)
 //   - The mnemonic shows up in the per-row GrainEntry name for traces
 //     (DispatchTables.cpp), so trace fidelity is preserved.
 //   - Per-leaf specialization (S_PalIntrinsic posture) can lift any one
@@ -3543,381 +3612,496 @@ auto execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
 
 // ---- MFPR group ----
 AXP_HOT AXP_FLATTEN
-auto execMfprAsn_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprAsn_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprAsten_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprAsten_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprAstsr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprAstsr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprEsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprEsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprIpl_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprIpl_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprMces(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprMces(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprPcbb_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprPcbb_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprPrbr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprPrbr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprPtbr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprPtbr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprSisr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprSisr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprSsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprSsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprSysptbr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprSysptbr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprTbchk_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprTbchk_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprUsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprUsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMfprVirbnd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMfprVirbnd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 
 // ---- MTPR group ----
 AXP_HOT AXP_FLATTEN
-auto execMtprAsten_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprAsten_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprAstsr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprAstsr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprDatfx(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprDatfx(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprEsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprEsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprIpir(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprIpir(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprIpl_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprIpl_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprMces(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprMces(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprPerfmon(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprPerfmon(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprPrbr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprPrbr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprSirr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprSirr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprSsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprSsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprTbia_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprTbia_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprTbiap_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprTbiap_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprTbis_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprTbis_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprTbisd_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprTbisd_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprTbisi_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprTbisi_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMtprUsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execMtprUsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 
 // ---- CONTROL group ----
 AXP_HOT AXP_FLATTEN
-auto execBpt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execBpt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execBugchk_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execBugchk_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCflush(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execCflush(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execChmk(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execChmk(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    // P-SUP-1 baseline row (JRN-SUPMODE-001; REMOVE with the CHMS
+    // probe).  CHMK demonstrably WORKS -- its rows are the healthy
+    // reference for shR21/shR22 against the failing CHMS.  Tight cap:
+    // CHMK fires constantly.
+    {
+        static bool const s_supProbe =
+            std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+        if (s_supProbe) {
+            static unsigned long long s_n = 0;
+            ++s_n;
+            if (s_n <= 4 || (s_n & 0x3FFFull) == 0) {
+                std::fprintf(stderr,
+                    "SUPMODE CHMK#%llu cyc=%llu pc=0x%llx mode=%d "
+                    "sde=%d shR22=0x%llx shR21=0x%llx pal=%d\n",
+                    s_n,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<int>(c.cpu->mode),
+                    static_cast<int>((c.cpu->i_ctl >> 7) & 1),
+                    static_cast<unsigned long long>(c.cpu->intShadow[6]),
+                    static_cast<unsigned long long>(c.cpu->intShadow[5]),
+                    c.cpu->inPalMode() ? 1 : 0);
+                std::fflush(stderr);
+            }
+        }
+    }
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execChms_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execChms_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    // ---- P-SUP-1 issuance probe (JRN-SUPMODE-001 Sec 5; REMOVE after
+    // readout).  The census (E3 data, both 2026-08-09 runs) shows CM=2
+    // is NEVER a transition target; CHMS dispatch is wired identically
+    // to the working CHME/CHMK.  Remaining question: does the guest
+    // ever ISSUE CHMS?  Zero rows here across a boot = the break is
+    // UPSTREAM (the DCL-entry / PROCSTRT REI-to-super path never runs
+    // or dies first); nonzero rows with the census still 0 = the PAL's
+    // CHMS flow eats the mode write.  Gated on EMULATR_PROBE_SUPMODE.
+    {
+        static bool const s_supProbe =
+            std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+        if (s_supProbe) {
+            static unsigned long long s_n = 0;
+            ++s_n;
+            if (s_n <= 8 || (s_n & 0x3FFull) == 0) {
+                // Extended (JRN-SUPMODE-001 Sec 11 follow-up): the CHMS
+                // PAL flow reads its current mode from p_misc = shadow
+                // R22.  Pre-dispatch here: intShadow[6] is what p_misc
+                // WILL read as after a correct SDE swap; intReg[22] is
+                // what it reads if the swap does NOT fire (SDE clear).
+                // sde = I_CTL bit 7.  These three fields adjudicate the
+                // stale-shadow vs no-swap vs corridor question without
+                // the retire trace.
+                // shR21 = p_temp (PALtemp/scratch base; healthy value
+                // 0xF000-region).  Zero here = the corridor's hw_stq/p
+                // scratch stores + PT__PCBB load run on physical addr 0
+                // -> flow wanders without ever writing PS.  Prior form:
+                // the July PTEMP capture measured r21=0 at CSERVE-START.
+                std::fprintf(stderr,
+                    "SUPMODE CHMS#%llu cyc=%llu pc=0x%llx mode=%d "
+                    "sde=%d shR22=0x%llx shR21=0x%llx natR22=0x%llx pal=%d\n",
+                    s_n,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<int>(c.cpu->mode),
+                    static_cast<int>((c.cpu->i_ctl >> 7) & 1),
+                    static_cast<unsigned long long>(c.cpu->intShadow[6]),
+                    static_cast<unsigned long long>(c.cpu->intShadow[5]),
+                    static_cast<unsigned long long>(c.cpu->intReg[22]),
+                    c.cpu->inPalMode() ? 1 : 0);
+                std::fflush(stderr);
+            }
+        }
+    }
+    // ---- P-SUP-2 self-arming retire window (JRN-SUPMODE-001 Sec 12
+    // realized; REMOVE with the CHMS probe).  Sec 12's console arming
+    // (Ctrl/P after date entry + TIG deposit) cannot capture the
+    // corridor as written: the TIG countdown emits the FIRST N retires
+    // after `continue`, and the date->CHMS gap is ~90M cycles of
+    // STARTUP work, so any affordable window closes long before the
+    // corridor.  Arm HERE instead: the window opens at the CHMS
+    // issuance itself, so the ~40-insn CHMS->EV6__PS corridor is the
+    // first thing captured; re-arming on every CHMS keeps all attempts
+    // in-window.  Env EMULATR_PROBE_SUPMODE_ARM=<retire count, base
+    // 0x-aware> (unset/0 = off); requires EMULATR_TRACE_WINDOW=1 so
+    // the _srm.trc sink is open (main.cpp).
+    {
+        static long long const s_armCount = [] {
+            char const* const v = std::getenv("EMULATR_PROBE_SUPMODE_ARM");
+            return v ? std::strtoll(v, nullptr, 0) : 0LL;
+        }();
+        if (s_armCount > 0) {
+            traceLib::DecListingSink::setTraceWindowCountdown(s_armCount);
+            std::fprintf(stderr,
+                "SUPMODE ARM window=%lld cyc=%llu pc=0x%llx\n",
+                s_armCount,
+                static_cast<unsigned long long>(c.cpu->cycleCount),
+                static_cast<unsigned long long>(g.pc));
+            std::fflush(stderr);
+        }
+    }
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execChmu_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execChmu_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    // P-SUP-1 twin (JRN-SUPMODE-001; REMOVE with the CHMS probe).
+    {
+        static bool const s_supProbe =
+            std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+        if (s_supProbe) {
+            static unsigned long long s_n = 0;
+            ++s_n;
+            if (s_n <= 8 || (s_n & 0x3FFull) == 0) {
+                std::fprintf(stderr,
+                    "SUPMODE CHMU#%llu cyc=%llu pc=0x%llx mode=%d\n",
+                    s_n,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<int>(c.cpu->mode));
+                std::fflush(stderr);
+            }
+        }
+    }
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execClrfen(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execClrfen(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execDraina(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execDraina(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execGentrap(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execGentrap(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execImb(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execImb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRei(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRei(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRetsys_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRetsys_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execSwpipl_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execSwpipl_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execSwppal(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execSwppal(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 
 // ---- WRRD group ----
 AXP_HOT AXP_FLATTEN
-auto execRdps_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRdps_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRdusp_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRdusp_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRdPs_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRdPs_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execTbi_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execTbi_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWrent_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWrent_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWriteUnq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWriteUnq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWrkgp_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWrkgp_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWrperfmon_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWrperfmon_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWrusp_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWrusp_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWrval_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWrval_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWrvptptr_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWrvptptr_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWrPsSw_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWrPsSw_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 
 // ---- QUEUE group ----
 AXP_HOT AXP_FLATTEN
-auto execInsqhil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqhil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqhilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqhilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqhiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqhiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqhiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqhiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqtil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqtil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqtilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqtilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqtiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqtiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqtiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqtiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsquel_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsquel_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsquelD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsquelD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqueq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqueq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqueqD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execInsqueqD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqhil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqhil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqhiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqhiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqtil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqtil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqtiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqtiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 // Interlocked (resident-reentrant) queue removes -- delegate to the CALL_PAL
@@ -3926,85 +4110,85 @@ auto execRemqtiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> Bo
 // These were stubbed to logUnimplementedStub instead of delegated -- a coverage
 // oversight, now corrected.
 AXP_HOT AXP_FLATTEN
-auto execRemqhilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqhilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqtilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqtilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqhiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqhiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqtiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqtiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemquel_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemquel_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemquelD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemquelD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqueq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqueq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRemqueqD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRemqueqD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 
 // ---- OTHER group ----
 AXP_HOT AXP_FLATTEN
-auto execAmovrm_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execAmovrm_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execAmovrr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execAmovrr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execProber_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execProber_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execProbew_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execProbew_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execReadUnq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execReadUnq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execRscc_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execRscc_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execSwasten_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execSwasten_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 AXP_HOT AXP_FLATTEN
-auto execWhami_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
-    return execCallPalDispatch(g, c);
+auto execWhami_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void {
+    { execCallPalDispatch(g, c, out); return; }
 }
 
 #pragma endregion CALL_PAL bulk-delegating leaves

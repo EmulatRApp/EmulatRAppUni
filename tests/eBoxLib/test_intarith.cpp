@@ -1,6 +1,14 @@
 // ============================================================================
 // tests/eBoxLib/test_intarith.cpp -- doctest cases for INTA leaves
 // ============================================================================
+//
+// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
+//   FILE:     tests/eBoxLib/test_intarith.cpp
+//   FUNCTION: every direct leaf invocation
+//   CHANGE:   leaf ABI is now out-parameter: calls became
+//             `BoxResult r{}; leaf(g, ctx, r);`.  The test is the caller
+//             and therefore OWNS the latch reset -- the `{}` value-init is
+//             load-bearing (coreLib/BoxResult.h ownership contract).
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -83,7 +91,9 @@ TEST_CASE("eBox::execAddl -- small positive operands")
     ctx.opA = 7;
     ctx.opB = 5;
 
-    BoxResult r = eBox::execAddl(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddl(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 3);
@@ -100,7 +110,9 @@ TEST_CASE("eBox::execAddl -- result sign-extends from 32 to 64 bits")
     ctx.opA = 0xFFFFFFFEULL;
     ctx.opB = 0x00000001ULL;
 
-    BoxResult r = eBox::execAddl(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddl(g, ctx, r);
 
     CHECK(r.regWriteIdx == 5);
     CHECK(r.regWriteValue == 0xFFFFFFFFFFFFFFFFULL);
@@ -113,7 +125,9 @@ TEST_CASE("eBox::execAddl -- 32-bit overflow wraps and sign-extends")
     ctx.opA = 0x7FFFFFFFULL;
     ctx.opB = 0x00000001ULL;
 
-    BoxResult r = eBox::execAddl(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddl(g, ctx, r);
 
     CHECK(r.regWriteIdx == 7);
     CHECK(r.regWriteValue == 0xFFFFFFFF80000000ULL);
@@ -126,7 +140,9 @@ TEST_CASE("eBox::execAddl -- only the low 32 bits of operands enter the add")
     ctx.opA = 0xDEADBEEF00000003ULL;
     ctx.opB = 0xCAFEBABE00000004ULL;
 
-    BoxResult r = eBox::execAddl(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddl(g, ctx, r);
 
     CHECK(r.regWriteIdx == 9);
     CHECK(r.regWriteValue == 7u);
@@ -139,7 +155,9 @@ TEST_CASE("eBox::execAddl -- semFlags propagate from grain to result")
     ctx.opA = 0;
     ctx.opB = 0;
 
-    BoxResult r = eBox::execAddl(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddl(g, ctx, r);
 
     CHECK(any(r.semFlags & GrainSem::S_OpFormat));
     CHECK(any(r.semFlags & GrainSem::S_WritesRc));
@@ -155,7 +173,8 @@ TEST_CASE("eBox::execAddl -- reachable through grain.execFn")
     ctx.opA = 100;
     ctx.opB = 23;
 
-    BoxResult r = (*g.execFn)(g, ctx);
+    BoxResult r{};
+    (*g.execFn)(g, ctx, r);
 
     CHECK(r.regWriteIdx == 11);
     CHECK(r.regWriteValue == 123u);
@@ -173,7 +192,9 @@ TEST_CASE("eBox::execSubl -- basic positive subtraction")
     ctx.opA = 10;
     ctx.opB = 3;
 
-    BoxResult r = eBox::execSubl(g, ctx);
+    BoxResult r{};
+
+    eBox::execSubl(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 4);
@@ -187,7 +208,9 @@ TEST_CASE("eBox::execSubl -- underflow sign-extends to 64-bit all-ones")
     ctx.opA = 0;
     ctx.opB = 1;
 
-    BoxResult r = eBox::execSubl(g, ctx);
+    BoxResult r{};
+
+    eBox::execSubl(g, ctx, r);
 
     // 0 - 1 = -1 in 32 bits; sign-extended to 64 bits = all-ones.
     CHECK(r.regWriteValue == 0xFFFFFFFFFFFFFFFFULL);
@@ -205,7 +228,9 @@ TEST_CASE("eBox::execAddq -- 64-bit positive add")
     ctx.opA = 0x1000000000ULL;
     ctx.opB = 0x0000000003ULL;
 
-    BoxResult r = eBox::execAddq(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddq(g, ctx, r);
 
     CHECK(r.regWriteIdx == 4);
     CHECK(r.regWriteValue == 0x1000000003ULL);
@@ -218,7 +243,9 @@ TEST_CASE("eBox::execAddq -- 64-bit overflow wraps to zero")
     ctx.opA = 0xFFFFFFFFFFFFFFFFULL;
     ctx.opB = 0x0000000000000001ULL;
 
-    BoxResult r = eBox::execAddq(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddq(g, ctx, r);
 
     // UINT64_MAX + 1 wraps to 0; no trap (the _V variant traps but
     // is not implemented in v1).
@@ -237,7 +264,9 @@ TEST_CASE("eBox::execSubq -- basic 64-bit subtraction")
     ctx.opA = 0x1000000000ULL;
     ctx.opB = 0x0000000003ULL;
 
-    BoxResult r = eBox::execSubq(g, ctx);
+    BoxResult r{};
+
+    eBox::execSubq(g, ctx, r);
 
     CHECK(r.regWriteIdx == 4);
     CHECK(r.regWriteValue == 0xFFFFFFFFDULL);
@@ -250,7 +279,9 @@ TEST_CASE("eBox::execSubq -- 64-bit underflow wraps to UINT64_MAX")
     ctx.opA = 0;
     ctx.opB = 1;
 
-    BoxResult r = eBox::execSubq(g, ctx);
+    BoxResult r{};
+
+    eBox::execSubq(g, ctx, r);
 
     CHECK(r.regWriteValue == 0xFFFFFFFFFFFFFFFFULL);
 }
@@ -267,7 +298,9 @@ TEST_CASE("eBox::execCmpeq -- equal operands return 1")
     ctx.opA = 0x123456789ABCDEFULL;
     ctx.opB = 0x123456789ABCDEFULL;
 
-    BoxResult r = eBox::execCmpeq(g, ctx);
+    BoxResult r{};
+
+    eBox::execCmpeq(g, ctx, r);
 
     CHECK(r.regWriteIdx == 4);
     CHECK(r.regWriteValue == 1u);
@@ -280,7 +313,9 @@ TEST_CASE("eBox::execCmpeq -- unequal operands return 0")
     ctx.opA = 5;
     ctx.opB = 7;
 
-    BoxResult r = eBox::execCmpeq(g, ctx);
+    BoxResult r{};
+
+    eBox::execCmpeq(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -293,7 +328,9 @@ TEST_CASE("eBox::execCmpeq -- full 64-bit comparison (high bits matter)")
     ctx.opA = 0x1000000000000000ULL;
     ctx.opB = 0x2000000000000000ULL;
 
-    BoxResult r = eBox::execCmpeq(g, ctx);
+    BoxResult r{};
+
+    eBox::execCmpeq(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
 }
@@ -336,7 +373,9 @@ TEST_CASE("eBox::execAddlV -- non-overflow stores the ADDL result")
     ctx.opA = 7;
     ctx.opB = 5;
 
-    BoxResult r = eBox::execAddlV(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddlV(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 3);
@@ -355,7 +394,9 @@ TEST_CASE("eBox::execAddlV -- overflow still stores sign-extended wrap")
     ctx.opA = 0x7FFFFFFFULL;
     ctx.opB = 0x00000001ULL;
 
-    BoxResult r = eBox::execAddlV(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddlV(g, ctx, r);
 
     CHECK(r.regWriteIdx == 7);
     CHECK(r.regWriteValue == 0xFFFFFFFF80000000ULL);
@@ -369,7 +410,9 @@ TEST_CASE("eBox::execSublV -- non-overflow stores the SUBL result")
     ctx.opA = 10;
     ctx.opB = 3;
 
-    BoxResult r = eBox::execSublV(g, ctx);
+    BoxResult r{};
+
+    eBox::execSublV(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 4);
@@ -385,7 +428,9 @@ TEST_CASE("eBox::execSublV -- overflow still stores sign-extended wrap")
     ctx.opA = 0x80000000ULL;
     ctx.opB = 0x00000001ULL;
 
-    BoxResult r = eBox::execSublV(g, ctx);
+    BoxResult r{};
+
+    eBox::execSublV(g, ctx, r);
 
     CHECK(r.regWriteValue == 0x000000007FFFFFFFULL);
     CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
@@ -398,7 +443,9 @@ TEST_CASE("eBox::execAddqV -- non-overflow stores the ADDQ result")
     ctx.opA = 0x100000000ULL;
     ctx.opB = 0x200000001ULL;
 
-    BoxResult r = eBox::execAddqV(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddqV(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 4);
@@ -414,7 +461,9 @@ TEST_CASE("eBox::execAddqV -- overflow into bit 64 still stores wrap")
     ctx.opA = 0x7FFFFFFFFFFFFFFFULL;
     ctx.opB = 0x0000000000000001ULL;
 
-    BoxResult r = eBox::execAddqV(g, ctx);
+    BoxResult r{};
+
+    eBox::execAddqV(g, ctx, r);
 
     CHECK(r.regWriteValue == 0x8000000000000000ULL);
     CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
@@ -427,7 +476,9 @@ TEST_CASE("eBox::execSubqV -- non-overflow stores the SUBQ result")
     ctx.opA = 10;
     ctx.opB = 3;
 
-    BoxResult r = eBox::execSubqV(g, ctx);
+    BoxResult r{};
+
+    eBox::execSubqV(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteValue == 7u);
@@ -441,7 +492,9 @@ TEST_CASE("eBox::execSubqV -- overflow still stores wrap")
     ctx.opA = 0x8000000000000000ULL;
     ctx.opB = 0x0000000000000001ULL;
 
-    BoxResult r = eBox::execSubqV(g, ctx);
+    BoxResult r{};
+
+    eBox::execSubqV(g, ctx, r);
 
     CHECK(r.regWriteValue == 0x7FFFFFFFFFFFFFFFULL);
     CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
@@ -454,7 +507,9 @@ TEST_CASE("eBox::execMullV -- non-overflow stores the MULL result")
     ctx.opA = 6;
     ctx.opB = 7;
 
-    BoxResult r = eBox::execMullV(g, ctx);
+    BoxResult r{};
+
+    eBox::execMullV(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 5);
@@ -470,7 +525,9 @@ TEST_CASE("eBox::execMullV -- overflow still stores sign-extended low 32")
     ctx.opA = 0x10000ULL;
     ctx.opB = 0x10000ULL;
 
-    BoxResult r = eBox::execMullV(g, ctx);
+    BoxResult r{};
+
+    eBox::execMullV(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
     CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
@@ -483,7 +540,9 @@ TEST_CASE("eBox::execMulqV -- non-overflow stores the MULQ result")
     ctx.opA = 6;
     ctx.opB = 7;
 
-    BoxResult r = eBox::execMulqV(g, ctx);
+    BoxResult r{};
+
+    eBox::execMulqV(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 5);
@@ -500,7 +559,9 @@ TEST_CASE("eBox::execMulqV -- 128-bit overflow still stores low 64 bits")
     ctx.opA = 0x8000000000000000ULL;
     ctx.opB = 0x0000000000000002ULL;
 
-    BoxResult r = eBox::execMulqV(g, ctx);
+    BoxResult r{};
+
+    eBox::execMulqV(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
     CHECK(r.faultCode == kNoFault);   // named deviation int-ov-trap
@@ -514,7 +575,9 @@ TEST_CASE("eBox::execMulqV -- negative operands, representable product")
     ctx.opA = static_cast<uint64_t>(int64_t{-3});
     ctx.opB = 5;
 
-    BoxResult r = eBox::execMulqV(g, ctx);
+    BoxResult r{};
+
+    eBox::execMulqV(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteValue == static_cast<uint64_t>(int64_t{-15}));
@@ -560,7 +623,9 @@ TEST_CASE("eBox::execRc -- reads intrFlag into Ra and clears it")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = eBox::execRc(g, ctx);
+    BoxResult r{};
+
+    eBox::execRc(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 5);
@@ -575,7 +640,9 @@ TEST_CASE("eBox::execRc -- preserves prior zero state and remains zero")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = eBox::execRc(g, ctx);
+    BoxResult r{};
+
+    eBox::execRc(g, ctx, r);
 
     CHECK(r.regWriteValue == 0u);
     CHECK(cpu.intrFlag == 0u);
@@ -592,7 +659,9 @@ TEST_CASE("eBox::execRc -- Ra=R31 suppresses commit, side effect still fires")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = eBox::execRc(g, ctx);
+    BoxResult r{};
+
+    eBox::execRc(g, ctx, r);
 
     CHECK(cpu.intrFlag == 0u);            // cleared regardless of Ra
     CHECK(r.regWriteIdx == 31);            // would suppress at MEM-drain
@@ -606,7 +675,9 @@ TEST_CASE("eBox::execRs -- reads intrFlag into Ra and sets it to 1")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = eBox::execRs(g, ctx);
+    BoxResult r{};
+
+    eBox::execRs(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 7);
@@ -622,7 +693,9 @@ TEST_CASE("eBox::execRs -- prior set value returns 1, stays 1")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = eBox::execRs(g, ctx);
+    BoxResult r{};
+
+    eBox::execRs(g, ctx, r);
 
     CHECK(r.regWriteValue == 0x1ULL);
     CHECK(cpu.intrFlag == 1u);
@@ -637,13 +710,15 @@ TEST_CASE("eBox::execRc -> execRs -- atomic toggle round-trip")
 
     // RC: returns 1, clears.
     InstructionGrain const gRc = makeMiscGrain(0xE000, /*ra*/ 1, &eBox::execRc);
-    BoxResult const rRc = eBox::execRc(gRc, ctx);
+    BoxResult rRc{};
+    eBox::execRc(gRc, ctx, rRc);
     CHECK(rRc.regWriteValue == 0x1ULL);
     CHECK(cpu.intrFlag == 0u);
 
     // RS: returns 0 (now-cleared), sets to 1.
     InstructionGrain const gRs = makeMiscGrain(0xF000, /*ra*/ 2, &eBox::execRs);
-    BoxResult const rRs = eBox::execRs(gRs, ctx);
+    BoxResult rRs{};
+    eBox::execRs(gRs, ctx, rRs);
     CHECK(rRs.regWriteValue == 0u);
     CHECK(cpu.intrFlag == 1u);
 }
@@ -665,19 +740,22 @@ TEST_CASE("eBox::execRpcc -- packed CC: offset<63:32> | counter<31:0> (F-1)")
     SUBCASE("fields are packed, not summed") {
         cpu.cycleCount = 0x777ULL;
         cpu.ccOffset   = 0xCAFEBABEULL;
-        BoxResult const r = eBox::execRpcc(g, ctx);
+        BoxResult r{};
+        eBox::execRpcc(g, ctx, r);
         CHECK(r.regWriteValue == ((0xCAFEBABEULL << 32) | 0x777ULL));
     }
     SUBCASE("counter overflow does not corrupt the offset half") {
         cpu.cycleCount = 0x1'2345'6789ULL;      // > 2^32
         cpu.ccOffset   = 0x11112222ULL;
-        BoxResult const r = eBox::execRpcc(g, ctx);
+        BoxResult r{};
+        eBox::execRpcc(g, ctx, r);
         CHECK(r.regWriteValue == ((0x11112222ULL << 32) | 0x23456789ULL));
     }
     SUBCASE("AARM 4.11.9 idiom yields (offset+counter) mod 2^32") {
         cpu.cycleCount = 0xFFFFFFF0ULL;
         cpu.ccOffset   = 0x00000020ULL;
-        BoxResult const r = eBox::execRpcc(g, ctx);
+        BoxResult r{};
+        eBox::execRpcc(g, ctx, r);
         uint64_t const rx = r.regWriteValue;
         uint64_t const idiom = ((rx + (rx << 32)) >> 32) & 0xFFFFFFFFULL;
         CHECK(idiom == 0x10ULL);                 // 0xFFFFFFF0+0x20 mod 2^32
@@ -718,7 +796,8 @@ TEST_CASE("eBox::execFtois -- AARM bit reorder with sign extension")
         // Extract: <63:62> = 0b00 -> result<31:30>; <58:29> = 0x3F800000's
         // low 30 bits pattern.  1.0f as a raw single is 0x3F800000.
         ctx.opA = 0x3FF0000000000000ULL;
-        BoxResult const r = eBox::execFtois(g, ctx);
+        BoxResult r{};
+        eBox::execFtois(g, ctx, r);
         CHECK(r.regWriteIdx  == 4);
         CHECK(r.regWriteIsFp == false);
         CHECK(r.regWriteValue == 0x000000003F800000ULL);   // 1.0f, zero-ext
@@ -726,14 +805,16 @@ TEST_CASE("eBox::execFtois -- AARM bit reorder with sign extension")
     SUBCASE("negative image sign-extends into Rc<63:32>") {
         // Sign bit set -> result bit 31 set -> SEXT fills the upper half.
         ctx.opA = 0xBFF0000000000000ULL;                   // -1.0
-        BoxResult const r = eBox::execFtois(g, ctx);
+        BoxResult r{};
+        eBox::execFtois(g, ctx, r);
         CHECK(r.regWriteValue == 0xFFFFFFFFBF800000ULL);   // -1.0f, sign-ext
     }
     SUBCASE("zero-exponent image keeps its fraction (bits-only, no WB-2 drop)") {
         // exp field zero, fraction non-zero: FTOIS must still reorder the
         // bits rather than collapsing to signed zero.
         ctx.opA = 0x0000000020000000ULL;                   // frac bit 29 set
-        BoxResult const r = eBox::execFtois(g, ctx);
+        BoxResult r{};
+        eBox::execFtois(g, ctx, r);
         CHECK(r.regWriteValue == 0x0000000000000001ULL);
     }
     SUBCASE("round-trips ITOFS for a representative single") {
@@ -746,9 +827,11 @@ TEST_CASE("eBox::execFtois -- AARM bit reorder with sign extension")
         gi.primaryOp = 0x14;
         ExecCtx ic{};
         ic.opA = 0x000000003F800000ULL;                    // 1.0f
-        BoxResult const ri = eBox::execItofs(gi, ic);
+        BoxResult ri{};
+        eBox::execItofs(gi, ic, ri);
         ctx.opA = ri.regWriteValue;
-        BoxResult const rf = eBox::execFtois(g, ctx);
+        BoxResult rf{};
+        eBox::execFtois(g, ctx, rf);
         CHECK(rf.regWriteValue == 0x000000003F800000ULL);
     }
 }

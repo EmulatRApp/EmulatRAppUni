@@ -95,19 +95,29 @@ constexpr char const* boxName(Box b)
 
 // Type of every leaf function emitted from GrainMasterV4.tsv.
 //
-// A leaf is a pure function from (grain, ctx) to BoxResult.  It reads
-// register state from ctx, computes the instruction's effect, and
-// packs the effect into the returned BoxResult.  It does NOT mutate
-// architectural state directly: register writes are applied by WB
-// from regWriteIdx + regWriteValue, memory effects are applied by
-// MEM from memEffect fields, PC redirection is applied at end-of-EX
-// from divertTarget.
+// A leaf is a pure function from (grain, ctx) into the caller-supplied
+// BoxResult latch `out`.  It reads register state from ctx, computes
+// the instruction's effect, and writes the effect's fields into `out`.
+// It does NOT mutate architectural state directly: register writes are
+// applied by WB from regWriteIdx + regWriteValue, memory effects are
+// applied by MEM from memEffect fields, PC redirection is applied at
+// end-of-EX from divertTarget.
+//
+// BRIEF-EXEC-ABI-001 (2026-08-10): out-parameter ABI.  The caller
+// supplies a value-initialized BoxResult and owns its reset; the leaf
+// writes only the fields its semantics define and reads none of them.
+// The return-by-value form forced MSVC to materialize an sret
+// temporary plus a 56-byte copy into slot.result at the EX seam
+// (assignment through an indirect call cannot NRVO); the out-param
+// form removes both, and removes the per-leaf default-init of the
+// old local `BoxResult r;`.  Ownership contract: coreLib/BoxResult.h.
 //
 // This is the single indirect call between the dispatch table and
 // the per-instruction implementation; it is the seam a future trace
 // cache or JIT specializer would inline through.
-using GrainFn = BoxResult (*)(InstructionGrain const& grain,
-                              ExecCtx const&          ctx);
+using GrainFn = void (*)(InstructionGrain const& grain,
+                         ExecCtx const&          ctx,
+                         BoxResult&              out);
 
 
 struct InstructionGrain

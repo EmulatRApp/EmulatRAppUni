@@ -43,8 +43,12 @@ namespace coreLib {
 // and Pal lookup helpers fall through to it on default.  An
 // unmapped (op, sub) pair therefore raises an OPCDEC trap rather
 // than dispatching into garbage.
-AXP_HOT BoxResult execOpcDec(InstructionGrain const& g,
-                             ExecCtx const&          c) noexcept;
+// BRIEF-EXEC-ABI-001 (2026-08-10): out-parameter leaf ABI -- see the
+// GrainFn typedef in coreLib/InstructionGrain.h (the typedef lives
+// there, not here, because GrainFn predates GrainEntry).
+AXP_HOT void execOpcDec(InstructionGrain const& g,
+                        ExecCtx const&          c,
+                        BoxResult&              out) noexcept;
 
 
 // Per-leaf dispatch descriptor.  Each populated (primaryOpcode,

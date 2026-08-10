@@ -1,6 +1,17 @@
 // ============================================================================
 // coreLib/OpcDec.cpp -- OPCDEC executor for unmapped (op, sub) pairs
 // ============================================================================
+//
+// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
+//   FILE:     coreLib/OpcDec.cpp
+//   FUNCTION: every executor leaf in this file
+//   CHANGE:   leaf ABI return-by-value -> caller-supplied out-parameter.
+//             Signatures gain `BoxResult& out` and return void; body head
+//             `BoxResult r;` -> `BoxResult& r = out;` (field writes stay
+//             byte-identical); `return r;` -> `return;`; helper tail-returns
+//             (fpWrite / execCallPalDispatch) became braced call-then-return
+//             statements.  The caller owns the latch reset -- ownership
+//             contract in coreLib/BoxResult.h.
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -38,13 +49,13 @@
 namespace coreLib {
 
 AXP_HOT
-BoxResult execOpcDec(InstructionGrain const&         g,
-                     [[maybe_unused]] ExecCtx const& c) noexcept
+void execOpcDec(InstructionGrain const&         g,
+                     [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags  = g.semFlags | grainFactory::GrainSem::S_OpcDec;
     r.faultCode = kFaultOpcDec;
-    return r;
+    return;
 }
 
 } // namespace coreLib

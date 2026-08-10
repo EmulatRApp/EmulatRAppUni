@@ -1,6 +1,17 @@
 // ============================================================================
 // iBoxLib/grains/ControlFlow.cpp -- iBox branch and jump executors (v1)
 // ============================================================================
+//
+// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
+//   FILE:     iBoxLib/grains/ControlFlow.cpp
+//   FUNCTION: every executor leaf in this file
+//   CHANGE:   leaf ABI return-by-value -> caller-supplied out-parameter.
+//             Signatures gain `BoxResult& out` and return void; body head
+//             `BoxResult r;` -> `BoxResult& r = out;` (field writes stay
+//             byte-identical); `return r;` -> `return;`; helper tail-returns
+//             (fpWrite / execCallPalDispatch) became braced call-then-return
+//             statements.  The caller owns the latch reset -- ownership
+//             contract in coreLib/BoxResult.h.
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -116,16 +127,16 @@ constexpr uint8_t raIndex(InstructionGrain const& g) noexcept
 // BR Ra, disp -- always taken.  Ra <- pc + 4, PC <- target.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBr(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
+auto execBr(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = (g.pc + 4) & ~uint64_t{3};   // clear PALmode/align bits from link (AXPBox: pc & ~3)
     r.divertTarget  = g.pc + 4 + static_cast<uint64_t>(braDispSext(g));
     r.divert        = true;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -134,16 +145,16 @@ auto execBr(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexce
 // future return-stack work.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBsr(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
+auto execBsr(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = (g.pc + 4) & ~uint64_t{3};   // clear PALmode/align bits from link (AXPBox: pc & ~3)
     r.divertTarget  = g.pc + 4 + static_cast<uint64_t>(braDispSext(g));
     r.divert        = true;
-    return r;
+    return;
 }
 
 #pragma endregion Bra-format Unconditional
@@ -155,102 +166,102 @@ auto execBsr(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexc
 // BEQ Ra, disp -- branch if Ra == 0.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBeq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (c.opA == 0);
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
 // BNE Ra, disp -- branch if Ra != 0.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBne(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (c.opA != 0);
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
 // BLT Ra, disp -- branch if Ra < 0 (signed).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBlt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (static_cast<int64_t>(c.opA) < 0);
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
 // BGE Ra, disp -- branch if Ra >= 0 (signed).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBge(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (static_cast<int64_t>(c.opA) >= 0);
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
 // BLE Ra, disp -- branch if Ra <= 0 (signed).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBle(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (static_cast<int64_t>(c.opA) <= 0);
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
 // BGT Ra, disp -- branch if Ra > 0 (signed).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBgt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (static_cast<int64_t>(c.opA) > 0);
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -260,17 +271,17 @@ auto execBgt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 // and BLBCs back if not equal).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBlbc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBlbc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (c.opA & 1ULL) == 0;
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -278,17 +289,17 @@ auto execBlbc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 // to BLBC.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execBlbs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execBlbs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     const bool taken = (c.opA & 1ULL) != 0;
 
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags     = g.semFlags;
     r.divert       = taken;
     r.divertTarget = taken
         ? (g.pc + 4 + static_cast<uint64_t>(braDispSext(g)))
         : 0;
-    return r;
+    return;
 }
 
 #pragma endregion Bra-format Conditional
@@ -307,32 +318,32 @@ auto execBlbs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 // from the function-code sub-decode, not the leaf body.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execJmp(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execJmp(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = (g.pc + 4) & ~uint64_t{3};   // clear PALmode/align bits from link (AXPBox: pc & ~3)
     r.divertTarget  = (c.opB & ~0x3ULL) | (g.pc & 1ULL);  // carry PALmode (PC<0>) across the indirect jump
     r.divert        = true;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
 // JSR Ra, (Rb), hint -- indirect call.  Same shape as JMP.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execJsr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execJsr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = (g.pc + 4) & ~uint64_t{3};   // clear PALmode/align bits from link (AXPBox: pc & ~3)
     r.divertTarget  = (c.opB & ~0x3ULL) | (g.pc & 1ULL);  // carry PALmode (PC<0>) across the indirect jump
     r.divert        = true;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -341,16 +352,16 @@ auto execJsr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 // distinguish RET from a generic JMP.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execRet(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execRet(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = (g.pc + 4) & ~uint64_t{3};   // clear PALmode/align bits from link (AXPBox: pc & ~3)
     r.divertTarget  = (c.opB & ~0x3ULL) | (g.pc & 1ULL);  // carry PALmode (PC<0>) across the indirect jump
     r.divert        = true;
-    return r;
+    return;
 }
 
 // ----------------------------------------------------------------------------
@@ -358,16 +369,16 @@ auto execRet(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 // S_CallBased and S_RetBased are set in semFlags.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execJsrCoroutine(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execJsrCoroutine(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
-    BoxResult r;
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = (g.pc + 4) & ~uint64_t{3};   // clear PALmode/align bits from link (AXPBox: pc & ~3)
     r.divertTarget  = (c.opB & ~0x3ULL) | (g.pc & 1ULL);  // carry PALmode (PC<0>) across the indirect jump
     r.divert        = true;
-    return r;
+    return;
 }
 
 #pragma endregion Jmp-format Indirect

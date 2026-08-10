@@ -19,2176 +19,2177 @@ using coreLib::BoxResult; using coreLib::ExecCtx; using coreLib::InstructionGrai
 
 // Local copy of Float.cpp's fpWrite (that one has internal linkage). Commits a
 // 64-bit value to FP register Fc (encoded[4:0]) and propagates semantic flags.
+// BRIEF-EXEC-ABI-001: writes into the caller-supplied latch `out` (pristine per
+// the coreLib/BoxResult.h contract); no return-by-value, no sret.
 namespace {
 AXP_HOT AXP_FLATTEN
-BoxResult fpWrite(InstructionGrain const& g, uint64_t value) noexcept {
-    BoxResult r;
+void fpWrite(InstructionGrain const& g, uint64_t value, BoxResult& out) noexcept {
+    BoxResult& r = out;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1Fu);
     r.regWriteIsFp  = true;
     r.regWriteValue = value;
-    return r;
 }
 }  // anonymous namespace
 
 // CMPTUN
 AXP_HOT AXP_FLATTEN
-auto execCmptun(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmptun(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpT(fpBox::FpCompare::Un, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS
 AXP_HOT AXP_FLATTEN
-auto execCvtts(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTST
 AXP_HOT AXP_FLATTEN
-auto execCvtst(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtst(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtST(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ
 AXP_HOT AXP_FLATTEN
-auto execCvttq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS
 AXP_HOT AXP_FLATTEN
-auto execCvtqs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT
 AXP_HOT AXP_FLATTEN
-auto execCvtqt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_C
 AXP_HOT AXP_FLATTEN
-auto execCvttsC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_M
 AXP_HOT AXP_FLATTEN
-auto execCvttsM(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_D
 AXP_HOT AXP_FLATTEN
-auto execCvttsD(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_UC
 AXP_HOT AXP_FLATTEN
-auto execCvttsUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_UM
 AXP_HOT AXP_FLATTEN
-auto execCvttsUm(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsUm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_U
 AXP_HOT AXP_FLATTEN
-auto execCvttsU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_UD
 AXP_HOT AXP_FLATTEN
-auto execCvttsUd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsUd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SUC
 AXP_HOT AXP_FLATTEN
-auto execCvttsSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SUM
 AXP_HOT AXP_FLATTEN
-auto execCvttsSum(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSum(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SU
 AXP_HOT AXP_FLATTEN
-auto execCvttsSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SUD
 AXP_HOT AXP_FLATTEN
-auto execCvttsSud(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSud(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SUIC
 AXP_HOT AXP_FLATTEN
-auto execCvttsSuic(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SUIM
 AXP_HOT AXP_FLATTEN
-auto execCvttsSuim(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SUI
 AXP_HOT AXP_FLATTEN
-auto execCvttsSui(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTS_SUID
 AXP_HOT AXP_FLATTEN
-auto execCvttsSuid(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttsSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_C
 AXP_HOT AXP_FLATTEN
-auto execCvttqC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_M
 AXP_HOT AXP_FLATTEN
-auto execCvttqM(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_D
 AXP_HOT AXP_FLATTEN
-auto execCvttqD(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_VC
 AXP_HOT AXP_FLATTEN
-auto execCvttqVc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqVc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_VM
 AXP_HOT AXP_FLATTEN
-auto execCvttqVm(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqVm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_V
 AXP_HOT AXP_FLATTEN
-auto execCvttqV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_VD
 AXP_HOT AXP_FLATTEN
-auto execCvttqVd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqVd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SVC
 AXP_HOT AXP_FLATTEN
-auto execCvttqSvc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSvc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SVM
 AXP_HOT AXP_FLATTEN
-auto execCvttqSvm(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSvm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SV
 AXP_HOT AXP_FLATTEN
-auto execCvttqSv(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SVD
 AXP_HOT AXP_FLATTEN
-auto execCvttqSvd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSvd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SVIC
 AXP_HOT AXP_FLATTEN
-auto execCvttqSvic(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSvic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SVIM
 AXP_HOT AXP_FLATTEN
-auto execCvttqSvim(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSvim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SVI
 AXP_HOT AXP_FLATTEN
-auto execCvttqSvi(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSvi(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTTQ_SVID
 AXP_HOT AXP_FLATTEN
-auto execCvttqSvid(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvttqSvid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtTQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS_C
 AXP_HOT AXP_FLATTEN
-auto execCvtqsC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqsC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS_M
 AXP_HOT AXP_FLATTEN
-auto execCvtqsM(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqsM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS_D
 AXP_HOT AXP_FLATTEN
-auto execCvtqsD(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqsD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS_SUIC
 AXP_HOT AXP_FLATTEN
-auto execCvtqsSuic(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqsSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS_SUIM
 AXP_HOT AXP_FLATTEN
-auto execCvtqsSuim(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqsSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS_SUI
 AXP_HOT AXP_FLATTEN
-auto execCvtqsSui(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqsSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQS_SUID
 AXP_HOT AXP_FLATTEN
-auto execCvtqsSuid(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqsSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT_C
 AXP_HOT AXP_FLATTEN
-auto execCvtqtC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqtC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT_M
 AXP_HOT AXP_FLATTEN
-auto execCvtqtM(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqtM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT_D
 AXP_HOT AXP_FLATTEN
-auto execCvtqtD(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqtD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT_SUIC
 AXP_HOT AXP_FLATTEN
-auto execCvtqtSuic(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqtSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT_SUIM
 AXP_HOT AXP_FLATTEN
-auto execCvtqtSuim(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqtSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT_SUI
 AXP_HOT AXP_FLATTEN
-auto execCvtqtSui(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqtSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQT_SUID
 AXP_HOT AXP_FLATTEN
-auto execCvtqtSuid(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqtSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTST_S
 AXP_HOT AXP_FLATTEN
-auto execCvtstS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtstS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtST(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPTUN_SU
 AXP_HOT AXP_FLATTEN
-auto execCmptunSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmptunSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpT(fpBox::FpCompare::Un, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPTEQ_SU
 AXP_HOT AXP_FLATTEN
-auto execCmpteqSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmpteqSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpT(fpBox::FpCompare::Eq, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPTLT_SU
 AXP_HOT AXP_FLATTEN
-auto execCmptltSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmptltSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpT(fpBox::FpCompare::Lt, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPTLE_SU
 AXP_HOT AXP_FLATTEN
-auto execCmptleSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmptleSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpT(fpBox::FpCompare::Le, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS
 AXP_HOT AXP_FLATTEN
-auto execSqrts(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT
 AXP_HOT AXP_FLATTEN
-auto execSqrtt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF_C
 AXP_HOT AXP_FLATTEN
-auto execSqrtfC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF
 AXP_HOT AXP_FLATTEN
-auto execSqrtf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF_UC
 AXP_HOT AXP_FLATTEN
-auto execSqrtfUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF_U
 AXP_HOT AXP_FLATTEN
-auto execSqrtfU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF_SC
 AXP_HOT AXP_FLATTEN
-auto execSqrtfSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF_S
 AXP_HOT AXP_FLATTEN
-auto execSqrtfS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF_SUC
 AXP_HOT AXP_FLATTEN
-auto execSqrtfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTF_SU
 AXP_HOT AXP_FLATTEN
-auto execSqrtfSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG_C
 AXP_HOT AXP_FLATTEN
-auto execSqrtgC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG
 AXP_HOT AXP_FLATTEN
-auto execSqrtg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG_UC
 AXP_HOT AXP_FLATTEN
-auto execSqrtgUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG_U
 AXP_HOT AXP_FLATTEN
-auto execSqrtgU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG_SC
 AXP_HOT AXP_FLATTEN
-auto execSqrtgSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG_S
 AXP_HOT AXP_FLATTEN
-auto execSqrtgS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG_SUC
 AXP_HOT AXP_FLATTEN
-auto execSqrtgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTG_SU
 AXP_HOT AXP_FLATTEN
-auto execSqrtgSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_C
 AXP_HOT AXP_FLATTEN
-auto execSqrtsC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_M
 AXP_HOT AXP_FLATTEN
-auto execSqrtsM(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_D
 AXP_HOT AXP_FLATTEN
-auto execSqrtsD(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_UC
 AXP_HOT AXP_FLATTEN
-auto execSqrtsUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_UM
 AXP_HOT AXP_FLATTEN
-auto execSqrtsUm(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsUm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_U
 AXP_HOT AXP_FLATTEN
-auto execSqrtsU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_UD
 AXP_HOT AXP_FLATTEN
-auto execSqrtsUd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsUd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SUC
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SUM
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSum(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSum(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SU
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SUD
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSud(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSud(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SUIC
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSuic(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SUIM
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSuim(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SUI
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSui(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTS_SUID
 AXP_HOT AXP_FLATTEN
-auto execSqrtsSuid(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrtsSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtS(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_C
 AXP_HOT AXP_FLATTEN
-auto execSqrttC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_M
 AXP_HOT AXP_FLATTEN
-auto execSqrttM(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_D
 AXP_HOT AXP_FLATTEN
-auto execSqrttD(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_UC
 AXP_HOT AXP_FLATTEN
-auto execSqrttUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_UM
 AXP_HOT AXP_FLATTEN
-auto execSqrttUm(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttUm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_U
 AXP_HOT AXP_FLATTEN
-auto execSqrttU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_UD
 AXP_HOT AXP_FLATTEN
-auto execSqrttUd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttUd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SUC
 AXP_HOT AXP_FLATTEN
-auto execSqrttSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SUM
 AXP_HOT AXP_FLATTEN
-auto execSqrttSum(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSum(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SU
 AXP_HOT AXP_FLATTEN
-auto execSqrttSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SUD
 AXP_HOT AXP_FLATTEN
-auto execSqrttSud(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSud(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SUIC
 AXP_HOT AXP_FLATTEN
-auto execSqrttSuic(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SUIM
 AXP_HOT AXP_FLATTEN
-auto execSqrttSuim(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SUI
 AXP_HOT AXP_FLATTEN
-auto execSqrttSui(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SQRTT_SUID
 AXP_HOT AXP_FLATTEN
-auto execSqrttSuid(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSqrttSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().sqrtT(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF_C
 AXP_HOT AXP_FLATTEN
-auto execAddfC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF_C
 AXP_HOT AXP_FLATTEN
-auto execSubfC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF_C
 AXP_HOT AXP_FLATTEN
-auto execMulfC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF_C
 AXP_HOT AXP_FLATTEN
-auto execDivfC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG_C
 AXP_HOT AXP_FLATTEN
-auto execCvtdgC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG_C
 AXP_HOT AXP_FLATTEN
-auto execAddgC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG_C
 AXP_HOT AXP_FLATTEN
-auto execSubgC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG_C
 AXP_HOT AXP_FLATTEN
-auto execMulgC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG_C
 AXP_HOT AXP_FLATTEN
-auto execDivgC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF_C
 AXP_HOT AXP_FLATTEN
-auto execCvtgfC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD_C
 AXP_HOT AXP_FLATTEN
-auto execCvtgdC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgdC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ_C
 AXP_HOT AXP_FLATTEN
-auto execCvtgqC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgqC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQF_C
 AXP_HOT AXP_FLATTEN
-auto execCvtqfC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQG_C
 AXP_HOT AXP_FLATTEN
-auto execCvtqgC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF
 AXP_HOT AXP_FLATTEN
-auto execAddf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF
 AXP_HOT AXP_FLATTEN
-auto execSubf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF
 AXP_HOT AXP_FLATTEN
-auto execMulf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF
 AXP_HOT AXP_FLATTEN
-auto execDivf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG
 AXP_HOT AXP_FLATTEN
-auto execCvtdg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG
 AXP_HOT AXP_FLATTEN
-auto execAddg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG
 AXP_HOT AXP_FLATTEN
-auto execSubg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG
 AXP_HOT AXP_FLATTEN
-auto execMulg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG
 AXP_HOT AXP_FLATTEN
-auto execDivg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPGEQ
 AXP_HOT AXP_FLATTEN
-auto execCmpgeq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmpgeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpG(fpBox::FpCompare::Eq, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPGLT
 AXP_HOT AXP_FLATTEN
-auto execCmpglt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmpglt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpG(fpBox::FpCompare::Lt, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPGLE
 AXP_HOT AXP_FLATTEN
-auto execCmpgle(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmpgle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpG(fpBox::FpCompare::Le, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF
 AXP_HOT AXP_FLATTEN
-auto execCvtgf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD
 AXP_HOT AXP_FLATTEN
-auto execCvtgd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ
 AXP_HOT AXP_FLATTEN
-auto execCvtgq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQF
 AXP_HOT AXP_FLATTEN
-auto execCvtqf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTQG
 AXP_HOT AXP_FLATTEN
-auto execCvtqg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtQG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF_UC
 AXP_HOT AXP_FLATTEN
-auto execAddfUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF_UC
 AXP_HOT AXP_FLATTEN
-auto execSubfUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF_UC
 AXP_HOT AXP_FLATTEN
-auto execMulfUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF_UC
 AXP_HOT AXP_FLATTEN
-auto execDivfUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG_UC
 AXP_HOT AXP_FLATTEN
-auto execCvtdgUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG_UC
 AXP_HOT AXP_FLATTEN
-auto execAddgUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG_UC
 AXP_HOT AXP_FLATTEN
-auto execSubgUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG_UC
 AXP_HOT AXP_FLATTEN
-auto execMulgUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG_UC
 AXP_HOT AXP_FLATTEN
-auto execDivgUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF_UC
 AXP_HOT AXP_FLATTEN
-auto execCvtgfUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD_UC
 AXP_HOT AXP_FLATTEN
-auto execCvtgdUc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgdUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ_VC
 AXP_HOT AXP_FLATTEN
-auto execCvtgqVc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgqVc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF_U
 AXP_HOT AXP_FLATTEN
-auto execAddfU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF_U
 AXP_HOT AXP_FLATTEN
-auto execSubfU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF_U
 AXP_HOT AXP_FLATTEN
-auto execMulfU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF_U
 AXP_HOT AXP_FLATTEN
-auto execDivfU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG_U
 AXP_HOT AXP_FLATTEN
-auto execCvtdgU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG_U
 AXP_HOT AXP_FLATTEN
-auto execAddgU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG_U
 AXP_HOT AXP_FLATTEN
-auto execSubgU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG_U
 AXP_HOT AXP_FLATTEN
-auto execMulgU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG_U
 AXP_HOT AXP_FLATTEN
-auto execDivgU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF_U
 AXP_HOT AXP_FLATTEN
-auto execCvtgfU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD_U
 AXP_HOT AXP_FLATTEN
-auto execCvtgdU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgdU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ_V
 AXP_HOT AXP_FLATTEN
-auto execCvtgqV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF_SC
 AXP_HOT AXP_FLATTEN
-auto execAddfSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF_SC
 AXP_HOT AXP_FLATTEN
-auto execSubfSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF_SC
 AXP_HOT AXP_FLATTEN
-auto execMulfSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF_SC
 AXP_HOT AXP_FLATTEN
-auto execDivfSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG_SC
 AXP_HOT AXP_FLATTEN
-auto execCvtdgSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG_SC
 AXP_HOT AXP_FLATTEN
-auto execAddgSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG_SC
 AXP_HOT AXP_FLATTEN
-auto execSubgSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG_SC
 AXP_HOT AXP_FLATTEN
-auto execMulgSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG_SC
 AXP_HOT AXP_FLATTEN
-auto execDivgSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF_SC
 AXP_HOT AXP_FLATTEN
-auto execCvtgfSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD_SC
 AXP_HOT AXP_FLATTEN
-auto execCvtgdSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgdSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ_SC
 AXP_HOT AXP_FLATTEN
-auto execCvtgqSc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgqSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF_S
 AXP_HOT AXP_FLATTEN
-auto execAddfS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF_S
 AXP_HOT AXP_FLATTEN
-auto execSubfS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF_S
 AXP_HOT AXP_FLATTEN
-auto execMulfS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF_S
 AXP_HOT AXP_FLATTEN
-auto execDivfS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG_S
 AXP_HOT AXP_FLATTEN
-auto execCvtdgS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG_S
 AXP_HOT AXP_FLATTEN
-auto execAddgS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG_S
 AXP_HOT AXP_FLATTEN
-auto execSubgS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG_S
 AXP_HOT AXP_FLATTEN
-auto execMulgS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG_S
 AXP_HOT AXP_FLATTEN
-auto execDivgS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPGEQ_S
 AXP_HOT AXP_FLATTEN
-auto execCmpgeqS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmpgeqS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpG(fpBox::FpCompare::Eq, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPGLT_S
 AXP_HOT AXP_FLATTEN
-auto execCmpgltS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmpgltS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpG(fpBox::FpCompare::Lt, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CMPGLE_S
 AXP_HOT AXP_FLATTEN
-auto execCmpgleS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCmpgleS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cmpG(fpBox::FpCompare::Le, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF_S
 AXP_HOT AXP_FLATTEN
-auto execCvtgfS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD_S
 AXP_HOT AXP_FLATTEN
-auto execCvtgdS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgdS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ_S
 AXP_HOT AXP_FLATTEN
-auto execCvtgqS(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgqS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF_SUC
 AXP_HOT AXP_FLATTEN
-auto execAddfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF_SUC
 AXP_HOT AXP_FLATTEN
-auto execSubfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF_SUC
 AXP_HOT AXP_FLATTEN
-auto execMulfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF_SUC
 AXP_HOT AXP_FLATTEN
-auto execDivfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG_SUC
 AXP_HOT AXP_FLATTEN
-auto execCvtdgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG_SUC
 AXP_HOT AXP_FLATTEN
-auto execAddgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG_SUC
 AXP_HOT AXP_FLATTEN
-auto execSubgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG_SUC
 AXP_HOT AXP_FLATTEN
-auto execMulgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG_SUC
 AXP_HOT AXP_FLATTEN
-auto execDivgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF_SUC
 AXP_HOT AXP_FLATTEN
-auto execCvtgfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD_SUC
 AXP_HOT AXP_FLATTEN
-auto execCvtgdSuc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgdSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ_SVC
 AXP_HOT AXP_FLATTEN
-auto execCvtgqSvc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgqSvc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDF_SU
 AXP_HOT AXP_FLATTEN
-auto execAddfSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBF_SU
 AXP_HOT AXP_FLATTEN
-auto execSubfSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULF_SU
 AXP_HOT AXP_FLATTEN
-auto execMulfSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVF_SU
 AXP_HOT AXP_FLATTEN
-auto execDivfSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divF(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTDG_SU
 AXP_HOT AXP_FLATTEN
-auto execCvtdgSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtdgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtDG(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // ADDG_SU
 AXP_HOT AXP_FLATTEN
-auto execAddgSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execAddgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().addG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // SUBG_SU
 AXP_HOT AXP_FLATTEN
-auto execSubgSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execSubgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().subG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // MULG_SU
 AXP_HOT AXP_FLATTEN
-auto execMulgSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execMulgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().mulG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // DIVG_SU
 AXP_HOT AXP_FLATTEN
-auto execDivgSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execDivgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().divG(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGF_SU
 AXP_HOT AXP_FLATTEN
-auto execCvtgfSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGF(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGD_SU
 AXP_HOT AXP_FLATTEN
-auto execCvtgdSu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgdSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGD(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTGQ_SV
 AXP_HOT AXP_FLATTEN
-auto execCvtgqSv(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtgqSv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult const r = fpBox::activeBackend().cvtGQ(c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    return fpWrite(g, r.bits);
+    { fpWrite(g, r.bits, out); return; }
 }
 
 // CVTLQ
 AXP_HOT AXP_FLATTEN
-auto execCvtlq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtlq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     uint64_t const fb = c.opB;
     uint32_t const lw = static_cast<uint32_t>((((fb >> 62) & 0x3ULL) << 30)
                                             | ((fb >> 29) & 0x3FFFFFFFULL));
-    return fpWrite(g, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(lw))));
+    { fpWrite(g, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(lw))), out); return; }
 }
 
 // FCMOVEQ
 AXP_HOT AXP_FLATTEN
-auto execFcmoveq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFcmoveq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional move: Fc <- Fb when Fa == 0.0, else Fc unchanged.
     double const fa = std::bit_cast<double>(c.opA);
-    if (fa == 0.0) return fpWrite(g, c.opB);
-    BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;
+    if (fa == 0.0) { fpWrite(g, c.opB, out); return; }
+    BoxResult& r = out; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return;
 }
 
 // FCMOVNE
 AXP_HOT AXP_FLATTEN
-auto execFcmovne(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFcmovne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional move: Fc <- Fb when Fa != 0.0, else Fc unchanged.
     double const fa = std::bit_cast<double>(c.opA);
-    if (fa != 0.0) return fpWrite(g, c.opB);
-    BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;
+    if (fa != 0.0) { fpWrite(g, c.opB, out); return; }
+    BoxResult& r = out; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return;
 }
 
 // FCMOVLT
 AXP_HOT AXP_FLATTEN
-auto execFcmovlt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFcmovlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional move: Fc <- Fb when Fa < 0.0, else Fc unchanged.
     double const fa = std::bit_cast<double>(c.opA);
-    if (fa < 0.0) return fpWrite(g, c.opB);
-    BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;
+    if (fa < 0.0) { fpWrite(g, c.opB, out); return; }
+    BoxResult& r = out; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return;
 }
 
 // FCMOVGE
 AXP_HOT AXP_FLATTEN
-auto execFcmovge(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFcmovge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional move: Fc <- Fb when Fa >= 0.0, else Fc unchanged.
     double const fa = std::bit_cast<double>(c.opA);
-    if (fa >= 0.0) return fpWrite(g, c.opB);
-    BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;
+    if (fa >= 0.0) { fpWrite(g, c.opB, out); return; }
+    BoxResult& r = out; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return;
 }
 
 // FCMOVLE
 AXP_HOT AXP_FLATTEN
-auto execFcmovle(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFcmovle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional move: Fc <- Fb when Fa <= 0.0, else Fc unchanged.
     double const fa = std::bit_cast<double>(c.opA);
-    if (fa <= 0.0) return fpWrite(g, c.opB);
-    BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;
+    if (fa <= 0.0) { fpWrite(g, c.opB, out); return; }
+    BoxResult& r = out; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return;
 }
 
 // FCMOVGT
 AXP_HOT AXP_FLATTEN
-auto execFcmovgt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFcmovgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional move: Fc <- Fb when Fa > 0.0, else Fc unchanged.
     double const fa = std::bit_cast<double>(c.opA);
-    if (fa > 0.0) return fpWrite(g, c.opB);
-    BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;
+    if (fa > 0.0) { fpWrite(g, c.opB, out); return; }
+    BoxResult& r = out; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return;
 }
 
 // CVTQL -- AARM 4.10.2: integer overflow occurs if Fb is outside
@@ -2200,7 +2201,7 @@ auto execFcmovgt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxRes
 // 2026-07-28.  NOTE for regeneration: this fix must be mirrored into
 // gen_fp_leaves.py custom_body() (CVTQL branch) or it is lost on regen.
 AXP_HOT AXP_FLATTEN
-auto execCvtql(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     uint64_t const fb = c.opB;
     uint64_t const r = (((fb >> 30) & 0x3ULL) << 62) | ((fb & 0x3FFFFFFFULL) << 29);
@@ -2209,12 +2210,12 @@ auto execCvtql(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResul
         fpBox::FpExc e; e.iov = true;
         foldFpcrExc(c.cpu->fpcr, e);
     }
-    return fpWrite(g, r);
+    { fpWrite(g, r, out); return; }
 }
 
 // CVTQL_V -- see execCvtql: same truncated result + sticky IOV (FV-10).
 AXP_HOT AXP_FLATTEN
-auto execCvtqlV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqlV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     uint64_t const fb = c.opB;
     uint64_t const r = (((fb >> 30) & 0x3ULL) << 62) | ((fb & 0x3FFFFFFFULL) << 29);
@@ -2223,12 +2224,12 @@ auto execCvtqlV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
         fpBox::FpExc e; e.iov = true;
         foldFpcrExc(c.cpu->fpcr, e);
     }
-    return fpWrite(g, r);
+    { fpWrite(g, r, out); return; }
 }
 
 // CVTQL_SV -- see execCvtql: same truncated result + sticky IOV (FV-10).
 AXP_HOT AXP_FLATTEN
-auto execCvtqlSv(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execCvtqlSv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     uint64_t const fb = c.opB;
     uint64_t const r = (((fb >> 30) & 0x3ULL) << 62) | ((fb & 0x3FFFFFFFULL) << 29);
@@ -2237,91 +2238,91 @@ auto execCvtqlSv(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxRes
         fpBox::FpExc e; e.iov = true;
         foldFpcrExc(c.cpu->fpcr, e);
     }
-    return fpWrite(g, r);
+    { fpWrite(g, r, out); return; }
 }
 
 // FBEQ
 AXP_HOT AXP_FLATTEN
-auto execFbeq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFbeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional branch: divert to PC+4 + SEXT(disp21)*4 when Fa == 0.0.
     double const fa = std::bit_cast<double>(c.opA);
     int64_t const disp = (static_cast<int64_t>(static_cast<int32_t>((g.encoded & 0x1FFFFFu) << 11)) >> 11) * 4;
     bool const taken = (fa == 0.0);
-    BoxResult r; r.semFlags = g.semFlags;
+    BoxResult& r = out; r.semFlags = g.semFlags;
     r.divert = taken;
     r.divertTarget = taken ? (g.pc + 4 + static_cast<uint64_t>(disp)) : 0;
-    return r;
+    return;
 }
 
 // FBLT
 AXP_HOT AXP_FLATTEN
-auto execFblt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFblt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional branch: divert to PC+4 + SEXT(disp21)*4 when Fa < 0.0.
     double const fa = std::bit_cast<double>(c.opA);
     int64_t const disp = (static_cast<int64_t>(static_cast<int32_t>((g.encoded & 0x1FFFFFu) << 11)) >> 11) * 4;
     bool const taken = (fa < 0.0);
-    BoxResult r; r.semFlags = g.semFlags;
+    BoxResult& r = out; r.semFlags = g.semFlags;
     r.divert = taken;
     r.divertTarget = taken ? (g.pc + 4 + static_cast<uint64_t>(disp)) : 0;
-    return r;
+    return;
 }
 
 // FBLE
 AXP_HOT AXP_FLATTEN
-auto execFble(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFble(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional branch: divert to PC+4 + SEXT(disp21)*4 when Fa <= 0.0.
     double const fa = std::bit_cast<double>(c.opA);
     int64_t const disp = (static_cast<int64_t>(static_cast<int32_t>((g.encoded & 0x1FFFFFu) << 11)) >> 11) * 4;
     bool const taken = (fa <= 0.0);
-    BoxResult r; r.semFlags = g.semFlags;
+    BoxResult& r = out; r.semFlags = g.semFlags;
     r.divert = taken;
     r.divertTarget = taken ? (g.pc + 4 + static_cast<uint64_t>(disp)) : 0;
-    return r;
+    return;
 }
 
 // FBNE
 AXP_HOT AXP_FLATTEN
-auto execFbne(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFbne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional branch: divert to PC+4 + SEXT(disp21)*4 when Fa != 0.0.
     double const fa = std::bit_cast<double>(c.opA);
     int64_t const disp = (static_cast<int64_t>(static_cast<int32_t>((g.encoded & 0x1FFFFFu) << 11)) >> 11) * 4;
     bool const taken = (fa != 0.0);
-    BoxResult r; r.semFlags = g.semFlags;
+    BoxResult& r = out; r.semFlags = g.semFlags;
     r.divert = taken;
     r.divertTarget = taken ? (g.pc + 4 + static_cast<uint64_t>(disp)) : 0;
-    return r;
+    return;
 }
 
 // FBGE
 AXP_HOT AXP_FLATTEN
-auto execFbge(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFbge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional branch: divert to PC+4 + SEXT(disp21)*4 when Fa >= 0.0.
     double const fa = std::bit_cast<double>(c.opA);
     int64_t const disp = (static_cast<int64_t>(static_cast<int32_t>((g.encoded & 0x1FFFFFu) << 11)) >> 11) * 4;
     bool const taken = (fa >= 0.0);
-    BoxResult r; r.semFlags = g.semFlags;
+    BoxResult& r = out; r.semFlags = g.semFlags;
     r.divert = taken;
     r.divertTarget = taken ? (g.pc + 4 + static_cast<uint64_t>(disp)) : 0;
-    return r;
+    return;
 }
 
 // FBGT
 AXP_HOT AXP_FLATTEN
-auto execFbgt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
+auto execFbgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
 {
     // FP conditional branch: divert to PC+4 + SEXT(disp21)*4 when Fa > 0.0.
     double const fa = std::bit_cast<double>(c.opA);
     int64_t const disp = (static_cast<int64_t>(static_cast<int32_t>((g.encoded & 0x1FFFFFu) << 11)) >> 11) * 4;
     bool const taken = (fa > 0.0);
-    BoxResult r; r.semFlags = g.semFlags;
+    BoxResult& r = out; r.semFlags = g.semFlags;
     r.divert = taken;
     r.divertTarget = taken ? (g.pc + 4 + static_cast<uint64_t>(disp)) : 0;
-    return r;
+    return;
 }
 
 }  // namespace fBox

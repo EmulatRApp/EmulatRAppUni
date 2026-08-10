@@ -1,6 +1,14 @@
 // ============================================================================
 // tests/cBoxLib/test_cacheops.cpp -- doctest cases for cBox v1 leaves
 // ============================================================================
+//
+// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
+//   FILE:     tests/cBoxLib/test_cacheops.cpp
+//   FUNCTION: every direct leaf invocation
+//   CHANGE:   leaf ABI is now out-parameter: calls became
+//             `BoxResult r{}; leaf(g, ctx, r);`.  The test is the caller
+//             and therefore OWNS the latch reset -- the `{}` value-init is
+//             load-bearing (coreLib/BoxResult.h ownership contract).
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -75,7 +83,9 @@ TEST_CASE("cBox::execTrapb -- propagates S_TrapBarrier, no effect")
     InstructionGrain g = makeMiscCbGrain(0x0000, flags, &cBox::execTrapb);
     ExecCtx ctx{};
 
-    BoxResult r = cBox::execTrapb(g, ctx);
+    BoxResult r{};
+
+    cBox::execTrapb(g, ctx, r);
 
     CHECK(static_cast<uint64_t>(r.semFlags) == static_cast<uint64_t>(flags));
     checkNoEffect(r);
@@ -87,7 +97,9 @@ TEST_CASE("cBox::execExcb -- propagates S_ExcBarrier, no effect")
     InstructionGrain g = makeMiscCbGrain(0x0400, flags, &cBox::execExcb);
     ExecCtx ctx{};
 
-    BoxResult r = cBox::execExcb(g, ctx);
+    BoxResult r{};
+
+    cBox::execExcb(g, ctx, r);
 
     CHECK(static_cast<uint64_t>(r.semFlags) == static_cast<uint64_t>(flags));
     checkNoEffect(r);
@@ -104,7 +116,9 @@ TEST_CASE("cBox::execMb -- propagates S_Mb, no effect")
     InstructionGrain g = makeMiscCbGrain(0x4000, flags, &cBox::execMb);
     ExecCtx ctx{};
 
-    BoxResult r = cBox::execMb(g, ctx);
+    BoxResult r{};
+
+    cBox::execMb(g, ctx, r);
 
     CHECK(static_cast<uint64_t>(r.semFlags) == static_cast<uint64_t>(flags));
     checkNoEffect(r);
@@ -116,7 +130,9 @@ TEST_CASE("cBox::execWmb -- propagates S_Wmb, no effect")
     InstructionGrain g = makeMiscCbGrain(0x4400, flags, &cBox::execWmb);
     ExecCtx ctx{};
 
-    BoxResult r = cBox::execWmb(g, ctx);
+    BoxResult r{};
+
+    cBox::execWmb(g, ctx, r);
 
     CHECK(static_cast<uint64_t>(r.semFlags) == static_cast<uint64_t>(flags));
     checkNoEffect(r);
@@ -137,7 +153,9 @@ TEST_CASE("cBox::execEcb -- propagates S_PrefetchOnly, no effect; opB ignored")
     ExecCtx ctx{};
     ctx.opB = 0xDEADBEEFULL;   // a cache subsystem would consult this; v1 ignores
 
-    BoxResult r = cBox::execEcb(g, ctx);
+    BoxResult r{};
+
+    cBox::execEcb(g, ctx, r);
 
     CHECK(static_cast<uint64_t>(r.semFlags) == static_cast<uint64_t>(flags));
     checkNoEffect(r);

@@ -91,15 +91,22 @@ def custom_body(name, mnem):
     """Deterministic leaves needing no backend: CVTLQ/CVTQL (bit reformat,
     AARM 4.10.x formulas) and FCMOVxx (conditional move, no write on false)."""
     base = mnem.split("_")[0]
+    # BRIEF-EXEC-ABI-001 (2026-08-10): out-parameter leaf ABI.  Signature
+    # gains `BoxResult& out`, returns void; `return fpWrite(g, X);` becomes
+    # the braced single statement `{ fpWrite(g, X, out); return; }` (braced
+    # so it stays one statement inside un-braced `if`); the FCMOV/FBxx local
+    # `BoxResult r;` becomes `BoxResult& r = out;`.  Emission must stay
+    # byte-identical to the mechanical hand transformation of the emitted
+    # file (T-3 v).
     head = (f"AXP_HOT AXP_FLATTEN\n"
-            f"auto {name}(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult\n{{\n")
+            f"auto {name}(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void\n{{\n")
     if base == "CVTLQ":
         # Fc = SEXT(Fb<63:62> || Fb<58:29>)  -- longword (FP-reg form) -> quad
         return (head +
                 "    uint64_t const fb = c.opB;\n"
                 "    uint32_t const lw = static_cast<uint32_t>((((fb >> 62) & 0x3ULL) << 30)\n"
                 "                                            | ((fb >> 29) & 0x3FFFFFFFULL));\n"
-                "    return fpWrite(g, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(lw))));\n}\n")
+                "    { fpWrite(g, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(lw))), out); return; }\n}\n")
     if base == "CVTQL":
         # Fc = Fb<31:30> || 0<2:0> || Fb<29:0> || 0<28:0>  -- quad -> longword (FP-reg form)
         #
@@ -120,14 +127,14 @@ def custom_body(name, mnem):
                 "        fpBox::FpExc e; e.iov = true;\n"
                 "        foldFpcrExc(c.cpu->fpcr, e);\n"
                 "    }\n"
-                "    return fpWrite(g, r);\n}\n")
+                "    { fpWrite(g, r, out); return; }\n}\n")
     if base in FCMOV_COND:
         cond = FCMOV_COND[base]
         return (head +
                 f"    // FP conditional move: Fc <- Fb when Fa {cond}, else Fc unchanged.\n"
                 f"    double const fa = std::bit_cast<double>(c.opA);\n"
-                f"    if (fa {cond}) return fpWrite(g, c.opB);\n"
-                f"    BoxResult r; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return r;\n}}\n")
+                f"    if (fa {cond}) {{ fpWrite(g, c.opB, out); return; }}\n"
+                f"    BoxResult& r = out; r.semFlags = g.semFlags; r.regWriteIdx = coreLib::kNoRegWrite; return;\n}}\n")
     if base in FBRANCH:
         cond = FBRANCH[base]
         return (head +
@@ -135,10 +142,10 @@ def custom_body(name, mnem):
                 f"    double const fa = std::bit_cast<double>(c.opA);\n"
                 f"    int64_t const disp = (static_cast<int64_t>(static_cast<int32_t>((g.encoded & 0x1FFFFFu) << 11)) >> 11) * 4;\n"
                 f"    bool const taken = (fa {cond});\n"
-                f"    BoxResult r; r.semFlags = g.semFlags;\n"
+                f"    BoxResult& r = out; r.semFlags = g.semFlags;\n"
                 f"    r.divert = taken;\n"
                 f"    r.divertTarget = taken ? (g.pc + 4 + static_cast<uint64_t>(disp)) : 0;\n"
-                f"    return r;\n}}\n")
+                f"    return;\n}}\n")
     return None
 
 
@@ -148,14 +155,14 @@ def body(name, mnem):
         return cb
     kind, op = classify(mnem)
     head = (f"AXP_HOT AXP_FLATTEN\n"
-            f"auto {name}(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult\n{{\n")
+            f"auto {name}(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void\n{{\n")
     if kind == "stub":
         return (head +
                 f"    // TODO(fp-leaf): {mnem} -- backend/custom semantics not yet wired\n"
                 f"    //   (VAX F/G needs IFpBackend VAX kernels; FCMOV/CVTLQ/CVTQL/FBxx/ITOFF\n"
                 f"    //   need custom bit/branch bodies). Emitted as a distinct leaf per the\n"
                 f"    //   no-consolidation decision; returns 0 until the body lands.\n"
-                f"    (void)c;\n    return fpWrite(g, 0);\n}}\n")
+                f"    (void)c;\n    {{ fpWrite(g, 0, out); return; }}\n}}\n")
     ctx = "    fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };\n"
     if kind == "binA":
         call = f"    fpBox::FpResult const r = fpBox::activeBackend().{op}(c.opA, c.opB, ctx);\n"
@@ -166,7 +173,7 @@ def body(name, mnem):
     else:  # cvt / sqrt: unary, source Fb
         call = f"    fpBox::FpResult const r = fpBox::activeBackend().{op}(c.opB, ctx);\n"
     return (head + ctx + call +
-            "    foldFpcrExc(c.cpu->fpcr, r.exc);\n    return fpWrite(g, r.bits);\n}\n")
+            "    foldFpcrExc(c.cpu->fpcr, r.exc);\n    { fpWrite(g, r.bits, out); return; }\n}\n")
 
 
 def main():
@@ -226,21 +233,38 @@ def main():
            'using coreLib::BoxResult; using coreLib::ExecCtx; using coreLib::InstructionGrain;\n\n'
            '// Local copy of Float.cpp\'s fpWrite (that one has internal linkage). Commits a\n'
            '// 64-bit value to FP register Fc (encoded[4:0]) and propagates semantic flags.\n'
+           '// BRIEF-EXEC-ABI-001: writes into the caller-supplied latch `out` (pristine per\n'
+           '// the coreLib/BoxResult.h contract); no return-by-value, no sret.\n'
            'namespace {\n'
            'AXP_HOT AXP_FLATTEN\n'
-           'BoxResult fpWrite(InstructionGrain const& g, uint64_t value) noexcept {\n'
-           '    BoxResult r;\n'
+           'void fpWrite(InstructionGrain const& g, uint64_t value, BoxResult& out) noexcept {\n'
+           '    BoxResult& r = out;\n'
            '    r.semFlags      = g.semFlags;\n'
            '    r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1Fu);\n'
            '    r.regWriteIsFp  = true;\n'
            '    r.regWriteValue = value;\n'
-           '    return r;\n'
            '}\n'
            '}  // anonymous namespace\n\n')
+    # Enriched per-leaf banner comments.  The emitted file is the one a reader
+    # opens, so audit-critical notes ride the banner; they live HERE (not in
+    # the emitted file) so a regen cannot lose them (audit FV-10, 2026-07-28,
+    # nearly lost on the 2026-08-10 BRIEF-EXEC-ABI-001 regen).
+    BANNERS = {
+        "CVTQL": ("// CVTQL -- AARM 4.10.2: integer overflow occurs if Fb is outside\n"
+                  "// -2**31..2**31-1; the truncated (repositioned low-32) result is STILL\n"
+                  "// stored, and IOV (FPCR bit 57, which names CVTQL) is recorded sticky.  The\n"
+                  "// FPCR sticky bits are recorded INDEPENDENT of the trapping mode (AARM 4.7.5),\n"
+                  "// so the plain variant records IOV exactly like /V and /SV -- only trap\n"
+                  "// DELIVERY differs, and that is deferred project-wide.  Audit FV-10,\n"
+                  "// 2026-07-28.  NOTE for regeneration: this fix must be mirrored into\n"
+                  "// gen_fp_leaves.py custom_body() (CVTQL branch) or it is lost on regen.\n"),
+        "CVTQL_V": "// CVTQL_V -- see execCvtql: same truncated result + sticky IOV (FV-10).\n",
+        "CVTQL_SV": "// CVTQL_SV -- see execCvtql: same truncated result + sticky IOV (FV-10).\n",
+    }
     with open(a.out, "w", encoding="latin-1") as o:
         o.write(hdr)
         for q, name, mnem, ns in fbox:
-            o.write(f"// {mnem}\n" + body(name, mnem) + "\n")
+            o.write(BANNERS.get(mnem, f"// {mnem}\n") + body(name, mnem) + "\n")
         o.write("}  // namespace fBox\n")
 
     # Rewrite handwritten.tsv = base (hand-written) + marker + generated names.

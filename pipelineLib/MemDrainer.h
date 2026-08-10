@@ -68,6 +68,7 @@
 #include "memoryLib/ISystemBus.h"
 #include "mmuLib/Ev6Translator.h"
 #include "mmuLib/TranslationResult.h"
+#include "coreLib/SupModeProbeRing.h" // P-SUP-3 (JRN-SUPMODE-001 Sec 13.7; REMOVE with probe)
 
 // ---------------------------------------------------------------------------
 // MEMDIAG -- surgical, cycle-gated translation diagnostics (temporary probe).
@@ -388,11 +389,64 @@ private:
             // single-miss handler re-enter itself forever (its own VPTE load
             // re-misses).  Matches AXPBox virt2phys (VPTE -> DTBM_DOUBLE_3) and
             // SimH alpha_ev5_tlb single/double split.
+            bool wasReclassifiedDouble = false;
             if (r.faultCode == coreLib::kFaultDtbMiss
                 && slot.grain.primaryOp == 0x1Bu
                 && ((slot.grain.encoded >> 13) & 0x7u) == 0x2u) {
                 r.faultCode = coreLib::kFaultDtbMissDouble;
+                wasReclassifiedDouble = true;
             }
+            // ---- JRN-VPTB-001 kill-test COMPANION row (fault side;
+            // REMOVE with the success-side probe).  Architect refinement
+            // #1 (2026-08-09 late): an out-of-window VPTE load is MORE
+            // likely to fault than succeed; without this row, zero
+            // success-side rows is ambiguous between "theory dead" and
+            // "poison sources all unmapped".  Row: EA, window flags,
+            // fault type, and rcls (this row IS the first-entry miss
+            // reclassified to double, vs a VPTE load arriving with some
+            // OTHER fault -- ACV/FOR/etc., a different situation).
+            // Sampling is PER-CATEGORY on the flag pair (architect:
+            // a global every-4096th would be dominated by the most
+            // frequent category and a rare out-of-window fault would
+            // ~never appear): each of the four categories gets first 16
+            // + every 4096th OF ITS OWN COUNT.
+            {
+                static bool const s_vpteProbeF =
+                    std::getenv("EMULATR_AST_PROBE") != nullptr;
+                bool const isVpteLdF =
+                    slot.grain.primaryOp == 0x1Bu
+                    && ((slot.grain.encoded >> 13) & 0x7u) == 0x2u;
+                if (s_vpteProbeF && isVpteLdF) {
+                    uint64_t const eaTop =
+                        r.memAddr & coreLib::kVaCtlVptbMask;
+                    bool const fInCtl =
+                        eaTop == (cpu.va_ctl & coreLib::kVaCtlVptbMask);
+                    bool const fInVptb =
+                        eaTop == (cpu.vptb & coreLib::kVaCtlVptbMask);
+                    unsigned const cat =
+                        (fInCtl ? 2u : 0u) | (fInVptb ? 1u : 0u);
+                    static unsigned long long s_fcat[4] = {0, 0, 0, 0};
+                    unsigned long long const n = ++s_fcat[cat];
+                    if (n <= 16 || (n & 0xFFFull) == 0) {
+                        std::fprintf(stderr,
+                            "VPTE-LD FLT cyc=%llu pc=0x%llx ea=0x%llx "
+                            "fault=%u rcls=%d inCtl=%d inVptb=%d "
+                            "va_ctl=0x%llx vptb=0x%llx "
+                            "cat=%u catN=%llu\n",
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(slot.grain.pc),
+                            static_cast<unsigned long long>(r.memAddr),
+                            static_cast<unsigned>(r.faultCode),
+                            wasReclassifiedDouble ? 1 : 0,
+                            fInCtl ? 1 : 0, fInVptb ? 1 : 0,
+                            static_cast<unsigned long long>(cpu.va_ctl),
+                            static_cast<unsigned long long>(cpu.vptb),
+                            cat, n);
+                        std::fflush(stderr);
+                    }
+                }
+            }
+            // ---- END companion row ----
 #if EMULATR_BRINGUP_PROBES
             // ---- DTBM-DOUBLE probe (A-vs-B fork, 2026-07-19) --------------------
             // Answers whether the OS-PAL Sec 17.6.1 physical fallback walk can even
@@ -527,6 +581,58 @@ private:
             // VA_FORM computed 0, the walk loaded an invalid PTE from [0], and
             // re-faulted forever (2026-05-27 SROM 0x8301-0x8321 page-walk spin).
             cpu.va = r.memAddr;
+            // ---- P-SUP-3 ACV-instant dump (JRN-SUPMODE-001 Sec 13.7;
+            // REMOVE with the probe family).  Fires ONLY on an
+            // AccessViolation whose VA falls in the Species-A page
+            // (7FF9C000..7FF9DFFF, the Sec 2 E3 supervisor-owned P1
+            // page).  Prints the fault context plus the last 8 CM-write
+            // events from the uncapped ring -- naming the transition
+            // that left the CPU in this mode ahead of the fault.  No
+            // mode filter on purpose: an ACV here at mode<=2 would
+            // indict the protection check itself, and that row must
+            // not be filtered out.  Gate EMULATR_PROBE_SUPMODE.
+            {
+                static bool const s_supAcv =
+                    std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+                if (s_supAcv
+                    && tr == mmuLib::TranslationResult::AccessViolation
+                    && (r.memAddr & ~uint64_t{0x1FFF}) == 0x7FF9C000ULL) {
+                    static unsigned s_supAcvN = 0;
+                    if (s_supAcvN < 16) {
+                        ++s_supAcvN;
+                        std::fprintf(stderr,
+                            "SUPMODE-ACV#%u cyc=%llu pc=0x%llx va=0x%llx "
+                            "store=%d mode=%d pal=%d\n",
+                            s_supAcvN,
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(slot.grain.pc),
+                            static_cast<unsigned long long>(r.memAddr),
+                            r.memIsStore ? 1 : 0,
+                            static_cast<int>(cpu.mode),
+                            static_cast<int>((slot.grain.pc & 1ULL) != 0ULL));
+                        namespace sp = coreLib::supmode_probe;
+                        uint64_t const n = sp::g_ringN;
+                        unsigned const have =
+                            static_cast<unsigned>(n < 8 ? n : 8);
+                        for (unsigned i = 0; i < have; ++i) {
+                            // oldest-first of the last `have` events
+                            sp::CmEvent const& e =
+                                sp::g_ring[(n - have + i) & 7];
+                            std::fprintf(stderr,
+                                "  SUPMODE-RING[-%u] cyc=%llu pc=0x%llx "
+                                "%s opB=0x%llx mode %u->%u\n",
+                                have - i,
+                                static_cast<unsigned long long>(e.cyc),
+                                static_cast<unsigned long long>(e.pc),
+                                e.site ? "ier_cm" : "cm",
+                                static_cast<unsigned long long>(e.opB),
+                                static_cast<unsigned>(e.from),
+                                static_cast<unsigned>(e.to));
+                        }
+                        std::fflush(stderr);
+                    }
+                }
+            }
 #if EMULATR_MEMDIAG
             // D-side fault probe.  Filters out the SROM DTBM_SINGLE handler's
             // own VPTE re-load at palBase+0x321 so we see the ORIGINAL upstream
@@ -597,6 +703,86 @@ private:
             applyStoreEffect(r, cpu, bus, locks, pa, isLocked);
         } else {
             applyLoadEffect(r, cpu, bus, locks, pa, isLocked);
+
+            // ---- JRN-VPTB-001 Sec 3 KILL-TEST probe (REMOVE after
+            // capture).  Every SUCCESSFUL HW_LD TYPE=010 Virtual/VPTE:
+            // the loaded value IS what the PAL will install as a PTE, so
+            // {EA, PA, value, va_ctl, vptb} in ONE row confirms (or
+            // kills) the garbage-EA-poison-fill mechanism AND lets each
+            // install be traced to what actually lived at the source
+            // (architect refinement 2026-08-09: predict WHICH garbage,
+            // not just THAT garbage).  Bounded: first 64 DISTINCT EAs
+            // logged; every row carries the running total so collision
+            // recurrence (the deterministic-Species-A corollary) is
+            // readable from the counts.  Gated on EMULATR_AST_PROBE.
+            {
+                static bool const s_vpteProbe =
+                    std::getenv("EMULATR_AST_PROBE") != nullptr;
+                bool const isVpteLd =
+                    slot.grain.primaryOp == 0x1Bu
+                    && ((slot.grain.encoded >> 13) & 0x7u) == 0x2u;
+                if (s_vpteProbe && isVpteLd) {
+                    // Window-keyed budgets (architect refinement #2,
+                    // 2026-08-09 late): in-window successes are the
+                    // boring case -- cap HARD (16).  OUT-of-window
+                    // successes are the rows the test exists to find
+                    // (each one is a candidate poison fill) -- big
+                    // budget (512).  ea top-bits compared against BOTH
+                    // VPTB homes (va_ctl field and cpu.vptb) so a
+                    // stranded-base run classifies correctly.
+                    // Four budgets keyed on the FLAG PAIR (architect,
+                    // 2026-08-09 late): (1,1) tight; (1,0)/(0,1) -- the
+                    // stranded-base stories -- generous; (0,0) generous.
+                    // MASK DIRECTION, stated precisely (architect
+                    // correction 2026-08-09): this predicate uses
+                    // kVaCtlVptbMask (bits [63:30]) -- WIDER than
+                    // computeVaForm's [63:43], therefore STRICTER: it
+                    // tests more bits, so FEWER EAs classify in-window,
+                    // i.e. it errs toward OUT-of-window and BIASES
+                    // TOWARD the theory under test.  A borderline OUT
+                    // count therefore leans optimistic; the raw
+                    // va_ctl/vptb in every row support offline
+                    // reclassification under the [63:43] form.
+                    static unsigned long long s_total = 0, s_out = 0;
+                    static unsigned s_rows11 = 0, s_rows10 = 0,
+                                    s_rows01 = 0, s_rows00 = 0;
+                    ++s_total;
+                    uint64_t const eaTop =
+                        r.memAddr & coreLib::kVaCtlVptbMask;
+                    bool const inCtl =
+                        eaTop == (cpu.va_ctl & coreLib::kVaCtlVptbMask);
+                    bool const inVptb =
+                        eaTop == (cpu.vptb & coreLib::kVaCtlVptbMask);
+                    bool const inWindow = inCtl || inVptb;
+                    if (!inWindow) ++s_out;
+                    // NOTE: not named "emit" -- Qt macro-expands that
+                    // identifier to nothing in any Qt-including TU.
+                    bool emitRow = false;
+                    if (inCtl && inVptb)       emitRow = (s_rows11++ < 16);
+                    else if (inCtl)            emitRow = (s_rows10++ < 256);
+                    else if (inVptb)           emitRow = (s_rows01++ < 256);
+                    else                       emitRow = (s_rows00++ < 512);
+                    if (emitRow) {
+                        std::fprintf(stderr,
+                            "VPTE-LD %s cyc=%llu pc=0x%llx ea=0x%llx "
+                            "pa=0x%llx val=0x%llx va_ctl=0x%llx "
+                            "vptb=0x%llx inCtl=%d inVptb=%d "
+                            "total=%llu out=%llu\n",
+                            inWindow ? "IN " : "OUT",
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(slot.grain.pc),
+                            static_cast<unsigned long long>(r.memAddr),
+                            static_cast<unsigned long long>(pa),
+                            static_cast<unsigned long long>(r.regWriteValue),
+                            static_cast<unsigned long long>(cpu.va_ctl),
+                            static_cast<unsigned long long>(cpu.vptb),
+                            inCtl ? 1 : 0, inVptb ? 1 : 0,
+                            s_total, s_out);
+                        std::fflush(stderr);
+                    }
+                }
+            }
+            // ---- END JRN-VPTB-001 kill-test probe ----
         }
     }
 

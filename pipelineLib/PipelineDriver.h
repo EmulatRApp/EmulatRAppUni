@@ -16,6 +16,28 @@
 // CHANGE HISTORY
 // ----------------------------------------------------------------------------
 // FILE 1: pipelineLib/PipelineDriver.h
+//   DATE:     2026-08-10
+//   FUNCTION: step() -- EX seam; header stage map
+//   CHANGE:   BRIEF-EXEC-ABI-001: leaf ABI moved from return-by-value to a
+//             caller-supplied out-parameter.  The EX statement
+//             `slot.result = slot.grain.execFn(slot.grain, ctx)` became
+//             `slot.grain.execFn(slot.grain, ctx, slot.result)`.  The
+//             assignment-through-indirect-call form could not NRVO: MSVC
+//             materialized an sret temporary and copied 56 bytes into
+//             slot.result per retired instruction (baseline: lea + 8-instr/
+//             33-byte copy at the call site, Machine.obj offset 0x789).
+//   INVARIANT: `coreLib::PipelineSlot slot{}` value-initializes slot.result
+//             BEFORE IF, and that reset is now the ONLY reset -- the per-leaf
+//             `BoxResult r;` default-init is gone.  The reset must stay
+//             before IF, not before EX: the I-side translation-fault and
+//             fetch-bus-error paths retire without ever reaching EX.  Do not
+//             hoist or reuse the slot.  Ownership contract: coreLib/
+//             BoxResult.h.  Transformation rule for the ~487 leaves:
+//             signature gains `BoxResult& out`, returns void; body head
+//             `BoxResult r;` -> `BoxResult& r = out;`; `return r;` ->
+//             `return;`; helper-return leaves assign into out then return.
+// ----------------------------------------------------------------------------
+// FILE 1 (prior): pipelineLib/PipelineDriver.h
 //   DATE:     2026-08-01
 //   FUNCTION: step() -- retire-path warp sites
 //   CHANGE:   REMOVED six cycle/register "warp" blocks (287-480, 515-607 of the
@@ -63,8 +85,12 @@
 //   GR  -- build ExecCtx: read regfile (intReg or fpReg per
 //          S_ReadsFp / S_ReadsInt) into ctx.opA / opB; copy palMode
 //          and cycleCount; install the CpuState* escape hatch.
-//   EX  -- invoke grain.execFn(grain, ctx) and store the returned
-//          BoxResult on slot.result.
+//   EX  -- invoke grain.execFn(grain, ctx, slot.result); the leaf
+//          writes its effect fields directly into the slot.result
+//          latch (out-parameter ABI, BRIEF-EXEC-ABI-001).  The latch
+//          was value-initialized by `PipelineSlot slot{}` before IF;
+//          the caller owns that reset, the leaf writes only the
+//          fields its semantics define.
 //   MEM -- pipelineLib::MemDrainer::drain(slot, cpu, memory).
 //          Applies memEffect, sign-extends loads, commits the
 //          regfile write, manages the LDx_L / STx_C reservation.
@@ -91,6 +117,7 @@
 #ifndef PIPELINELIB_PIPELINEDRIVER_H
 #define PIPELINELIB_PIPELINEDRIVER_H
 
+#include <cassert>  // T-6 debug-only pristine-latch assert (BRIEF-EXEC-ABI-001)
 #include <cstdint>
 #include <cstdio>   // TEMP probes 2026-06-01/02 (fprintf) -- revert with probes
 #include <cstdlib>  // TEMP probes 2026-06-02 (getenv, tick-warp) -- revert with probes
@@ -496,7 +523,26 @@ struct PipelineDriver
         // -----------------------------------------------------
         // EX: invoke leaf.
         // -----------------------------------------------------
-        slot.result = slot.grain.execFn(slot.grain, ctx);
+        // BRIEF-EXEC-ABI-001: leaf writes into slot.result directly via
+        // the out-parameter ABI -- no sret temporary, no 56-byte copy.
+        // slot.result is pristine here: `PipelineSlot slot{}` value-
+        // initialized it before IF (NOT before EX -- the I-side fault
+        // paths retire without reaching EX).  See coreLib/BoxResult.h
+        // for the ownership contract.
+#if !defined(NDEBUG)
+        // T-6 contract assert (debug config only; compiled out of
+        // relwithdebinfo/release): the latch must be pristine at EX.
+        // Sentinel-field check, not a full struct compare -- cheap, and
+        // it is what catches a future TB inner pipeline reusing a slot
+        // without resetting it.
+        assert(slot.result.faultCode == coreLib::kNoFault
+               && slot.result.regWriteIdx == coreLib::kNoRegWrite
+               && !slot.result.divert
+               && slot.result.semFlags == grainFactory::GrainSem::None
+               && "EX entered with a non-pristine slot.result latch "
+                  "(BRIEF-EXEC-ABI-001 ownership contract violated)");
+#endif
+        slot.grain.execFn(slot.grain, ctx, slot.result);
 
 
 #if EMULATR_MEMDIAG

@@ -804,9 +804,12 @@ def emitGrainsForward(grains: List[GrainRow],
             note = g.notes.strip() if g.notes else g.mnemonic
             out.append(f"// {g.mnemonic}: {note}")
             out.append("AXP_HOT AXP_FLATTEN")
+            # BRIEF-EXEC-ABI-001 (2026-08-10): out-parameter leaf ABI --
+            # third param `BoxResult& out`, return void.  Must match the
+            # GrainFn typedef in coreLib/InstructionGrain.h.
             out.append(
-                f"BoxResult {leaf_name}(InstructionGrain const& g, "
-                f"ExecCtx const& c) noexcept;")
+                f"void {leaf_name}(InstructionGrain const& g, "
+                f"ExecCtx const& c, BoxResult& out) noexcept;")
             out.append("")
 
         # Append synthetic hand-written leaves declared in handwritten.tsv
@@ -820,8 +823,8 @@ def emitGrainsForward(grains: List[GrainRow],
                        f"(handwritten.tsv only; no GrainMaster row)")
             out.append("AXP_HOT AXP_FLATTEN")
             out.append(
-                f"BoxResult {leaf}(InstructionGrain const& g, "
-                f"ExecCtx const& c) noexcept;")
+                f"void {leaf}(InstructionGrain const& g, "
+                f"ExecCtx const& c, BoxResult& out) noexcept;")
             out.append("")
 
         out.append(f"}} // namespace {ns}")
@@ -1325,16 +1328,18 @@ def emitGrainStubs(grains: List[GrainRow],
             note = g.notes.strip() if g.notes else g.mnemonic
             out.append(f"// {g.mnemonic}: {note}")
             out.append("AXP_HOT AXP_FLATTEN")
+            # BRIEF-EXEC-ABI-001 (2026-08-10): out-parameter leaf ABI --
+            # stub writes into the caller-supplied pristine latch.
             out.append(
-                f"BoxResult {leaf_name}(InstructionGrain const& g, "
-                f"ExecCtx const& c) noexcept")
+                f"void {leaf_name}(InstructionGrain const& g, "
+                f"ExecCtx const& c, BoxResult& out) noexcept")
             out.append("{")
             out.append("    static std::atomic<uint64_t> s_cnt{ 0 };")
             out.append(f"    logUnimplementedStub(\"{g.mnemonic}\", g, c, s_cnt);")
-            out.append("    BoxResult r;")
+            out.append("    BoxResult& r = out;")
             out.append("    r.semFlags  = g.semFlags;")
             out.append("    r.faultCode = coreLib::kFaultUnimplemented;")
-            out.append("    return r;")
+            out.append("    return;")
             out.append("}")
             out.append("")
 

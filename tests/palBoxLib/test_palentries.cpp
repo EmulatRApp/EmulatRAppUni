@@ -1,6 +1,14 @@
 // ============================================================================
 // tests/palBoxLib/test_palentries.cpp -- doctest cases for palBox v1 leaves
 // ============================================================================
+//
+// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
+//   FILE:     tests/palBoxLib/test_palentries.cpp
+//   FUNCTION: every direct leaf invocation
+//   CHANGE:   leaf ABI is now out-parameter: calls became
+//             `BoxResult r{}; leaf(g, ctx, r);`.  The test is the caller
+//             and therefore OWNS the latch reset -- the `{}` value-init is
+//             load-bearing (coreLib/BoxResult.h ownership contract).
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -102,7 +110,9 @@ TEST_CASE("palBox::execHalt -- raises kFaultHalt; no other effect")
     InstructionGrain g = makePalGrain(0x0, flags, &palBox::execHalt);
     ExecCtx ctx{};
 
-    BoxResult r = palBox::execHalt(g, ctx);
+    BoxResult r{};
+
+    palBox::execHalt(g, ctx, r);
 
     CHECK(r.faultCode == kFaultHalt);
     CHECK(r.regWriteIdx == kNoRegWrite);
@@ -162,7 +172,9 @@ TEST_CASE("palBox::execHwMfpr -- reads HW_CC from CpuState::cycleCount")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execHwMfpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMfpr(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 1);
@@ -179,7 +191,9 @@ TEST_CASE("palBox::execHwMfpr -- reads HW_EXC_ADDR")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execHwMfpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMfpr(g, ctx, r);
 
     CHECK(r.regWriteIdx == 2);
     CHECK(r.regWriteValue == 0x12345000ULL);
@@ -194,7 +208,9 @@ TEST_CASE("palBox::execHwMfpr -- reads HW_CM as integer mode bits")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execHwMfpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMfpr(g, ctx, r);
 
     CHECK(r.regWriteValue == 3u);
 }
@@ -209,7 +225,9 @@ TEST_CASE("palBox::execHwMfpr -- unknown selector raises kFaultUnimplemented")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execHwMfpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMfpr(g, ctx, r);
 
     CHECK(r.faultCode == kFaultUnimplemented);
     CHECK(r.regWriteIdx == kNoRegWrite);
@@ -226,7 +244,9 @@ TEST_CASE("palBox::execHwMfpr -- silent-stub IPR returns 0 with no fault")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execHwMfpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMfpr(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 9);
@@ -260,7 +280,8 @@ TEST_CASE("palBox::execHwMtpr HW_CC -- packed format: writes OFFSET half only")
     ExecCtx ctxMt{};
     ctxMt.cpu = &cpu;
     ctxMt.opB = (0xCAFEBABEULL << 32) | 0xDEADBEEFULL;
-    BoxResult rMt = palBox::execHwMtpr(gMt, ctxMt);
+    BoxResult rMt{};
+    palBox::execHwMtpr(gMt, ctxMt, rMt);
     CHECK(rMt.faultCode == kNoFault);
     CHECK(cpu.ccOffset == 0xCAFEBABEULL);
 
@@ -273,7 +294,8 @@ TEST_CASE("palBox::execHwMtpr HW_CC -- packed format: writes OFFSET half only")
                                        kHwMfprFlags, &palBox::execHwMfpr);
     ExecCtx ctxMf{};
     ctxMf.cpu = &cpu;
-    BoxResult rMf = palBox::execHwMfpr(gMf, ctxMf);
+    BoxResult rMf{};
+    palBox::execHwMfpr(gMf, ctxMf, rMf);
     CHECK(rMf.faultCode == kNoFault);
     CHECK(rMf.regWriteValue == ((0xCAFEBABEULL << 32) | 0x777ULL));
 
@@ -295,7 +317,9 @@ TEST_CASE("palBox::execHwMtpr -- writes HW_VA_CTL into CpuState::va_ctl")
     ctx.cpu = &cpu;
     ctx.opB = 0x2ULL;   // bit 1 set: 48-bit VA mode
 
-    BoxResult r = palBox::execHwMtpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMtpr(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.va_ctl == 0x2ULL);
@@ -316,14 +340,16 @@ TEST_CASE("palBox::execHwMtpr -- HW_CM (PS) takes CM from DATA bits [4:3]")
     ctx.cpu = &cpu;
     ctx.opB = (2ULL << 3) | 0x3ULL;   // CM<4:3> = 10b Supervisor; [1:0] noise ignored
 
-    BoxResult r = palBox::execHwMtpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMtpr(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.mode == Mode_Privilege::Supervisor);
 
     // Executive via the same field; and the PS read returns CM at [4:3].
     ctx.opB = 1ULL << 3;
-    (void)palBox::execHwMtpr(g, ctx);
+    { BoxResult t{}; palBox::execHwMtpr(g, ctx, t); }
     CHECK(cpu.mode == Mode_Privilege::Executive);
 }
 
@@ -336,7 +362,9 @@ TEST_CASE("palBox::execHwMtpr -- unknown selector raises kFaultUnimplemented")
     ctx.cpu = &cpu;
     ctx.opB = 0x1234ULL;
 
-    BoxResult r = palBox::execHwMtpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMtpr(g, ctx, r);
 
     CHECK(r.faultCode == kFaultUnimplemented);
 }
@@ -354,7 +382,9 @@ TEST_CASE("palBox::execHwMtpr -- silent-stub IPR swallows write with no fault")
     ctx.cpu = &cpu;
     ctx.opB = 0xDEADULL;
 
-    BoxResult r = palBox::execHwMtpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMtpr(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == kNoRegWrite);   // MTPR never writes a regfile slot
@@ -382,7 +412,9 @@ TEST_CASE("palBox::execHwMtpr -- HW_PAL_BASE sources from Rb (regression: 2026-0
     ctx.cpu = &cpu;
     ctx.opB = 0x0000000000600000ULL;   // R30 source per the trace
 
-    BoxResult r = palBox::execHwMtpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMtpr(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.palBase == 0x0000000000600000ULL);   // must NOT be zero
@@ -403,7 +435,9 @@ TEST_CASE("palBox::execHwMtpr -- HW_PAL_BASE rejects opA noise (regression: 2026
     ctx.opA = 0xBADCAFE0ULL;             // noise; must be ignored
     ctx.opB = 0x0000000000800000ULL;     // real source
 
-    BoxResult r = palBox::execHwMtpr(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwMtpr(g, ctx, r);
 
     CHECK(cpu.palBase == 0x0000000000800000ULL);
 }
@@ -429,14 +463,15 @@ TEST_CASE("PCTX: EV6__ASTER write (0x42) updates only the ASTEN nibble; 0x5F rea
     InstructionGrain gw = makeHwGrain(0x1D, /*ra*/ 31, /*scbd*/ 0x42,
                                       kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = 0x5ULL << 5;                 // ASTER = 0b0101
-    CHECK(palBox::execHwMtpr(gw, ctx).faultCode == kNoFault);
+    { BoxResult t{}; palBox::execHwMtpr(gw, ctx, t); CHECK(t.faultCode == kNoFault); }
     CHECK(cpu.asten_sr == 0xF5ULL);        // ASTSR nibble untouched
     CHECK(cpu.asn == 0x2A);                // ASN untouched
 
     // Full read at EV6__PROCESS_CONTEXT (0x5F): all fields composed.
     InstructionGrain gr = makeHwGrain(0x19, /*ra*/ 3, /*scbd*/ 0x5F,
                                       kHwMfprFlags, &palBox::execHwMfpr);
-    BoxResult rr = palBox::execHwMfpr(gr, ctx);
+    BoxResult rr{};
+    palBox::execHwMfpr(gr, ctx, rr);
     CHECK(rr.faultCode == kNoFault);
     CHECK(((rr.regWriteValue >> 5)  & 0xF) == 0x5);   // ASTER
     CHECK(((rr.regWriteValue >> 9)  & 0xF) == 0xF);   // ASTRR
@@ -452,13 +487,13 @@ TEST_CASE("PCTX: ASN field write (0x41) takes value<46:39>; ASTRR write (0x44) t
     InstructionGrain gAsn = makeHwGrain(0x1D, 31, /*scbd*/ 0x41,
                                         kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = 0x7BULL << 39;
-    CHECK(palBox::execHwMtpr(gAsn, ctx).faultCode == kNoFault);
+    { BoxResult t{}; palBox::execHwMtpr(gAsn, ctx, t); CHECK(t.faultCode == kNoFault); }
     CHECK(cpu.asn == 0x7B);
 
     InstructionGrain gRr = makeHwGrain(0x1D, 31, /*scbd*/ 0x44,
                                        kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = 0x9ULL << 9;                 // ASTRR = 0b1001
-    CHECK(palBox::execHwMtpr(gRr, ctx).faultCode == kNoFault);
+    { BoxResult t{}; palBox::execHwMtpr(gRr, ctx, t); CHECK(t.faultCode == kNoFault); }
     CHECK(cpu.asten_sr == 0x90ULL);        // -> HWPCB ASTSR nibble <7:4>
 }
 
@@ -475,7 +510,7 @@ TEST_CASE("PCTX: full write (0x5F) sets all five fields incl. FPE->fen, PPCE->pm
             | (0xAULL  << 5)               // ASTER
             | (1ULL    << 2)               // FPE
             | (1ULL    << 1);              // PPCE
-    CHECK(palBox::execHwMtpr(gw, ctx).faultCode == kNoFault);
+    { BoxResult t{}; palBox::execHwMtpr(gw, ctx, t); CHECK(t.faultCode == kNoFault); }
     CHECK(cpu.asn == 0x33);
     CHECK(cpu.asten_sr == 0x6AULL);
     CHECK(cpu.fen == 1u);
@@ -495,7 +530,8 @@ TEST_CASE("PCTX: bare read form 0x60 (01xx xxxx) is a legal composed read, not a
 
     InstructionGrain gr = makeHwGrain(0x19, /*ra*/ 7, /*scbd*/ 0x60,
                                       kHwMfprFlags, &palBox::execHwMfpr);
-    BoxResult rr = palBox::execHwMfpr(gr, ctx);
+    BoxResult rr{};
+    palBox::execHwMfpr(gr, ctx, rr);
     CHECK(rr.faultCode == kNoFault);
     CHECK(rr.regWriteIdx == 7);
     CHECK(rr.regWriteValue == ((0x11ULL << 39) | (1ULL << 2)));
@@ -529,7 +565,9 @@ TEST_CASE("palBox::execHwRei -- STACKED form diverts to EXC_ADDR and clears palM
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execHwRei(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwRei(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.divert);
@@ -561,7 +599,9 @@ TEST_CASE("palBox::execHwRei -- REGISTER form diverts to Rb and tracks palMode b
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execHwRei(g, ctx);
+    BoxResult r{};
+
+    palBox::execHwRei(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.divert);
@@ -584,7 +624,9 @@ TEST_CASE("palBox::execBpt_tru64 -- stub raises kFaultUnimplemented")
     InstructionGrain g = makePalGrain(0x80, flags, &palBox::execBpt_tru64);
     ExecCtx ctx{};
 
-    BoxResult r = palBox::execBpt_tru64(g, ctx);
+    BoxResult r{};
+
+    palBox::execBpt_tru64(g, ctx, r);
 
     checkUnimplStub(r);
 }
@@ -599,7 +641,9 @@ TEST_CASE("palBox::execBpt_vms -- stub raises kFaultUnimplemented")
     InstructionGrain g = makePalGrain(0x80, flags, &palBox::execBpt_vms);
     ExecCtx ctx{};
 
-    BoxResult r = palBox::execBpt_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execBpt_vms(g, ctx, r);
 
     checkUnimplStub(r);
 }
@@ -628,7 +672,9 @@ TEST_CASE("palBox::execChme_vms -- diverts to CALL_PAL entry palBase+0x3080")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execChme_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execChme_vms(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.divert);
@@ -652,7 +698,9 @@ TEST_CASE("palBox::execChmk_tru64 -- stub raises kFaultUnimplemented")
     InstructionGrain g = makePalGrain(0x83, flags, &palBox::execChmk_tru64);
     ExecCtx ctx{};
 
-    BoxResult r = palBox::execChmk_tru64(g, ctx);
+    BoxResult r{};
+
+    palBox::execChmk_tru64(g, ctx, r);
 
     checkUnimplStub(r);
 }
@@ -691,7 +739,9 @@ TEST_CASE("palBox::execCserve -- function 0x44 (MTPR_EXC_ADDR) diverts to R17, n
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCserve(g, ctx);
+    BoxResult r{};
+
+    palBox::execCserve(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.divert);                          // PAL->PAL control transfer
@@ -715,7 +765,9 @@ TEST_CASE("palBox::execCserve -- function 0x65 (MP_WORK_REQUEST) tolerated no-op
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCserve(g, ctx);
+    BoxResult r{};
+
+    palBox::execCserve(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == kNoRegWrite);   // R0 untouched (31)
@@ -734,7 +786,9 @@ TEST_CASE("palBox::execCserve -- function code in low 8 bits only")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCserve(g, ctx);
+    BoxResult r{};
+
+    palBox::execCserve(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteValue == 0u);
@@ -756,7 +810,9 @@ TEST_CASE("palBox::execCserve -- unhandled function is tolerated (no-op, no faul
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCserve(g, ctx);
+    BoxResult r{};
+
+    palBox::execCserve(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == kNoRegWrite);   // R0 untouched (31)
@@ -791,7 +847,9 @@ TEST_CASE("palBox::execLdqp_vms -- packs phys-load memEffect targeting R0")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execLdqp_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execLdqp_vms(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.memAddr == 0x4560ULL);
@@ -817,7 +875,9 @@ TEST_CASE("palBox::execStqp_vms -- packs phys-store memEffect from R17")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execStqp_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execStqp_vms(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.memAddr == 0x4560ULL);
@@ -845,7 +905,9 @@ TEST_CASE("palBox::execLdqp_vms -- unaligned R16 raises kFaultUnaligned")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execLdqp_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execLdqp_vms(g, ctx, r);
 
     CHECK(r.faultCode == kFaultUnaligned);
     CHECK(r.memSize == kNoMemEffect);          // no memEffect packed
@@ -868,7 +930,9 @@ TEST_CASE("palBox::execStqp_vms -- unaligned R16 raises kFaultUnaligned")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execStqp_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execStqp_vms(g, ctx, r);
 
     CHECK(r.faultCode == kFaultUnaligned);
     CHECK(r.memSize == kNoMemEffect);
@@ -894,7 +958,9 @@ TEST_CASE("palBox::execLdqp_vms -- 8-byte aligned address passes alignment check
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execLdqp_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execLdqp_vms(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.memAddr == 0x0ULL);
@@ -930,7 +996,9 @@ TEST_CASE("palBox::execMfprVptb_vms -- returns cpu.vptb in R0; no fault, no dive
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execMfprVptb_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execMfprVptb_vms(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 0);          // R0 (v0)
@@ -946,7 +1014,9 @@ TEST_CASE("palBox::execMfprVptb_vms -- returns 0 when cpu.vptb is unset")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execMfprVptb_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execMfprVptb_vms(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteValue == 0u);
@@ -970,7 +1040,9 @@ TEST_CASE("palBox::execMtprVptb_vms -- updates cpu.vptb, both IPRs, AND PT__VPTB
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execMtprVptb_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execMtprVptb_vms(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == kNoRegWrite);     // MTPR doesn't commit a regfile slot
@@ -1005,7 +1077,9 @@ TEST_CASE("palBox::execMtprVptb_vms -- an unusable p_temp FAULTS, never skips")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execMtprVptb_vms(g, ctx);
+    BoxResult r{};
+
+    palBox::execMtprVptb_vms(g, ctx, r);
 
     CHECK(r.faultCode != kNoFault);
     CHECK_FALSE(r.memIsStore);
@@ -1019,10 +1093,10 @@ TEST_CASE("palBox::execMtprVptb_vms -> execMfprVptb_vms -- round-trips via cpu.v
     ctx.cpu = &cpu;
 
     InstructionGrain const wg = makePalGrain(0x2A, kVptbWriteFlags, &palBox::execMtprVptb_vms);
-    palBox::execMtprVptb_vms(wg, ctx);
-
+    { BoxResult t{}; palBox::execMtprVptb_vms(wg, ctx, t); }
     InstructionGrain const rg = makePalGrain(0x29, kVptbReadFlags, &palBox::execMfprVptb_vms);
-    BoxResult r = palBox::execMfprVptb_vms(rg, ctx);
+    BoxResult r{};
+    palBox::execMfprVptb_vms(rg, ctx, r);
 
     CHECK(r.regWriteValue == 0xDEADBEEFCAFEBABEULL);
 }
@@ -1050,7 +1124,9 @@ TEST_CASE("palBox::execWtint -- returns 0 in R0; no fault, no divert")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execWtint(g, ctx);
+    BoxResult r{};
+
+    palBox::execWtint(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 0);          // R0 (v0)
@@ -1072,7 +1148,9 @@ TEST_CASE("palBox::execMfprWhami -- returns 0 in R0 (single-CPU)")
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execMfprWhami(g, ctx);
+    BoxResult r{};
+
+    palBox::execMfprWhami(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 0);          // R0 (v0)
@@ -1115,7 +1193,9 @@ TEST_CASE("palBox::execCallPalDispatch -- privileged func 0x29 (MFPR_VPTB) compu
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCallPalDispatch(g, ctx);
+    BoxResult r{};
+
+    palBox::execCallPalDispatch(g, ctx, r);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.divert);
@@ -1140,7 +1220,9 @@ TEST_CASE("palBox::execCallPalDispatch -- unprivileged func 0x86 (IMB) hits 0x30
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCallPalDispatch(g, ctx);
+    BoxResult r{};
+
+    palBox::execCallPalDispatch(g, ctx, r);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x603181ULL);
@@ -1161,7 +1243,9 @@ TEST_CASE("palBox::execCallPalDispatch -- excAddr captures prior PALmode in bit 
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCallPalDispatch(g, ctx);
+    BoxResult r{};
+
+    palBox::execCallPalDispatch(g, ctx, r);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x602A41ULL);
@@ -1183,7 +1267,9 @@ TEST_CASE("palBox::execCallPalDispatch -- preserves palBase high bits above 32K 
     ExecCtx ctx{};
     ctx.cpu = &cpu;
 
-    BoxResult r = palBox::execCallPalDispatch(g, ctx);
+    BoxResult r{};
+
+    palBox::execCallPalDispatch(g, ctx, r);
 
     // entry = (0x4000060000 & ~0x7FFF) | 0x2000 = 0x4000060000 | 0x2000
     //       = 0x4000062000
@@ -1220,7 +1306,8 @@ TEST_CASE("palBox HW_SIRR -- MTPR drops reserved bits; MFPR round-trips SIR<15:1
     InstructionGrain gMt = makeHwGrain(0x1D, /*ra*/ 31, kScbdSirr,
                                        kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = ~uint64_t{0};
-    BoxResult rMt = palBox::execHwMtpr(gMt, ctx);
+    BoxResult rMt{};
+    palBox::execHwMtpr(gMt, ctx, rMt);
     CHECK(rMt.faultCode == kNoFault);
     CHECK(cpu.sirr == coreLib::kSirrSirMask);
 
@@ -1229,12 +1316,13 @@ TEST_CASE("palBox HW_SIRR -- MTPR drops reserved bits; MFPR round-trips SIR<15:1
     // (ev6_vms_callpal.mar :7539/:7869); partial fidelity corrupts it.
     uint64_t const parked = sirBit(3) | sirBit(4) | sirBit(15);
     ctx.opB = parked;
-    palBox::execHwMtpr(gMt, ctx);
+    { BoxResult t{}; palBox::execHwMtpr(gMt, ctx, t); }
     CHECK(cpu.sirr == parked);
 
     InstructionGrain gMf = makeHwGrain(0x19, /*ra*/ 7, kScbdSirr,
                                        kHwMfprFlags, &palBox::execHwMfpr);
-    BoxResult rMf = palBox::execHwMfpr(gMf, ctx);
+    BoxResult rMf{};
+    palBox::execHwMfpr(gMf, ctx, rMf);
     CHECK(rMf.faultCode == kNoFault);
     CHECK(rMf.regWriteIdx == 7);
     CHECK(rMf.regWriteValue == parked);
@@ -1242,7 +1330,7 @@ TEST_CASE("palBox HW_SIRR -- MTPR drops reserved bits; MFPR round-trips SIR<15:1
     // Plain full store clears -- hw_mtpr r31, EV6__SIRR semantics
     // (ev6_vms_pal.mar :4125/:4505): no W1C trickery.
     ctx.opB = 0;
-    palBox::execHwMtpr(gMt, ctx);
+    { BoxResult t{}; palBox::execHwMtpr(gMt, ctx, t); }
     CHECK(cpu.sirr == 0);
 }
 
@@ -1257,14 +1345,16 @@ TEST_CASE("palBox HW_ISUM -- derived read; MTPR stays a permissive no-op (T5)")
     // Staged hardware cause (EI[2], interval timer) passes through.
     constexpr uint64_t ei2 = uint64_t{1} << 35;
     cpu.isum = ei2;
-    BoxResult r1 = palBox::execHwMfpr(gMf, ctx);
+    BoxResult r1{};
+    palBox::execHwMfpr(gMf, ctx, r1);
     CHECK(r1.regWriteValue == ei2);
 
     // Live SW derivation: SIRR request + IER.SIEN enable appears in
     // the SAME read, OR'd beside the staged EI bit.
     cpu.sirr = sirBit(4);
     cpu.ier  = sirBit(4);
-    BoxResult r2 = palBox::execHwMfpr(gMf, ctx);
+    BoxResult r2{};
+    palBox::execHwMfpr(gMf, ctx, r2);
     CHECK(r2.regWriteValue == (ei2 | sirBit(4)));
 
     // A stale SI bit in the STAGED word is filtered (kIsumHwMask):
@@ -1272,7 +1362,8 @@ TEST_CASE("palBox HW_ISUM -- derived read; MTPR stays a permissive no-op (T5)")
     cpu.sirr = 0;
     cpu.ier  = 0;
     cpu.isum = ei2 | sirBit(4);
-    BoxResult r3 = palBox::execHwMfpr(gMf, ctx);
+    BoxResult r3{};
+    palBox::execHwMfpr(gMf, ctx, r3);
     CHECK(r3.regWriteValue == ei2);
 
     // ISUM is architecturally read-only: MTPR swallows with no fault
@@ -1280,7 +1371,8 @@ TEST_CASE("palBox HW_ISUM -- derived read; MTPR stays a permissive no-op (T5)")
     InstructionGrain gMt = makeHwGrain(0x1D, /*ra*/ 31, kScbdIsum,
                                        kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = ~uint64_t{0};
-    BoxResult rMt = palBox::execHwMtpr(gMt, ctx);
+    BoxResult rMt{};
+    palBox::execHwMtpr(gMt, ctx, rMt);
     CHECK(rMt.faultCode == kNoFault);
     CHECK(cpu.isum == (ei2 | sirBit(4)));   // staged word untouched
     CHECK(cpu.sirr == 0);                   // sirr untouched
@@ -1324,11 +1416,11 @@ TEST_CASE("pendingSoftInt + the run-loop delivery gate shape (T6)")
     InstructionGrain gAstrr = makeHwGrain(0x1D, /*ra*/ 31, /*scbd*/ 0x44,
                                           kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = uint64_t{1} << 9;                        // ASTRR[K]
-    palBox::execHwMtpr(gAstrr, ctx);
+    { BoxResult t{}; palBox::execHwMtpr(gAstrr, ctx, t); }
     InstructionGrain gAster = makeHwGrain(0x1D, /*ra*/ 31, /*scbd*/ 0x42,
                                           kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = uint64_t{1} << 5;                        // ASTER[K]
-    palBox::execHwMtpr(gAster, ctx);
+    { BoxResult t{}; palBox::execHwMtpr(gAster, ctx, t); }
     cpu2.ier  = coreLib::kIerAstenBit;
     cpu2.mode = Mode_Privilege::Kernel;
     CHECK(coreLib::pendingSoftInt(cpu2) == (uint64_t{1} << 3));   // ASTK
@@ -1338,7 +1430,8 @@ TEST_CASE("pendingSoftInt + the run-loop delivery gate shape (T6)")
     // ASTRR at [12:9].
     InstructionGrain gPctxRd = makeHwGrain(0x19, /*ra*/ 6, /*scbd*/ 0x44,
                                            kHwMfprFlags, &palBox::execHwMfpr);
-    BoxResult rPctx = palBox::execHwMfpr(gPctxRd, ctx);
+    BoxResult rPctx{};
+    palBox::execHwMfpr(gPctxRd, ctx, rPctx);
     CHECK(((rPctx.regWriteValue >> 9) & 0xFULL) == 1u);   // ASTRR[K] visible
 }
 
@@ -1360,29 +1453,30 @@ TEST_CASE("SIRR liveness loop: request -> deliverable -> clear -> quiescent (T7)
     InstructionGrain gMt = makeHwGrain(0x1D, /*ra*/ 31, kScbdSirr,
                                        kHwMtprFlags, &palBox::execHwMtpr);
     ctx.opB = sirBit(4);
-    palBox::execHwMtpr(gMt, ctx);
-
+    { BoxResult t{}; palBox::execHwMtpr(gMt, ctx, t); }
     // 2. DELIVERABLE: the run-loop predicate fires and the handler's
     //    ISUM read decodes the cause.
     CHECK(coreLib::pendingSoftInt(cpu) == sirBit(4));
     InstructionGrain gMf = makeHwGrain(0x19, /*ra*/ 4, kScbdIsum,
                                        kHwMfprFlags, &palBox::execHwMfpr);
-    BoxResult rIsum = palBox::execHwMfpr(gMf, ctx);
+    BoxResult rIsum{};
+    palBox::execHwMfpr(gMf, ctx, rIsum);
     CHECK(rIsum.regWriteValue == sirBit(4));
 
     // 3. CLEAR: trap__interrupt_sw_found clears the taken bit by
     //    mfpr/bic/mtpr -- emulate the RMW through the leaves.
     InstructionGrain gSirrRd = makeHwGrain(0x19, /*ra*/ 8, kScbdSirr,
                                            kHwMfprFlags, &palBox::execHwMfpr);
-    BoxResult rSirr = palBox::execHwMfpr(gSirrRd, ctx);
+    BoxResult rSirr{};
+    palBox::execHwMfpr(gSirrRd, ctx, rSirr);
     ctx.opB = rSirr.regWriteValue & ~sirBit(4);
-    palBox::execHwMtpr(gMt, ctx);
-
+    { BoxResult t{}; palBox::execHwMtpr(gMt, ctx, t); }
     // 4. QUIESCENT: the next ISUM read shows the bit GONE (live
     //    derivation -- a staged copy would still show it) and the
     //    delivery predicate stands down.
     CHECK(cpu.sirr == 0);
     CHECK(coreLib::pendingSoftInt(cpu) == 0);
-    BoxResult rIsum2 = palBox::execHwMfpr(gMf, ctx);
+    BoxResult rIsum2{};
+    palBox::execHwMfpr(gMf, ctx, rIsum2);
     CHECK(rIsum2.regWriteValue == 0);
 }

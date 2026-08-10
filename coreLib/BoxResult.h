@@ -13,7 +13,8 @@
 // Documentation:  https://timothypeer.github.io/ASA-EMulatR-Project/
 // ============================================================================
 //
-// BoxResult is the value object every leaf function returns.  It is the
+// BoxResult is the per-grain effect bag every leaf function fills in via
+// its caller-supplied out-parameter (BRIEF-EXEC-ABI-001).  It is the
 // communication channel from grain execution down to the CPU's
 // architectural state mutation, drained at successive pipeline stages:
 //
@@ -50,6 +51,25 @@
 //          slot.grain.pc to EXC_ADDR and enters PALcode.  WB does NOT
 //          touch the regfile; that drain has already happened at MEM.
 //
+// Ownership contract (BRIEF-EXEC-ABI-001, 2026-08-10 -- the leaf ABI is
+// out-parameter: `void execX(grain, ctx, BoxResult& out)`):
+//
+//   The caller supplies a value-initialized `BoxResult` and owns its
+//   reset.  A leaf writes only the fields its semantics define and
+//   reads none of them.  A leaf MUST NOT assume any field it does not
+//   write holds a defined value on entry unless the caller's reset is
+//   documented, and MUST NOT rely on a self-reset that no longer
+//   exists (the old per-leaf `BoxResult r;` default-init is gone; the
+//   body-head `BoxResult& r = out;` aliases the caller's latch).  The
+//   single production caller is `PipelineDriver::step`, where
+//   `coreLib::PipelineSlot slot{}` performs the reset BEFORE IF -- not
+//   before EX -- because the I-side translation-fault and fetch-bus-
+//   error paths retire without ever reaching EX.  Unit tests calling a
+//   leaf directly are callers too: `coreLib::BoxResult r{};` before
+//   the call, every time.  This relies on BoxResult having default
+//   member initializers and NO user-provided default constructor --
+//   do not add one.
+//
 // Design contract:
 //
 //   The BoxResult is a flat POD; unused fields hold sentinel values.
@@ -69,7 +89,8 @@
 //   structurally precludes V3's merge-drops-divertTarget defect.
 //
 // Sizing:
-//   At present the struct packs to ~48 bytes (one cache line is 64).
+//   The struct packs to 56 bytes (one cache line is 64; confirmed in the
+//   2026-08-10 T-0 disassembly -- stores span offsets 0x00..0x37).
 //   Fields are ordered to keep the 8-byte members contiguous so the
 //   compiler does not insert padding between them.
 //

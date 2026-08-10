@@ -47,59 +47,59 @@ using coreLib::InstructionGrain;
 
 // JMP: indirect jump
 AXP_HOT AXP_FLATTEN
-BoxResult execJmp(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execJmp(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // JSR: indirect call
 AXP_HOT AXP_FLATTEN
-BoxResult execJsr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execJsr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RET: return; hint that target was pushed by JSR
 AXP_HOT AXP_FLATTEN
-BoxResult execRet(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRet(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // JSR_COROUTINE: coroutine swap
 AXP_HOT AXP_FLATTEN
-BoxResult execJsrCoroutine(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execJsrCoroutine(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BR: unconditional branch with link in Ra
 AXP_HOT AXP_FLATTEN
-BoxResult execBr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BSR: branch to subroutine; pushes return PC
 AXP_HOT AXP_FLATTEN
-BoxResult execBsr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBsr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BLBC: branch if low bit of Ra is clear
 AXP_HOT AXP_FLATTEN
-BoxResult execBlbc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBlbc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BEQ: branch if Ra == 0
 AXP_HOT AXP_FLATTEN
-BoxResult execBeq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BLT: branch if Ra < 0
 AXP_HOT AXP_FLATTEN
-BoxResult execBlt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BLE: branch if Ra <= 0 (signed)
 AXP_HOT AXP_FLATTEN
-BoxResult execBle(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BLBS: branch if low bit of Ra is set
 AXP_HOT AXP_FLATTEN
-BoxResult execBlbs(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBlbs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BNE: branch if Ra != 0
 AXP_HOT AXP_FLATTEN
-BoxResult execBne(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BGE: branch if Ra >= 0
 AXP_HOT AXP_FLATTEN
-BoxResult execBge(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BGT: branch if Ra > 0 (signed)
 AXP_HOT AXP_FLATTEN
-BoxResult execBgt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 } // namespace iBox
 
@@ -114,383 +114,383 @@ using coreLib::InstructionGrain;
 
 // ADDL: 32-bit add; result sign-extended to 64
 AXP_HOT AXP_FLATTEN
-BoxResult execAddl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S4ADDL: scaled add longword: Rc = sext((Ra*4 + Rb)<31:0>)
 AXP_HOT AXP_FLATTEN
-BoxResult execS4addl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS4addl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBL: 32-bit subtract
 AXP_HOT AXP_FLATTEN
-BoxResult execSubl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S4SUBL: scaled sub longword: Rc = sext((Ra*4 - Rb)<31:0>)
 AXP_HOT AXP_FLATTEN
-BoxResult execS4subl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS4subl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPBGE: per-byte unsigned compare; 8-bit result in low byte of Rc
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpbge(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpbge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S8ADDL: scaled add longword: Rc = sext((Ra*8 + Rb)<31:0>)
 AXP_HOT AXP_FLATTEN
-BoxResult execS8addl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS8addl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S8SUBL: scaled sub longword: Rc = sext((Ra*8 - Rb)<31:0>)
 AXP_HOT AXP_FLATTEN
-BoxResult execS8subl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS8subl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPULT: compare unsigned less than
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpult(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpult(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDQ: 64-bit add
 AXP_HOT AXP_FLATTEN
-BoxResult execAddq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S4ADDQ: scaled add quadword: Rc = Ra*4 + Rb
 AXP_HOT AXP_FLATTEN
-BoxResult execS4addq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS4addq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBQ: 64-bit subtract
 AXP_HOT AXP_FLATTEN
-BoxResult execSubq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S4SUBQ: scaled sub quadword: Rc = Ra*4 - Rb
 AXP_HOT AXP_FLATTEN
-BoxResult execS4subq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS4subq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPEQ: compare equal
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpeq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S8ADDQ: scaled add quadword: Rc = Ra*8 + Rb
 AXP_HOT AXP_FLATTEN
-BoxResult execS8addq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS8addq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // S8SUBQ: scaled sub quadword: Rc = Ra*8 - Rb
 AXP_HOT AXP_FLATTEN
-BoxResult execS8subq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execS8subq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPULE: compare unsigned less or equal
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpule(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpule(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDL_V: ADDL/V: 32-bit add, same stored result as ADDL; signals IOV on overflow (AARM 4.4.1)
 AXP_HOT AXP_FLATTEN
-BoxResult execAddlV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddlV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBL_V: SUBL/V: 32-bit subtract, same stored result as SUBL; signals IOV on overflow (AARM 4.4.15)
 AXP_HOT AXP_FLATTEN
-BoxResult execSublV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSublV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPLT: compare signed less than
 AXP_HOT AXP_FLATTEN
-BoxResult execCmplt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmplt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDQ_V: ADDQ/V: 64-bit add, same stored result as ADDQ; signals IOV on two's-complement overflow (AARM 4.4.2)
 AXP_HOT AXP_FLATTEN
-BoxResult execAddqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBQ_V: SUBQ/V: 64-bit subtract, same stored result as SUBQ; signals IOV on two's-complement overflow (AARM 4.4.14)
 AXP_HOT AXP_FLATTEN
-BoxResult execSubqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPLE: compare signed less or equal
 AXP_HOT AXP_FLATTEN
-BoxResult execCmple(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmple(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // AND: bitwise AND
 AXP_HOT AXP_FLATTEN
-BoxResult execAnd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAnd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BIC: bit clear (AND NOT): Rc = Ra & ~Rb
 AXP_HOT AXP_FLATTEN
-BoxResult execBic(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVLBS: conditional move if Ra<0> set; else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmovlbs(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmovlbs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVLBC: conditional move if Ra<0> clear; else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmovlbc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmovlbc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BIS: OR; canonical MOV pseudo-op (bis Rs, R31, Rd)
 AXP_HOT AXP_FLATTEN
-BoxResult execBis(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBis(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVEQ: conditional move if Ra == 0; else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmoveq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmoveq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVNE: conditional move if Ra != 0; else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmovne(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmovne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ORNOT: OR NOT: Rc = Ra | ~Rb
 AXP_HOT AXP_FLATTEN
-BoxResult execOrnot(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execOrnot(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // XOR: bitwise XOR
 AXP_HOT AXP_FLATTEN
-BoxResult execXor(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execXor(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVLT: conditional move if Ra < 0 (signed); else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmovlt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmovlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVGE: conditional move if Ra >= 0 (signed); else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmovge(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmovge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EQV: equivalence (XNOR): Rc = ~(Ra ^ Rb)
 AXP_HOT AXP_FLATTEN
-BoxResult execEqv(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execEqv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // AMASK: architecture mask: Rc <- Rb & ~supported_features
 AXP_HOT AXP_FLATTEN
-BoxResult execAmask(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAmask(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVLE: conditional move if Ra <= 0 (signed); else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmovle(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmovle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMOVGT: conditional move if Ra > 0 (signed); else Rc unchanged
 AXP_HOT AXP_FLATTEN
-BoxResult execCmovgt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmovgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // IMPLVER: report processor implementation version (EV6=2)
 AXP_HOT AXP_FLATTEN
-BoxResult execImplver(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execImplver(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MSKBL: mask byte low
 AXP_HOT AXP_FLATTEN
-BoxResult execMskbl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMskbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXTBL: extract byte low
 AXP_HOT AXP_FLATTEN
-BoxResult execExtbl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExtbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSBL: insert byte low
 AXP_HOT AXP_FLATTEN
-BoxResult execInsbl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MSKWL: mask word low
 AXP_HOT AXP_FLATTEN
-BoxResult execMskwl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMskwl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXTWL: extract word low
 AXP_HOT AXP_FLATTEN
-BoxResult execExtwl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExtwl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSWL: insert word low
 AXP_HOT AXP_FLATTEN
-BoxResult execInswl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInswl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MSKLL: mask longword low
 AXP_HOT AXP_FLATTEN
-BoxResult execMskll(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMskll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXTLL: extract longword low
 AXP_HOT AXP_FLATTEN
-BoxResult execExtll(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExtll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSLL: insert longword low
 AXP_HOT AXP_FLATTEN
-BoxResult execInsll(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ZAP: zero per-byte where Rb<i> set
 AXP_HOT AXP_FLATTEN
-BoxResult execZap(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execZap(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ZAPNOT: zero per-byte where Rb<i> clear
 AXP_HOT AXP_FLATTEN
-BoxResult execZapnot(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execZapnot(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MSKQL: mask quadword low
 AXP_HOT AXP_FLATTEN
-BoxResult execMskql(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMskql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SRL: shift right logical
 AXP_HOT AXP_FLATTEN
-BoxResult execSrl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSrl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXTQL: extract quadword low
 AXP_HOT AXP_FLATTEN
-BoxResult execExtql(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExtql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SLL: shift left logical
 AXP_HOT AXP_FLATTEN
-BoxResult execSll(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQL: insert quadword low
 AXP_HOT AXP_FLATTEN
-BoxResult execInsql(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SRA: shift right arithmetic
 AXP_HOT AXP_FLATTEN
-BoxResult execSra(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSra(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MSKWH: mask word high
 AXP_HOT AXP_FLATTEN
-BoxResult execMskwh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMskwh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSWH: insert word high
 AXP_HOT AXP_FLATTEN
-BoxResult execInswh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInswh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXTWH: extract word high
 AXP_HOT AXP_FLATTEN
-BoxResult execExtwh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExtwh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MSKLH: mask longword high
 AXP_HOT AXP_FLATTEN
-BoxResult execMsklh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMsklh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSLH: insert longword high
 AXP_HOT AXP_FLATTEN
-BoxResult execInslh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInslh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXTLH: extract longword high
 AXP_HOT AXP_FLATTEN
-BoxResult execExtlh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExtlh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MSKQH: mask quadword high
 AXP_HOT AXP_FLATTEN
-BoxResult execMskqh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMskqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQH: insert quadword high
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXTQH: extract quadword high
 AXP_HOT AXP_FLATTEN
-BoxResult execExtqh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExtqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULL: 32-bit multiply
 AXP_HOT AXP_FLATTEN
-BoxResult execMull(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMull(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULQ: 64-bit multiply
 AXP_HOT AXP_FLATTEN
-BoxResult execMulq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // UMULH: unsigned multiply high (upper 64 bits of 128-bit product)
 AXP_HOT AXP_FLATTEN
-BoxResult execUmulh(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execUmulh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULL_V: MULL/V: 32-bit multiply, same stored result as MULL; signals IOV on overflow (AARM 4.4.11)
 AXP_HOT AXP_FLATTEN
-BoxResult execMullV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMullV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULQ_V: MULQ/V: 64-bit multiply, same stored result as MULQ; signals IOV when 128-bit product high half is not the sign-extension of the low half (AARM 4.4.13)
 AXP_HOT AXP_FLATTEN
-BoxResult execMulqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ITOFS: integer -> FP single-precision move
 AXP_HOT AXP_FLATTEN
-BoxResult execItofs(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execItofs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ITOFF: integer -> FP F_floating move
 AXP_HOT AXP_FLATTEN
-BoxResult execItoff(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execItoff(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ITOFT: integer -> FP T-format move
 AXP_HOT AXP_FLATTEN
-BoxResult execItoft(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execItoft(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RPCC: read cycle counter; non-deterministic
 AXP_HOT AXP_FLATTEN
-BoxResult execRpcc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRpcc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RC: read-and-set intrFlag IPR; old value -> Ra
 AXP_HOT AXP_FLATTEN
-BoxResult execRc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RS: read-and-clear intrFlag IPR; old value -> Ra
 AXP_HOT AXP_FLATTEN
-BoxResult execRs(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SEXTB: sign-extend byte
 AXP_HOT AXP_FLATTEN
-BoxResult execSextb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSextb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SEXTW: sign-extend word
 AXP_HOT AXP_FLATTEN
-BoxResult execSextw(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSextw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CTPOP: count population
 AXP_HOT AXP_FLATTEN
-BoxResult execCtpop(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCtpop(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // PERR: pixel error: sum of abs byte differences across 8 lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execPerr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execPerr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CTLZ: count leading zeros
 AXP_HOT AXP_FLATTEN
-BoxResult execCtlz(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCtlz(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CTTZ: count trailing zeros
 AXP_HOT AXP_FLATTEN
-BoxResult execCttz(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCttz(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // UNPKBW: unpack low 4 bytes of Rb into 4 zero-extended 16-bit lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execUnpkbw(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execUnpkbw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // UNPKBL: unpack low 2 bytes of Rb into 2 zero-extended 32-bit lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execUnpkbl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execUnpkbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // PKWB: pack low byte of each 16-bit lane of Rb into low halfword
 AXP_HOT AXP_FLATTEN
-BoxResult execPkwb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execPkwb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // PKLB: pack low byte of each 32-bit lane of Rb into low halfword
 AXP_HOT AXP_FLATTEN
-BoxResult execPklb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execPklb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MINSB8: per-lane signed min, 8 byte lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMinsb8(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMinsb8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MINSW4: per-lane signed min, 4 word lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMinsw4(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMinsw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MINUB8: per-lane unsigned min, 8 byte lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMinub8(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMinub8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MINUW4: per-lane unsigned min, 4 word lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMinuw4(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMinuw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MAXUB8: per-lane unsigned max, 8 byte lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMaxub8(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMaxub8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MAXUW4: per-lane unsigned max, 4 word lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMaxuw4(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMaxuw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MAXSB8: per-lane signed max, 8 byte lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMaxsb8(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMaxsb8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MAXSW4: per-lane signed max, 4 word lanes
 AXP_HOT AXP_FLATTEN
-BoxResult execMaxsw4(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMaxsw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FTOIT: FP T-format -> integer register move
 AXP_HOT AXP_FLATTEN
-BoxResult execFtoit(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFtoit(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
-// FTOIS: FP S-format -> integer register move (AARM: Rc<31:0> = Fav<63:62>||Fav<58:29>, SEXT); audit CM-3 2026-07-28
+// FTOIS: FP S-format -> integer register move
 AXP_HOT AXP_FLATTEN
-BoxResult execFtois(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFtois(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 } // namespace eBox
 
@@ -505,999 +505,999 @@ using coreLib::InstructionGrain;
 
 // SQRTF_C: VAX SQRTF/C
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtfC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_C: IEEE SQRTS/C
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG_C: VAX SQRTG/C
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtgC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_C: IEEE SQRTT/C
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_M: IEEE SQRTS/M
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsM(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_M: IEEE SQRTT/M
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttM(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTF: VAX SQRTF
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS: Square root S_floating
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrts(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG: VAX SQRTG
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT: Square root T_floating
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_D: IEEE SQRTS/D
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsD(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_D: IEEE SQRTT/D
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttD(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTF_UC: VAX SQRTF/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtfUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_UC: IEEE SQRTS/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG_UC: VAX SQRTG/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtgUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_UC: IEEE SQRTT/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_UM: IEEE SQRTS/UM
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsUm(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsUm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_UM: IEEE SQRTT/UM
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttUm(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttUm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTF_U: VAX SQRTF/U
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtfU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_U: IEEE SQRTS/U
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG_U: VAX SQRTG/U
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtgU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_U: IEEE SQRTT/U
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_UD: IEEE SQRTS/UD
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsUd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsUd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_UD: IEEE SQRTT/UD
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttUd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttUd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTF_SC: VAX SQRTF/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtfSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG_SC: VAX SQRTG/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtgSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTF_S: VAX SQRTF/S
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtfS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG_S: VAX SQRTG/S
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtgS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTF_SUC: VAX SQRTF/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SUC: IEEE SQRTS/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG_SUC: VAX SQRTG/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SUC: IEEE SQRTT/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SUM: IEEE SQRTS/SUM
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSum(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSum(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SUM: IEEE SQRTT/SUM
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSum(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSum(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTF_SU: VAX SQRTF/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtfSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SU: IEEE SQRTS/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTG_SU: VAX SQRTG/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtgSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SU: IEEE SQRTT/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SUD: IEEE SQRTS/SUD
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSud(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSud(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SUD: IEEE SQRTT/SUD
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSud(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSud(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SUIC: IEEE SQRTS/SUIC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSuic(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SUIC: IEEE SQRTT/SUIC
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSuic(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SUIM: IEEE SQRTS/SUIM
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSuim(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SUIM: IEEE SQRTT/SUIM
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSuim(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SUI: IEEE SQRTS/SUI
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSui(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SUI: IEEE SQRTT/SUI
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSui(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTS_SUID: IEEE SQRTS/SUID
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrtsSuid(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrtsSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SQRTT_SUID: IEEE SQRTT/SUID
 AXP_HOT AXP_FLATTEN
-BoxResult execSqrttSuid(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSqrttSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF_C: VAX ADDF/C
 AXP_HOT AXP_FLATTEN
-BoxResult execAddfC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF_C: VAX SUBF/C
 AXP_HOT AXP_FLATTEN
-BoxResult execSubfC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF_C: VAX MULF/C
 AXP_HOT AXP_FLATTEN
-BoxResult execMulfC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF_C: VAX DIVF/C
 AXP_HOT AXP_FLATTEN
-BoxResult execDivfC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG_C: VAX CVTDG/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdgC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG_C: VAX ADDG/C
 AXP_HOT AXP_FLATTEN
-BoxResult execAddgC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG_C: VAX SUBG/C
 AXP_HOT AXP_FLATTEN
-BoxResult execSubgC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG_C: VAX MULG/C
 AXP_HOT AXP_FLATTEN
-BoxResult execMulgC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG_C: VAX DIVG/C
 AXP_HOT AXP_FLATTEN
-BoxResult execDivgC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF_C: VAX CVTGF/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgfC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD_C: VAX CVTGD/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgdC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgdC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ_C: VAX CVTGQ/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgqC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgqC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQF_C: VAX CVTQF/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqfC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqfC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQG_C: VAX CVTQG/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqgC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqgC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF: VAX ADDF
 AXP_HOT AXP_FLATTEN
-BoxResult execAddf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF: VAX SUBF
 AXP_HOT AXP_FLATTEN
-BoxResult execSubf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF: VAX MULF
 AXP_HOT AXP_FLATTEN
-BoxResult execMulf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF: VAX DIVF
 AXP_HOT AXP_FLATTEN
-BoxResult execDivf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG: VAX CVTDG
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG: VAX ADDG
 AXP_HOT AXP_FLATTEN
-BoxResult execAddg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG: VAX SUBG
 AXP_HOT AXP_FLATTEN
-BoxResult execSubg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG: VAX MULG
 AXP_HOT AXP_FLATTEN
-BoxResult execMulg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG: VAX DIVG
 AXP_HOT AXP_FLATTEN
-BoxResult execDivg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPGEQ: VAX CMPGEQ
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpgeq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpgeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPGLT: VAX CMPGLT
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpglt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpglt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPGLE: VAX CMPGLE
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpgle(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpgle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF: VAX CVTGF
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD: VAX CVTGD
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ: VAX CVTGQ
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQF: VAX CVTQF
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQG: VAX CVTQG
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF_UC: VAX ADDF/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execAddfUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF_UC: VAX SUBF/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execSubfUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF_UC: VAX MULF/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execMulfUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF_UC: VAX DIVF/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execDivfUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG_UC: VAX CVTDG/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdgUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG_UC: VAX ADDG/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execAddgUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG_UC: VAX SUBG/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execSubgUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG_UC: VAX MULG/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execMulgUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG_UC: VAX DIVG/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execDivgUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivgUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF_UC: VAX CVTGF/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgfUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgfUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD_UC: VAX CVTGD/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgdUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgdUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ_VC: VAX CVTGQ/VC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgqVc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgqVc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF_U: VAX ADDF/U
 AXP_HOT AXP_FLATTEN
-BoxResult execAddfU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF_U: VAX SUBF/U
 AXP_HOT AXP_FLATTEN
-BoxResult execSubfU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF_U: VAX MULF/U
 AXP_HOT AXP_FLATTEN
-BoxResult execMulfU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF_U: VAX DIVF/U
 AXP_HOT AXP_FLATTEN
-BoxResult execDivfU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG_U: VAX CVTDG/U
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdgU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG_U: VAX ADDG/U
 AXP_HOT AXP_FLATTEN
-BoxResult execAddgU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG_U: VAX SUBG/U
 AXP_HOT AXP_FLATTEN
-BoxResult execSubgU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG_U: VAX MULG/U
 AXP_HOT AXP_FLATTEN
-BoxResult execMulgU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG_U: VAX DIVG/U
 AXP_HOT AXP_FLATTEN
-BoxResult execDivgU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivgU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF_U: VAX CVTGF/U
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgfU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgfU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD_U: VAX CVTGD/U
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgdU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgdU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ_V: VAX CVTGQ/V
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF_SC: VAX ADDF/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execAddfSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF_SC: VAX SUBF/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execSubfSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF_SC: VAX MULF/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execMulfSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF_SC: VAX DIVF/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execDivfSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG_SC: VAX CVTDG/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdgSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG_SC: VAX ADDG/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execAddgSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG_SC: VAX SUBG/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execSubgSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG_SC: VAX MULG/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execMulgSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG_SC: VAX DIVG/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execDivgSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivgSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF_SC: VAX CVTGF/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgfSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgfSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD_SC: VAX CVTGD/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgdSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgdSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ_SC: VAX CVTGQ/SC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgqSc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgqSc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF_S: VAX ADDF/S
 AXP_HOT AXP_FLATTEN
-BoxResult execAddfS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF_S: VAX SUBF/S
 AXP_HOT AXP_FLATTEN
-BoxResult execSubfS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF_S: VAX MULF/S
 AXP_HOT AXP_FLATTEN
-BoxResult execMulfS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF_S: VAX DIVF/S
 AXP_HOT AXP_FLATTEN
-BoxResult execDivfS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG_S: VAX CVTDG/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdgS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG_S: VAX ADDG/S
 AXP_HOT AXP_FLATTEN
-BoxResult execAddgS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG_S: VAX SUBG/S
 AXP_HOT AXP_FLATTEN
-BoxResult execSubgS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG_S: VAX MULG/S
 AXP_HOT AXP_FLATTEN
-BoxResult execMulgS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG_S: VAX DIVG/S
 AXP_HOT AXP_FLATTEN
-BoxResult execDivgS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivgS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPGEQ_S: VAX CMPGEQ/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpgeqS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpgeqS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPGLT_S: VAX CMPGLT/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpgltS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpgltS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPGLE_S: VAX CMPGLE/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpgleS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpgleS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF_S: VAX CVTGF/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgfS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgfS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD_S: VAX CVTGD/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgdS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgdS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ_S: VAX CVTGQ/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgqS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgqS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF_SUC: VAX ADDF/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execAddfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF_SUC: VAX SUBF/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execSubfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF_SUC: VAX MULF/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execMulfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF_SUC: VAX DIVF/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execDivfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG_SUC: VAX CVTDG/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG_SUC: VAX ADDG/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execAddgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG_SUC: VAX SUBG/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execSubgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG_SUC: VAX MULG/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execMulgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG_SUC: VAX DIVG/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execDivgSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivgSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF_SUC: VAX CVTGF/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgfSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgfSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD_SUC: VAX CVTGD/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgdSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgdSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ_SVC: VAX CVTGQ/SVC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgqSvc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgqSvc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDF_SU: VAX ADDF/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execAddfSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBF_SU: VAX SUBF/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execSubfSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULF_SU: VAX MULF/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execMulfSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVF_SU: VAX DIVF/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execDivfSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTDG_SU: VAX CVTDG/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtdgSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtdgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDG_SU: VAX ADDG/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execAddgSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBG_SU: VAX SUBG/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execSubgSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULG_SU: VAX MULG/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execMulgSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMulgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVG_SU: VAX DIVG/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execDivgSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivgSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGF_SU: VAX CVTGF/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgfSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgfSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGD_SU: VAX CVTGD/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgdSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgdSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTGQ_SV: VAX CVTGQ/SV
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtgqSv(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtgqSv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDS_C: IEEE ADDS (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execAdds(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAdds(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBS_C: IEEE SUBS (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execSubs(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULS_C: IEEE MULS (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execMuls(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMuls(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVS_C: IEEE DIVS (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execDivs(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ADDT_C: IEEE ADDT (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execAddt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAddt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SUBT_C: IEEE SUBT (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execSubt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSubt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MULT_C: IEEE MULT (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execMult(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMult(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DIVT_C: IEEE DIVT (chopped)
 AXP_HOT AXP_FLATTEN
-BoxResult execDivt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDivt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_C: IEEE CVTTS/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_C: IEEE CVTTQ/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS_C: IEEE CVTQS/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqsC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqsC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT_C: IEEE CVTQT/C
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqtC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqtC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_M: IEEE CVTTS/M
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsM(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_M: IEEE CVTTQ/M
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqM(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS_M: IEEE CVTQS/M
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqsM(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqsM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT_M: IEEE CVTQT/M
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqtM(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqtM(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTUN: IEEE compare unordered (T)
 AXP_HOT AXP_FLATTEN
-BoxResult execCmptun(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmptun(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTEQ: IEEE compare equal (T)
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpteq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpteq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTLT: IEEE compare less than (T)
 AXP_HOT AXP_FLATTEN
-BoxResult execCmptlt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmptlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTLE: IEEE compare less or equal (T)
 AXP_HOT AXP_FLATTEN
-BoxResult execCmptle(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmptle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS: Convert T_floating to S_floating
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtts(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ: Convert T_floating to quadword
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS: Convert quadword to S_floating
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqs(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT: Convert quadword to T_floating
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_D: IEEE CVTTS/D
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsD(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_D: IEEE CVTTQ/D
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqD(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS_D: IEEE CVTQS/D
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqsD(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqsD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT_D: IEEE CVTQT/D
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqtD(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqtD(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_UC: IEEE CVTTS/UC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsUc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsUc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_VC: IEEE CVTTQ/VC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqVc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqVc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_UM: IEEE CVTTS/UM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsUm(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsUm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_VM: IEEE CVTTQ/VM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqVm(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqVm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_U: IEEE CVTTS/U
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_V: IEEE CVTTQ/V
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_UD: IEEE CVTTS/UD
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsUd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsUd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_VD: IEEE CVTTQ/VD
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqVd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqVd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTST: Convert S_floating to T_floating
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtst(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtst(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SUC: IEEE CVTTS/SUC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSuc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSuc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SVC: IEEE CVTTQ/SVC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSvc(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSvc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SUM: IEEE CVTTS/SUM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSum(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSum(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SVM: IEEE CVTTQ/SVM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSvm(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSvm(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTUN_SU: IEEE CMPTUN/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCmptunSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmptunSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTEQ_SU: IEEE CMPTEQ/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCmpteqSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmpteqSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTLT_SU: IEEE CMPTLT/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCmptltSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmptltSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CMPTLE_SU: IEEE CMPTLE/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCmptleSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCmptleSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SU: IEEE CVTTS/SU
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SV: IEEE CVTTQ/SV
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSv(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SUD: IEEE CVTTS/SUD
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSud(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSud(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SVD: IEEE CVTTQ/SVD
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSvd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSvd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTST_S: IEEE CVTST/S
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtstS(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtstS(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SUIC: IEEE CVTTS/SUIC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSuic(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SVIC: IEEE CVTTQ/SVIC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSvic(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSvic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS_SUIC: IEEE CVTQS/SUIC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqsSuic(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqsSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT_SUIC: IEEE CVTQT/SUIC
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqtSuic(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqtSuic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SUIM: IEEE CVTTS/SUIM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSuim(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SVIM: IEEE CVTTQ/SVIM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSvim(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSvim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS_SUIM: IEEE CVTQS/SUIM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqsSuim(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqsSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT_SUIM: IEEE CVTQT/SUIM
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqtSuim(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqtSuim(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SUI: IEEE CVTTS/SUI
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSui(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SVI: IEEE CVTTQ/SVI
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSvi(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSvi(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS_SUI: IEEE CVTQS/SUI
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqsSui(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqsSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT_SUI: IEEE CVTQT/SUI
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqtSui(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqtSui(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTS_SUID: IEEE CVTTS/SUID
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttsSuid(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttsSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTTQ_SVID: IEEE CVTTQ/SVID
 AXP_HOT AXP_FLATTEN
-BoxResult execCvttqSvid(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvttqSvid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQS_SUID: IEEE CVTQS/SUID
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqsSuid(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqsSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQT_SUID: IEEE CVTQT/SUID
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqtSuid(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqtSuid(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTLQ: convert longword to quadword (FP-reg integer reformat)
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtlq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtlq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CPYS: copy with sign of Ra
 AXP_HOT AXP_FLATTEN
-BoxResult execCpys(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCpys(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CPYSN: copy with negated sign of Ra
 AXP_HOT AXP_FLATTEN
-BoxResult execCpysn(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCpysn(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CPYSE: copy sign+exp of Ra, fraction of Rb
 AXP_HOT AXP_FLATTEN
-BoxResult execCpyse(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCpyse(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MT_FPCR: move Ra to FPCR
 AXP_HOT AXP_FLATTEN
-BoxResult execMtFpcr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtFpcr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MF_FPCR: move FPCR to Rc
 AXP_HOT AXP_FLATTEN
-BoxResult execMfFpcr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfFpcr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FCMOVEQ: FP conditional move if Fa == 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFcmoveq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFcmoveq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FCMOVNE: FP conditional move if Fa != 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFcmovne(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFcmovne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FCMOVLT: FP conditional move if Fa < 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFcmovlt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFcmovlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FCMOVGE: FP conditional move if Fa >= 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFcmovge(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFcmovge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FCMOVLE: FP conditional move if Fa <= 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFcmovle(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFcmovle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FCMOVGT: FP conditional move if Fa > 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFcmovgt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFcmovgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQL: convert quadword to longword (FP-reg integer reformat)
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtql(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQL_V: convert quadword to longword, overflow enable
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqlV(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqlV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CVTQL_SV: convert quadword to longword, sw completion + overflow
 AXP_HOT AXP_FLATTEN
-BoxResult execCvtqlSv(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCvtqlSv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDF: VAX F_floating load: 32-bit memory -> 64-bit Fa register
 AXP_HOT AXP_FLATTEN
-BoxResult execLdf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDG: VAX G_floating load: 64-bit memory -> 64-bit Fa register
 AXP_HOT AXP_FLATTEN
-BoxResult execLdg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDS: IEEE S_floating load: 32-bit memory -> 64-bit Fa register (expanded)
 AXP_HOT AXP_FLATTEN
-BoxResult execLds(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLds(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDT: IEEE T_floating load: 64-bit memory -> 64-bit Fa register
 AXP_HOT AXP_FLATTEN
-BoxResult execLdt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STF: VAX F_floating store: 64-bit Fa register -> 32-bit memory
 AXP_HOT AXP_FLATTEN
-BoxResult execStf(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STG: VAX G_floating store: 64-bit Fa register -> 64-bit memory
 AXP_HOT AXP_FLATTEN
-BoxResult execStg(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STS: IEEE S_floating store: 64-bit Fa register -> 32-bit memory (collapsed)
 AXP_HOT AXP_FLATTEN
-BoxResult execSts(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STT: IEEE T_floating store: 64-bit Fa register -> 64-bit memory
 AXP_HOT AXP_FLATTEN
-BoxResult execStt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FBEQ: branch if Fa == 0.0 (signed zero counts)
 AXP_HOT AXP_FLATTEN
-BoxResult execFbeq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFbeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FBLT: branch if Fa < 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFblt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFblt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FBLE: branch if Fa <= 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFble(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFble(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FBNE: branch if Fa != 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFbne(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFbne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FBGE: branch if Fa >= 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFbge(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFbge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FBGT: branch if Fa > 0.0
 AXP_HOT AXP_FLATTEN
-BoxResult execFbgt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFbgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 } // namespace fBox
 
@@ -1512,79 +1512,79 @@ using coreLib::InstructionGrain;
 
 // LDA: load address: Ra <- Rb + sext(disp); no memory access
 AXP_HOT AXP_FLATTEN
-BoxResult execLda(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLda(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDAH: load address high: Ra <- Rb + (sext(disp) << 16); no memory access
 AXP_HOT AXP_FLATTEN
-BoxResult execLdah(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdah(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDBU: load byte unsigned: Ra <- zero_extend(Mem[EA]<7:0>)
 AXP_HOT AXP_FLATTEN
-BoxResult execLdbu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdbu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDQ_U: load quadword unaligned: EA force-aligned by clearing low 3 bits
 AXP_HOT AXP_FLATTEN
-BoxResult execLdqU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdqU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDWU: load word unsigned: Ra <- zero_extend(Mem[EA]<15:0>)
 AXP_HOT AXP_FLATTEN
-BoxResult execLdwu(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdwu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STW: 16-bit store (word)
 AXP_HOT AXP_FLATTEN
-BoxResult execStw(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STB: 8-bit store (byte)
 AXP_HOT AXP_FLATTEN
-BoxResult execStb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STQ_U: store quadword unaligned: EA force-aligned by clearing low 3 bits
 AXP_HOT AXP_FLATTEN
-BoxResult execStqU(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStqU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // FETCH: prefetch hint
 AXP_HOT AXP_FLATTEN
-BoxResult execFetch(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execFetch(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // HW_LD: PALmode load with hint bits
 AXP_HOT AXP_FLATTEN
-BoxResult execHwLd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execHwLd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // HW_ST: PALmode store with hint bits
 AXP_HOT AXP_FLATTEN
-BoxResult execHwSt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execHwSt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDL: sign-extended 32-bit load: Ra <- sext_32(Mem[EA])
 AXP_HOT AXP_FLATTEN
-BoxResult execLdl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDQ: 64-bit aligned load
 AXP_HOT AXP_FLATTEN
-BoxResult execLdq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDL_L: sign-extended longword load locked
 AXP_HOT AXP_FLATTEN
-BoxResult execLdlL(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdlL(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDQ_L: quadword load locked
 AXP_HOT AXP_FLATTEN
-BoxResult execLdqL(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdqL(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STL: 32-bit aligned store
 AXP_HOT AXP_FLATTEN
-BoxResult execStl(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STQ: 64-bit aligned store
 AXP_HOT AXP_FLATTEN
-BoxResult execStq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STL_C: store longword conditional; writes Ra with success indicator
 AXP_HOT AXP_FLATTEN
-BoxResult execStlC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStlC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STQ_C: store quadword conditional; writes Ra with success indicator
 AXP_HOT AXP_FLATTEN
-BoxResult execStqC(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStqC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 } // namespace mBox
 
@@ -1599,23 +1599,23 @@ using coreLib::InstructionGrain;
 
 // TRAPB: trap barrier; serializes precise traps
 AXP_HOT AXP_FLATTEN
-BoxResult execTrapb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execTrapb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // EXCB: exception barrier
 AXP_HOT AXP_FLATTEN
-BoxResult execExcb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execExcb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MB: memory barrier
 AXP_HOT AXP_FLATTEN
-BoxResult execMb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WMB: write memory barrier
 AXP_HOT AXP_FLATTEN
-BoxResult execWmb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWmb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // ECB: evict cache block
 AXP_HOT AXP_FLATTEN
-BoxResult execEcb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execEcb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 } // namespace cBox
 
@@ -1630,446 +1630,446 @@ using coreLib::InstructionGrain;
 
 // HALT: halt processor; 3 personalities (AARM C-15: HALT/halt/halt)
 AXP_HOT AXP_FLATTEN
-BoxResult execHalt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execHalt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CFLUSH: cache flush; 3 personalities (VMS:CFLUSH, Tru64+Linux:cflush)
 AXP_HOT AXP_FLATTEN
-BoxResult execCflush(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCflush(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // DRAINA: drain aborts; 3 personalities (VMS:DRAINA, Tru64+Linux:draina); REQUIRED per AARM C-16
 AXP_HOT AXP_FLATTEN
-BoxResult execDraina(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execDraina(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // LDQP: load quadword physical intrinsic; R0 := mem[R16] (8 bytes, physical addressing); VMS-only per AARM C-15 (Tru64/Linux: --)
 AXP_HOT AXP_FLATTEN
-BoxResult execLdqp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execLdqp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // STQP: store quadword physical intrinsic; mem[R16] := R17 (8 bytes, physical addressing); VMS-only per AARM C-15 (Tru64/Linux: --)
 AXP_HOT AXP_FLATTEN
-BoxResult execStqp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execStqp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SWPCTX: swap process context (VMS); R16=new HWPCB PA, R0=old PTBR; distinct from Tru64 swpctx at 0x30 (DIFFERENT opcode); v1 leaf is forward-looking stub (palBoxLib/grains/PalEntries.cpp execSwpctx_vms) -- needs CpuState shadow regs + leaf-side memory accessor
 AXP_HOT AXP_FLATTEN
-BoxResult execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSwpctx_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_ASN: read processor register ASN (address space number)
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprAsn_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprAsn_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_ASTEN: write processor register ASTEN (AST enable)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprAsten_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprAsten_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_ASTSR: write processor register ASTSR (AST summary)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprAstsr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprAstsr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CSERVE: console service intrinsic; inline-executed, no PAL transfer; R16=func, R0=result; 3 personalities (VMS:CSERVE, Tru64+Linux:cserve)
 AXP_HOT AXP_FLATTEN
-BoxResult execCserve(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCserve(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SWPPAL: swap PALcode image; 3 personalities (VMS:SWPPAL, Tru64+Linux:swppal)
 AXP_HOT AXP_FLATTEN
-BoxResult execSwppal(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSwppal(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_FEN: read processor register FEN (floating-point enable)
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprFen_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprFen_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_FEN: write processor register FEN (floating-point enable)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprFen_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprFen_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_IPIR: write inter-processor interrupt request (VMS:MTPR_IPIR / Tru64+Linux:wripir); same operation, three personalities
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprIpir(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprIpir(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_IPL: read processor register IPL (interrupt priority level)
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprIpl_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprIpl_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_IPL: write processor register IPL (interrupt priority level)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprIpl_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprIpl_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_MCES: read machine check error summary (VMS:MFPR_MCES / Tru64+Linux:rdmces); same operation, three personalities
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprMces(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprMces(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_MCES: write machine check error summary (VMS:MTPR_MCES / Tru64+Linux:wrmces); same operation, three personalities
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprMces(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprMces(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_PCBB: read process control block base
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprPcbb_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprPcbb_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_PRBR: read processor base register
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprPrbr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprPrbr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_PRBR: write processor base register
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprPrbr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprPrbr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_PTBR: read page table base register
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprPtbr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprPtbr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_SCBB: read system control block base; V4 v1 intrinsic returns cpu.scbb in R0 (palBoxLib/grains/PalEntries.cpp execMfprScbb); SCB layout in deviceLib/Scb.h per AARM 14.6
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprScbb_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprScbb_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_SCBB: write system control block base; V4 v1 intrinsic stores R16 into cpu.scbb (palBoxLib/grains/PalEntries.cpp execMtprScbb)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprScbb_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprScbb_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_SIRR: write software interrupt request
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprSirr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprSirr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_SISR: read software interrupt summary
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprSisr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprSisr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_TBCHK: check translation buffer for entry
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprTbchk_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprTbchk_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_TBIA: invalidate all translation buffer entries
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprTbia_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprTbia_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_TBIAP: invalidate all process TB entries (ASM=0)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprTbiap_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprTbiap_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_TBIS: invalidate single TB entry
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprTbis_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprTbis_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_ESP: read executive stack pointer
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprEsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprEsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_ESP: write executive stack pointer
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprEsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprEsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_SSP: read supervisor stack pointer
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprSsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprSsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_SSP: write supervisor stack pointer
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprSsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprSsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_USP: read user stack pointer (VMS); distinct from Tru64 RDUSP at 0x3A (DIFFERENT opcode)
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprUsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprUsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_USP: write user stack pointer (VMS); distinct from Tru64 WRUSP at 0x38 (DIFFERENT opcode)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprUsp_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprUsp_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_TBISD: invalidate single TB entry (data stream)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprTbisd_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprTbisd_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_TBISI: invalidate single TB entry (instruction stream)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprTbisi_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprTbisi_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_ASTEN: read AST enable register
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprAsten_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprAsten_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_ASTSR: read AST summary register
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprAstsr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprAstsr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_VPTB: read Virtual Page Table Base intrinsic; R0 := cpu.vptb; VMS-only per AARM C-15 (Tru64/Linux: --)
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprVptb_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprVptb_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_VPTB: write Virtual Page Table Base intrinsic; cpu.vptb := R16; VMS-only per AARM C-15 (Tru64/Linux: --)
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprVptb_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprVptb_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_PERFMON: VMS:MTPR_PERFMON (write performance monitor) / Tru64+Linux:wrfen (write FP enable) -- DIFFERENT operations same opcode 0x2B; runtime must dispatch on personality
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprPerfmon(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprPerfmon(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WRVPTPTR: write virtual page table pointer (Tru64+Linux); no VMS counterpart at 0x2D
 AXP_HOT AXP_FLATTEN
-BoxResult execWrvptptr_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWrvptptr_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MTPR_DATFX: VMS:MTPR_DATFX (write data align trap fixup enable) / Tru64:wrasn (write ASN); Linux: not supported -- DIFFERENT operations same opcode 0x2E
 AXP_HOT AXP_FLATTEN
-BoxResult execMtprDatfx(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMtprDatfx(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_VIRBND: VMS:MFPR_VIRBND (read virtual addr boundary; optional ext, AARM 13.3.24; AARM TOC has typo MFPT_VIRBND, normalized) / Tru64+Linux:swpctx (swap process context) -- DIFFERENT operations same opcode 0x30
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprVirbnd(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprVirbnd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WRVAL: write system value (Tru64+Linux); no VMS counterpart at 0x31
 AXP_HOT AXP_FLATTEN
-BoxResult execWrval_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWrval_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_SYSPTBR: VMS:MFPR_SYSPTBR (read system page table base; optional ext, AARM 13.3.18) / Tru64+Linux:rdval (read system value) -- DIFFERENT operations same opcode 0x32
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprSysptbr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprSysptbr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // TBI: translation buffer invalidate (Tru64+Linux); no VMS counterpart at 0x33
 AXP_HOT AXP_FLATTEN
-BoxResult execTbi_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execTbi_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WRENT: write system entry vector (Tru64+Linux); no VMS counterpart at 0x34
 AXP_HOT AXP_FLATTEN
-BoxResult execWrent_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWrent_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SWPIPL: swap interrupt priority level (Tru64+Linux); no VMS counterpart at 0x35
 AXP_HOT AXP_FLATTEN
-BoxResult execSwpipl_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSwpipl_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RDPS: read processor status (Tru64+Linux); distinct from VMS unprivileged RD_PS at 0x91 (DIFFERENT opcode)
 AXP_HOT AXP_FLATTEN
-BoxResult execRdps_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRdps_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WRKGP: write kernel global pointer (Tru64+Linux); no VMS counterpart at 0x37
 AXP_HOT AXP_FLATTEN
-BoxResult execWrkgp_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWrkgp_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WRUSP: write user stack pointer (Tru64+Linux); distinct from VMS MTPR_USP at 0x23 (DIFFERENT opcode)
 AXP_HOT AXP_FLATTEN
-BoxResult execWrusp_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWrusp_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WRPERFMON: write performance monitor (Tru64+Linux); no VMS counterpart at 0x39
 AXP_HOT AXP_FLATTEN
-BoxResult execWrperfmon_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWrperfmon_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RDUSP: read user stack pointer (Tru64+Linux); distinct from VMS MFPR_USP at 0x22 (DIFFERENT opcode)
 AXP_HOT AXP_FLATTEN
-BoxResult execRdusp_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRdusp_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WHAMI: read CPU ID (Tru64+Linux); divert to PAL, body returns whami in R0; distinct from VMS MFPR_WHAMI at 0x3F (DIFFERENT opcode)
 AXP_HOT AXP_FLATTEN
-BoxResult execWhami_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWhami_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RETSYS: return from system call (Tru64+Linux); no VMS counterpart at 0x3D
 AXP_HOT AXP_FLATTEN
-BoxResult execRetsys_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRetsys_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WTINT: wait for interrupt intrinsic; 3 personalities (AARM C-15: WTINT/wtint/wtint); V4 has no interrupt source so returns 0 in R0 immediately
 AXP_HOT AXP_FLATTEN
-BoxResult execWtint(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWtint(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // MFPR_WHAMI: VMS:MFPR_WHAMI (read CPU ID) / Tru64+Linux:rti (return from trap/interrupt) -- DIFFERENT operations same opcode 0x3F; V4 v1 has VMS WHAMI intrinsic at this opcode (palBoxLib/grains/PalEntries.cpp execMfprWhami) -- Tru64/Linux RTI not yet implemented
 AXP_HOT AXP_FLATTEN
-BoxResult execMfprWhami(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execMfprWhami(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BPT: breakpoint trap; 3 personalities (AARM C-15: BPT/bpt/bpt)
 AXP_HOT AXP_FLATTEN
-BoxResult execBpt(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBpt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // BUGCHK: bug check (VMS only)
 AXP_HOT AXP_FLATTEN
-BoxResult execBugchk_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBugchk_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CHME: change mode to executive (VMS only)
 AXP_HOT AXP_FLATTEN
-BoxResult execChme_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execChme_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CHMK: change mode to kernel (Tru64+Linux: callsys) / VMS: CHMK; 3 personalities at opcode 0x83
 AXP_HOT AXP_FLATTEN
-BoxResult execChmk(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execChmk(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CHMS: change mode to supervisor (VMS only)
 AXP_HOT AXP_FLATTEN
-BoxResult execChms_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execChms_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CHMU: change mode to user (VMS only)
 AXP_HOT AXP_FLATTEN
-BoxResult execChmu_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execChmu_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // IMB: instruction memory barrier; 3 personalities (VMS:IMB, Tru64+Linux:imb); REQUIRED per AARM C-16
 AXP_HOT AXP_FLATTEN
-BoxResult execImb(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execImb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQHIL: insert into queue at head, longword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqhil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqhil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQTIL: insert into queue at tail, longword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqtil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqtil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQHIQ: insert into queue at head, quadword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqhiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqhiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQTIQ: insert into queue at tail, quadword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqtiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqtiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQUEL: insert into queue, longword
 AXP_HOT AXP_FLATTEN
-BoxResult execInsquel_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsquel_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQUEQ: insert into queue, quadword
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqueq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqueq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQUEL_D: insert into queue (deferred), longword (AARM mnemonic: INSQUEL/D; slash replaced with underscore for codegen)
 AXP_HOT AXP_FLATTEN
-BoxResult execInsquelD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsquelD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQUEQ_D: insert into queue (deferred), quadword (AARM mnemonic: INSQUEQ/D)
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqueqD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqueqD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // PROBER: probe for read access
 AXP_HOT AXP_FLATTEN
-BoxResult execProber_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execProber_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // PROBEW: probe for write access
 AXP_HOT AXP_FLATTEN
-BoxResult execProbew_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execProbew_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RD_PS: read processor status (VMS unprivileged); distinct from Tru64 RDPS at 0x36 (DIFFERENT opcode)
 AXP_HOT AXP_FLATTEN
-BoxResult execRdPs_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRdPs_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REI: VMS:REI (return from exception/interrupt) / Tru64:urti (user-level RTI); Linux: not supported -- DIFFERENT operations same opcode 0x92
 AXP_HOT AXP_FLATTEN
-BoxResult execRei(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRei(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQHIL: remove from queue at head, longword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqhil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqhil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQTIL: remove from queue at tail, longword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqtil_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqtil_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQHIQ: remove from queue at head, quadword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqhiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqhiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQTIQ: remove from queue at tail, quadword (interlocked)
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqtiq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqtiq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQUEL: remove from queue, longword
 AXP_HOT AXP_FLATTEN
-BoxResult execRemquel_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemquel_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQUEQ: remove from queue, quadword
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqueq_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqueq_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQUEL_D: remove from queue (deferred), longword (AARM mnemonic: REMQUEL/D)
 AXP_HOT AXP_FLATTEN
-BoxResult execRemquelD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemquelD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQUEQ_D: remove from queue (deferred), quadword (AARM mnemonic: REMQUEQ/D)
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqueqD_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqueqD_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // SWASTEN: swap AST enable
 AXP_HOT AXP_FLATTEN
-BoxResult execSwasten_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execSwasten_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WR_PS_SW: write processor status software bits
 AXP_HOT AXP_FLATTEN
-BoxResult execWrPsSw_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWrPsSw_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // RSCC: read system cycle counter
 AXP_HOT AXP_FLATTEN
-BoxResult execRscc_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRscc_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // READ_UNQ: read process unique value (VMS:READ_UNQ / Tru64+Linux:rdunique); same operation, three personalities; thread-local storage primitive
 AXP_HOT AXP_FLATTEN
-BoxResult execReadUnq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execReadUnq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // WRITE_UNQ: write process unique value (VMS:WRITE_UNQ / Tru64+Linux:wrunique); same operation, three personalities; thread-local storage primitive
 AXP_HOT AXP_FLATTEN
-BoxResult execWriteUnq(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execWriteUnq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // AMOVRR: atomic move register-to-register
 AXP_HOT AXP_FLATTEN
-BoxResult execAmovrr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAmovrr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // AMOVRM: atomic move register-to-memory
 AXP_HOT AXP_FLATTEN
-BoxResult execAmovrm_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execAmovrm_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQHILR: insert at head, longword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqhilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqhilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQTILR: insert at tail, longword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqtilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqtilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQHIQR: insert at head, quadword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqhiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqhiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // INSQTIQR: insert at tail, quadword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execInsqtiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execInsqtiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQHILR: remove at head, longword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqhilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqhilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQTILR: remove at tail, longword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqtilr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqtilr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQHIQR: remove at head, quadword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqhiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqhiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // REMQTIQR: remove at tail, quadword, resident-reentrant
 AXP_HOT AXP_FLATTEN
-BoxResult execRemqtiqr_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execRemqtiqr_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // GENTRAP: generate software trap; 3 personalities (VMS:GENTRAP, Tru64+Linux:gentrap)
 AXP_HOT AXP_FLATTEN
-BoxResult execGentrap(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execGentrap(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // CLRFEN: clear floating-point enable; 3 personalities (VMS:CLRFEN, Tru64+Linux:clrfen)
 AXP_HOT AXP_FLATTEN
-BoxResult execClrfen(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execClrfen(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // HW_MFPR: read internal processor register
 AXP_HOT AXP_FLATTEN
-BoxResult execHwMfpr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execHwMfpr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // HW_MTPR: write internal processor register
 AXP_HOT AXP_FLATTEN
-BoxResult execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execHwMtpr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // HW_REI: return from PAL; resume EXC_ADDR
 AXP_HOT AXP_FLATTEN
-BoxResult execHwRei(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execHwRei(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // execBpt_tru64: synthetic hand-written leaf (handwritten.tsv only; no GrainMaster row)
 AXP_HOT AXP_FLATTEN
-BoxResult execBpt_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBpt_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // execBpt_vms: synthetic hand-written leaf (handwritten.tsv only; no GrainMaster row)
 AXP_HOT AXP_FLATTEN
-BoxResult execBpt_vms(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execBpt_vms(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // execCallPalDispatch: synthetic hand-written leaf (handwritten.tsv only; no GrainMaster row)
 AXP_HOT AXP_FLATTEN
-BoxResult execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execCallPalDispatch(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 // execChmk_tru64: synthetic hand-written leaf (handwritten.tsv only; no GrainMaster row)
 AXP_HOT AXP_FLATTEN
-BoxResult execChmk_tru64(InstructionGrain const& g, ExecCtx const& c) noexcept;
+void execChmk_tru64(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept;
 
 } // namespace palBox
