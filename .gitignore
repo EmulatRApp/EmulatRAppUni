@@ -205,3 +205,6 @@ srm_conformance/
 # CMake-generated version header (in-source MSVC build root; source of truth
 # is the project() VERSION line -- see config/emulatr_version.h.in, 2026-08-04)
 /generated/
+__pycache__/
+*.pyc
+logs/
