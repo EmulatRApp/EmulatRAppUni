@@ -384,17 +384,28 @@ struct Ev6Translator
     //   cpu.mode; (2) the PAL-mode-vs-CM effective-mode rule must be
     //   confirmed against the ARM/HRM, not asserted from memory.  Do
     //   NOT add further callers relying on the default.
+    // altCheckMode (added 2026-08-10, JRN-SUPMODE-001 Sec 19): -1 =
+    // ambient (cpu.mode); 0..3 = check at this explicit mode.  Carries
+    // the MODELED DTB_ALT_MODE value for HW_LD TYPE 110/111 and HW_ST
+    // TYPE 110 (EV6 Spec Sec 4.1.1 / 4.1.2: "Access checks use
+    // DTB_ALT_MODE IPR").  This is the ruling's precondition (1): the
+    // Virtual/Alt arm consumes the modeled IPR explicitly -- it never
+    // falls back to ambient mode.  forceKernelChecks (Virtual/VPTE)
+    // takes priority; the two are never set together by the drainer.
     AXP_HOT AXP_FLATTEN
     static TranslationResult translateData(
         coreLib::CpuState const& cpu,
         coreLib::VAType va,
         coreLib::AccessKind access,
         coreLib::PAType& pa_out,
-        bool forceKernelChecks = false) noexcept
+        bool forceKernelChecks = false,
+        int8_t altCheckMode = -1) noexcept
     {
         coreLib::Mode_Privilege const chkMode = forceKernelChecks
             ? coreLib::Mode_Privilege::Kernel
-            : cpu.mode;
+            : (altCheckMode >= 0
+                ? static_cast<coreLib::Mode_Privilege>(altCheckMode & 0x3)
+                : cpu.mode);
         // C5 (2026-05-27): the blanket PAL-mode physical bypass is REMOVED.
         // EV6 PAL mode does NOT disable D-stream translation -- only the
         // explicitly-physical accesses (HW_LD / HW_ST / LDQP / STQP, tagged
@@ -650,7 +661,8 @@ struct Ev6Translator
         uint8_t accessSize,
         coreLib::AccessKind access,
         coreLib::PAType& pa_out,
-        bool forceKernelChecks = false) noexcept
+        bool forceKernelChecks = false,
+        int8_t altCheckMode = -1) noexcept
     {
         // Alignment check is uniform across PAL / non-PAL modes (it runs
         // here, before translateData; a misaligned PAL-mode access trips the
@@ -673,7 +685,8 @@ struct Ev6Translator
             logUnalignedEvent(cpu.cycleCount, cpu.pcAddr(), va,
                               accessSize, cpu.inPalMode());
         }
-        return translateData(cpu, va, access, pa_out, forceKernelChecks);
+        return translateData(cpu, va, access, pa_out, forceKernelChecks,
+                             altCheckMode);
     }
 
 

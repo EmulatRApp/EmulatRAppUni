@@ -451,6 +451,18 @@ struct CpuState
     ASNType  dtbAsn0 = 0;   // DTB_ASN0   (HW_MTPR DTB_ASN0)
     ASNType  dtbAsn1 = 0;   // DTB_ASN1   (HW_MTPR DTB_ASN1)
 
+    // DTB_ALT_MODE (EV6 Spec Rev 2.0 Sec 5.3.3): write-only IPR,
+    // ALT_MODE<1:0> = 00 Kernel / 01 Executive / 10 Supervisor /
+    // 11 User.  Consumed by the HW_LD Virtual/Alt (TYPE 110) and
+    // Virtual/WrChk/Alt (TYPE 111) and HW_ST Virtual/Alt (TYPE 110)
+    // access checks (Spec Sec 4.1.1 / 4.1.2) -- the VMS PAL PROBER/
+    // PROBEW corridor sets this to the probe mode before its check
+    // access.  Modeled 2026-08-10 (JRN-SUPMODE-001 Sec 19): the prior
+    // silent no-op made PROBEW answer "writable" for a UWE-clear page,
+    // defeating DCL's elevation guard -> the Species-A ACCVIO.
+    // Layout change: kCpuStateVersion 11 -> 12 (systemLib/Snapshot.h).
+    uint8_t  dtbAltMode = 0;
+
     // TB PTE_TEMP staging / read-back registers (HRM 5.2.3 / 5.3.3).
     // Single slot per realm: both DTB_PTE0 and DTB_PTE1 writes flow
     // through dtbPteTemp (last-write-wins), and the install operation

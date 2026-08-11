@@ -3187,8 +3187,18 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
     case coreLib::HW_ITB_PTE_TEMP_PROVISIONAL: c.cpu->itbPteTemp = c.opB; break;
     case coreLib::HW_DTB_PTE_TEMP_PROVISIONAL: c.cpu->dtbPteTemp = c.opB; break;
 
-        // ---- MBox writes (silent no-op) ----
+        // DTB_ALT_MODE write (EV6 Spec Rev 2.0 Sec 5.3.3): store
+        // ALT_MODE<1:0> for the HW_LD/HW_ST Virtual/Alt access checks.
+        // Modeled 2026-08-10 (JRN-SUPMODE-001 Sec 19) -- the prior
+        // silent no-op made the VMS PAL PROBEW corridor's alt-mode
+        // write-check pass unconditionally: DCL's PROBEW(mode=User,
+        // 7FF9DE90) answered 1 where the PTE (UWE clear) says 0, DCL
+        // skipped its CHMS elevation, wrote at User -> Species A.
     case coreLib::HW_DTB_ALTMODE:
+        c.cpu->dtbAltMode = static_cast<uint8_t>(c.opB & 0x3u);
+        break;
+
+        // ---- MBox writes (silent no-op) ----
     case coreLib::HW_DC_CTL:
     case coreLib::HW_DC_STAT:      // architecturally read-only; permissive
         break;

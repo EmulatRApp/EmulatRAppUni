@@ -347,14 +347,51 @@ private:
             // kernel-only page-table PTE -> dfault-of-ld_vpte -> the VMS
             // PAL's HALT 4 "invalid PTBR" (trap__ldvpte_dfault,
             // ev6_vms_pal.mar:5689).  Fixed 2026-08-09, JRN-AST-001
-            // OBS-4.  (HW_LD/HW_ST Virtual/Alt -- TYPE 11x, checks via
-            // DTB_ALT_MODE -- remains unmodeled: DTB_ALT_MODE writes are
-            // silent no-ops today.  Separate item, same defect family.)
+            // OBS-4.
+            //
+            // HW_LD/HW_ST alternate-mode + write-check TYPE arms
+            // (EV6 Spec Rev 2.0 Sec 4.1.1 / 4.1.2; modeled 2026-08-10,
+            // JRN-SUPMODE-001 Sec 19 -- fourth surfacing of the
+            // access-mode family):
+            //   HW_LD (0x1B) TYPE<15:13>: 101 Virtual/WrChk = "checks
+            //     FOR, FOW, read and write protection"; 110 Virtual/Alt
+            //     and 111 Virtual/WrChk/Alt = "access checks use
+            //     DTB_ALT_MODE IPR".
+            //   HW_ST (0x1F) TYPE: 110 Virtual/Alt.
+            // The VMS PAL PROBER/PROBEW corridor rides these: it sets
+            // DTB_ALT_MODE to the probe mode, then issues the check
+            // access.  Un-modeled, the check passed as a plain
+            // current-mode load -> PROBEW answered "User-writable" for
+            // the KES-write page 7FF9C000 -> DCL skipped its CHMS
+            // elevation -> the Species-A ACCVIO.  WrChk is realized as
+            // a second, write-kind check of the same VA at the same
+            // mode (spec: read AND write protection) -- probe-path
+            // only, so the extra translation is off the hot path.
+            uint32_t const hwType =
+                (slot.grain.primaryOp == 0x1Bu
+                 || slot.grain.primaryOp == 0x1Fu)
+                    ? ((slot.grain.encoded >> 13) & 0x7u)
+                    : 0x0u;
             bool const vpteKernel =
+                slot.grain.primaryOp == 0x1Bu && hwType == 0x2u;
+            bool const useAltMode =
+                (slot.grain.primaryOp == 0x1Bu
+                 && (hwType == 0x6u || hwType == 0x7u))
+                || (slot.grain.primaryOp == 0x1Fu && hwType == 0x6u);
+            bool const writeCheck =
                 slot.grain.primaryOp == 0x1Bu
-                && ((slot.grain.encoded >> 13) & 0x7u) == 0x2u;
+                && (hwType == 0x5u || hwType == 0x7u);
+            int8_t const altMode = useAltMode
+                ? static_cast<int8_t>(cpu.dtbAltMode & 0x3u)
+                : static_cast<int8_t>(-1);
             tr = mmuLib::Ev6Translator::translateDataAligned(
-                cpu, r.memAddr, r.memSize, access, pa, vpteKernel);
+                cpu, r.memAddr, r.memSize, access, pa, vpteKernel,
+                altMode);
+            if (tr == mmuLib::TranslationResult::Success && writeCheck) {
+                tr = mmuLib::Ev6Translator::translateDataAligned(
+                    cpu, r.memAddr, r.memSize,
+                    coreLib::AccessKind::DataWrite, pa, false, altMode);
+            }
         }
 
 #if EMULATR_MEMDIAG

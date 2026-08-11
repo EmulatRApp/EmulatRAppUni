@@ -592,6 +592,7 @@ set(EMULATR_TEST_SOURCES
     tests/iBoxLib/test_controlflow.cpp
     tests/cBoxLib/test_cacheops.cpp
     tests/palBoxLib/test_palentries.cpp
+    tests/mmuLib/test_alt_mode_checks.cpp
     tests/coreLib/test_iprfields.cpp
     tests/coreLib/test_byteops.cpp
     tests/fBoxLib/test_float.cpp
