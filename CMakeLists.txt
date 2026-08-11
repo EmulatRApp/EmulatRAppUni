@@ -38,7 +38,8 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET AND WIN32)
         CACHE STRING "vcpkg target triplet")
 endif()
 
-project(Emulatr VERSION 1.5.12 LANGUAGES C CXX)  # C enabled for the vendored SoftFloat (.c) static lib (task #26).  VERSION feeds CPACK_PACKAGE_VERSION.
+#project(Emulatr VERSION 1.5.12 LANGUAGES C CXX)  # C enabled for the vendored SoftFloat (.c) static lib (task #26).  VERSION feeds CPACK_PACKAGE_VERSION.
+project(Emulatr VERSION 1.5.13 LANGUAGES C CXX)   # Refactored instruction grain execute seam
 # VERSION grammar (H&M topic "EmulatR Version Numbering and Release Stages",
 # 2026-08-04): <stage><major>.<variant>-<build>.  MAJOR=release series,
 # MINOR=appuni variant (5), PATCH=deliberate build number.  Synchronized with
