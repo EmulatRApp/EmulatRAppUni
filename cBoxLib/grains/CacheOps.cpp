@@ -1,17 +1,6 @@
 // ============================================================================
 // cBoxLib/grains/CacheOps.cpp -- cBox barrier and cache-hint executors (v1)
 // ============================================================================
-//
-// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
-//   FILE:     cBoxLib/grains/CacheOps.cpp
-//   FUNCTION: every executor leaf in this file
-//   CHANGE:   leaf ABI return-by-value -> caller-supplied out-parameter.
-//             Signatures gain `BoxResult& out` and return void; body head
-//             `BoxResult r;` -> `BoxResult& r = out;` (field writes stay
-//             byte-identical); `return r;` -> `return;`; helper tail-returns
-//             (fpWrite / execCallPalDispatch) became braced call-then-return
-//             statements.  The caller owns the latch reset -- ownership
-//             contract in coreLib/BoxResult.h.
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -88,22 +77,22 @@ using coreLib::InstructionGrain;
 // instructions.  No-op in v1 (no out-of-order trap queue exists).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execTrapb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execTrapb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
 // EXCB -- exception barrier; serialize exceptions.  No-op in v1.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execExcb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExcb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
-    return;
+    return r;
 }
 
 #pragma endregion Trap and Exception Barriers
@@ -117,11 +106,11 @@ auto execExcb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxR
 // already program-ordered at MEM-stage drain).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execMb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -129,11 +118,11 @@ auto execMb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxRes
 // stores.  No-op in v1.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execWmb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execWmb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
-    return;
+    return r;
 }
 
 #pragma endregion Memory Barriers
@@ -149,11 +138,11 @@ auto execWmb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxRe
 // without taking any architectural register or memory effect.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execEcb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execEcb(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
-    return;
+    return r;
 }
 
 #pragma endregion Cache Hints

@@ -1,17 +1,6 @@
 // ============================================================================
 // eBoxLib/grains/IntArith.cpp -- INTA leaf executors (opcode 0x10)
 // ============================================================================
-//
-// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
-//   FILE:     eBoxLib/grains/IntArith.cpp
-//   FUNCTION: every executor leaf in this file
-//   CHANGE:   leaf ABI return-by-value -> caller-supplied out-parameter.
-//             Signatures gain `BoxResult& out` and return void; body head
-//             `BoxResult r;` -> `BoxResult& r = out;` (field writes stay
-//             byte-identical); `return r;` -> `return;`; helper tail-returns
-//             (fpWrite / execCallPalDispatch) became braced call-then-return
-//             statements.  The caller owns the latch reset -- ownership
-//             contract in coreLib/BoxResult.h.
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -105,7 +94,7 @@ void noteIovNotDelivered(char const* mnem,
 
 #pragma region Miscellaneous Instructions
 AXP_HOT AXP_FLATTEN
-auto execAmask(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execAmask(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // AMASK Rb, Rc (Ra encoded as R31): Rc <- Rb & ~supported_features
     //
@@ -127,12 +116,12 @@ auto execAmask(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 
     const uint64_t result = c.opB & ~kAmask21264;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 #pragma endregion Miscellaneous Instructions
@@ -159,19 +148,19 @@ auto execAmask(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // value.  The leaf is agnostic to that distinction.
 //
 AXP_HOT AXP_FLATTEN
-void execAddl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execAddl(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     int32_t a = static_cast<int32_t>(c.opA);
     int32_t b = static_cast<int32_t>(c.opB);
     int32_t sum32 = a + b;          // 32-bit add; overflow wraps per Alpha SRM
     int64_t result = sum32;         // implicit sign-extension to 64 bits
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Rc
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
     // ----------------------------------------------------------------------------
 // SUBL Ra, Rb, Rc -- 32-bit integer subtract, result sign-extended to 64
@@ -183,19 +172,19 @@ void execAddl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // is the separate execSublV row below).
 //
 AXP_HOT AXP_FLATTEN
-void execSubl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execSubl(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     int32_t a = static_cast<int32_t>(c.opA);
     int32_t b = static_cast<int32_t>(c.opB);
     int32_t diff32 = a - b;
     int64_t result = diff32;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 // ----------------------------------------------------------------------------
 // ADDQ Ra, Rb, Rc -- 64-bit integer add (no sign-extension; full width)
@@ -206,16 +195,16 @@ void execSubl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // Overflow wraps; the _V variant is the separate execAddqV row below.
 //
 AXP_HOT AXP_FLATTEN
-void execAddq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execAddq(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     uint64_t result = c.opA + c.opB;        // unsigned add wraps mod 2^64
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 // ----------------------------------------------------------------------------
 // SUBQ Ra, Rb, Rc -- 64-bit integer subtract
@@ -224,16 +213,16 @@ void execAddq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // Operation: Rc <- Ra - Rb  (modulo 2^64)
 //
 AXP_HOT AXP_FLATTEN
-void execSubq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execSubq(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     uint64_t result = c.opA - c.opB;        // unsigned subtract wraps mod 2^64
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -259,7 +248,7 @@ void execSubq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-void execAddlV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execAddlV(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     alpha_int::IntStatus st;
     int32_t const sum32 = alpha_int::addL(static_cast<int32_t>(c.opA),
@@ -271,16 +260,16 @@ void execAddlV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
         noteIovNotDelivered("ADDL/V", g, s_cnt);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Rc
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execSublV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execSublV(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     alpha_int::IntStatus st;
     int32_t const diff32 = alpha_int::subL(static_cast<int32_t>(c.opA),
@@ -292,16 +281,16 @@ void execSublV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
         noteIovNotDelivered("SUBL/V", g, s_cnt);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execAddqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execAddqV(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     alpha_int::IntStatus st;
     int64_t const result = alpha_int::addQ(static_cast<int64_t>(c.opA),
@@ -313,16 +302,16 @@ void execAddqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
         noteIovNotDelivered("ADDQ/V", g, s_cnt);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execSubqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execSubqV(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     alpha_int::IntStatus st;
     int64_t const result = alpha_int::subQ(static_cast<int64_t>(c.opA),
@@ -334,12 +323,12 @@ void execSubqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
         noteIovNotDelivered("SUBQ/V", g, s_cnt);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 
 
@@ -363,103 +352,103 @@ void execSubqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-void execS4addl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS4addl(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     uint32_t const lo = static_cast<uint32_t>((c.opA << 2) + c.opB);
     int64_t  const sx = static_cast<int64_t>(static_cast<int32_t>(lo));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(sx);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execS4subl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS4subl(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     uint32_t const lo = static_cast<uint32_t>((c.opA << 2) - c.opB);
     int64_t  const sx = static_cast<int64_t>(static_cast<int32_t>(lo));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(sx);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execS8addl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS8addl(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     uint32_t const lo = static_cast<uint32_t>((c.opA << 3) + c.opB);
     int64_t  const sx = static_cast<int64_t>(static_cast<int32_t>(lo));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(sx);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execS8subl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS8subl(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     uint32_t const lo = static_cast<uint32_t>((c.opA << 3) - c.opB);
     int64_t  const sx = static_cast<int64_t>(static_cast<int32_t>(lo));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(sx);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execS4addq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS4addq(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = (c.opA << 2) + c.opB;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execS4subq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS4subq(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = (c.opA << 2) - c.opB;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execS8addq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS8addq(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = (c.opA << 3) + c.opB;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-void execS8subq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execS8subq(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = (c.opA << 3) - c.opB;
-    return;
+    return r;
 }
 
 
@@ -477,82 +466,82 @@ void execS8subq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // 0 otherwise.  Used by branch sequences and conditional moves.
 //
 AXP_HOT AXP_FLATTEN
-void execCmpeq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept
+BoxResult execCmpeq(InstructionGrain const& g, ExecCtx const& c) noexcept
 {
     uint64_t result = (c.opA == c.opB) ? 1u : 0u;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmpult(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmpult(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMPULT Ra, Rb, Rc: Rc <- (Ra < Rb) ? 1 : 0  (unsigned)
     const uint64_t result = (c.opA < c.opB) ? 1ULL : 0ULL;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmpule(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmpule(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMPULE Ra, Rb, Rc: Rc <- (Ra <= Rb) ? 1 : 0  (unsigned)
     const uint64_t result = (c.opA <= c.opB) ? 1ULL : 0ULL;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmplt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmplt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMPLT Ra, Rb, Rc: Rc <- (Ra < Rb) ? 1 : 0  (signed)
     const int64_t a = static_cast<int64_t>(c.opA);
     const int64_t b = static_cast<int64_t>(c.opB);
     const uint64_t result = (a < b) ? 1ULL : 0ULL;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmple(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmple(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMPLE Ra, Rb, Rc: Rc <- (Ra <= Rb) ? 1 : 0  (signed)
     const int64_t a = static_cast<int64_t>(c.opA);
     const int64_t b = static_cast<int64_t>(c.opB);
     const uint64_t result = (a <= b) ? 1ULL : 0ULL;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
 
 AXP_HOT AXP_FLATTEN
-auto execUmulh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execUmulh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // UMULH Ra, Rb, Rc: Rc <- (Ra * Rb) >> 64; upper 64 bits of the
     // unsigned 128-bit product.  All platform-specific math now lives
@@ -562,12 +551,12 @@ auto execUmulh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
     alpha_int::IntStatus st;
     const uint64_t result = alpha_int::umulh(c.opA, c.opB, st);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -579,14 +568,14 @@ auto execUmulh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // trapping form is the separate execMulqV row below).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execMulq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMulq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = c.opA * c.opB;     // unsigned multiply truncated to 64 bits
-    return;
+    return r;
 }
 
 
@@ -599,19 +588,19 @@ auto execMulq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // sign-extend via int32_t -> int64_t.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execMull(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMull(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint32_t const lo32 =
         static_cast<uint32_t>(c.opA) * static_cast<uint32_t>(c.opB);
     int64_t  const sext =
         static_cast<int64_t>(static_cast<int32_t>(lo32));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(sext);
-    return;
+    return r;
 }
 
 
@@ -633,7 +622,7 @@ auto execMull(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execMullV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMullV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     alpha_int::IntStatus st;
     int32_t const lo32 = alpha_int::mulL(static_cast<int32_t>(c.opA),
@@ -645,16 +634,16 @@ auto execMullV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
         noteIovNotDelivered("MULL/V", g, s_cnt);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(sext);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMulqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMulqV(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     alpha_int::IntStatus st;
     int64_t const result = alpha_int::mulQ(static_cast<int64_t>(c.opA),
@@ -666,12 +655,12 @@ auto execMulqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
         noteIovNotDelivered("MULQ/V", g, s_cnt);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 
 #pragma  endregion Comparison Arithmetic Instructions
@@ -680,49 +669,49 @@ auto execMulqV(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 
 
 AXP_HOT AXP_FLATTEN
-auto execCtpop(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCtpop(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CTPOP Rb, Rc: Rc <- popcount(Rb).  FpTiExt rows read only Rb.
     const uint64_t result = static_cast<uint64_t>(BitUtils::popcount(c.opB));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 // CTLZ -- BitUtils form
 AXP_HOT AXP_FLATTEN
-auto execCtlz(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCtlz(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = c.opB
         ? (63ULL - BitUtils::highestSetBit(c.opB))
         : 64ULL;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 // CTTZ -- BitUtils form
 AXP_HOT AXP_FLATTEN
-auto execCttz(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCttz(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = c.opB
         ? static_cast<uint64_t>(BitUtils::lowestSetBit(c.opB))
         : 64ULL;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 #pragma  endregion Bit Count Family Instructions
@@ -737,83 +726,83 @@ auto execCttz(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // The leaf just reads c.opB without knowing or caring where it came from.
 // ====================================================================
 AXP_HOT AXP_FLATTEN
-auto execAnd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execAnd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = c.opA & c.opB;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execBic(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execBic(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // BIC = Bit Clear (AND NOT): Rc <- Ra & ~Rb
     const uint64_t result = c.opA & ~c.opB;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 AXP_HOT AXP_FLATTEN
-auto execBis(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execBis(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // BIS = bitwise OR; canonical Alpha pseudo-MOV is `bis Rs, R31, Rd`.
     const uint64_t result = c.opA | c.opB;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 AXP_HOT AXP_FLATTEN
-auto execEqv(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execEqv(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // EQV = XNOR (Equivalence): result has 1 in every bit position
     // where Ra and Rb agree, 0 where they differ.
     const uint64_t result = ~(c.opA ^ c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 AXP_HOT AXP_FLATTEN
-auto execOrnot(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execOrnot(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // ORNOT: Rc <- Ra | ~Rb
     const uint64_t result = c.opA | ~c.opB;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execXor(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execXor(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = c.opA ^ c.opB;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 #pragma  endregion Logical Operation Instructions
@@ -821,116 +810,116 @@ auto execXor(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // Conditional Move Operations
 // ====================================================================
 AXP_HOT AXP_FLATTEN
-auto execCmoveq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmoveq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVEQ: move if Ra == 0; else Rc unchanged.
     const bool met = (c.opA == 0);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmovne(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmovne(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVNE: move if Ra != 0; else Rc unchanged.
     const bool met = (c.opA != 0);
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmovlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmovlt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVLT: move if Ra < 0 (signed); else Rc unchanged.
     const bool met = (static_cast<int64_t>(c.opA) < 0);
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmovge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmovge(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVGE: move if Ra >= 0 (signed); else Rc unchanged.
     const bool met = (static_cast<int64_t>(c.opA) >= 0);
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmovle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmovle(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVLE: move if Ra <= 0 (signed); else Rc unchanged.
     const bool met = (static_cast<int64_t>(c.opA) <= 0);
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmovgt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmovgt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVGT: move if Ra > 0 (signed); else Rc unchanged.
     const bool met = (static_cast<int64_t>(c.opA) > 0);
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmovlbs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmovlbs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVLBS: move if low bit of Ra is set; else Rc unchanged.
     const bool met = ((c.opA & 1ULL) != 0);
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execCmovlbc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmovlbc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // CMOVLBC: move if low bit of Ra is clear; else Rc unchanged.
     const bool met = ((c.opA & 1ULL) == 0);
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = met ? static_cast<uint8_t>(g.encoded & 0x1F)
         : coreLib::kNoRegWrite;
     r.regWriteIsFp = false;
     r.regWriteValue = met ? c.opB : 0;
-    return;
+    return r;
 }
 #pragma region Logical and Shift Instructions
 
@@ -938,23 +927,23 @@ auto execCmovlbc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) no
 // Shift Operations
 // ====================================================================
 AXP_HOT AXP_FLATTEN
-auto execSll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSll(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // SLL Ra, Rb, Rc: Rc <- Ra << (Rb<5:0>); zero-fill from right.
     // Alpha SRM uses only the low 6 bits of opB as shift count.
     const unsigned shiftAmount = static_cast<unsigned>(c.opB & 0x3F);
     const uint64_t result = c.opA << shiftAmount;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execSrl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSrl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // SRL Ra, Rb, Rc: Rc <- Ra >> (Rb<5:0>); zero-fill from left (logical).
     // Logical because c.opA is uint64_t -- C++ guarantees logical shift
@@ -962,16 +951,16 @@ auto execSrl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
     const unsigned shiftAmount = static_cast<unsigned>(c.opB & 0x3F);
     const uint64_t result = c.opA >> shiftAmount;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execSra(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSra(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // SRA Ra, Rb, Rc: Rc <- Ra >> (Rb<5:0>); sign-extend from left (arithmetic).
     // C++20 guarantees signed right shift is arithmetic (preserves sign);
@@ -979,12 +968,12 @@ auto execSra(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
     const unsigned shiftAmount = static_cast<unsigned>(c.opB & 0x3F);
     const int64_t  result = static_cast<int64_t>(c.opA) >> shiftAmount;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
     r.regWriteIdx = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 #pragma endregion Logical and Shift Instructions
 
@@ -998,7 +987,7 @@ auto execSra(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // Ra is >= byte i of Rb (unsigned compare); else 0.  Rc<63:8> = 0.
 //
 AXP_HOT AXP_FLATTEN
-auto execCmpbge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmpbge(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t result = 0;
     for (int i = 0; i < 8; ++i) {
@@ -1009,12 +998,12 @@ auto execCmpbge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         }
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -1023,94 +1012,94 @@ auto execCmpbge(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execExtbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExtbl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::extbl(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execExtwl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExtwl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::extwl(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execExtll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExtll(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::extll(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execExtql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExtql(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::extql(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execExtwh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExtwh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::extwh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execExtlh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExtlh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::extlh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execExtqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execExtqh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::extqh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -1119,94 +1108,94 @@ auto execExtqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execInsbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execInsbl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::insbl(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInswl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execInswl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::inswl(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execInsll(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::insll(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execInsql(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::insql(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInswh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execInswh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::inswh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInslh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execInslh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::inslh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execInsqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execInsqh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::insqh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -1215,94 +1204,94 @@ auto execInsqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execMskbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMskbl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::mskbl(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMskwl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMskwl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::mskwl(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMskll(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMskll(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::mskll(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMskql(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMskql(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::mskql(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMskwh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMskwh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::mskwh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMsklh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMsklh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::msklh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMskqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMskqh(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const uint64_t result = alpha_byteops::mskqh(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -1314,29 +1303,29 @@ auto execMskqh(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // enforce this.  v1 does not raise IllegalInstruction if Ra != R31.
 //
 AXP_HOT AXP_FLATTEN
-auto execSextb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSextb(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const int64_t result = static_cast<int64_t>(static_cast<int8_t>(c.opB));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execSextw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSextw(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const int64_t result = static_cast<int64_t>(static_cast<int16_t>(c.opB));
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = static_cast<uint64_t>(result);
-    return;
+    return r;
 }
 
 
@@ -1345,31 +1334,31 @@ auto execSextw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execZap(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execZap(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // ZAP: zero byte i of Ra when bit i of opB is set.
     const uint64_t result = alpha_byteops::zap(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execZapnot(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execZapnot(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // ZAPNOT: keep byte i of Ra when bit i of opB is set; zero otherwise.
     const uint64_t result = alpha_byteops::zapnot(c.opA, c.opB);
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 #pragma endregion Byte Manipulation Instructions
@@ -1382,7 +1371,7 @@ auto execZapnot(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execMaxub8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMaxub8(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MAXUB8: Rc[i] = unsigned max(Ra[i], Rb[i]) for i in 0..7
     uint64_t result = 0;
@@ -1392,16 +1381,16 @@ auto execMaxub8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>((a > b) ? a : b) << (i * 8);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMaxsb8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMaxsb8(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MAXSB8: Rc[i] = signed max(Ra[i], Rb[i]) for i in 0..7
     uint64_t result = 0;
@@ -1412,16 +1401,16 @@ auto execMaxsb8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>(v) << (i * 8);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMaxuw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMaxuw4(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MAXUW4: Rc[i] = unsigned max(Ra[i], Rb[i]) for i in 0..3 (16-bit lanes)
     uint64_t result = 0;
@@ -1431,16 +1420,16 @@ auto execMaxuw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>((a > b) ? a : b) << (i * 16);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMaxsw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMaxsw4(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MAXSW4: Rc[i] = signed max(Ra[i], Rb[i]) for i in 0..3 (16-bit lanes)
     uint64_t result = 0;
@@ -1451,16 +1440,16 @@ auto execMaxsw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>(v) << (i * 16);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMinub8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMinub8(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MINUB8: Rc[i] = unsigned min(Ra[i], Rb[i]) for i in 0..7
     uint64_t result = 0;
@@ -1470,16 +1459,16 @@ auto execMinub8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>((a < b) ? a : b) << (i * 8);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMinsb8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMinsb8(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MINSB8: Rc[i] = signed min(Ra[i], Rb[i]) for i in 0..7
     uint64_t result = 0;
@@ -1490,16 +1479,16 @@ auto execMinsb8(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>(v) << (i * 8);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMinuw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMinuw4(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MINUW4: Rc[i] = unsigned min(Ra[i], Rb[i]) for i in 0..3 (16-bit lanes)
     uint64_t result = 0;
@@ -1509,16 +1498,16 @@ auto execMinuw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>((a < b) ? a : b) << (i * 16);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMinsw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMinsw4(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // MINSW4: Rc[i] = signed min(Ra[i], Rb[i]) for i in 0..3 (16-bit lanes)
     uint64_t result = 0;
@@ -1529,12 +1518,12 @@ auto execMinsw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         result |= static_cast<uint64_t>(v) << (i * 16);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -1545,7 +1534,7 @@ auto execMinsw4(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // Rc <- sum(i in 0..7) abs(Ra[i] - Rb[i])  (per-byte unsigned difference)
 //
 AXP_HOT AXP_FLATTEN
-auto execPerr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execPerr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t result = 0;
     for (int i = 0; i < 8; ++i) {
@@ -1555,12 +1544,12 @@ auto execPerr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
                            : static_cast<uint64_t>(b - a);
     }
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -1569,7 +1558,7 @@ auto execPerr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execUnpkbw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execUnpkbw(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // UNPKBW: low 4 bytes of Rb spread into 4 16-bit lanes of Rc, zero-extended.
     const uint64_t result =
@@ -1578,28 +1567,28 @@ auto execUnpkbw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
         | ((c.opB >> 16) & 0xFFULL) << 32
         | ((c.opB >> 24) & 0xFFULL) << 48;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execUnpkbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execUnpkbl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // UNPKBL: low 2 bytes of Rb spread into 2 32-bit lanes of Rc, zero-extended.
     const uint64_t result =
           ((c.opB >> 0) & 0xFFULL) <<  0
         | ((c.opB >> 8) & 0xFFULL) << 32;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 
@@ -1608,7 +1597,7 @@ auto execUnpkbl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // ----------------------------------------------------------------------------
 
 AXP_HOT AXP_FLATTEN
-auto execPkwb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execPkwb(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // PKWB: low byte of each of Rb's 4 16-bit lanes -> 4-byte low halfword.
     const uint64_t result =
@@ -1617,28 +1606,28 @@ auto execPkwb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
         | ((c.opB >> 32) & 0xFFULL) << 16
         | ((c.opB >> 48) & 0xFFULL) << 24;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execPklb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execPklb(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     // PKLB: low byte of each of Rb's 2 32-bit lanes -> 2-byte low halfword.
     const uint64_t result =
           ((c.opB >>  0) & 0xFFULL) << 0
         | ((c.opB >> 32) & 0xFFULL) << 8;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = result;
-    return;
+    return r;
 }
 
 #pragma endregion MVI / Pixel Operations
@@ -1673,17 +1662,17 @@ auto execPklb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // same as HW_MTPR's IPR writes.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execRc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execRc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const prior = c.cpu->intrFlag;
     c.cpu->intrFlag = 0;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>((g.encoded >> 21) & 0x1F);   // Ra
     r.regWriteIsFp  = false;
     r.regWriteValue = prior;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -1692,17 +1681,17 @@ auto execRc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcep
 // Symmetric to RC.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execRs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execRs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const prior = c.cpu->intrFlag;
     c.cpu->intrFlag = 1;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>((g.encoded >> 21) & 0x1F);   // Ra
     r.regWriteIsFp  = false;
     r.regWriteValue = prior;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -1731,9 +1720,9 @@ auto execRs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcep
 // an endless MCHK loop.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execRpcc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execRpcc(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>((g.encoded >> 21) & 0x1F);   // Ra
     r.regWriteIsFp  = false;
@@ -1743,7 +1732,7 @@ auto execRpcc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
     r.regWriteValue = ((c.cpu->ccOffset & 0xFFFFFFFFULL) << 32) | counter;
 
 
-    return;
+    return r;
 }
 
 #pragma endregion Misc IPR-Touching Instructions
@@ -1765,16 +1754,16 @@ auto execRpcc(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // the source becomes c.cpu->implver instead of the constant.
 //
 AXP_HOT AXP_FLATTEN
-auto execImplver(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execImplver(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
     constexpr uint64_t kImplVer21264 = 2ULL;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);
     r.regWriteIsFp  = false;
     r.regWriteValue = kImplVer21264;
-    return;
+    return r;
 }
 
 #pragma endregion Implementation Version
@@ -1788,14 +1777,14 @@ auto execImplver(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, B
 // straight bit copy (T-format = no reformatting, unlike the S-format FTOIS).
 // One half of the EV6 FIX extension; ITOFx (opcode 0x14) is the reverse.
 AXP_HOT AXP_FLATTEN
-auto execFtoit(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execFtoit(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Rc (integer dest)
     r.regWriteIsFp  = false;
     r.regWriteValue = c.opA;                                    // fpReg[Ra], raw bits
-    return;
+    return r;
 }
 
 
@@ -1820,14 +1809,14 @@ auto execFtoit(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // probing code (Tru64 libc/libm, VMS math RTL) could legitimately emit
 // it and take an OPCDEC.  FTOIT (0x70) was already present.
 AXP_HOT AXP_FLATTEN
-auto execFtois(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execFtois(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const fav = c.opA;                       // fpReg[Ra], raw bits
     uint32_t const packed =
           static_cast<uint32_t>(((fav >> 62) & 0x3ULL) << 30)   // Fav<63:62>
         | static_cast<uint32_t>((fav >> 29) & 0x3FFFFFFFULL);   // Fav<58:29>
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Rc (integer dest)
     r.regWriteIsFp  = false;
@@ -1835,7 +1824,7 @@ auto execFtois(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
     // Rc<63:32> <- SEXT(Fav<63>) clause exactly.
     r.regWriteValue = static_cast<uint64_t>(
                           static_cast<int64_t>(static_cast<int32_t>(packed)));
-    return;
+    return r;
 }
 
 
@@ -1848,36 +1837,36 @@ auto execFtois(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 //   ITOFF 0x014 -- low 32 bits as VAX  F_floating -> register (same map as LDF).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execItoft(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execItoft(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Fc
     r.regWriteIsFp  = true;
     r.regWriteValue = c.opA;                                    // intReg[Ra], raw bits
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execItofs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execItofs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Fc
     r.regWriteIsFp  = true;
     r.regWriteValue = fBox::convertS_FloatingToRegister(static_cast<uint32_t>(c.opA));
-    return;
+    return r;
 }
 
 AXP_HOT AXP_FLATTEN
-auto execItoff(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execItoff(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = static_cast<uint8_t>(g.encoded & 0x1F);   // Fc
     r.regWriteIsFp  = true;
     r.regWriteValue = fBox::convertF_FloatingToRegister(static_cast<uint32_t>(c.opA));
-    return;
+    return r;
 }
 
 } // namespace eBox

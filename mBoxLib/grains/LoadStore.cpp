@@ -1,17 +1,6 @@
 // ============================================================================
 // mBoxLib/grains/LoadStore.cpp -- mBox load/store leaf executors (v1 wave)
 // ============================================================================
-//
-// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
-//   FILE:     mBoxLib/grains/LoadStore.cpp
-//   FUNCTION: every executor leaf in this file
-//   CHANGE:   leaf ABI return-by-value -> caller-supplied out-parameter.
-//             Signatures gain `BoxResult& out` and return void; body head
-//             `BoxResult r;` -> `BoxResult& r = out;` (field writes stay
-//             byte-identical); `return r;` -> `return;`; helper tail-returns
-//             (fpWrite / execCallPalDispatch) became braced call-then-return
-//             statements.  The caller owns the latch reset -- ownership
-//             contract in coreLib/BoxResult.h.
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -112,30 +101,30 @@ constexpr uint8_t raIndex(InstructionGrain const& g) noexcept
 // LDA Ra, disp(Rb) -- Ra <- Rb + sext_16(disp).  No memory access.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLda(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLda(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = c.opB + static_cast<uint64_t>(memDispSext(g));
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
 // LDAH Ra, disp(Rb) -- Ra <- Rb + (sext_16(disp) << 16).  No memory access.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdah(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdah(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     const int64_t disp = memDispSext(g) << 16;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
     r.regWriteValue = c.opB + static_cast<uint64_t>(disp);
-    return;
+    return r;
 }
 
 #pragma endregion Compute-only Mem-format
@@ -147,32 +136,32 @@ auto execLdah(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // LDBU Ra, disp(Rb) -- Ra <- zero_extend(Mem[EA]<7:0>); EA = Rb + sext(disp).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdbu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdbu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 1;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
 // LDWU Ra, disp(Rb) -- Ra <- zero_extend(Mem[EA]<15:0>).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdwu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdwu(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 2;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -181,32 +170,32 @@ auto execLdwu(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // regWriteIsFp == false (see BoxResult.h drain-map).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 4;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
 // LDQ Ra, disp(Rb) -- Ra <- Mem[EA]<63:0>.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 8;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -215,16 +204,16 @@ auto execLdq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // treats the result like any other 8-byte access.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdqU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdqU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
     r.memAddr      = (c.opB + static_cast<uint64_t>(memDispSext(g))) & ~0x7ULL;
     r.memSize      = 8;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -233,16 +222,16 @@ auto execLdqU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // is the signal.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdlL(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdlL(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 4;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -250,16 +239,16 @@ auto execLdlL(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // as LDL_L but 8-byte access; no sign extension.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdqL(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdqL(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 8;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 #pragma endregion Mem-format Loads
@@ -271,64 +260,64 @@ auto execLdqL(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // STB Ra, disp(Rb) -- Mem[EA]<7:0> <- Ra<7:0>.  No register effect.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStb(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStb(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memData     = c.opA;
     r.memSize     = 1;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
 // STW Ra, disp(Rb) -- Mem[EA]<15:0> <- Ra<15:0>.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStw(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStw(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memData     = c.opA;
     r.memSize     = 2;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
 // STL Ra, disp(Rb) -- Mem[EA]<31:0> <- Ra<31:0>.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStl(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStl(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memData     = c.opA;
     r.memSize     = 4;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
 // STQ Ra, disp(Rb) -- Mem[EA]<63:0> <- Ra.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memData     = c.opA;
     r.memSize     = 8;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -336,16 +325,16 @@ auto execStq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // the leaf force-aligns EA; drainer behaves like a normal 8-byte store.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStqU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStqU(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = (c.opB + static_cast<uint64_t>(memDispSext(g))) & ~0x7ULL;
     r.memData     = c.opA;
     r.memSize     = 8;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -358,9 +347,9 @@ auto execStqU(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // publish and to overwrite regWriteValue with the success indicator.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStlC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStlC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
@@ -369,7 +358,7 @@ auto execStlC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
     r.memData       = c.opA;
     r.memSize       = 4;
     r.memIsStore    = true;
-    return;
+    return r;
 }
 
 // ----------------------------------------------------------------------------
@@ -377,9 +366,9 @@ auto execStlC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // STL_C but 8-byte access.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStqC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStqC(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags      = g.semFlags;
     r.regWriteIdx   = raIndex(g);
     r.regWriteIsFp  = false;
@@ -388,7 +377,7 @@ auto execStqC(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
     r.memData       = c.opA;
     r.memSize       = 8;
     r.memIsStore    = true;
-    return;
+    return r;
 }
 
 #pragma endregion Mem-format Stores
@@ -443,9 +432,9 @@ constexpr uint8_t hwQuadSize(InstructionGrain const& g) noexcept
 // applied at MEM drain.  No reservation, no alignment trap.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execHwLd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execHwLd(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = false;
@@ -453,7 +442,7 @@ auto execHwLd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
     r.memAddr      = (c.opB + static_cast<uint64_t>(hwDispSext(g)))
                      & ~static_cast<uint64_t>(r.memSize - 1u);   // EV6: va<2:0>/<1:0> ignored
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 
@@ -465,9 +454,9 @@ auto execHwLd(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // encoded[12]; data = Ra.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execHwSt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execHwSt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memSize     = hwQuadSize(g);
@@ -475,7 +464,7 @@ auto execHwSt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
                     & ~static_cast<uint64_t>(r.memSize - 1u);   // EV6: va<2:0>/<1:0> ignored
     r.memData     = c.opA;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 #pragma endregion HW-format physical / virtual access (PALmode)
@@ -490,11 +479,11 @@ auto execHwSt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // no displacement, no Ra read.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execFetch(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execFetch(InstructionGrain const& g, [[maybe_unused]] ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags = g.semFlags;
-    return;
+    return r;
 }
 
 #pragma endregion Misc-format Hint

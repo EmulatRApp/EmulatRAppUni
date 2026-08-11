@@ -1,14 +1,6 @@
 // ============================================================================
 // tests/iBoxLib/test_controlflow.cpp -- doctest cases for iBox v1 leaves
 // ============================================================================
-//
-// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
-//   FILE:     tests/iBoxLib/test_controlflow.cpp
-//   FUNCTION: every direct leaf invocation
-//   CHANGE:   leaf ABI is now out-parameter: calls became
-//             `BoxResult r{}; leaf(g, ctx, r);`.  The test is the caller
-//             and therefore OWNS the latch reset -- the `{}` value-init is
-//             load-bearing (coreLib/BoxResult.h ownership contract).
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -130,9 +122,7 @@ TEST_CASE("iBox::execBr -- forward 1 instruction")
     InstructionGrain g = makeBraGrain(0x30, 26, 1, kUncondBraFlags, &iBox::execBr);
     ExecCtx ctx{};
 
-    BoxResult r{};
-
-    iBox::execBr(g, ctx, r);
+    BoxResult r = iBox::execBr(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x100008ULL);
@@ -146,9 +136,7 @@ TEST_CASE("iBox::execBr -- backward to itself (disp = -1)")
     InstructionGrain g = makeBraGrain(0x30, 26, -1, kUncondBraFlags, &iBox::execBr);
     ExecCtx ctx{};
 
-    BoxResult r{};
-
-    iBox::execBr(g, ctx, r);
+    BoxResult r = iBox::execBr(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x100000ULL);
@@ -160,9 +148,7 @@ TEST_CASE("iBox::execBr -- R31 destination suppresses link via kNoRegWrite")
     InstructionGrain g = makeBraGrain(0x30, 31, 4, kUncondBraFlags, &iBox::execBr);
     ExecCtx ctx{};
 
-    BoxResult r{};
-
-    iBox::execBr(g, ctx, r);
+    BoxResult r = iBox::execBr(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.regWriteIdx == kNoRegWrite);
@@ -178,9 +164,7 @@ TEST_CASE("iBox::execBsr -- positive disp links Ra to pc+4")
     InstructionGrain g = makeBraGrain(0x34, 26, 16, kUncondBraFlags, &iBox::execBsr);
     ExecCtx ctx{};
 
-    BoxResult r{};
-
-    iBox::execBsr(g, ctx, r);
+    BoxResult r = iBox::execBsr(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x100044ULL);   // pc + 4 + 16*4
@@ -199,9 +183,7 @@ TEST_CASE("iBox::execBeq -- taken when Ra == 0")
     ExecCtx ctx{};
     ctx.opA = 0;
 
-    BoxResult r{};
-
-    iBox::execBeq(g, ctx, r);
+    BoxResult r = iBox::execBeq(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x100014ULL);   // pc + 4 + 4*4
@@ -213,9 +195,7 @@ TEST_CASE("iBox::execBeq -- not taken when Ra != 0")
     ExecCtx ctx{};
     ctx.opA = 1;
 
-    BoxResult r{};
-
-    iBox::execBeq(g, ctx, r);
+    BoxResult r = iBox::execBeq(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -226,9 +206,7 @@ TEST_CASE("iBox::execBne -- taken when Ra != 0")
     ExecCtx ctx{};
     ctx.opA = 0xFFFFFFFFFFFFFFFFULL;
 
-    BoxResult r{};
-
-    iBox::execBne(g, ctx, r);
+    BoxResult r = iBox::execBne(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0xFFFF4ULL);     // pc + 4 - 16
@@ -240,9 +218,7 @@ TEST_CASE("iBox::execBne -- not taken when Ra == 0")
     ExecCtx ctx{};
     ctx.opA = 0;
 
-    BoxResult r{};
-
-    iBox::execBne(g, ctx, r);
+    BoxResult r = iBox::execBne(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -253,9 +229,7 @@ TEST_CASE("iBox::execBlt -- taken on signed-negative Ra")
     ExecCtx ctx{};
     ctx.opA = static_cast<uint64_t>(-1LL);
 
-    BoxResult r{};
-
-    iBox::execBlt(g, ctx, r);
+    BoxResult r = iBox::execBlt(g, ctx);
 
     CHECK(r.divert);
 }
@@ -266,9 +240,7 @@ TEST_CASE("iBox::execBlt -- not taken on zero Ra")
     ExecCtx ctx{};
     ctx.opA = 0;
 
-    BoxResult r{};
-
-    iBox::execBlt(g, ctx, r);
+    BoxResult r = iBox::execBlt(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -279,9 +251,7 @@ TEST_CASE("iBox::execBge -- taken on zero Ra (>= 0)")
     ExecCtx ctx{};
     ctx.opA = 0;
 
-    BoxResult r{};
-
-    iBox::execBge(g, ctx, r);
+    BoxResult r = iBox::execBge(g, ctx);
 
     CHECK(r.divert);
 }
@@ -292,9 +262,7 @@ TEST_CASE("iBox::execBge -- not taken on signed-negative Ra")
     ExecCtx ctx{};
     ctx.opA = static_cast<uint64_t>(-1LL);
 
-    BoxResult r{};
-
-    iBox::execBge(g, ctx, r);
+    BoxResult r = iBox::execBge(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -310,9 +278,7 @@ TEST_CASE("iBox::execBle -- taken on zero (Ra <= 0)")
     ExecCtx ctx{};
     ctx.opA = 0;
 
-    BoxResult r{};
-
-    iBox::execBle(g, ctx, r);
+    BoxResult r = iBox::execBle(g, ctx);
 
     CHECK(r.divert);
 }
@@ -323,9 +289,7 @@ TEST_CASE("iBox::execBle -- taken on signed-negative")
     ExecCtx ctx{};
     ctx.opA = static_cast<uint64_t>(-1LL);
 
-    BoxResult r{};
-
-    iBox::execBle(g, ctx, r);
+    BoxResult r = iBox::execBle(g, ctx);
 
     CHECK(r.divert);
 }
@@ -336,9 +300,7 @@ TEST_CASE("iBox::execBle -- not taken on positive Ra")
     ExecCtx ctx{};
     ctx.opA = 1;
 
-    BoxResult r{};
-
-    iBox::execBle(g, ctx, r);
+    BoxResult r = iBox::execBle(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -349,9 +311,7 @@ TEST_CASE("iBox::execBgt -- taken on positive Ra")
     ExecCtx ctx{};
     ctx.opA = 1;
 
-    BoxResult r{};
-
-    iBox::execBgt(g, ctx, r);
+    BoxResult r = iBox::execBgt(g, ctx);
 
     CHECK(r.divert);
 }
@@ -362,9 +322,7 @@ TEST_CASE("iBox::execBgt -- not taken on zero")
     ExecCtx ctx{};
     ctx.opA = 0;
 
-    BoxResult r{};
-
-    iBox::execBgt(g, ctx, r);
+    BoxResult r = iBox::execBgt(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -375,9 +333,7 @@ TEST_CASE("iBox::execBgt -- not taken on signed-negative")
     ExecCtx ctx{};
     ctx.opA = static_cast<uint64_t>(-1LL);
 
-    BoxResult r{};
-
-    iBox::execBgt(g, ctx, r);
+    BoxResult r = iBox::execBgt(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -388,9 +344,7 @@ TEST_CASE("iBox::execBlbc -- taken when low bit clear (even Ra)")
     ExecCtx ctx{};
     ctx.opA = 0xFFFFFFFFFFFFFFFEULL;   // all bits set except bit 0
 
-    BoxResult r{};
-
-    iBox::execBlbc(g, ctx, r);
+    BoxResult r = iBox::execBlbc(g, ctx);
 
     CHECK(r.divert);
 }
@@ -401,9 +355,7 @@ TEST_CASE("iBox::execBlbc -- not taken when low bit set (odd Ra)")
     ExecCtx ctx{};
     ctx.opA = 1;
 
-    BoxResult r{};
-
-    iBox::execBlbc(g, ctx, r);
+    BoxResult r = iBox::execBlbc(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -414,9 +366,7 @@ TEST_CASE("iBox::execBlbs -- taken when low bit set (odd Ra)")
     ExecCtx ctx{};
     ctx.opA = 0x12345679ULL;            // low bit set; high bits irrelevant
 
-    BoxResult r{};
-
-    iBox::execBlbs(g, ctx, r);
+    BoxResult r = iBox::execBlbs(g, ctx);
 
     CHECK(r.divert);
 }
@@ -427,9 +377,7 @@ TEST_CASE("iBox::execBlbs -- not taken when low bit clear (even Ra)")
     ExecCtx ctx{};
     ctx.opA = 0x12345678ULL;            // low bit clear
 
-    BoxResult r{};
-
-    iBox::execBlbs(g, ctx, r);
+    BoxResult r = iBox::execBlbs(g, ctx);
 
     CHECK_FALSE(r.divert);
 }
@@ -445,9 +393,7 @@ TEST_CASE("iBox::execJmp -- target masks low 2 bits of opB")
     ExecCtx ctx{};
     ctx.opB = 0x200007ULL;   // low 3 bits set; bottom 2 cleared by leaf
 
-    BoxResult r{};
-
-    iBox::execJmp(g, ctx, r);
+    BoxResult r = iBox::execJmp(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x200004ULL);
@@ -463,9 +409,7 @@ TEST_CASE("iBox::execJsr -- links Ra to pc+4, target from opB")
     ExecCtx ctx{};
     ctx.opB = 0x300000ULL;
 
-    BoxResult r{};
-
-    iBox::execJsr(g, ctx, r);
+    BoxResult r = iBox::execJsr(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x300000ULL);
@@ -482,9 +426,7 @@ TEST_CASE("iBox::execRet -- target from opB; Ra typically R31")
     ExecCtx ctx{};
     ctx.opB = 0x400008ULL;
 
-    BoxResult r{};
-
-    iBox::execRet(g, ctx, r);
+    BoxResult r = iBox::execRet(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x400008ULL);
@@ -500,9 +442,7 @@ TEST_CASE("iBox::execJsrCoroutine -- both link and indirect")
     ExecCtx ctx{};
     ctx.opB = 0x500003ULL;
 
-    BoxResult r{};
-
-    iBox::execJsrCoroutine(g, ctx, r);
+    BoxResult r = iBox::execJsrCoroutine(g, ctx);
 
     CHECK(r.divert);
     CHECK(r.divertTarget == 0x500000ULL);    // low 2 bits cleared

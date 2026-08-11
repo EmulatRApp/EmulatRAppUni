@@ -1,17 +1,6 @@
 // ============================================================================
 // fBoxLib/grains/Float.cpp -- fBox IEEE T-format leaves and FP sign manip
 // ============================================================================
-//
-// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
-//   FILE:     fBoxLib/grains/Float.cpp
-//   FUNCTION: every executor leaf in this file
-//   CHANGE:   leaf ABI return-by-value -> caller-supplied out-parameter.
-//             Signatures gain `BoxResult& out` and return void; body head
-//             `BoxResult r;` -> `BoxResult& r = out;` (field writes stay
-//             byte-identical); `return r;` -> `return;`; helper tail-returns
-//             (fpWrite / execCallPalDispatch) became braced call-then-return
-//             statements.  The caller owns the latch reset -- ownership
-//             contract in coreLib/BoxResult.h.
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -116,18 +105,16 @@ constexpr uint64_t kCmpFalseBits  = 0x0000000000000000ULL;
 
 // Pack a BoxResult that commits a 64-bit value to FP register Fc and
 // propagates the grain's semantic flag set.  Used by every leaf in
-// this file.  BRIEF-EXEC-ABI-001: writes into the caller-supplied
-// latch `out` (pristine per the coreLib/BoxResult.h contract); the
-// old return-by-value form fed the leaf's own sret return.
-AXP_HOT AXP_FLATTEN
-static void fpWrite(InstructionGrain const& g, uint64_t value,
-                    BoxResult& out) noexcept
+// this file.
+[[nodiscard]] AXP_HOT AXP_FLATTEN
+static BoxResult fpWrite(InstructionGrain const& g, uint64_t value) noexcept
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = fcIndex(g);
     r.regWriteIsFp = true;
     r.regWriteValue = value;
+    return r;
 }
 
 
@@ -140,10 +127,10 @@ static void fpWrite(InstructionGrain const& g, uint64_t value,
 // Result bits 62:0 = Fb[62:0]
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCpys(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCpys(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const value = (c.opA & kSignBit) | (c.opB & ~kSignBit);
-    { fpWrite(g, value, out); return; }
+    return fpWrite(g, value);
 }
 
 
@@ -154,11 +141,11 @@ auto execCpys(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // Result bits 62:0 = Fb[62:0]
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCpysn(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCpysn(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const flippedSign = (c.opA & kSignBit) ^ kSignBit;
     uint64_t const value       = flippedSign | (c.opB & ~kSignBit);
-    { fpWrite(g, value, out); return; }
+    return fpWrite(g, value);
 }
 
 
@@ -169,10 +156,10 @@ auto execCpysn(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // Result bits 51:0  = Fb[51:0]    (52-bit fraction)
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCpyse(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCpyse(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     uint64_t const value = (c.opA & kSignExpMask) | (c.opB & ~kSignExpMask);
-    { fpWrite(g, value, out); return; }
+    return fpWrite(g, value);
 }
 
 #pragma endregion FltLogical sign manipulation
@@ -185,12 +172,12 @@ auto execCpyse(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noex
 // All 16 trap-mode / rounding variants share this leaf.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execAddt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execAddt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().addT(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 
@@ -198,12 +185,12 @@ auto execAddt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // SUBT Fc, Fa, Fb -- IEEE T-format subtraction.  Fc <- Fa - Fb.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execSubt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSubt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().subT(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 
@@ -211,12 +198,12 @@ auto execSubt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // MULT Fc, Fa, Fb -- IEEE T-format multiplication.  Fc <- Fa * Fb.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execMult(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMult(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().mulT(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 
@@ -229,12 +216,12 @@ auto execMult(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // result without need for a guard.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execDivt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execDivt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().divT(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 #pragma endregion FltIeee T-format arithmetic
@@ -251,39 +238,39 @@ auto execDivt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // promote the former logUnimplementedStub single leaves to real arithmetic.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execAdds(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execAdds(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().addS(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 AXP_HOT AXP_FLATTEN
-auto execSubs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSubs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().subS(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 AXP_HOT AXP_FLATTEN
-auto execMuls(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMuls(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().mulS(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 AXP_HOT AXP_FLATTEN
-auto execDivs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execDivs(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r = fpBox::activeBackend().divS(c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 #pragma endregion FltIeee S-format arithmetic
@@ -297,13 +284,13 @@ auto execDivs(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexc
 // NaN operands: result is 0.0 (host == returns false).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCmpteq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmpteq(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r =
         fpBox::activeBackend().cmpT(fpBox::FpCompare::Eq, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 
@@ -312,13 +299,13 @@ auto execCmpteq(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // Fc <- 2.0 if Fa < Fb, else 0.0.  NaN operands: result is 0.0.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCmptlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmptlt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r =
         fpBox::activeBackend().cmpT(fpBox::FpCompare::Lt, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 
@@ -327,13 +314,13 @@ auto execCmptlt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // Fc <- 2.0 if Fa <= Fb, else 0.0.  NaN operands: result is 0.0.
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execCmptle(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execCmptle(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     fpBox::FpExecCtx const ctx{ fpVariantFromEncoded(g.encoded), c.cpu->fpcr };
     fpBox::FpResult  const r =
         fpBox::activeBackend().cmpT(fpBox::FpCompare::Le, c.opA, c.opB, ctx);
     foldFpcrExc(c.cpu->fpcr, r.exc);
-    { fpWrite(g, r.bits, out); return; }
+    return fpWrite(g, r.bits);
 }
 
 #pragma endregion FltIeee T-format compares
@@ -391,16 +378,16 @@ constexpr uint8_t raIndex(InstructionGrain const& g) noexcept
 // 32 bits at EA -> 64-bit register form (sign + 11-bit exp + frac).
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = true;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 4;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 
@@ -409,16 +396,16 @@ auto execLdf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // 64-bit memory -> 64-bit register form via word swap.
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = true;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 8;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 
@@ -427,16 +414,16 @@ auto execLdg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // 32-bit IEEE single -> 64-bit register form (exponent expanded).
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLds(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLds(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = true;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 4;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 
@@ -445,16 +432,16 @@ auto execLds(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // 64-bit IEEE double -> 64-bit register form (identity).
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execLdt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execLdt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags     = g.semFlags;
     r.regWriteIdx  = raIndex(g);
     r.regWriteIsFp = true;
     r.memAddr      = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memSize      = 8;
     r.memIsStore   = false;
-    return;
+    return r;
 }
 
 
@@ -463,9 +450,9 @@ auto execLdt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // 64-bit register form -> 32-bit memory (word-swapped VAX layout).
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStf(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
@@ -473,7 +460,7 @@ auto execStf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
                         fBox::convertF_FloatingToMemory(c.opA));
     r.memSize     = 4;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 
@@ -482,16 +469,16 @@ auto execStf(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // 64-bit register form -> 64-bit memory (word-swapped VAX layout).
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStg(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memData     = fBox::convertG_FloatingToMemory(c.opA);
     r.memSize     = 8;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 
@@ -500,9 +487,9 @@ auto execStg(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // 64-bit register form -> 32-bit IEEE single in memory.
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execSts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execSts(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
@@ -510,7 +497,7 @@ auto execSts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
                         fBox::convertS_FloatingToMemory(c.opA));
     r.memSize     = 4;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 
@@ -519,16 +506,16 @@ auto execSts(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // 64-bit register form -> 64-bit IEEE double in memory (identity).
 // ---------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execStt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execStt(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
     r.memAddr     = c.opB + static_cast<uint64_t>(memDispSext(g));
     r.memData     = fBox::convertT_FloatingToMemory(c.opA);
     r.memSize     = 8;
     r.memIsStore  = true;
-    return;
+    return r;
 }
 
 #pragma endregion FP load/store -- Mem-format
@@ -559,9 +546,9 @@ auto execStt(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexce
 // (SROM-resident PAL FP-context save during HWRPB / console init).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execMfFpcr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMfFpcr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
-    { fpWrite(g, c.cpu->fpcr, out); return; }
+    return fpWrite(g, c.cpu->fpcr);
 }
 
 
@@ -592,14 +579,14 @@ auto execMfFpcr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noe
 // Fa-indexed FP register file value for FltL-format instructions).
 // ----------------------------------------------------------------------------
 AXP_HOT AXP_FLATTEN
-auto execMtFpcr(InstructionGrain const& g, ExecCtx const& c, BoxResult& out) noexcept -> void
+auto execMtFpcr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult
 {
     c.cpu->fpcr = c.opA;
 
-    BoxResult& r = out;
+    BoxResult r;
     r.semFlags    = g.semFlags;
     r.regWriteIdx = kNoRegWrite;
-    return;
+    return r;
 }
 
 #pragma endregion FPCR control register

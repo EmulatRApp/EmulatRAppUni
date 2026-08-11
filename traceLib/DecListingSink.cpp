@@ -10,7 +10,6 @@
 
 #include "coreLib/BoxResult.h"
 #include "coreLib/CpuState.h"
-#include "coreLib/SupModeProbeRing.h" // P-SUP-6 landing rows (JRN-SUPMODE-001 Sec 16.5b; REMOVE with probe)
 #include "coreLib/DispatchEntry.h"
 #include "grainFactoryLib/DispatchAccess.h"
 #include "grainFactoryLib/generated/DispatchKinds.h"
@@ -644,28 +643,6 @@ void DecListingSink::onCommit(CommitRecord const&        record,
     // the first post-gate onPalEntry dump emit valid recent context.
     m_lookback[m_lookbackHead & (LOOKBACK_SIZE - 1)] = frozen;
     ++m_lookbackHead;
-
-    // P-SUP-6 landing row (JRN-SUPMODE-001 Sec 16.5b; REMOVE with the
-    // probe family): a supervisor-involving CM write armed the pending
-    // counter; the first NATIVE-mode retire after it is the REI landing
-    // (stub entry PC for 1->2, User resume PC for 2->3).
-    if (coreLib::supmode_probe::g_landPending > 0) {
-        if ((record.pc & 1ULL) == 0ULL) {
-            std::fprintf(stderr,
-                "SUPMODE-LAND %u->%u cyc=%llu pc=0x%llx\n",
-                static_cast<unsigned>(coreLib::supmode_probe::g_landFrom),
-                static_cast<unsigned>(coreLib::supmode_probe::g_landTo),
-                static_cast<unsigned long long>(record.cycle),
-                static_cast<unsigned long long>(record.pc));
-            std::fflush(stderr);
-            coreLib::supmode_probe::g_landPending = 0;
-        } else if (--coreLib::supmode_probe::g_landPending == 0) {
-            std::fprintf(stderr, "SUPMODE-LAND %u->%u NO-NATIVE-IN-32\n",
-                static_cast<unsigned>(coreLib::supmode_probe::g_landFrom),
-                static_cast<unsigned>(coreLib::supmode_probe::g_landTo));
-            std::fflush(stderr);
-        }
-    }
 
     // Value-triggered ring dump: when this retire writes the gate value into
     // its destination register, dump the ring ONCE (oldest -> newest, ending on

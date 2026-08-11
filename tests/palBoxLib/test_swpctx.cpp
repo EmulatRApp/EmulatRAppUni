@@ -1,14 +1,6 @@
 // ============================================================================
 // tests/palBoxLib/test_swpctx.cpp -- SPEC-SWPCTX-001 C3 pins (T1-T6)
 // ============================================================================
-//
-// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
-//   FILE:     tests/palBoxLib/test_swpctx.cpp
-//   FUNCTION: every direct leaf invocation
-//   CHANGE:   leaf ABI is now out-parameter: calls became
-//             `BoxResult r{}; leaf(g, ctx, r);`.  The test is the caller
-//             and therefore OWNS the latch reset -- the `{}` value-init is
-//             load-bearing (coreLib/BoxResult.h ownership contract).
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V5)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -109,8 +101,7 @@ TEST_CASE("SWPCTX T1+T5: A->B->A round-trips save-set fields and CPC")
 
     // Boot-strap: adopt context A (pcbb==0 path skips the save -- T6-adj).
     cpu.intReg[16] = kPcbbA;
-    BoxResult r{};
-    palBox::execSwpctx_vms(g, ctx, r);
+    BoxResult r = palBox::execSwpctx_vms(g, ctx);
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.pcbb == kPcbbA);
     CHECK(cpu.intReg[30] == 0x1A00ULL);        // live SP = A's KSP
@@ -132,8 +123,7 @@ TEST_CASE("SWPCTX T1+T5: A->B->A round-trips save-set fields and CPC")
 
     // Swap A -> B.
     cpu.intReg[16] = kPcbbB;
-    r = {};
-    palBox::execSwpctx_vms(g, ctx, r);
+    r = palBox::execSwpctx_vms(g, ctx);
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.pcbb == kPcbbB);
     CHECK(cpu.intReg[30] == 0x1B00ULL);
@@ -163,8 +153,7 @@ TEST_CASE("SWPCTX T1+T5: A->B->A round-trips save-set fields and CPC")
 
     // Swap B -> A: every save-set field of A must come back exactly.
     cpu.intReg[16] = kPcbbA;
-    r = {};
-    palBox::execSwpctx_vms(g, ctx, r);
+    r = palBox::execSwpctx_vms(g, ctx);
     CHECK(r.faultCode == kNoFault);
     CHECK(cpu.pcbb == kPcbbA);
     CHECK(cpu.intReg[30] == 0x1A08ULL);        // A's PUSHED ksp, not the seed
@@ -198,7 +187,7 @@ TEST_CASE("SWPCTX T2+T3+T4: TB semantics -- TBIAP, ASM survival, GH span")
     InstructionGrain const g = makeSwpctxGrain();
 
     cpu.intReg[16] = kPcbbA;
-    { BoxResult t{}; palBox::execSwpctx_vms(g, ctx, t); CHECK(t.faultCode == kNoFault); }
+    CHECK(palBox::execSwpctx_vms(g, ctx).faultCode == kNoFault);
 
     // Populate the TBs as "process A" (asn 3): a private page, an ASM
     // page, and a private GH=3 block.
@@ -218,7 +207,7 @@ TEST_CASE("SWPCTX T2+T3+T4: TB semantics -- TBIAP, ASM survival, GH span")
 
     // Swap A -> B.
     cpu.intReg[16] = kPcbbB;
-    { BoxResult t{}; palBox::execSwpctx_vms(g, ctx, t); CHECK(t.faultCode == kNoFault); }
+    CHECK(palBox::execSwpctx_vms(g, ctx).faultCode == kNoFault);
 
     // T3: private translations are gone; ASM=1 survives (HRM 4.1.7).
     CHECK_FALSE(cpu.dtbMgr.lookup(TlbRealm::Dtb, 0x10000, 3).isHit());
@@ -245,14 +234,13 @@ TEST_CASE("SWPCTX T6: misaligned R16 faults with NO state change; success "
     InstructionGrain const g = makeSwpctxGrain();
 
     cpu.intReg[16] = kPcbbA;
-    { BoxResult t{}; palBox::execSwpctx_vms(g, ctx, t); CHECK(t.faultCode == kNoFault); }
+    CHECK(palBox::execSwpctx_vms(g, ctx).faultCode == kNoFault);
     uint64_t const pcbbBefore = cpu.pcbb;
     uint64_t const r30Before  = cpu.intReg[30];
 
     // Misaligned R16 (bit 6 set is not enough -- must be 128-aligned).
     cpu.intReg[16] = kPcbbA + 0x40;
-    BoxResult rBad{};
-    palBox::execSwpctx_vms(g, ctx, rBad);
+    BoxResult const rBad = palBox::execSwpctx_vms(g, ctx);
     CHECK(rBad.faultCode == kFaultOpcDec);     // named deviation (ILLOP arch.)
     CHECK(cpu.pcbb == pcbbBefore);             // no state touched
     CHECK(cpu.intReg[30] == r30Before);
@@ -261,8 +249,7 @@ TEST_CASE("SWPCTX T6: misaligned R16 faults with NO state change; success "
     // Success path: no fault, no divert, R30 installed -- one grain does
     // the whole swap (atomicity is structural: no intermediate retire).
     cpu.intReg[16] = kPcbbA;
-    BoxResult rOk{};
-    palBox::execSwpctx_vms(g, ctx, rOk);
+    BoxResult const rOk = palBox::execSwpctx_vms(g, ctx);
     CHECK(rOk.faultCode == kNoFault);
     CHECK(rOk.divertTarget == 0);
 }

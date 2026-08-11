@@ -1,14 +1,6 @@
 // ============================================================================
 // tests/mBoxLib/test_loadstore.cpp -- doctest cases for mBox v1 leaves
 // ============================================================================
-//
-// CHANGE (2026-08-10, BRIEF-EXEC-ABI-001):
-//   FILE:     tests/mBoxLib/test_loadstore.cpp
-//   FUNCTION: every direct leaf invocation
-//   CHANGE:   leaf ABI is now out-parameter: calls became
-//             `BoxResult r{}; leaf(g, ctx, r);`.  The test is the caller
-//             and therefore OWNS the latch reset -- the `{}` value-init is
-//             load-bearing (coreLib/BoxResult.h ownership contract).
 // Project: EmulatR -- Alpha AXP / EV6 Architecture Emulator (V4)
 // Copyright (C) 2025, 2026 eNVy Systems, Inc.  All rights reserved.
 // Licensed under eNVy Systems Non-Commercial License v1.1
@@ -132,9 +124,7 @@ TEST_CASE("mBox::execLda -- positive displacement")
     ExecCtx ctx{};
     ctx.opB = 0x1000;
 
-    BoxResult r{};
-
-    mBox::execLda(g, ctx, r);
+    BoxResult r = mBox::execLda(g, ctx);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == 1);
@@ -150,9 +140,7 @@ TEST_CASE("mBox::execLda -- negative displacement sign-extends")
     ExecCtx ctx{};
     ctx.opB = 0x1000;
 
-    BoxResult r{};
-
-    mBox::execLda(g, ctx, r);
+    BoxResult r = mBox::execLda(g, ctx);
 
     CHECK(r.regWriteIdx == 3);
     CHECK(r.regWriteValue == 0x0FF0ULL);
@@ -164,9 +152,7 @@ TEST_CASE("mBox::execLda -- R31 destination is just kNoRegWrite")
     ExecCtx ctx{};
     ctx.opB = 0x2000;
 
-    BoxResult r{};
-
-    mBox::execLda(g, ctx, r);
+    BoxResult r = mBox::execLda(g, ctx);
 
     CHECK(r.regWriteIdx == kNoRegWrite);   // R31 == 31 == kNoRegWrite
 }
@@ -182,9 +168,7 @@ TEST_CASE("mBox::execLdah -- displacement scaled by 65536")
     ExecCtx ctx{};
     ctx.opB = 0;
 
-    BoxResult r{};
-
-    mBox::execLdah(g, ctx, r);
+    BoxResult r = mBox::execLdah(g, ctx);
 
     CHECK(r.regWriteIdx == 5);
     CHECK(r.regWriteValue == 0x10000ULL);
@@ -196,9 +180,7 @@ TEST_CASE("mBox::execLdah -- negative disp shifts and sign-extends correctly")
     ExecCtx ctx{};
     ctx.opB = 0x100000ULL;
 
-    BoxResult r{};
-
-    mBox::execLdah(g, ctx, r);
+    BoxResult r = mBox::execLdah(g, ctx);
 
     CHECK(r.regWriteValue == (0x100000ULL + static_cast<uint64_t>(-65536LL)));
 }
@@ -214,9 +196,7 @@ TEST_CASE("mBox::execLdbu -- packs memSize=1 and EA")
     ExecCtx ctx{};
     ctx.opB = 0x2000;
 
-    BoxResult r{};
-
-    mBox::execLdbu(g, ctx, r);
+    BoxResult r = mBox::execLdbu(g, ctx);
 
     CHECK(r.memAddr == 0x2004ULL);
     CHECK(r.memSize == 1);
@@ -231,9 +211,7 @@ TEST_CASE("mBox::execLdwu -- packs memSize=2 and EA")
     ExecCtx ctx{};
     ctx.opB = 0x3000;
 
-    BoxResult r{};
-
-    mBox::execLdwu(g, ctx, r);
+    BoxResult r = mBox::execLdwu(g, ctx);
 
     CHECK(r.memAddr == 0x3008ULL);
     CHECK(r.memSize == 2);
@@ -251,9 +229,7 @@ TEST_CASE("mBox::execLdl -- packs memSize=4 (drainer sign-extends)")
     ExecCtx ctx{};
     ctx.opB = 0x4000;
 
-    BoxResult r{};
-
-    mBox::execLdl(g, ctx, r);
+    BoxResult r = mBox::execLdl(g, ctx);
 
     CHECK(r.memAddr == 0x4010ULL);
     CHECK(r.memSize == 4);
@@ -267,9 +243,7 @@ TEST_CASE("mBox::execLdq -- packs memSize=8")
     ExecCtx ctx{};
     ctx.opB = 0x5000;
 
-    BoxResult r{};
-
-    mBox::execLdq(g, ctx, r);
+    BoxResult r = mBox::execLdq(g, ctx);
 
     CHECK(r.memAddr == 0x5020ULL);
     CHECK(r.memSize == 8);
@@ -287,9 +261,7 @@ TEST_CASE("mBox::execLdqU -- masks low 3 bits of computed EA")
     ExecCtx ctx{};
     ctx.opB = 0x6000;
 
-    BoxResult r{};
-
-    mBox::execLdqU(g, ctx, r);
+    BoxResult r = mBox::execLdqU(g, ctx);
 
     // EA = (0x6000 + 0x0007) & ~7 = 0x6000
     CHECK(r.memAddr == 0x6000ULL);
@@ -303,9 +275,7 @@ TEST_CASE("mBox::execLdqU -- already-aligned EA passes through")
     ExecCtx ctx{};
     ctx.opB = 0x6000;
 
-    BoxResult r{};
-
-    mBox::execLdqU(g, ctx, r);
+    BoxResult r = mBox::execLdqU(g, ctx);
 
     CHECK(r.memAddr == 0x6008ULL);
 }
@@ -322,9 +292,7 @@ TEST_CASE("mBox::execLdlL -- packs memSize=4, propagates S_Locked")
     ExecCtx ctx{};
     ctx.opB = 0x7000;
 
-    BoxResult r{};
-
-    mBox::execLdlL(g, ctx, r);
+    BoxResult r = mBox::execLdlL(g, ctx);
 
     CHECK(r.memAddr == 0x7000ULL);
     CHECK(r.memSize == 4);
@@ -337,9 +305,7 @@ TEST_CASE("mBox::execLdqL -- packs memSize=8, propagates S_Locked")
     ExecCtx ctx{};
     ctx.opB = 0x8000;
 
-    BoxResult r{};
-
-    mBox::execLdqL(g, ctx, r);
+    BoxResult r = mBox::execLdqL(g, ctx);
 
     CHECK(r.memAddr == 0x8000ULL);
     CHECK(r.memSize == 8);
@@ -358,9 +324,7 @@ TEST_CASE("mBox::execStb -- packs memSize=1, memData=opA, no register effect")
     ctx.opA = 0xAB;
     ctx.opB = 0x9000;
 
-    BoxResult r{};
-
-    mBox::execStb(g, ctx, r);
+    BoxResult r = mBox::execStb(g, ctx);
 
     CHECK(r.memAddr == 0x9004ULL);
     CHECK(r.memSize == 1);
@@ -376,9 +340,7 @@ TEST_CASE("mBox::execStw -- packs memSize=2")
     ctx.opA = 0xBEEF;
     ctx.opB = 0xA000;
 
-    BoxResult r{};
-
-    mBox::execStw(g, ctx, r);
+    BoxResult r = mBox::execStw(g, ctx);
 
     CHECK(r.memAddr == 0xA002ULL);
     CHECK(r.memSize == 2);
@@ -394,9 +356,7 @@ TEST_CASE("mBox::execStl -- packs memSize=4")
     ctx.opA = 0xCAFEBABEULL;
     ctx.opB = 0xB000;
 
-    BoxResult r{};
-
-    mBox::execStl(g, ctx, r);
+    BoxResult r = mBox::execStl(g, ctx);
 
     CHECK(r.memAddr == 0xB008ULL);
     CHECK(r.memSize == 4);
@@ -412,9 +372,7 @@ TEST_CASE("mBox::execStq -- packs memSize=8")
     ctx.opA = 0xDEADBEEFCAFEBABEULL;
     ctx.opB = 0xC000;
 
-    BoxResult r{};
-
-    mBox::execStq(g, ctx, r);
+    BoxResult r = mBox::execStq(g, ctx);
 
     CHECK(r.memAddr == 0xC010ULL);
     CHECK(r.memSize == 8);
@@ -435,9 +393,7 @@ TEST_CASE("mBox::execStqU -- masks low 3 bits of computed EA")
     ctx.opA = 0x1122334455667788ULL;
     ctx.opB = 0xD000;
 
-    BoxResult r{};
-
-    mBox::execStqU(g, ctx, r);
+    BoxResult r = mBox::execStqU(g, ctx);
 
     CHECK(r.memAddr == 0xD000ULL);     // (0xD005) & ~7
     CHECK(r.memSize == 8);
@@ -457,9 +413,7 @@ TEST_CASE("mBox::execStlC -- packs memEffect AND regWriteIdx=Ra")
     ctx.opA = 0x12345678ULL;
     ctx.opB = 0xE000;
 
-    BoxResult r{};
-
-    mBox::execStlC(g, ctx, r);
+    BoxResult r = mBox::execStlC(g, ctx);
 
     CHECK(r.memAddr == 0xE000ULL);
     CHECK(r.memSize == 4);
@@ -477,9 +431,7 @@ TEST_CASE("mBox::execStqC -- packs memEffect AND regWriteIdx=Ra")
     ctx.opA = 0xAABBCCDDEEFF0011ULL;
     ctx.opB = 0xF000;
 
-    BoxResult r{};
-
-    mBox::execStqC(g, ctx, r);
+    BoxResult r = mBox::execStqC(g, ctx);
 
     CHECK(r.memAddr == 0xF000ULL);
     CHECK(r.memSize == 8);
@@ -499,9 +451,7 @@ TEST_CASE("mBox::execFetch -- propagates semFlags only, no effect")
     ExecCtx ctx{};
     ctx.opB = 0x12340000ULL;   // ignored by leaf
 
-    BoxResult r{};
-
-    mBox::execFetch(g, ctx, r);
+    BoxResult r = mBox::execFetch(g, ctx);
 
     CHECK(r.faultCode == kNoFault);
     CHECK(r.regWriteIdx == kNoRegWrite);
