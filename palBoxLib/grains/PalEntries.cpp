@@ -3015,6 +3015,39 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                 std::fflush(stderr);
             }
         }
+        // P-SUP-7 (JRN-SUPMODE-001 Sec 16.4 follow-up; REMOVE with the
+        // probe family): arm a SHORT retire window at EVERY ->Supervisor
+        // CM write.  The ARM23 windows open AT the 2->3 frame-pop, so
+        // the 411-cycle supervisor visit that PRECEDES each one -- the
+        // visit P-SUP-6 measured as retiring ZERO native instructions --
+        // is systematically uncaptured.  Arming at the ->2 write instead
+        // brackets every visit end-to-end: the 1->2 frame-pop's quad
+        // reads (what PC/PS the frame carried), the swallowed PAL era,
+        // and the 2->3 exit.  ~950 arms/boot x a small count is about
+        // one ARM23 window's volume.  Env EMULATR_PROBE_SUPMODE_ARM12=
+        // <retire count> (0x-aware; unset/0 = off); requires
+        // EMULATR_TRACE_WINDOW=1.  No from-mode filter on purpose --
+        // a 2->2 same-mode rewrite arming is itself a finding (Sec 11.2
+        // census gap).
+        {
+            static long long const s_arm12 = [] {
+                char const* const v =
+                    std::getenv("EMULATR_PROBE_SUPMODE_ARM12");
+                return v ? std::strtoll(v, nullptr, 0) : 0LL;
+            }();
+            if (s_arm12 > 0
+                && coreLib::ierCmExtractMode(c.opB)
+                       == coreLib::Mode_Privilege::Supervisor) {
+                traceLib::DecListingSink::setTraceWindowCountdown(s_arm12);
+                std::fprintf(stderr,
+                    "SUPMODE ARM12 window=%lld cyc=%llu pc=0x%llx from=%d\n",
+                    s_arm12,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<int>(c.cpu->mode));
+                std::fflush(stderr);
+            }
+        }
         c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
         break;
     }

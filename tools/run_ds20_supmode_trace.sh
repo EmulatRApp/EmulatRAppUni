@@ -41,7 +41,7 @@ LOG="logs/${STEM}_supmode_trace_${TS}.log"
 
 # Facility guards: the P-SUP-2 arm row proves the new hook is in; the
 # H-8b DEFER row proves the reselection binary did not regress.
-for NEEDLE in 'SUPMODE ARM window=' 'N810-DEFER'; do
+for NEEDLE in 'SUPMODE ARM window=' 'SUPMODE ARM12' 'N810-DEFER'; do
     if [[ "$(grep -a -c "$NEEDLE" "$EXE" || true)" -eq 0 ]]; then
         echo "FATAL: '$NEEDLE' not found in $EXE -- rebuild relwithdebinfo"
         exit 1
@@ -67,6 +67,7 @@ unset  EMULATR_SCSI_MOVE_PROBE
 export EMULATR_PROBE_SUPMODE=1                 # P-SUP-1 issuance/census rows
 export EMULATR_PROBE_SUPMODE_ARM=0x200000      # P-SUP-2: 2M-retire window per CHMS
 export EMULATR_PROBE_SUPMODE_ARM23=0x200000    # P-SUP-5: 2M-retire window per 2->3 CM write
+export EMULATR_PROBE_SUPMODE_ARM12=0x1000      # P-SUP-7: 4096-retire window per ->2 CM write (brackets each supervisor visit)
 export EMULATR_TRACE_WINDOW=1                  # open the _srm.trc sink
 export EMULATR_RETIRE_TRACE_DIR="$RUN_DIR/traces"
 
