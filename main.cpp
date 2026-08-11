@@ -256,6 +256,72 @@ int main(int argc, char* argv[])
     // generic_string() keeps forward slashes for the stem derivation.
     settings.rom.firmwareImage = opts.firmwarePath.generic_string();
 
+    // STEM-WINS MODEL DERIVATION (2026-08-11, GAP-PLAT-001 CFG-6, architect
+    // direction): when --firmware is present the firmware STEM is the platform
+    // identity authority.  The stem already selects the manifest
+    // (<stem>_platform.json, Machine.cpp P1 latch); the machine MODEL must
+    // follow the SAME stem or the two identity channels drift -- the P1-latch
+    // "PLATFORM MISMATCH" this supersedes fired on exactly that hybrid
+    // (ini model=DS20 + ds10_v7_3.exe booted a DS10 bus under a DS20 model).
+    // The ini [System] model remains the fallback when no firmware is given
+    // or the stem's leading token names no known model.
+    if (!opts.firmwarePath.empty()) {
+        std::string const stem = opts.firmwarePath.stem().string();
+        std::string tok = stem.substr(0, stem.find('_'));
+        for (char& c : tok) if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
+        static char const* const kKnownModels[] =
+            { "DS10", "DS20", "DS25", "ES40", "ES45" };
+        for (char const* const k : kKnownModels) {
+            if (tok == k) {
+                if (settings.system.model != tok) {
+                    std::fprintf(stderr,
+                        "platform: model '%s' DERIVED from firmware stem '%s' "
+                        "(overrides ini [System] model='%s'; the firmware stem "
+                        "is the identity authority when present)\n",
+                        tok.c_str(), stem.c_str(),
+                        settings.system.model.c_str());
+                }
+                settings.system.model = tok;
+                break;
+            }
+        }
+    }
+
+    // GEOMETRY CLAMP (2026-08-11, architect direction): the guest memory size
+    // must not exceed the modeled machine's SILICON maximum -- an unsupported
+    // geometry is not a bigger machine, it is an impossible one (a DS10 given
+    // the ini's 4 GiB churned its memory configuration indefinitely; the real
+    // Webbrick tops out at 2 GiB).  Policy: RESET to the supported maximum and
+    // say so LOUDLY in the log, rather than fail -- the ini memorySize is one
+    // global value shared across models.  Maxima are the vendor system specs
+    // (QuickSpecs): DS10 2 GiB, DS20 4 GiB, DS25 16 GiB, ES40/ES45 32 GiB.
+    {
+        struct MemMax { char const* model; uint64_t maxBytes; };
+        static MemMax const kMemMax[] = {
+            { "DS10",  2ULL << 30 },
+            { "DS20",  4ULL << 30 },
+            { "DS25", 16ULL << 30 },
+            { "ES40", 32ULL << 30 },
+            { "ES45", 32ULL << 30 },
+        };
+        std::string modelUp = settings.system.model;
+        for (char& c : modelUp) if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
+        for (MemMax const& m : kMemMax) {
+            if (modelUp == m.model && opts.memSize > m.maxBytes) {
+                std::fprintf(stderr,
+                    "memory: GEOMETRY CLAMP -- requested %llu bytes exceeds "
+                    "the %s silicon maximum of %llu bytes; memory RESET to "
+                    "the supported maximum.  (Unsupported geometry does not "
+                    "boot: 2026-08-11 DS10 4-GiB stall, GAP-PLAT-001.)\n",
+                    static_cast<unsigned long long>(opts.memSize), m.model,
+                    static_cast<unsigned long long>(m.maxBytes));
+                opts.memSize = m.maxBytes;
+                settings.system.memorySizeBytes = m.maxBytes;
+                break;
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Construct the Machine and load firmware.
     // ------------------------------------------------------------------
