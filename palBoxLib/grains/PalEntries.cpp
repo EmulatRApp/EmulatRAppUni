@@ -94,6 +94,8 @@
 #include "deviceLib/Hwrpb.h"          // deviceLib::hwrpb::Hwpcb layout (SWPCTX)
 #include "deviceLib/HwpcbContext.h"   // loadCpuFromHwpcb / storeCpuToHwpcb (SWPCTX)
 #include "memoryLib/GuestMemory.h"   // CSERVE PUTS reads its buffer via ExecCtx::memory
+#include "traceLib/DecListingSink.h" // P-SUP-2 CHMS-armed retire window (JRN-SUPMODE-001 Sec 12; REMOVE with probe)
+#include "coreLib/SupModeProbeRing.h" // P-SUP-3 CM-transition ring (JRN-SUPMODE-001 Sec 13.7; REMOVE with probe)
 // 2026-07-08: ToyRtc.h include removed with the CSERVE 0x66 get_time case (its
 // only user).  Time is read via the internal get_timestamp bsr, not a CSERVE.
 
@@ -2862,6 +2864,20 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
             }
         }
         // ---- END P-AST-1 E3 (IER_CM arm) ----
+        // P-SUP-3 ring feed (JRN-SUPMODE-001 Sec 13.7; REMOVE with the
+        // probe family).  Uncapped by design -- the stderr census's
+        // 1024-row cap is what blinded Sec 10.1/11.1 (Sec 13.4).
+        {
+            static bool const s_supRing =
+                std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+            if (s_supRing) {
+                coreLib::supmode_probe::push(
+                    c.cpu->cycleCount, g.pc, c.opB,
+                    static_cast<uint8_t>(c.cpu->mode),
+                    static_cast<uint8_t>(coreLib::ierCmExtractMode(c.opB)),
+                    1u);
+            }
+        }
         c.cpu->ier = coreLib::ierCmIerPortion(c.opB);
         c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
 #if EMULATR_IRQDIAG
@@ -2956,6 +2972,47 @@ auto execHwMtpr(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
                     std::fflush(stderr);
                     ++s_rowsCm;
                 }
+            }
+        }
+        // P-SUP-3 ring feed (JRN-SUPMODE-001 Sec 13.7; REMOVE with the
+        // probe family).  This is the corridor's own write site (PAL
+        // 0x11181, raw index 0x09) -- Sec 13.3.
+        {
+            static bool const s_supRingCm =
+                std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+            if (s_supRingCm) {
+                coreLib::supmode_probe::push(
+                    c.cpu->cycleCount, g.pc, c.opB,
+                    static_cast<uint8_t>(c.cpu->mode),
+                    static_cast<uint8_t>(coreLib::ierCmExtractMode(c.opB)),
+                    0u);
+            }
+        }
+        // P-SUP-5 (JRN-SUPMODE-001 Sec 14.5; REMOVE with the probe
+        // family): arm the retire window at the RARE supervisor->user
+        // CM write (measured ~8-10/boot, all at the 0xFD90 frame-pop
+        // REI).  The window then covers the REI tail, the entire user
+        // era, the Species-A fault, and its handling.  Env
+        // EMULATR_PROBE_SUPMODE_ARM23=<retire count>; requires
+        // EMULATR_TRACE_WINDOW=1.  No site filter on purpose: a 2->3
+        // from an unexpected site would be its own finding.
+        {
+            static long long const s_arm23 = [] {
+                char const* const v =
+                    std::getenv("EMULATR_PROBE_SUPMODE_ARM23");
+                return v ? std::strtoll(v, nullptr, 0) : 0LL;
+            }();
+            if (s_arm23 > 0
+                && c.cpu->mode == coreLib::Mode_Privilege::Supervisor
+                && coreLib::ierCmExtractMode(c.opB)
+                       == coreLib::Mode_Privilege::User) {
+                traceLib::DecListingSink::setTraceWindowCountdown(s_arm23);
+                std::fprintf(stderr,
+                    "SUPMODE ARM23 window=%lld cyc=%llu pc=0x%llx\n",
+                    s_arm23,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc));
+                std::fflush(stderr);
             }
         }
         c.cpu->mode = coreLib::ierCmExtractMode(c.opB);
@@ -3723,16 +3780,131 @@ auto execCflush(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResu
 
 AXP_HOT AXP_FLATTEN
 auto execChmk(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
+    // P-SUP-1 baseline row (JRN-SUPMODE-001; REMOVE with the CHMS
+    // probe).  CHMK demonstrably WORKS -- its rows are the healthy
+    // reference for shR21/shR22 against the failing CHMS.  Tight cap:
+    // CHMK fires constantly.
+    {
+        static bool const s_supProbe =
+            std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+        if (s_supProbe) {
+            static unsigned long long s_n = 0;
+            ++s_n;
+            if (s_n <= 4 || (s_n & 0x3FFFull) == 0) {
+                std::fprintf(stderr,
+                    "SUPMODE CHMK#%llu cyc=%llu pc=0x%llx mode=%d "
+                    "sde=%d shR22=0x%llx shR21=0x%llx pal=%d\n",
+                    s_n,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<int>(c.cpu->mode),
+                    static_cast<int>((c.cpu->i_ctl >> 7) & 1),
+                    static_cast<unsigned long long>(c.cpu->intShadow[6]),
+                    static_cast<unsigned long long>(c.cpu->intShadow[5]),
+                    c.cpu->inPalMode() ? 1 : 0);
+                std::fflush(stderr);
+            }
+        }
+    }
     return execCallPalDispatch(g, c);
 }
 
 AXP_HOT AXP_FLATTEN
 auto execChms_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
+    // ---- P-SUP-1 issuance probe (JRN-SUPMODE-001 Sec 5; REMOVE after
+    // readout).  The census (E3 data, both 2026-08-09 runs) shows CM=2
+    // is NEVER a transition target; CHMS dispatch is wired identically
+    // to the working CHME/CHMK.  Remaining question: does the guest
+    // ever ISSUE CHMS?  Zero rows here across a boot = the break is
+    // UPSTREAM (the DCL-entry / PROCSTRT REI-to-super path never runs
+    // or dies first); nonzero rows with the census still 0 = the PAL's
+    // CHMS flow eats the mode write.  Gated on EMULATR_PROBE_SUPMODE.
+    {
+        static bool const s_supProbe =
+            std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+        if (s_supProbe) {
+            static unsigned long long s_n = 0;
+            ++s_n;
+            if (s_n <= 8 || (s_n & 0x3FFull) == 0) {
+                // Extended (JRN-SUPMODE-001 Sec 11 follow-up): the CHMS
+                // PAL flow reads its current mode from p_misc = shadow
+                // R22.  Pre-dispatch here: intShadow[6] is what p_misc
+                // WILL read as after a correct SDE swap; intReg[22] is
+                // what it reads if the swap does NOT fire (SDE clear).
+                // sde = I_CTL bit 7.  These three fields adjudicate the
+                // stale-shadow vs no-swap vs corridor question without
+                // the retire trace.
+                // shR21 = p_temp (PALtemp/scratch base; healthy value
+                // 0xF000-region).  Zero here = the corridor's hw_stq/p
+                // scratch stores + PT__PCBB load run on physical addr 0
+                // -> flow wanders without ever writing PS.  Prior form:
+                // the July PTEMP capture measured r21=0 at CSERVE-START.
+                std::fprintf(stderr,
+                    "SUPMODE CHMS#%llu cyc=%llu pc=0x%llx mode=%d "
+                    "sde=%d shR22=0x%llx shR21=0x%llx natR22=0x%llx pal=%d\n",
+                    s_n,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<int>(c.cpu->mode),
+                    static_cast<int>((c.cpu->i_ctl >> 7) & 1),
+                    static_cast<unsigned long long>(c.cpu->intShadow[6]),
+                    static_cast<unsigned long long>(c.cpu->intShadow[5]),
+                    static_cast<unsigned long long>(c.cpu->intReg[22]),
+                    c.cpu->inPalMode() ? 1 : 0);
+                std::fflush(stderr);
+            }
+        }
+    }
+    // ---- P-SUP-2 self-arming retire window (JRN-SUPMODE-001 Sec 12
+    // realized; REMOVE with the CHMS probe).  Sec 12's console arming
+    // (Ctrl/P after date entry + TIG deposit) cannot capture the
+    // corridor as written: the TIG countdown emits the FIRST N retires
+    // after `continue`, and the date->CHMS gap is ~90M cycles of
+    // STARTUP work, so any affordable window closes long before the
+    // corridor.  Arm HERE instead: the window opens at the CHMS
+    // issuance itself, so the ~40-insn CHMS->EV6__PS corridor is the
+    // first thing captured; re-arming on every CHMS keeps all attempts
+    // in-window.  Env EMULATR_PROBE_SUPMODE_ARM=<retire count, base
+    // 0x-aware> (unset/0 = off); requires EMULATR_TRACE_WINDOW=1 so
+    // the _srm.trc sink is open (main.cpp).
+    {
+        static long long const s_armCount = [] {
+            char const* const v = std::getenv("EMULATR_PROBE_SUPMODE_ARM");
+            return v ? std::strtoll(v, nullptr, 0) : 0LL;
+        }();
+        if (s_armCount > 0) {
+            traceLib::DecListingSink::setTraceWindowCountdown(s_armCount);
+            std::fprintf(stderr,
+                "SUPMODE ARM window=%lld cyc=%llu pc=0x%llx\n",
+                s_armCount,
+                static_cast<unsigned long long>(c.cpu->cycleCount),
+                static_cast<unsigned long long>(g.pc));
+            std::fflush(stderr);
+        }
+    }
     return execCallPalDispatch(g, c);
 }
 
 AXP_HOT AXP_FLATTEN
 auto execChmu_vms(InstructionGrain const& g, ExecCtx const& c) noexcept -> BoxResult {
+    // P-SUP-1 twin (JRN-SUPMODE-001; REMOVE with the CHMS probe).
+    {
+        static bool const s_supProbe =
+            std::getenv("EMULATR_PROBE_SUPMODE") != nullptr;
+        if (s_supProbe) {
+            static unsigned long long s_n = 0;
+            ++s_n;
+            if (s_n <= 8 || (s_n & 0x3FFull) == 0) {
+                std::fprintf(stderr,
+                    "SUPMODE CHMU#%llu cyc=%llu pc=0x%llx mode=%d\n",
+                    s_n,
+                    static_cast<unsigned long long>(c.cpu->cycleCount),
+                    static_cast<unsigned long long>(g.pc),
+                    static_cast<int>(c.cpu->mode));
+                std::fflush(stderr);
+            }
+        }
+    }
     return execCallPalDispatch(g, c);
 }
 
