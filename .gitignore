@@ -82,11 +82,10 @@ traces/
 *.axpsnap
 
 # Proprietary firmware + runtime images -- DO NOT redistribute ----------------
-# DEC / Compaq / HPE Alpha SRM firmware is copyrighted; users supply their own.
+# firmware; users supply their own.
 firmware/
 *.rom
 *.sys
-ds10_flash.rom
 *decompressed*.bin
 ref_decompressed.bin
 
@@ -164,7 +163,6 @@ boot*.out
 fw_*.out
 *.log
 *.runbak
-ds*_flash.rom
 EMULATR_STOP
 .fuse_hidden*
 *.BAK
@@ -184,7 +182,6 @@ traces/
 sysvar_dump.txt
 rpcc_probe.txt
 firmware/
-/journals/DS20_Badge_IIC_Completion_Interrupt_topic.xml
 
 # packaging output + bridge deletion-staging
 redist/

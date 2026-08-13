@@ -662,7 +662,8 @@ struct Ev6Translator
         coreLib::AccessKind access,
         coreLib::PAType& pa_out,
         bool forceKernelChecks = false,
-        int8_t altCheckMode = -1) noexcept
+        int8_t altCheckMode = -1,
+        uint8_t opcode = 0) noexcept
     {
         // Alignment check is uniform across PAL / non-PAL modes (it runs
         // here, before translateData; a misaligned PAL-mode access trips the
@@ -683,7 +684,7 @@ struct Ev6Translator
                 return TranslationResult::Unaligned;
             }
             logUnalignedEvent(cpu.cycleCount, cpu.pcAddr(), va,
-                              accessSize, cpu.inPalMode());
+                              accessSize, cpu.inPalMode(), opcode);
         }
         return translateData(cpu, va, access, pa_out, forceKernelChecks,
                              altCheckMode);

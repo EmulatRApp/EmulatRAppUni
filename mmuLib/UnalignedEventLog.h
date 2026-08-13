@@ -33,14 +33,21 @@
 // File format:
 //
 //   # EmulatR V4 unaligned-access fixup log
-//   # cycle  pc  va  width  palMode
-//   307     0x000000000000dbcc  0xffffffffffffffc0  8  1
+//   # cycle  pc  va  width  palMode  opcode
+//   307     0x000000000000dbcc  0xffffffffffffffc0  8  1  0x0d
 //   ...
 //
 //   First two lines are header comments (start with '#').  Each
 //   subsequent line is a tab-separated row.  Cycle is decimal; PC and
 //   VA are hex with 0x prefix; width is decimal bytes (1/2/4/8);
-//   palMode is 0 or 1.
+//   palMode is 0 or 1.  opcode (added 2026-08-12, JRN-SUPMODE-001
+//   sec 28) is the primary opcode encoded[31:26] in hex -- appended
+//   LAST so pre-existing column parsers keep working; 0x00 means the
+//   caller predates the column (or genuinely opcode 0 = CALL_PAL,
+//   which never reaches this path).  It names the instruction class
+//   without a .trc cross-reference: a row claiming LDQ_U/STQ_U
+//   (0x0b/0x0f) would be an instant misclassification flag, since
+//   those leaves force-align their EA and can never be here.
 //
 // Logging policy:
 //
@@ -90,7 +97,8 @@ void logUnalignedEvent(uint64_t cycle,
                        uint64_t pc,
                        uint64_t va,
                        uint8_t  width,
-                       bool     palMode) noexcept;
+                       bool     palMode,
+                       uint8_t  opcode = 0) noexcept;
 
 // Total events logged since the last reset.  Useful for end-of-run
 // summary dumps or comparing two runs.

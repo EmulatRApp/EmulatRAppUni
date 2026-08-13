@@ -68,7 +68,7 @@ void openIfNeeded()
                   std::ios::out | std::ios::trunc);
     if (s_stream) {
         s_stream << "# EmulatR V4 unaligned-access fixup log\n";
-        s_stream << "# cycle\tpc\tva\twidth\tpalMode\n";
+        s_stream << "# cycle\tpc\tva\twidth\tpalMode\topcode\n";
         s_streamOpen = true;
     }
 }
@@ -80,14 +80,16 @@ void logUnalignedEvent(uint64_t cycle,
                        uint64_t pc,
                        uint64_t va,
                        uint8_t  width,
-                       bool     palMode) noexcept
+                       bool     palMode,
+                       uint8_t  opcode) noexcept
 {
     uint64_t const n = s_count.fetch_add(1, std::memory_order_relaxed);
 
     if (n < kLoudThreshold) {
         SPDLOG_WARN(
-            "UNALIGN-FIXUP[{}]: cyc={} pc=0x{:016x} va=0x{:016x} width={} palMode={}",
-            n, cycle, pc, va, static_cast<int>(width), palMode ? 1 : 0);
+            "UNALIGN-FIXUP[{}]: cyc={} pc=0x{:016x} va=0x{:016x} width={} palMode={} opcode=0x{:02x}",
+            n, cycle, pc, va, static_cast<int>(width), palMode ? 1 : 0,
+            static_cast<unsigned>(opcode));
     } else if (((n - kLoudThreshold) % kSummaryStride) == 0) {
         SPDLOG_INFO("UNALIGN-FIXUP: {} total occurrences "
                     "(loud-stderr muted past first {})",
@@ -104,7 +106,9 @@ void logUnalignedEvent(uint64_t cycle,
                  << "0x" << std::hex << pc << '\t'
                  << "0x" << va << '\t'
                  << std::dec << static_cast<unsigned>(width) << '\t'
-                 << (palMode ? 1 : 0) << '\n';
+                 << (palMode ? 1 : 0) << '\t'
+                 << "0x" << std::hex << static_cast<unsigned>(opcode)
+                 << std::dec << '\n';
         // No flush per event; the OS buffers and we trade fsync cost
         // for throughput.  On clean halt the destructor flushes; on
         // crash the tail of the file may be lost but the first

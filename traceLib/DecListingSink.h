@@ -95,6 +95,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "traceLib/TraceSink.h"
 
@@ -267,6 +268,19 @@ public:
         s_pcGate.store(pc, std::memory_order_release);
     }
 
+    // Message-armed gate (env EMULATR_UART_TRACE_MARKER).  When that exact
+    // console TX line is emitted, Uart16550::bootstrapTraceWatch calls
+    // armValueGateNow() and the value/PC gate goes live FROM THAT INSTANT --
+    // a precise, timing-robust arm that replaces guessing a cycle floor
+    // (the startup.com message posts through the UART; arm there, not at an
+    // estimated cycle).  If EMULATR_UART_TRACE_MARKER is UNSET, the gate is
+    // armed at load (original floor-based behavior, unchanged).
+    static std::atomic<bool> s_valueGateArmed;
+    static void armValueGateNow() noexcept
+    {
+        s_valueGateArmed.store(true, std::memory_order_release);
+    }
+
 
 private:
     // Configuration captured at construction.
@@ -278,9 +292,16 @@ private:
     bool          m_machineOpen = false;
     bool          m_retireOpen  = false;
 
-    // Lookback ring -- fixed size, head is monotonically incrementing.
-    std::array<LookbackEntry, LOOKBACK_SIZE> m_lookback;
-    uint64_t                                 m_lookbackHead = 0;
+    // Lookback ring -- head is monotonically incrementing.  Depth is
+    // LOOKBACK_SIZE by default but can be overridden at construction via
+    // EMULATR_LOOKBACK (rounded down to a power of two, floored at 256) so
+    // the value-gate full-ring dump can reach back far enough to capture a
+    // value's *creation* stores, not just the site that loads it.  Heap-
+    // sized so a deep ring (e.g. 1<<20) does not blow the object footprint.
+    std::vector<LookbackEntry> m_lookback;          // size == m_lookbackSize
+    uint32_t                   m_lookbackSize = LOOKBACK_SIZE;
+    uint32_t                   m_lookbackMask = LOOKBACK_SIZE - 1;
+    uint64_t                   m_lookbackHead = 0;
 
     // P2-T3b: global retire ordinal.  Incremented once per onCommit (every
     // retire, traced or not), stamped into each frozen LookbackEntry and emitted

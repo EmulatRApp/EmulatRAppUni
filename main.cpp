@@ -370,7 +370,10 @@ int main(int argc, char* argv[])
                     opts.machineTraceLog,
                     opts.traceMask);
     }
-    else if (std::getenv("EMULATR_TRACE_WINDOW") != nullptr) {
+    else if (std::getenv("EMULATR_TRACE_WINDOW") != nullptr
+             || std::getenv("EMULATR_VALUE_GATE") != nullptr
+             || std::getenv("EMULATR_PC_GATE")    != nullptr
+             || std::getenv("EMULATR_LOOKBACK")   != nullptr) {
         // 2026-06-13: console-armable retire window WITHOUT a continuous
         // RETIRE_COMPACT stream.  EMULATR_TRACE_WINDOW makes the DecListingSink
         // ctor open its _srm.trc; traceMask=0 means it emits ONLY while
@@ -381,6 +384,16 @@ int main(int argc, char* argv[])
         //     >>> d pmem:80130000FF8 N    -- trace next N instrs (0 = off)
         // This bounds capture to exactly the `b dqa0/1` command, skipping the
         // multi-billion-cycle cold boot.  dec.log / machine.log stay disabled.
+        //
+        // 2026-08-11: ALSO construct when a value/PC gate or a deep-ring
+        // override is set (EMULATR_VALUE_GATE / EMULATR_PC_GATE / EMULATR_
+        // LOOKBACK).  The value/PC ring-dump gate lives in DecListingSink and
+        // fires from onCommit -- it is a no-op if the sink is never built.
+        // Requiring the caller to ALSO set EMULATR_TRACE_WINDOW just to arm a
+        // value gate was a silent footgun (a gate run with no sink boots to the
+        // fault and captures nothing).  With no EMULATR_TRACE_WINDOW the .trc
+        // is not opened at all (see DecListingSink.cpp retire-channel gate); the
+        // ring dump goes to stderr regardless, so the gate works file-free.
         trace = std::make_unique<traceLib::DecListingSink>(
                     std::filesystem::path{}, std::filesystem::path{},
                     /*traceMask*/ 0u);

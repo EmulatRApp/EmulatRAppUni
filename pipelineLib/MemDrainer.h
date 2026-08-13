@@ -68,6 +68,7 @@
 #include "memoryLib/ISystemBus.h"
 #include "mmuLib/Ev6Translator.h"
 #include "mmuLib/TranslationResult.h"
+#include "traceLib/DecListingSink.h" // VA-WATCH forward-window arm (JRN-SUPMODE-001 sec 25.4)
 #include "coreLib/SupModeProbeRing.h" // P-SUP-3 (JRN-SUPMODE-001 Sec 13.7; REMOVE with probe)
 
 // ---------------------------------------------------------------------------
@@ -386,11 +387,12 @@ private:
                 : static_cast<int8_t>(-1);
             tr = mmuLib::Ev6Translator::translateDataAligned(
                 cpu, r.memAddr, r.memSize, access, pa, vpteKernel,
-                altMode);
+                altMode, slot.grain.primaryOp);
             if (tr == mmuLib::TranslationResult::Success && writeCheck) {
                 tr = mmuLib::Ev6Translator::translateDataAligned(
                     cpu, r.memAddr, r.memSize,
-                    coreLib::AccessKind::DataWrite, pa, false, altMode);
+                    coreLib::AccessKind::DataWrite, pa, false, altMode,
+                    slot.grain.primaryOp);
             }
         }
 
@@ -1226,6 +1228,158 @@ private:
             }
         }
         // ---- END VAL-WATCH ----
+        // ---- VA-WATCH (JRN-SUPMODE-001 sec 25.4, 2026-08-12): store watch by
+        // VIRTUAL address -- catches the CREATION store into a known slot when
+        // the PA is unknown (Species B: the tz-struct string slot 0x82d95fa8
+        // holding "-46800"; creation proven >2M retires upstream of the copy,
+        // so the backward ring cannot reach it).  EMULATR_VA_WATCH=<base VA>
+        // with optional EMULATR_VA_WATCH_LEN=<bytes> (default 8), range overlap
+        // semantics identical to PA-WATCH above.  A base that fits in 32 bits
+        // with bit31 set ALSO matches its sign-extended 64-bit form (a VMS S0
+        // slot recorded as 0x82d95fa8 may travel as 0xFFFFFFFF82D95FA8 in the
+        // effective address) so an address-form guess cannot waste a run.
+        // On the FIRST hit, EMULATR_VA_WATCH_TRACE=<N> arms an N-line forward
+        // retire-compact window via DecListingSink::setTraceWindowCountdown --
+        // the "shallow forward capture from the creating store" the journal
+        // calls for.  Printed hits capped at 256 (the EXIT line carries the
+        // uncapped count).  The watch honours the message-armed
+        // gate (DecListingSink::s_valueGateArmed): with EMULATR_UART_TRACE_
+        // MARKER set it stays silent until that console line TXes, so a benign
+        // early-boot touch of the watched VA (firmware memory test) cannot
+        // burn the one-shot forward window; with the marker unset it is armed
+        // from load, matching PA-WATCH behaviour.
+        {
+            static uint64_t const s_vaWatch = []() -> uint64_t {
+                char const* e = std::getenv("EMULATR_VA_WATCH");
+                if (!e || !*e) return 0;
+                return std::strtoull(e, nullptr, 0);
+            }();
+            static uint64_t const s_vaWatchLen = []() -> uint64_t {
+                char const* e = std::getenv("EMULATR_VA_WATCH_LEN");
+                if (!e || !*e) return 8;
+                uint64_t const v = std::strtoull(e, nullptr, 0);
+                return v ? v : 8;
+            }();
+            // Optional ASN filter (EMULATR_VA_WATCH_ASN, 2026-08-12 sec 29):
+            // a LOW P0 watch address exists per-process, and the kernel
+            // demand-zero + image-activation paths CPU-store into every
+            // process's low P0 -- without a filter those hits flood the
+            // print cap.  -1 (unset) = no filter, matching prior behaviour.
+            static int64_t const s_vaWatchAsn = []() -> int64_t {
+                char const* e = std::getenv("EMULATR_VA_WATCH_ASN");
+                return (e && *e) ? static_cast<int64_t>(
+                    std::strtoull(e, nullptr, 0)) : -1;
+            }();
+            // Declare-what-you-cannot-see (2026-08-12, JRN-SUPMODE-001 sec
+            // 28): a zero-hit run must separate "armed, no hits" from "not
+            // in this build" from the log alone.  One CONFIGURED line at
+            // first drain (before any arming), one EXIT line with the true
+            // hit count at static teardown (clean shutdowns only -- a hard
+            // kill skips static destructors).  A local class may odr-use
+            // the enclosing statics (static storage duration).
+            static struct VaWatchReport {
+                unsigned long hits      = 0;   // ALL hits (print-cap below is separate)
+                bool          announced = false;
+                ~VaWatchReport() {
+                    if (s_vaWatch != 0) {
+                        std::fprintf(stderr,
+                            "VA-WATCH EXIT base=0x%llx hits=%lu armed=%d\n",
+                            static_cast<unsigned long long>(s_vaWatch), hits,
+                            traceLib::DecListingSink::s_valueGateArmed.load(
+                                std::memory_order_relaxed) ? 1 : 0);
+                        std::fflush(stderr);
+                    }
+                }
+            } s_vaReport;
+            if (s_vaWatch != 0 && !s_vaReport.announced) {
+                s_vaReport.announced = true;
+                std::fprintf(stderr,
+                    "VA-WATCH CONFIGURED base=0x%llx len=0x%llx gate=%s\n",
+                    static_cast<unsigned long long>(s_vaWatch),
+                    static_cast<unsigned long long>(s_vaWatchLen),
+                    std::getenv("EMULATR_UART_TRACE_MARKER")
+                        ? "awaits-uart-marker" : "armed-at-load");
+                std::fflush(stderr);
+            }
+            if (s_vaWatch != 0
+                && (s_vaWatchAsn < 0
+                    || cpu.asn == static_cast<uint64_t>(s_vaWatchAsn))
+                && traceLib::DecListingSink::s_valueGateArmed.load(
+                       std::memory_order_relaxed)) {
+                uint64_t const va  = r.memAddr;
+                uint64_t const sLo = va;
+                uint64_t const sHi = va + (r.memSize ? r.memSize : 1);
+                auto const hitBase = [&](uint64_t base) noexcept -> bool {
+                    return sLo < base + s_vaWatchLen && sHi > base;
+                };
+                uint64_t const sext =
+                    (s_vaWatch <= 0xFFFFFFFFull && (s_vaWatch & 0x80000000ull))
+                        ? (s_vaWatch | 0xFFFFFFFF00000000ull)
+                        : s_vaWatch;
+                uint64_t matchedBase = 0;
+                if (hitBase(s_vaWatch))                matchedBase = s_vaWatch;
+                else if (sext != s_vaWatch && hitBase(sext)) matchedBase = sext;
+                if (matchedBase != 0) {
+                    ++s_vaReport.hits;             // count ALL, print first 256
+                    if (s_vaReport.hits <= 256) {
+                        std::fprintf(stderr,
+                            "VA-WATCH(0x%llx+0x%llx) STORE off=+0x%llx cyc=%llu "
+                            "pc=0x%016llx va=0x%016llx pa=0x%016llx sz=%u "
+                            "v=0x%016llx pal=%d mode=%d asn=0x%llx ra=0x%016llx\n",
+                            static_cast<unsigned long long>(matchedBase),
+                            static_cast<unsigned long long>(s_vaWatchLen),
+                            static_cast<unsigned long long>(va - matchedBase),
+                            static_cast<unsigned long long>(cpu.cycleCount),
+                            static_cast<unsigned long long>(cpu.pc),
+                            static_cast<unsigned long long>(va),
+                            static_cast<unsigned long long>(pa),
+                            static_cast<unsigned>(r.memSize),
+                            static_cast<unsigned long long>(r.memData),
+                            cpu.inPalMode() ? 1 : 0,
+                            static_cast<int>(cpu.mode),
+                            static_cast<unsigned long long>(cpu.asn),
+                            static_cast<unsigned long long>(cpu.intReg[26]));
+                        std::fflush(stderr);
+                        static uint64_t const s_vaTrace = []() -> uint64_t {
+                            char const* e = std::getenv("EMULATR_VA_WATCH_TRACE");
+                            return (e && *e) ? std::strtoull(e, nullptr, 0) : 0;
+                        }();
+                        static bool s_vaTraceArmed = false;
+                        if (s_vaTrace > 0 && !s_vaTraceArmed) {
+                            s_vaTraceArmed = true;
+                            traceLib::DecListingSink::setTraceWindowCountdown(
+                                static_cast<int64_t>(s_vaTrace));
+                        }
+                        // EMULATR_VA_WATCH_RINGDUMP: chain the sink's one-
+                        // shot PC-gate ring dump onto a hit -- set the gate
+                        // to the storing PC so this store's own retire
+                        // (drain precedes commit) dumps the lookback ring
+                        // ENDING ON the creating store = the backward history
+                        // a post-hoc rerun would otherwise be needed for.
+                        // Requires the sink built (EMULATR_LOOKBACK et al).
+                        // Value "nz" (2026-08-12 sec 29): arm on the first
+                        // NON-ZERO store instead of the first hit -- kernel
+                        // demand-zero fills store v=0 into a fresh P0 page
+                        // and would burn the one-shot before the formatter
+                        // writes the bytes we are hunting.  Any other non-"0"
+                        // value keeps first-hit semantics.
+                        static int const s_vaRingDump = []() -> int {
+                            char const* e =
+                                std::getenv("EMULATR_VA_WATCH_RINGDUMP");
+                            if (!e || !*e || *e == '0') return 0;
+                            return (e[0] == 'n' && e[1] == 'z') ? 2 : 1;
+                        }();
+                        static bool s_vaRingArmed = false;
+                        if (s_vaRingDump != 0 && !s_vaRingArmed
+                            && (s_vaRingDump != 2 || r.memData != 0)) {
+                            s_vaRingArmed = true;
+                            traceLib::DecListingSink::setPcGate(cpu.pc);
+                        }
+                    }
+                }
+            }
+        }
+        // ---- END VA-WATCH ----
 #endif // EMULATR_BRINGUP_PROBES
 
 #if EMULATR_MEMDIAG

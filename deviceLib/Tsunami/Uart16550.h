@@ -167,6 +167,7 @@
 #if EMULATR_BRINGUP_PROBES
 #include <cstring>                              // 2026-07-18: strlen for bootstrap marker
 #include "traceLib/BreakpointSink.h"            // 2026-07-18: forceOpenNow() trace-arm
+#include "traceLib/DecListingSink.h"            // 2026-08-11: armValueGateNow() message-arm
 #endif
 
 class Uart16550 : public IIoPortHandler
@@ -993,6 +994,38 @@ private:
         if (c == '\n' || c == '\r') {
             if (!m_btLine.empty() && lineHasMarker(m_btLine)) {
                 m_btArmed = true;
+                // 2026-08-11: message-armed value/PC gate.  When
+                // EMULATR_UART_TRACE_MARKER selected this line, arm the
+                // DecListingSink value gate FROM HERE -- precise, timing-robust
+                // (the startup.com message posts through this UART, so we arm
+                // exactly at it instead of guessing a cycle floor).  Composes
+                // with EMULATR_VALUE_GATE / EMULATR_PC_GATE.  No-op when the
+                // gate is already armed (marker unset -> armed at load).
+                traceLib::DecListingSink::armValueGateNow();
+                // When a CUSTOM marker is set (EMULATR_UART_TRACE_MARKER), the
+                // intent is to START THE RETIRE TRACE at this console line --
+                // open a bounded window (EMULATR_UART_TRACE_WINDOW retires,
+                // default 20M, covers %STDRV -> the target era -> fault).  The
+                // 256-deep value-gate ring cannot reach a value BUILT far
+                // before its first register use; the full trace can.
+                // Retire-trace window is OPT-IN (EMULATR_UART_TRACE_WINDOW=<N>).
+                // Default marker-arm only ARMS THE VALUE GATE (fast, no I/O) --
+                // the full-retire firehose crawls the run (~37k cyc/s) and a
+                // window big enough to span %STDRV->target (~220M cyc) would be
+                // ~50-100 GB.  Use the value gate + ring for pinpointing; open
+                // the window explicitly only when a bounded trace is wanted.
+                static long long const s_win = []() -> long long {
+                    char const* w = std::getenv("EMULATR_UART_TRACE_WINDOW");
+                    return (w && *w) ? std::strtoll(w, nullptr, 0) : 0LL;
+                }();
+                if (s_win > 0) {
+                    traceLib::DecListingSink::setTraceWindowCountdown(s_win);
+                }
+                std::fprintf(stderr,
+                    "UART-MARKER: '%s' seen on %s -- value/PC gate ARMED%s\n",
+                    m_btLine.c_str(), m_name.c_str(),
+                    s_win > 0 ? " + retire trace window opened" : "");
+                std::fflush(stderr);
                 // 2026-07-18: force-open is OPT-IN.  It firehoses a full-retire
                 // record per instruction until shutdown -- from this marker to
                 // the transfer is ~250M cycles, which both throttles the run and
@@ -1021,10 +1054,17 @@ private:
         if (m_btLine.size() < 256u) m_btLine.push_back(c);
     }
 
-    // Case-insensitive ASCII substring test for the fixed bootstrap marker.
+    // Case-insensitive ASCII substring test for the arm marker.  The marker
+    // is env-configurable (EMULATR_UART_TRACE_MARKER=<console substring>, read
+    // once); it defaults to the VMB handoff line so existing behavior is
+    // unchanged.  Point it at "STARTUP begun" / "%STDRV" etc. to arm the
+    // value/PC gate precisely at that console message.
     static bool lineHasMarker(std::string const& line) noexcept
     {
-        static constexpr char kMarker[] = "jumping to bootstrap code";
+        static char const* const kMarker = []() -> char const* {
+            char const* e = std::getenv("EMULATR_UART_TRACE_MARKER");
+            return (e && *e) ? e : "jumping to bootstrap code";
+        }();
         std::size_t const mlen = std::strlen(kMarker);
         if (line.size() < mlen) return false;
         for (std::size_t i = 0; i + mlen <= line.size(); ++i) {
@@ -1032,7 +1072,9 @@ private:
             for (; j < mlen; ++j) {
                 char a = line[i + j];
                 if (a >= 'A' && a <= 'Z') a = static_cast<char>(a - 'A' + 'a');
-                if (a != kMarker[j]) break;
+                char b = kMarker[j];   // lowercase the marker too (env may have caps)
+                if (b >= 'A' && b <= 'Z') b = static_cast<char>(b - 'A' + 'a');
+                if (a != b) break;
             }
             if (j == mlen) return true;
         }

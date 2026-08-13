@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# run_es45.sh -- platform-named wrapper: launches EmulatR as ES45 with the
+# correct firmware + silicon-max memory + model.  Thin exec into the SSOT
+# launcher (tools/emulatr_launch.sh); do NOT duplicate arg logic here.
+# Usage: tools/run_es45.sh [purpose] [-- <extra Emulatr args>]
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/emulatr_launch.sh" es45 "$@"

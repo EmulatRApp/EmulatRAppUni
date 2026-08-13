@@ -57,6 +57,13 @@ std::atomic<uint64_t> DecListingSink::s_pcGate{
         return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
     }() };
 
+// Message-armed gate (EMULATR_UART_TRACE_MARKER).  Armed at load UNLESS a
+// marker is set -- then it waits for Uart16550 to call armValueGateNow() when
+// the marker console line is emitted on TX.  So the value/PC gate can be armed
+// precisely at "startup begun" rather than a guessed cycle floor.
+std::atomic<bool> DecListingSink::s_valueGateArmed{
+    std::getenv("EMULATR_UART_TRACE_MARKER") == nullptr };
+
 namespace {
 
 // Render a CommitRecord into a LookbackEntry.  The lookback ring
@@ -161,6 +168,33 @@ DecListingSink::DecListingSink(std::filesystem::path const& decLogPath,
     : m_traceMask(traceMask)
     , m_startTime(std::chrono::steady_clock::now())
 {
+    // Size the lookback ring.  EMULATR_LOOKBACK (decimal) overrides the
+    // LOOKBACK_SIZE default; rounded DOWN to a power of two (ring index is
+    // & mask) and floored at 256 so LOOKBACK_DUMP (250) stays valid.  A deep
+    // ring lets the value-gate dump reach a value's creation, not just its use.
+    {
+        uint32_t depth = LOOKBACK_SIZE;
+        if (char const* env = std::getenv("EMULATR_LOOKBACK")) {
+            unsigned long long req = std::strtoull(env, nullptr, 0);
+            if (req >= 256ULL) {
+                // Largest power of two <= min(req, 1<<24) to bound memory.
+                uint64_t cap = req > (1ULL << 24) ? (1ULL << 24) : req;
+                uint32_t p = 256;
+                while ((static_cast<uint64_t>(p) << 1) <= cap) p <<= 1;
+                depth = p;
+            }
+        }
+        m_lookbackSize = depth;
+        m_lookbackMask = depth - 1;
+        m_lookback.assign(depth, LookbackEntry{});
+        if (depth != LOOKBACK_SIZE) {
+            std::fprintf(stderr,
+                "[DecListingSink] lookback ring depth = %u (EMULATR_LOOKBACK)\n",
+                depth);
+            std::fflush(stderr);
+        }
+    }
+
     std::string const stamp = isoTimestampNow();
 
     if (!decLogPath.empty()) {
@@ -642,7 +676,7 @@ void DecListingSink::onCommit(CommitRecord const&        record,
     // Always update the lookback ring -- cheap, no I/O.  Keeping the
     // ring fresh during the Phase C+ pre-relocation gated window lets
     // the first post-gate onPalEntry dump emit valid recent context.
-    m_lookback[m_lookbackHead & (LOOKBACK_SIZE - 1)] = frozen;
+    m_lookback[m_lookbackHead & m_lookbackMask] = frozen;
     ++m_lookbackHead;
 
     // P-SUP-6 landing row (JRN-SUPMODE-001 Sec 16.5b; REMOVE with the
@@ -674,12 +708,15 @@ void DecListingSink::onCommit(CommitRecord const&        record,
         uint64_t const vg = s_valueGate.load(std::memory_order_relaxed);
         uint64_t const vgFloor = s_valueGateCycleFloor.load(std::memory_order_relaxed);
         uint64_t const pcg = s_pcGate.load(std::memory_order_relaxed);
-        bool const valueHit = (vg != 0
+        // Message-arm: when EMULATR_UART_TRACE_MARKER is set the gate stays
+        // disarmed until the UART sees that console line (armValueGateNow()).
+        bool const armed = s_valueGateArmed.load(std::memory_order_relaxed);
+        bool const valueHit = (armed && vg != 0
             && frozen.cycle >= vgFloor
             && record.result != nullptr
             && record.result->regWriteIdx != coreLib::kNoRegWrite
             && record.result->regWriteValue == vg);
-        bool const pcHit = (pcg != 0
+        bool const pcHit = (armed && pcg != 0
             && frozen.cycle >= vgFloor
             && frozen.pc == pcg);
         if (valueHit || pcHit) {
@@ -692,9 +729,9 @@ void DecListingSink::onCommit(CommitRecord const&        record,
                     static_cast<unsigned long long>(pcHit ? pcg : vg),
                     static_cast<unsigned long long>(frozen.cycle),
                     static_cast<unsigned long long>(frozen.pc));
-                for (uint32_t k = 0; k < LOOKBACK_SIZE; ++k) {
+                for (uint32_t k = 0; k < m_lookbackSize; ++k) {
                     LookbackEntry const& e =
-                        m_lookback[(m_lookbackHead + k) & (LOOKBACK_SIZE - 1)];
+                        m_lookback[(m_lookbackHead + k) & m_lookbackMask];
                     if (e.pc == 0 && e.mnemonic.empty()) continue;
                     std::fprintf(stderr,
                         "  o%llu cyc=%llu pc=0x%016llx %-8s %-26s %s\n",
@@ -812,7 +849,7 @@ void DecListingSink::onCommit(CommitRecord const&        record,
         // chronological order.  Same loop pattern as onPalEntry.
         for (uint32_t i = 0; i < have; ++i) {
             uint64_t const idx =
-                (m_lookbackHead - have + i) & (LOOKBACK_SIZE - 1);
+                (m_lookbackHead - have + i) & m_lookbackMask;
             LookbackEntry const& e = m_lookback[idx];
             if (e.valid) emitCommit(e, /*postCommitCpu*/ nullptr);
         }
@@ -833,10 +870,10 @@ void DecListingSink::onPalEntry(uint64_t cycle,
     // entry (single agent today => slot 0).  When CPU1 lands, thread the real
     // slot from the caller instead of inferring it from the ring.
     unsigned const cpu = static_cast<unsigned>(
-        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].cpuId
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & m_lookbackMask].cpuId
                        : 0u);
     uint64_t const ord =
-        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].ordinal
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & m_lookbackMask].ordinal
                        : 0ull;
 
     // Dump the last LOOKBACK_DUMP lookback entries into the trace
@@ -868,7 +905,7 @@ void DecListingSink::onPalEntry(uint64_t cycle,
 
     for (uint32_t i = 0; i < have; ++i) {
         uint64_t const idx =
-            (m_lookbackHead - have + i) & (LOOKBACK_SIZE - 1);
+            (m_lookbackHead - have + i) & m_lookbackMask;
         LookbackEntry const& e = m_lookback[idx];
         if (e.valid) emitCommit(e, /*postCommitCpu*/ nullptr);
     }
@@ -884,10 +921,10 @@ void DecListingSink::onPalExit(uint64_t cycle,
     // SMP marker tag (see onPalEntry): slot + global ordinal of the most recent
     // retired entry.
     unsigned const cpu = static_cast<unsigned>(
-        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].cpuId
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & m_lookbackMask].cpuId
                        : 0u);
     uint64_t const ord =
-        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & (LOOKBACK_SIZE - 1)].ordinal
+        m_lookbackHead ? m_lookback[(m_lookbackHead - 1) & m_lookbackMask].ordinal
                        : 0ull;
 
     if (m_decOpen) {
@@ -945,7 +982,7 @@ void DecListingSink::onRunEnd(coreLib::CpuState const& finalCpu)
 
     for (uint32_t i = 0; i < have; ++i) {
         uint64_t const idx =
-            (m_lookbackHead - have + i) & (LOOKBACK_SIZE - 1);
+            (m_lookbackHead - have + i) & m_lookbackMask;
         LookbackEntry const& e = m_lookback[idx];
         if (e.valid) emitCommit(e, /*postCommitCpu*/ nullptr);
     }
