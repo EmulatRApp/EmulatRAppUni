@@ -67,6 +67,26 @@ LookupResult SPAMShardManager<Shards, Ways>::lookup(
 
     uint64_t const rawVpn = vaToVpn(va);
 
+    // 2026-08-12 (Sec 32): fully-associative fast path.  With ONE shard
+    // there is no shard-selection problem -- the only reason the 4-GH
+    // probe loop exists -- so a single scan of the single bucket suffices:
+    // TlbEntry::matches() re-masks by each SLOT's own GH, which locates
+    // every granularity in one pass.  Cost drops from 4 x Ways to
+    // 1 x Ways tag compares, and no hash runs at all.
+    if constexpr (Shards == 1) {
+        LookupOutcome const out =
+            m_shards[0].lookup(rawVpn, asn, liveGlobal, liveProcess);
+        if (out.hit()) {
+            return LookupResult::fromHit(out.pte, realm);
+        }
+#if EMULATR_BRINGUP_PROBES
+        AsnCensus::classifyMiss(realm == TlbRealm::Dtb ? CensusRealm::Dtb
+                                                       : CensusRealm::Itb,
+                                rawVpn, asn);
+#endif
+        return LookupResult::miss(realm);
+    }
+
     // Probe GH=0 first (the common 8 KiB-page path), then escalate to
     // GH=1/2/3 for super-pages.  Each iteration normalises the VPN
     // through the tag constructor so super-page tags compare correctly
@@ -241,7 +261,8 @@ std::size_t SPAMShardManager<Shards, Ways>::occupancy() const noexcept
 // Explicit template instantiations.  See the comment in SPAMBucket.cpp
 // for the rationale and the procedure for adding more shapes.
 // ===========================================================================
-template class SPAMShardManager<2, 64>;   // CpuState-resident ITB/DTB (128 slots, 64-way) -- JRN-VMB-012
+template class SPAMShardManager<1, 128>;  // CpuState ITB/DTB: 128-entry FULLY ASSOCIATIVE (HRM 2.5) -- Sec 32
+template class SPAMShardManager<2, 64>;   // former CpuState shape (JRN-VMB-012; kept for bisects/tests)
 template class SPAMShardManager<16, 8>;   // former CpuState shape (now unused; harmless)
 template class SPAMShardManager<32, 8>;   // original default
 template class SPAMShardManager<8,  4>;   // tests prefer the smaller shape

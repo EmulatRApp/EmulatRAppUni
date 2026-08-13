@@ -167,7 +167,7 @@ inline constexpr uint32_t kFormatVersion         = 1;
 //       IDENTITY is re-applied from the platform manifest before restore;
 //       only mutable content travels.  Pre-v5 snapshots rejected (the IIC
 //       block layout changed; not backward-readable).
-inline constexpr uint32_t kCpuStateVersion       = 12; // v12: + dtbAltMode (JRN-SUPMODE-001 Sec 19); v11: + sirr (SPEC-SIRR-AST-001); v10: - reservedCacheLine/hasReservation (LL/SC SSOT = LockMonitor); v9: - mCpuId (T5)
+inline constexpr uint32_t kCpuStateVersion       = 13; // v13: itbMgr/dtbMgr reshaped <2,64> -> <1,128> fully associative (HRM 2.5, JRN-SUPMODE-001 Sec 32); v12: + dtbAltMode (JRN-SUPMODE-001 Sec 19); v11: + sirr (SPEC-SIRR-AST-001); v10: - reservedCacheLine/hasReservation (LL/SC SSOT = LockMonitor); v9: - mCpuId (T5)
 inline constexpr uint32_t kChipsetVersion        = 5;  // v5: manifest-driven IIC content
 inline constexpr char     kSnapshotExtension[]   = ".axpsnap";
 inline constexpr char     kSnapshotDirDefault[]  = "snapshots";

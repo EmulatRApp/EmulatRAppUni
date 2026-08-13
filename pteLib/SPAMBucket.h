@@ -90,7 +90,10 @@ struct LookupOutcome {
 template <std::size_t Ways = 8>
 class SPAMBucket {
 public:
-    static_assert(Ways > 0 && Ways <= 64, "Ways must be in 1..64");
+    // 2026-08-12: cap raised 64 -> 128 so a single bucket can hold the full
+    // 128-entry fully-associative EV6 TB organization (HRM 2.5).  The old
+    // cap dated from a 64-bit occupancy-word design that no longer exists.
+    static_assert(Ways > 0 && Ways <= 128, "Ways must be in 1..128");
 
     static constexpr std::size_t kWays = Ways;
 

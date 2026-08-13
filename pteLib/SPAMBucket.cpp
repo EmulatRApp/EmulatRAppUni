@@ -25,6 +25,10 @@
 
 #include "pteLib/SPAMBucket.h"
 
+#if defined(EMULATR_DIAG_TLB_CONSISTENCY)
+#include <cstdio>
+#endif
+
 namespace pteLib {
 
 
@@ -43,6 +47,53 @@ LookupOutcome SPAMBucket<Ways>::lookup(uint64_t         lookupVpn,
                                        EpochValue       liveProcessEpoch)
     const noexcept
 {
+#if defined(EMULATR_DIAG_TLB_CONSISTENCY)
+    // Diagnostic scan (2026-08-12, JRN-SUPMODE-001 Sec 32): do NOT return
+    // early, so overlapping live translations are seen rather than
+    // silently resolved by scan order.  REFINED same day (run 7 lesson):
+    // multiple live entries with the SAME tag and IDENTICAL PTE are the
+    // benign product of the EV6 dual DTB fill (PAL inserts via dtbTag0
+    // AND dtbTag1) -- scan order cannot change the answer, and the cold-
+    // boot firmware storm of those duplicates exhausted the report cap
+    // before VMS ever ran, leaving the era of interest UNOBSERVED.  Only
+    // a DIFFERING PTE (pfn/protection) makes the returned translation
+    // order-dependent = the true ill-formed-PTE signature.  Report that
+    // case only, capped.
+    std::size_t   matches   = 0;
+    bool          divergent = false;
+    uint64_t      firstRaw  = 0;
+    LookupOutcome first     = LookupOutcome::miss();
+
+    for (std::size_t i = 0; i < Ways; ++i) {
+        TlbEntry const& slot = m_slots[i];
+        if (!slot.matches(lookupVpn, lookupAsn)) continue;
+        if (!slot.isLiveUnder(liveGlobalEpoch, liveProcessEpoch)) continue;
+
+        if (matches == 0) {
+            first    = LookupOutcome::makeHit(slot.pte);
+            firstRaw = slot.pte.raw;
+        } else if (slot.pte.raw != firstRaw) {
+            divergent = true;
+        }
+        ++matches;
+    }
+
+    if (divergent) {
+        static unsigned long s_aliasReports = 0;
+        if (s_aliasReports < 64) { ++s_aliasReports;
+            std::fprintf(stderr,
+                "[TLB DIAG] ALIAS-DIVERGENT: %u live entries match VPN 0x%llx "
+                "ASN 0x%llx with DIFFERING PTEs (first raw=0x%llx) -- returned "
+                "translation is scan-order dependent\n",
+                static_cast<unsigned>(matches),
+                static_cast<unsigned long long>(lookupVpn),
+                static_cast<unsigned long long>(lookupAsn),
+                static_cast<unsigned long long>(firstRaw));
+            std::fflush(stderr);
+        }
+    }
+    return first;
+#else
     for (std::size_t i = 0; i < Ways; ++i) {
         TlbEntry const& slot = m_slots[i];
         if (!slot.matches(lookupVpn, lookupAsn)) {
@@ -54,6 +105,7 @@ LookupOutcome SPAMBucket<Ways>::lookup(uint64_t         lookupVpn,
         return LookupOutcome::makeHit(slot.pte);
     }
     return LookupOutcome::miss();
+#endif
 }
 
 
@@ -168,7 +220,8 @@ bool SPAMBucket<Ways>::any() const noexcept
 // Add a new line for any additional shape exercised by tests or by a
 // CpuState-resident manager.
 // ===========================================================================
-template class SPAMBucket<64>;    // CpuState ITB/DTB Ways=64 -- JRN-VMB-012
+template class SPAMBucket<128>;   // CpuState ITB/DTB fully associative (HRM 2.5) -- Sec 32
+template class SPAMBucket<64>;    // former CpuState shape (JRN-VMB-012; tests)
 template class SPAMBucket<8>;     // former production default (manager Ways=8)
 template class SPAMBucket<4>;     // tests prefer the smaller shape
 

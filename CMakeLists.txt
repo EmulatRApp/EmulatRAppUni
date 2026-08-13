@@ -515,6 +515,25 @@ if(EMULATR_BRINGUP_PROBES)
 endif()
 
 # ----------------------------------------------------------------------------
+# EMULATR_DIAG_TLB_CONSISTENCY -- TLB alias / ill-formed-PTE detector.
+# ----------------------------------------------------------------------------
+# When ON, SPAMBucket::lookup scans ALL ways instead of returning on the
+# first hit and reports (rate-capped) any lookup where MORE THAN ONE live
+# entry matches the VPN/ASN -- a state where the returned PFN depends on
+# scan order (architecturally UNPREDICTABLE per HRM 4.1.4; on real silicon
+# software avoids it, so its appearance implicates our fill/invalidate
+# path).  Built 2026-08-12 for the Species B "TLB may return a malformed
+# PTE" hypothesis (JRN-SUPMODE-001 Sec 32).  Costs a full-ways scan per
+# lookup -- diagnostics-default-off rule applies.
+option(EMULATR_DIAG_TLB_CONSISTENCY
+       "Compile in the TLB alias-detection diagnostic scan (slower lookups)"
+       OFF)
+
+if(EMULATR_DIAG_TLB_CONSISTENCY)
+    target_compile_definitions(Emulatr PRIVATE EMULATR_DIAG_TLB_CONSISTENCY=1)
+endif()
+
+# ----------------------------------------------------------------------------
 # Debug stepping flags (MSVC)
 # ----------------------------------------------------------------------------
 # Stepping through V4 under the Visual Studio / VS Code debugger needs

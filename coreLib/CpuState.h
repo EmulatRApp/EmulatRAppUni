@@ -431,8 +431,16 @@ struct CpuState
     // Lookup is driven by Ev6Translator; insert / invalidate are driven
     // by the HW_MTPR ITB_* / DTB_* PAL handlers, which reach these via
     // ExecCtx::cpu.
-    pteLib::SPAMShardManager<2, 64> itbMgr;   // JRN-VMB-012: was <16,8> (8-way conflict-evicted)
-    pteLib::SPAMShardManager<2, 64> dtbMgr;   // JRN-VMB-012: 128 slots, 64-way/shard
+    // 2026-08-12 (JRN-SUPMODE-001 Sec 32): <2,64> -> <1,128>.  EV6 ITB and
+    // DTB are each 128-entry FULLY ASSOCIATIVE with round-robin allocation
+    // (21264 HRM Sec 2.5 / 4.1.5).  Fully associative means ONE set: any
+    // Shards > 1 is set-associative and conflict-evicts entries the silicon
+    // would have kept, so the emulated miss set (and PAL refill traffic)
+    // diverges from hardware -- the JRN-VMB-012 root cause; <2,64> halved
+    // that divergence but did not change its kind.  Layout change: bump
+    // kCpuStateVersion 12 -> 13 (systemLib/Snapshot.h).
+    pteLib::SPAMShardManager<1, 128> itbMgr;
+    pteLib::SPAMShardManager<1, 128> dtbMgr;
 
     // TB IPR staging registers (HRM 5.2.1 / 5.3.x).  ITB_TAG / DTB_TAG
     // are write-only staging registers; a write to ITB_PTE / DTB_PTE
