@@ -138,6 +138,7 @@ private:
     QLabel*      m_firmwareNote = nullptr;
     QComboBox*   m_binaryCfg    = nullptr;   // per-system emulator binary pin
     QLabel*      m_binaryNote   = nullptr;
+    QComboBox*   m_snapMode     = nullptr;   // per-system snapshot cadence knob
     void updateBinaryWidgets(int row);
     QSpinBox*    m_consolePort  = nullptr;
     QCheckBox*   m_exposeLan    = nullptr;

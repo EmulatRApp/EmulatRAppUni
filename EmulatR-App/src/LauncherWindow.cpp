@@ -486,7 +486,24 @@ QWidget* LauncherWindow::buildDetailsTab()
     m_binaryNote = new QLabel(bin);
     m_binaryNote->setWordWrap(true);
     binForm->addRow(QString(), m_binaryNote);
+
+    // Snapshot cadence knob (2026-08-14).  Safety = the emulator default
+    // (one periodic save per 50B cycles); Diagnostic = dense 1B-cycle
+    // resume points (each save pauses the guest for a multi-GB write);
+    // Off = no periodic saves.
+    m_snapMode = new QComboBox(bin);
+    m_snapMode->addItem(tr("Safety net (default)"), QStringLiteral("safety"));
+    m_snapMode->addItem(tr("Diagnostic (dense, slower)"), QStringLiteral("diagnostic"));
+    m_snapMode->addItem(tr("Off"), QStringLiteral("off"));
+    binForm->addRow(tr("Snapshots:"), m_snapMode);
     layout->addWidget(bin);
+
+    connect(m_snapMode, &QComboBox::currentIndexChanged, this, [this] {
+        if (m_updatingWidgets) return;
+        int const row = selectedRow();
+        if (row < 0) return;
+        m_model->setSnapshotMode(row, m_snapMode->currentData().toString());
+    });
 
     connect(m_binaryCfg, &QComboBox::currentIndexChanged, this, [this] {
         if (m_updatingWidgets) return;
@@ -767,6 +784,12 @@ void LauncherWindow::updateBinaryWidgets(int row)
         ExeDiscovery::findEmulatrForSystem(r.binaryConfig, r.binaryCustomPath);
     m_binaryNote->setText(res.found() ? QDir::toNativeSeparators(res.path)
                                       : res.detail);
+    if (m_snapMode) {
+        QString mode = r.snapshotMode.trimmed().toLower();
+        if (mode.isEmpty()) mode = QStringLiteral("safety");
+        int const mi = m_snapMode->findData(mode);
+        m_snapMode->setCurrentIndex(mi < 0 ? 0 : mi);
+    }
     m_updatingWidgets = guard;
 }
 
@@ -1162,6 +1185,17 @@ void LauncherWindow::onStart()
     req.firmwareRelPath = m_firmware->currentData().toString();
     req.consolePort     = m_model->consolePort(row);
     req.environment     = m_envModel->composeEnvironment(inherited);
+    // Snapshot cadence knob -> the emulator's env channels (2026-08-14).
+    {
+        QString const mode = r.snapshotMode.trimmed().toLower();
+        if (mode == QLatin1String("off"))
+            req.environment.insert(QStringLiteral("EMULATR_AUTOSNAP"),
+                                   QStringLiteral("off"));
+        else if (mode == QLatin1String("diagnostic"))
+            req.environment.insert(QStringLiteral("EMULATR_AUTOSNAP_PERIOD"),
+                                   QStringLiteral("1000000000"));
+        // "" / "safety": emulator default (50B-cycle period), nothing to set.
+    }
     req.envForLog       = m_envModel->effectiveSelectionForLog();
     req.strippedForLog  = m_envModel->strippedFrom(inherited);
 

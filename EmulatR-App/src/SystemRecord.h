@@ -107,6 +107,13 @@ struct SystemRecord
     QString  binaryConfig;
     QString  binaryCustomPath;
 
+    // Snapshot cadence knob (2026-08-14): "" or "safety" -> emulator default
+    // (periodic save every 50B cycles -- a rare safety net); "diagnostic" ->
+    // EMULATR_AUTOSNAP_PERIOD=1e9 (dense resume points; each save freezes the
+    // guest for a multi-GB write, so this is an investigator's setting);
+    // "off" -> EMULATR_AUTOSNAP=off (no periodic saves at all).
+    QString  snapshotMode;
+
     // Transient (not persisted).
     bool     running     = false;
     Health   health      = Health::Unknown;

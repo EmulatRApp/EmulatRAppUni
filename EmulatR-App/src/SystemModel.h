@@ -98,6 +98,7 @@ public:
 
     void setHealth(int row, Health health, QString const& note);
     void setBinaryConfig(int row, QString const& cfg, QString const& customPath);
+    void setSnapshotMode(int row, QString const& mode);
 
     // ---- console port (W3 / E10) ------------------------------------------
     // The port is PER-SYSTEM STATE held in the system's own Emulatr.ini, not
