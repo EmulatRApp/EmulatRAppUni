@@ -10,7 +10,7 @@
 # superbuild cannot collide with emulator target names.
 # ============================================================================
 cmake_minimum_required(VERSION 3.20)
-project(PlatformEditor CXX)
+project(PlatformEditor VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -104,6 +104,17 @@ if(Qt6_FOUND)
   target_link_libraries(platedit_qt PRIVATE platedit_core Qt6::Widgets)
   target_compile_definitions(platedit_qt PRIVATE
     PLATEDIT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+  # Windows exe properties: VERSIONINFO + icon via the repo-shared template.
+  if(WIN32)
+    set(APP_DESCRIPTION "ASA EmulatR Platform Editor")
+    set(APP_EXENAME     "platedit_qt.exe")
+    set(APP_ICON        "${CMAKE_CURRENT_SOURCE_DIR}/resources/PlatEdit.ico")
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../../resources/version.rc.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/platedit_qt_version.rc @ONLY)
+    target_sources(platedit_qt PRIVATE
+                   ${CMAKE_CURRENT_BINARY_DIR}/platedit_qt_version.rc)
+  endif()
   # Stage the schema + catalog BESIDE THE EXECUTABLE so a deployed editors/
   # dir is self-contained (main.cpp resolution order: env, exe dir, source
   # dir).  $<TARGET_FILE_DIR> tracks the generator: VS multi-config appends

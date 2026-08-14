@@ -72,6 +72,17 @@ set_target_properties(EmulatrLaunch PROPERTIES
     OUTPUT_NAME "EmulatrLaunch"
     WIN32_EXECUTABLE ON)
 
+# Windows exe properties: VERSIONINFO + icon via the repo-shared template.
+if(WIN32)
+    set(APP_DESCRIPTION "ASA EmulatR Launcher")
+    set(APP_EXENAME     "EmulatrLaunch.exe")
+    set(APP_ICON        "${CMAKE_CURRENT_SOURCE_DIR}/resources/EmulatrLaunch.ico")
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../resources/version.rc.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/EmulatrLaunch_version.rc @ONLY)
+    target_sources(EmulatrLaunch PRIVATE
+                   ${CMAKE_CURRENT_BINARY_DIR}/EmulatrLaunch_version.rc)
+endif()
+
 # ----------------------------------------------------------------------------
 # Qt runtime deployment (2026-08-14, beta packaging).  windeployqt runs as a
 # POST_BUILD step so the build output directory is a complete, runnable,

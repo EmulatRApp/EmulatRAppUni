@@ -288,6 +288,18 @@ add_executable(Emulatr ${EMULATR_SOURCES}
     coreLib/LoggingMacros.h
     deviceLib/ControllerConfig.h)
 
+# Windows exe properties: VERSIONINFO + icon from the shared template
+# (resources/version.rc.in) -- version flows from project(Emulatr VERSION),
+# the same single source sync_hm_version.py mirrors into the H&M docs.
+if(WIN32)
+    set(APP_DESCRIPTION "ASA EmulatR -- Alpha AXP (EV6/21264) Emulator")
+    set(APP_EXENAME     "Emulatr.exe")
+    set(APP_ICON        "${CMAKE_CURRENT_SOURCE_DIR}/resources/EmulatR.ico")
+    configure_file(resources/version.rc.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/Emulatr_version.rc @ONLY)
+    target_sources(Emulatr PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/Emulatr_version.rc)
+endif()
+
 target_include_directories(Emulatr PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
