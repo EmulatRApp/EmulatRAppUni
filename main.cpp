@@ -373,6 +373,7 @@ int main(int argc, char* argv[])
     else if (std::getenv("EMULATR_TRACE_WINDOW") != nullptr
              || std::getenv("EMULATR_VALUE_GATE") != nullptr
              || std::getenv("EMULATR_PC_GATE")    != nullptr
+             || std::getenv("EMULATR_FAULT_RINGDUMP_VA") != nullptr
              || std::getenv("EMULATR_LOOKBACK")   != nullptr) {
         // 2026-06-13: console-armable retire window WITHOUT a continuous
         // RETIRE_COMPACT stream.  EMULATR_TRACE_WINDOW makes the DecListingSink
@@ -709,6 +710,25 @@ int main(int argc, char* argv[])
     if (!autoSnapshotEnabled) {
         std::fprintf(stderr, "DEBUG: periodic auto-snapshots OFF "
                              "(--autosnapshot off)\n");
+    }
+
+    // 2026-08-13: runtime save cadence + prune depth (b2cap1 lesson: the
+    // built-in 50B-cycle period wrote ZERO saves in a ~4B-cycle capture
+    // boot).  CLI numeric (--autosnapshot <N>) wins over the env channel
+    // EMULATR_AUTOSNAP_PERIOD; keep depth via EMULATR_AUTOSNAP_KEEP.
+    // Machine::run prints the effective schedule (CONFIGURED line).
+    {
+        uint64_t period = opts.autoSnapPeriodCycles;
+        if (period == 0) {
+            if (char const* const p = std::getenv("EMULATR_AUTOSNAP_PERIOD")) {
+                period = std::strtoull(p, nullptr, 0);
+            }
+        }
+        if (period != 0) mach.setAutoSavePeriodCycles(period);
+        if (char const* const k = std::getenv("EMULATR_AUTOSNAP_KEEP")) {
+            int const keep = std::atoi(k);
+            if (keep > 0) mach.setAutoSaveKeepCount(keep);
+        }
     }
 
     // ------------------------------------------------------------------

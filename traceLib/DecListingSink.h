@@ -268,6 +268,21 @@ public:
         s_pcGate.store(pc, std::memory_order_release);
     }
 
+    // Fault-triggered ring dump (env EMULATR_FAULT_RINGDUMP_VA).  The
+    // fault-raise seam (PipelineDriver) calls requestFaultRingDump() when a
+    // raised fault's VA matches the env value; the NEXT onCommit dumps the
+    // ring ONCE, so the ring ends at the faulting instruction (plus the
+    // first handler-entry retire).  Built 2026-08-13: a retire-PC gate
+    // structurally cannot end a ring on a faulting store -- the faulting
+    // instruction never retires, so a PC gate only ever catches benign
+    // passes through the same PC (measured, JRN-B2-001).
+    static std::atomic<uint64_t> s_faultRingDumpVa;
+    static std::atomic<bool>     s_faultRingDumpPending;
+    static void requestFaultRingDump() noexcept
+    {
+        s_faultRingDumpPending.store(true, std::memory_order_release);
+    }
+
     // Message-armed gate (env EMULATR_UART_TRACE_MARKER).  When that exact
     // console TX line is emitted, Uart16550::bootstrapTraceWatch calls
     // armValueGateNow() and the value/PC gate goes live FROM THAT INSTANT --

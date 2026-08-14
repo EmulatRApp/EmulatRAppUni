@@ -97,6 +97,14 @@ struct AppOptions
     bool                  autoSnapshot    = true;
     bool                  noAutoload      = false;
 
+    // 2026-08-13: runtime auto-save cadence (JRN-SUPMODE-001 b2cap1
+    // lesson: the built-in 50B-cycle period means a ~4B-cycle capture
+    // boot writes ZERO periodic saves).  Nonzero = save every N cycles;
+    // 0 = the built-in kAutoSavePeriodCycles default.  Set via
+    // --autosnapshot <N> (numeric = on with this period) or env
+    // EMULATR_AUTOSNAP_PERIOD (CLI wins).
+    uint64_t              autoSnapPeriodCycles = 0;
+
     // Experimental: one-shot synthetic INTERRUPT-class trap injection
     // at the specified absolute cycleCount.  When cpu.cycleCount first
     // reaches this value, Machine::run forces cpu.pc = palBase + 0x100

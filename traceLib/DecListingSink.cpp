@@ -46,6 +46,16 @@ std::atomic<uint64_t> DecListingSink::s_valueGateCycleFloor{
         return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
     }() };
 
+// Fault-triggered ring dump (EMULATR_FAULT_RINGDUMP_VA).  Armed from env at
+// load; the pending flag is raised by the fault seam in PipelineDriver and
+// consumed by the next onCommit.  0 = off.
+std::atomic<uint64_t> DecListingSink::s_faultRingDumpVa{
+    []() -> uint64_t {
+        char const* e = std::getenv("EMULATR_FAULT_RINGDUMP_VA");
+        return (e && *e) ? std::strtoull(e, nullptr, 0) : 0ULL;
+    }() };
+std::atomic<bool> DecListingSink::s_faultRingDumpPending{ false };
+
 // Optional PC gate for the ring dump (EMULATR_PC_GATE).  Dumps the ring ONCE
 // when a retire's PC equals this value (and cycle >= the shared floor).  Lets
 // the ring END on a chosen instruction so its predecessors are guaranteed
@@ -191,6 +201,19 @@ DecListingSink::DecListingSink(std::filesystem::path const& decLogPath,
             std::fprintf(stderr,
                 "[DecListingSink] lookback ring depth = %u (EMULATR_LOOKBACK)\n",
                 depth);
+            std::fflush(stderr);
+        }
+    }
+
+    // Visibility for the silent env-armed gates (b2cap1 lesson: an armed-but-
+    // silent instrument is indistinguishable from a dark one in the log).
+    {
+        uint64_t const frd = s_faultRingDumpVa.load(std::memory_order_relaxed);
+        if (frd != 0) {
+            std::fprintf(stderr,
+                "[DecListingSink] FAULT-RINGDUMP CONFIGURED va=0x%016llx "
+                "(EMULATR_FAULT_RINGDUMP_VA; one-shot, fires on matching fault)\n",
+                static_cast<unsigned long long>(frd));
             std::fflush(stderr);
         }
     }
@@ -719,28 +742,53 @@ void DecListingSink::onCommit(CommitRecord const&        record,
         bool const pcHit = (armed && pcg != 0
             && frozen.cycle >= vgFloor
             && frozen.pc == pcg);
-        if (valueHit || pcHit) {
-            static std::atomic<bool> s_fired{ false };
-            bool expected = false;
-            if (s_fired.compare_exchange_strong(expected, true)) {
+        // Fault-triggered dump: pending flag raised at the fault-raise seam
+        // (PipelineDriver) when the fault VA matched EMULATR_FAULT_RINGDUMP_VA.
+        // Consumed here on the first retire AFTER the fault (the handler
+        // entry), so the ring ends at the faulting instruction.  Independent
+        // one-shot: a spent PC/value gate must not suppress it.
+        bool const faultHit =
+            s_faultRingDumpPending.exchange(false, std::memory_order_acq_rel);
+        if (valueHit || pcHit || faultHit) {
+            auto dumpRing = [&](char const* kind, uint64_t key) {
                 std::fprintf(stderr,
                     "==== RING-GATE (%s) key=0x%016llx hit @ cyc=%llu pc=0x%016llx -- ring dump ====\n",
-                    pcHit ? "pc" : "value",
-                    static_cast<unsigned long long>(pcHit ? pcg : vg),
+                    kind,
+                    static_cast<unsigned long long>(key),
                     static_cast<unsigned long long>(frozen.cycle),
                     static_cast<unsigned long long>(frozen.pc));
                 for (uint32_t k = 0; k < m_lookbackSize; ++k) {
                     LookbackEntry const& e =
                         m_lookback[(m_lookbackHead + k) & m_lookbackMask];
                     if (e.pc == 0 && e.mnemonic.empty()) continue;
+                    // enc= raw instruction word: lets a ring reader verify the
+                    // DECODE against the guest's actual bytes (2026-08-13: an
+                    // LDA-vs-LDL one-opcode-bit question was undecidable from
+                    // mnemonics alone -- never omit the encoding again).
                     std::fprintf(stderr,
-                        "  o%llu cyc=%llu pc=0x%016llx %-8s %-26s %s\n",
+                        "  o%llu cyc=%llu pc=0x%016llx enc=%08x %-8s %-26s %s\n",
                         static_cast<unsigned long long>(e.ordinal),
                         static_cast<unsigned long long>(e.cycle),
                         static_cast<unsigned long long>(e.pc),
+                        e.encoded,
                         e.mnemonic.c_str(), e.operands.c_str(), e.result.c_str());
                 }
                 std::fflush(stderr);
+            };
+            if (valueHit || pcHit) {
+                static std::atomic<bool> s_fired{ false };
+                bool expected = false;
+                if (s_fired.compare_exchange_strong(expected, true)) {
+                    dumpRing(pcHit ? "pc" : "value", pcHit ? pcg : vg);
+                }
+            }
+            if (faultHit) {
+                static std::atomic<bool> s_faultFired{ false };
+                bool expected = false;
+                if (s_faultFired.compare_exchange_strong(expected, true)) {
+                    dumpRing("fault",
+                             s_faultRingDumpVa.load(std::memory_order_relaxed));
+                }
             }
         }
     }

@@ -307,6 +307,17 @@ public:
     void setAutoSnapshotEnabled(bool on) noexcept { m_autoSnapshotEnabled = on; }
     bool autoSnapshotEnabled() const noexcept     { return m_autoSnapshotEnabled; }
 
+    // 2026-08-13: runtime override of the periodic-save cadence and prune
+    // depth (b2cap1 lesson -- the built-in 50B-cycle period writes zero
+    // saves in a ~4B-cycle capture boot).  0 = built-in default from
+    // Snapshot.h (kAutoSavePeriodCycles / kAutoSaveKeepCount); the
+    // effective-value accessors resolve the override in Machine.cpp so
+    // this header does not need Snapshot.h.
+    void setAutoSavePeriodCycles(uint64_t cycles) noexcept { m_autoSavePeriodCycles = cycles; }
+    void setAutoSaveKeepCount(int n) noexcept              { m_autoSaveKeepCount = n; }
+    uint64_t autoSavePeriodCycles() const noexcept;  // effective (override or built-in)
+    int      autoSaveKeepCount()    const noexcept;  // effective (override or built-in)
+
     // ------------------------------------------------------------------
     // One-shot pre-diagnostic snapshot trigger.
     // ------------------------------------------------------------------
@@ -583,6 +594,8 @@ private:
     std::filesystem::path    m_snapshotDir       = "snapshots";
     uint64_t                 m_nextAutoSaveCycle = 0;
     bool                     m_autoSnapshotEnabled = false;
+    uint64_t                 m_autoSavePeriodCycles = 0;  // 0 = kAutoSavePeriodCycles
+    int                      m_autoSaveKeepCount    = 0;  // 0 = kAutoSaveKeepCount
 
     // ------------------------------------------------------------------
     // Pre-diagnostic snapshot trigger state.

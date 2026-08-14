@@ -1380,8 +1380,24 @@ bool Machine::step() noexcept
 // call setAutoSnapshotEnabled(false) before run().  The default is on.
 //
 // Cost: one boolean check and one uint64 compare per cycle in the
-// no-save path.  The save path itself is rare (every 10M cycles by
-// default) and dominated by file I/O.
+// no-save path.  The save path itself is rare (every 50B cycles by
+// default -- runtime-tunable via --autosnapshot <N> /
+// EMULATR_AUTOSNAP_PERIOD for ~1B-cadence capture boots) and
+// dominated by file I/O.
+
+// Effective auto-save policy: a nonzero runtime override (CLI/env, set
+// via main.cpp) wins; 0 falls back to the Snapshot.h built-ins.  Defined
+// here rather than inline so Machine.h does not need Snapshot.h.
+uint64_t Machine::autoSavePeriodCycles() const noexcept
+{
+    return m_autoSavePeriodCycles != 0 ? m_autoSavePeriodCycles
+                                       : kAutoSavePeriodCycles;
+}
+
+int Machine::autoSaveKeepCount() const noexcept
+{
+    return m_autoSaveKeepCount > 0 ? m_autoSaveKeepCount : kAutoSaveKeepCount;
+}
 
 StopReason Machine::run(uint64_t maxCycles) noexcept
 {
@@ -1389,7 +1405,17 @@ StopReason Machine::run(uint64_t maxCycles) noexcept
     // post-snapshot resume does not race a save fired in the previous
     // run's tail.
     if (m_autoSnapshotEnabled) {
-        m_nextAutoSaveCycle = systemNow() + kAutoSavePeriodCycles;
+        m_nextAutoSaveCycle = systemNow() + autoSavePeriodCycles();
+        // Loud CONFIGURED line (VA-WATCH precedent, sec 28.4): the b2cap1
+        // postmortem could not tell "auto-save armed but never due" from
+        // "auto-save dark" -- this line makes the schedule visible up front.
+        std::fprintf(stderr,
+                     "auto-snapshot: CONFIGURED  period=%llu cycles  keep=%d  "
+                     "first-save@cyc=%llu  dir=%s\n",
+                     static_cast<unsigned long long>(autoSavePeriodCycles()),
+                     autoSaveKeepCount(),
+                     static_cast<unsigned long long>(m_nextAutoSaveCycle),
+                     m_snapshotDir.string().c_str());
     }
 
     // Clear the forensic exception logs so each run() starts with
@@ -1782,9 +1808,17 @@ bool Machine::systemTick(uint64_t i) noexcept
 
             std::error_code ec;
             std::filesystem::create_directories(m_snapshotDir, ec);
-            (void) systemLib::save(*this, m_snapshotDir / name.str(), "periodic");
-            systemLib::pruneOldSnapshots(m_snapshotDir, kAutoSaveKeepCount);
-            m_nextAutoSaveCycle = systemNow() + kAutoSavePeriodCycles;
+            auto const res = systemLib::save(*this, m_snapshotDir / name.str(), "periodic");
+            // stderr witness per save (b2cap1 visibility gap): the run log
+            // must show every save (or its failure), not just spdlog.
+            std::fprintf(stderr,
+                         "auto-snapshot: %s %s at cyc=%llu (%llu bytes)\n",
+                         res.success ? "saved" : "SAVE FAILED:",
+                         res.success ? res.path.c_str() : res.errorMessage.c_str(),
+                         static_cast<unsigned long long>(systemNow()),
+                         static_cast<unsigned long long>(res.bytesWritten));
+            systemLib::pruneOldSnapshots(m_snapshotDir, autoSaveKeepCount());
+            m_nextAutoSaveCycle = systemNow() + autoSavePeriodCycles();
         }
 
         // ------------------------------------------------------------------

@@ -178,10 +178,18 @@ AppOptions AppOptions::parse(int argc, char* argv[])
         }
         else if (flag == "--autosnapshot") {
             // 2026-06-05: master toggle for periodic auto_*.axpsnap saves.
+            // 2026-08-13: numeric value = ON with an explicit save period in
+            // cycles (b2cap1: the built-in 50B period wrote zero saves in a
+            // 4B-cycle capture boot -- capture runs need ~1B cadence).
             if      (value == "on")  opts.autoSnapshot = true;
             else if (value == "off") opts.autoSnapshot = false;
+            else if (parseUnsigned(value, opts.autoSnapPeriodCycles)
+                     && opts.autoSnapPeriodCycles > 0) {
+                opts.autoSnapshot = true;
+            }
             else {
-                opts.parseError = std::string{"--autosnapshot: must be on|off, got "}
+                opts.parseError = std::string{"--autosnapshot: must be on|off|"
+                                              "<period-cycles>, got "}
                                 + std::string{value};
                 return opts;
             }
@@ -309,10 +317,14 @@ char const* AppOptions::helpText() noexcept
         "                         from the descriptor)\n"
         "  --mem      <bytes>     guest memory size                  (default 64 MiB)\n"
         "  --max-cycles <N>       cap on the run loop                (default unlimited)\n"
-        "  --autosnapshot <on|off>  periodic auto_*.axpsnap saves      (default on;\n"
+        "  --autosnapshot <on|off|N>  periodic auto_*.axpsnap saves    (default on;\n"
         "                              off = only the named --snapshot-on-pc file is\n"
         "                              written -- use for cold-boot mint runs to avoid\n"
-        "                              the disk cliff.  Env: EMULATR_AUTOSNAP=off)\n"
+        "                              the disk cliff.  N = on with an explicit save\n"
+        "                              period of N cycles (built-in default 50B -- too\n"
+        "                              coarse for capture boots; use ~1B).  Env:\n"
+        "                              EMULATR_AUTOSNAP=off, EMULATR_AUTOSNAP_PERIOD=N,\n"
+        "                              EMULATR_AUTOSNAP_KEEP=K (prune depth, default 5))\n"
         "  --no-autoload          skip autoload-newest at startup -- forces a genuine\n"
         "                              cold boot instead of restoring the newest\n"
         "                              snapshot.  Env: EMULATR_NO_AUTOLOAD=1\n"

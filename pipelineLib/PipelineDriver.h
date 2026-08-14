@@ -1254,6 +1254,31 @@ private:
         if (r.faultCode != coreLib::kNoFault) {
             cpu.lastFaultCode = r.faultCode;
 
+            // Fault-triggered ring dump (EMULATR_FAULT_RINGDUMP_VA): when a
+            // raised fault's VA matches (raw or sign-extended-32 form), ask
+            // DecListingSink to dump its lookback ring on the next retire --
+            // the only instrument that can end a ring ON a faulting
+            // instruction, which never retires (JRN-B2-001: a retire-PC
+            // gate at the fault PC catches only benign passes).
+            {
+                uint64_t const frdVa =
+                    traceLib::DecListingSink::s_faultRingDumpVa.load(
+                        std::memory_order_relaxed);
+                if (frdVa != 0
+                    && (cpu.va == frdVa
+                        || cpu.va == (0xFFFFFFFF00000000ULL | frdVa))) {
+                    traceLib::DecListingSink::requestFaultRingDump();
+                    std::fprintf(stderr,
+                        "FAULT-RINGDUMP: fault=%d va=0x%016llx pc=0x%016llx "
+                        "cyc=%llu -- ring dump on next retire\n",
+                        static_cast<int>(r.faultCode),
+                        static_cast<unsigned long long>(cpu.va),
+                        static_cast<unsigned long long>(slot.grain.pc),
+                        static_cast<unsigned long long>(cpu.cycleCount));
+                    std::fflush(stderr);
+                }
+            }
+
             // Fault telemetry -> logs/<stem>_faults.log (offline review, not the
             // multi-GB .trc).  Skip routine TB misses: kFaultDtbMiss /
             // kFaultItbMiss are high-volume paging events and would flood the
