@@ -18,6 +18,7 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QTimer>
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDialog>
@@ -291,8 +292,19 @@ LauncherWindow::LauncherWindow(QWidget* parent) : QMainWindow(parent)
             this, &LauncherWindow::onEscalationAvailable);
     connect(m_platEd, &PlatEdBridge::finished,
             this, &LauncherWindow::onPlatEdFinished);
+    // 2026-08-14: DEBOUNCED.  directoryChanged -> 300 ms restartable
+    // single-shot -> onRunDirChanged.  Two reasons: bursts of file events
+    // (emulator writing into the run dir) coalesce into one preflight, and
+    // no future self-write inside a watched directory can ever again spin
+    // the watcher->preflight->write loop at event-loop speed (the probe-file
+    // storm found on the first installed deployment).
+    m_watchDebounce = new QTimer(this);
+    m_watchDebounce->setSingleShot(true);
+    m_watchDebounce->setInterval(300);
+    connect(m_watchDebounce, &QTimer::timeout,
+            this, [this] { onRunDirChanged(QString()); });
     connect(m_watcher, &QFileSystemWatcher::directoryChanged,
-            this, &LauncherWindow::onRunDirChanged);
+            this, [this](QString const&) { m_watchDebounce->start(); });
 
     m_model->load();
 

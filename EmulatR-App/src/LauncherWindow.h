@@ -35,6 +35,7 @@
 class QCheckBox;
 class QComboBox;
 class QFileSystemWatcher;
+class QTimer;
 class QGroupBox;
 class QLabel;
 class QListView;
@@ -117,6 +118,8 @@ private:
     EmulatorProcess* m_proc     = nullptr;
     PlatEdBridge*    m_platEd   = nullptr;
     QFileSystemWatcher* m_watcher = nullptr;
+    QTimer*             m_watchDebounce = nullptr;  // coalesces watcher bursts;
+                                                    // breaks self-write loops
 
     // Tab 0
     QListView*   m_list         = nullptr;

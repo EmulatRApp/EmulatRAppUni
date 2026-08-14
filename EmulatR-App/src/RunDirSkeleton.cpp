@@ -110,7 +110,18 @@ bool probeWritable(QString const& dir, QString* error)
 
     QString const stamp =
         QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_hhmmsszzz"));
-    QString const probe = d.filePath(QStringLiteral(".emulatrlaunch_probe_") + stamp);
+    // 2026-08-14: probe inside logs/ when it exists.  The preflight watcher
+    // observes the run-dir ROOT (plus firmware/ and disks/); a probe file
+    // created there re-fires the watcher, which re-runs preflight, which
+    // probes again -- a self-sustaining spin loop (one core pegged, observed
+    // on the first installed deployment).  logs/ shares the volume and
+    // inherited ACLs, so its writability answers the same question, and it
+    // is deliberately unwatched.  Root fallback only when logs/ is absent
+    // (a skeleton that broken fails preflight for other reasons anyway).
+    QDir const logsDir(d.filePath(QStringLiteral("logs")));
+    QString const probe =
+        (logsDir.exists() ? logsDir : d)
+            .filePath(QStringLiteral(".emulatrlaunch_probe_") + stamp);
 
     QFile f(probe);
     if (!f.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
