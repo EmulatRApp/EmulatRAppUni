@@ -41,6 +41,7 @@
 #include <QPainter>
 #include <QProcess>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
 #include <QSpinBox>
 #include <QStandardPaths>
@@ -450,6 +451,15 @@ QWidget* LauncherWindow::buildSystemsTab()
     return page;
 }
 
+// Word-wrapped note labels sit in rows sized to ONE text line; when the note
+// wraps (PuTTY path + connect hint, a dist manifest path), both lines render
+// into that single-line slot and every glyph clips to half height.  Reserving
+// two lines of minimum height lets the row grow instead.
+static void reserveTwoNoteLines(QLabel* note)
+{
+    note->setMinimumHeight(note->fontMetrics().lineSpacing() * 2 + 6);
+}
+
 QWidget* LauncherWindow::buildDetailsTab()
 {
     auto* page   = new QWidget(this);
@@ -473,6 +483,7 @@ QWidget* LauncherWindow::buildDetailsTab()
     fwForm->addRow(tr("Image:"), m_firmware);
     m_firmwareNote = new QLabel(fw);
     m_firmwareNote->setWordWrap(true);
+    reserveTwoNoteLines(m_firmwareNote);
     fwForm->addRow(QString(), m_firmwareNote);
     auto* fwOpen = new QPushButton(tr("Open firmware folder"), fw);
     fwForm->addRow(QString(), fwOpen);
@@ -497,6 +508,7 @@ QWidget* LauncherWindow::buildDetailsTab()
     binForm->addRow(tr("Binary:"), m_binaryCfg);
     m_binaryNote = new QLabel(bin);
     m_binaryNote->setWordWrap(true);
+    reserveTwoNoteLines(m_binaryNote);
     binForm->addRow(QString(), m_binaryNote);
 
     // Snapshot cadence knob (2026-08-14).  Safety = the emulator default
@@ -563,6 +575,7 @@ QWidget* LauncherWindow::buildDetailsTab()
 
     m_consoleNote = new QLabel(console);
     m_consoleNote->setWordWrap(true);
+    reserveTwoNoteLines(m_consoleNote);
     consoleForm->addRow(QString(), m_consoleNote);
     consoleRow->addWidget(console, 1);
 
@@ -602,6 +615,7 @@ QWidget* LauncherWindow::buildDetailsTab()
     devLayout->addWidget(m_platEdBtn);
     m_platEdNote = new QLabel(devices);
     m_platEdNote->setWordWrap(true);
+    reserveTwoNoteLines(m_platEdNote);
     devLayout->addWidget(m_platEdNote);
     layout->addWidget(devices);
 
@@ -614,7 +628,16 @@ QWidget* LauncherWindow::buildDetailsTab()
     envLayout->addWidget(m_envPanel);
     layout->addWidget(envBox, 1);
 
-    return page;
+    // The Details column is taller than a modest window.  Without a scroll
+    // area, QVBoxLayout hands each group LESS than its size hint and the
+    // groups clip their own children mid-glyph (labels, even pushbuttons).
+    // Scrolling preserves every widget's natural height instead.
+    auto* scroll = new QScrollArea(this);
+    scroll->setWidget(page);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    return scroll;
 }
 
 QWidget* LauncherWindow::buildBottomBar()
@@ -705,6 +728,36 @@ void LauncherWindow::onRunDirChanged(QString const&)
 // ===========================================================================
 // details tab
 // ===========================================================================
+
+// Resolve the platform manifest exactly the way the core does at launch
+// (systemLib/Machine.cpp:512): the filename is keyed to the FIRMWARE-IMAGE
+// STEM (ds20_v7_3.exe -> ds20_v7_3_platform.json; bare <model>_platform.json
+// only when no image is selected), and the file lives BESIDE the emulator
+// executable this system launches -- not in the run dir.  PlatEd must edit
+// the copy the core will actually read.
+QString LauncherWindow::manifestPathFor(SystemRecord const& r) const
+{
+    // Firmware selection: the live combo first, else what the ini holds.
+    QString fwRel = m_firmware ? m_firmware->currentData().toString() : QString();
+    if (fwRel.isEmpty()) {
+        IniOverlay ini;
+        if (ini.load(r.iniPath())) {
+            fwRel = ini.value(QString::fromLatin1(IniOverlay::kSecRom),
+                              QString::fromLatin1(IniOverlay::kKeyFirmware));
+        }
+    }
+    QString const leaf = manifestLeafName(fwRel, r.platform);
+    if (leaf.isEmpty()) return QString();
+
+    ExeDiscovery::Result const exe =
+        ExeDiscovery::findEmulatrForSystem(r.binaryConfig, r.binaryCustomPath);
+    if (exe.found())
+        return QFileInfo(exe.path).absoluteDir().filePath(leaf);
+    // No resolvable binary (the system cannot start anyway): fall back to the
+    // run dir so the name at least stays stem-correct in the UI.
+    return QDir(r.runDir).filePath(leaf);
+}
+
 void LauncherWindow::refreshDetails()
 {
     m_updatingWidgets = true;
@@ -773,7 +826,7 @@ void LauncherWindow::refreshDetails()
     // ---- PlatEd (W5) ------------------------------------------------------
     m_platEdNote->setText(
         m_platEd->isAvailable()
-            ? tr("Manifest: %1").arg(QDir::toNativeSeparators(r.manifestPath()))
+            ? tr("Manifest: %1").arg(QDir::toNativeSeparators(manifestPathFor(r)))
             : m_platEd->unavailableReason());
 
     m_updatingWidgets = false;
@@ -874,7 +927,7 @@ void LauncherWindow::onOpenInPlatEd()
     if (row < 0) return;
 
     QString error;
-    if (!m_platEd->openManifest(m_model->at(row).manifestPath(), &error)) {
+    if (!m_platEd->openManifest(manifestPathFor(m_model->at(row)), &error)) {
         QMessageBox::information(this, tr("PlatEd"), error);
         return;
     }

@@ -112,6 +112,11 @@ private:
     int  selectedRow() const;
     bool hasSelection() const { return selectedRow() >= 0; }
 
+    // The platform manifest for this system, resolved the way the core
+    // resolves it: stem-keyed to the selected firmware image, located beside
+    // the emulator binary this system launches.
+    QString manifestPathFor(SystemRecord const& r) const;
+
     // Models and services
     SystemModel*     m_model    = nullptr;
     EnvVarModel*     m_envModel = nullptr;

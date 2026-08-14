@@ -126,6 +126,7 @@ qt_add_executable(EmulatrLaunchTests
     src/RunDirSkeleton.h    src/RunDirSkeleton.cpp
     src/FirmwareCheck.h     src/FirmwareCheck.cpp
     src/DiskImageFactory.h  src/DiskImageFactory.cpp
+    src/ExeDiscovery.h      src/ExeDiscovery.cpp
     src/EnvVarModel.h       src/EnvVarModel.cpp
 
     resources/emulatr_launch.qrc

@@ -269,25 +269,36 @@ void testGeometryTable(QString const& dir)
 
     QString tableNote;
     QList<DiskImageFactory::Geometry> const table = DiskImageFactory::loadTable(&tableNote);
-    check(table.size() == 28,
-          QStringLiteral("the table has the documented 28 drive models (found %1)")
-              .arg(table.size()));
     if (!tableNote.isEmpty()) out() << "        table note: " << tableNote << "\n";
 
-    // Spot-check against the core tree's own values.
-    DiskImageFactory::Geometry rz29;
-    for (DiskImageFactory::Geometry const& g : table)
-        if (g.model == QLatin1String("RZ29")) rz29 = g;
-    check(rz29.isValid(), "RZ29 is present");
-    check(rz29.totalLbn == 8407200, "RZ29 total_lbn matches the core table");
-    check(rz29.imageSizeBytes() == 8407200LL * 512,
-          "RZ29 container size is total_lbn * block_bytes exactly");
+    // The table is SSOT-first (config/disk_types.json beside the discovered
+    // emulator -- verified geometries only), with the bundled 28-model TSV as
+    // the offline fallback.  These checks hold for BOTH sources; the model
+    // spot-check keys off which family the loaded source publishes.
+    check(!table.isEmpty(),
+          QStringLiteral("the geometry table loaded (%1 models)").arg(table.size()));
 
-    DiskImageFactory::Geometry ra82;
+    bool sane = !table.isEmpty();
     for (DiskImageFactory::Geometry const& g : table)
-        if (g.model == QLatin1String("RA82")) ra82 = g;
-    check(ra82.isValid() && ra82.secTrk * ra82.heads * ra82.cyl == ra82.totalLbn,
-          "RA82 CHS multiplies out to its total_lbn");
+        sane = sane && g.isValid()
+                    && g.imageSizeBytes() == g.totalLbn * qint64(g.blockBytes);
+    check(sane, "every row is valid and sizes to total_lbn * block_bytes exactly");
+
+    // Spot-check one drive family against known core values: the SSOT
+    // publishes RZ29L (dka0's drive; measured MAXBLOCK 8380080), the TSV
+    // documents RZ29 (8407200 per the core table).
+    DiskImageFactory::Geometry rz;
+    for (DiskImageFactory::Geometry const& g : table)
+        if (g.model == QLatin1String("RZ29L") || g.model == QLatin1String("RZ29")) {
+            rz = g;
+            break;
+        }
+    check(rz.isValid(), "an RZ29-family drive is present");
+    check(rz.isValid()
+              && rz.totalLbn == (rz.model == QLatin1String("RZ29L") ? 8380080 : 8407200),
+          QStringLiteral("%1 total_lbn matches its authority").arg(rz.model));
+    check(rz.isValid() && rz.imageSizeBytes() == rz.totalLbn * qint64(rz.blockBytes),
+          QStringLiteral("%1 container size is total_lbn * block_bytes exactly").arg(rz.model));
 
     // Actually create one and verify the format: a raw flat file of exactly
     // that many bytes, with no header.

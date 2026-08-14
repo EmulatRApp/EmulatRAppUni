@@ -68,12 +68,26 @@ inline QString platformDescription(Platform p)
     return QStringLiteral("unknown platform");
 }
 
-// The platform manifest filename the core derives from [System] model:
-// <lower(model)>_platform.json.  PlatEd is invoked on this file (W5).
+// Fallback manifest filename when no firmware image is known:
+// <lower(model)>_platform.json.  The REAL rule is stem-keyed -- see
+// manifestLeafName() below.
 inline QString platformManifestFileName(Platform p)
 {
     QString const s = platformToString(p);
     return s.isEmpty() ? QString() : s.toLower() + QStringLiteral("_platform.json");
+}
+
+// The manifest filename, derived the way the core derives it
+// (systemLib/Machine.cpp:512): the FIRMWARE-IMAGE STEM wins --
+//   firmware/ds20_v7_3.exe  ->  ds20_v7_3_platform.json
+// -- so a firmware variant carries its own device set and the name can never
+// drift from the image.  Only when no image is selected does the bare
+// <lower(model)>_platform.json fallback apply.
+inline QString manifestLeafName(QString const& firmwareRelPath, Platform p)
+{
+    QString const stem = QFileInfo(firmwareRelPath).completeBaseName();
+    if (!stem.isEmpty()) return stem + QStringLiteral("_platform.json");
+    return platformManifestFileName(p);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,17 +153,11 @@ struct SystemRecord
         return QDir(runDir).filePath(QStringLiteral("EMULATR_STOP"));
     }
 
-    QString manifestPath() const
-    {
-        QString const fn = platformManifestFileName(platform);
-        if (fn.isEmpty()) return QString();
-        QDir const d(runDir);
-        QString const top = d.filePath(fn);
-        if (QFileInfo::exists(top)) return top;
-        QString const nested = d.filePath(QStringLiteral("config/") + fn);
-        if (QFileInfo::exists(nested)) return nested;
-        return top;  // canonical location even when absent
-    }
+    // NOTE: there is deliberately no manifestPath() here.  The manifest name
+    // depends on the SELECTED FIRMWARE (stem-keyed, manifestLeafName above)
+    // and its location on the RESOLVED EMULATOR BINARY (the core reads it
+    // beside Emulatr.exe) -- both live outside this value type.
+    // LauncherWindow::manifestPathFor() owns the resolution.
 };
 
 // ---------------------------------------------------------------------------

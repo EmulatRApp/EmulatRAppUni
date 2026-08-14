@@ -376,13 +376,22 @@ Platform inferPlatform(QString const& runDir, QString* how, bool* ambiguous)
     Platform fromIni      = Platform::Unknown;
     Platform fromFirmware = Platform::Unknown;
 
-    // 1. Platform manifest filename: <lower(model)>_platform.json.
+    // 1. Platform manifest filename.  Stem-keyed like the core
+    // (<firmware-stem>_platform.json, e.g. ds20_v7_3_platform.json); the
+    // stem starts with the model name, so a prefix glob recognizes both the
+    // stem-keyed form and the bare <lower(model)>_platform.json fallback.
     for (Platform p : { Platform::DS10, Platform::DS20, Platform::ES40 }) {
-        QString const fn = platformManifestFileName(p);
-        if (QFileInfo::exists(d.filePath(fn))
-            || QFileInfo::exists(d.filePath(QStringLiteral("config/") + fn))) {
+        QString const pattern =
+            platformToString(p).toLower() + QStringLiteral("*_platform.json");
+        QStringList hits =
+            d.entryList({ pattern }, QDir::Files, QDir::Name);
+        if (hits.isEmpty()) {
+            hits = QDir(d.filePath(QStringLiteral("config")))
+                       .entryList({ pattern }, QDir::Files, QDir::Name);
+        }
+        if (!hits.isEmpty()) {
             fromManifest = p;
-            reasons << QStringLiteral("manifest %1 is present").arg(fn);
+            reasons << QStringLiteral("manifest %1 is present").arg(hits.first());
             break;
         }
     }
