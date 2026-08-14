@@ -436,8 +436,68 @@ auto SoftFloatBackend::cvtGF(uint64_t a, FpExecCtx const& c) -> FpResult
     uint64_t const r = packFRange(a, vaxChop(c), c.variant.underflow, vaxSwc(c), x);
     return FpResult{ r, vaxToFpExc(x) };
 }
-auto SoftFloatBackend::cvtGD(uint64_t a, FpExecCtx const&) -> FpResult { return FpResult{ a, FpExc{} }; } // G<->D image identical here
-auto SoftFloatBackend::cvtDG(uint64_t a, FpExecCtx const&) -> FpResult { return FpResult{ a, FpExc{} }; }
+// CVTGD / CVTDG -- real G<->D register-image conversions (AARM 4.10.11).
+// Formerly identity ("G<->D image identical") -- WRONG: the register LAYOUTS
+// differ (G: exp11 <62:52> bias 1024; D: exp8 <62:55> bias 128, frac <54:0>,
+// AARM Fig. 2-10).  OpenVMS LIBRTL's heap size-class init extracts the D
+// exponent field from a CVTGD result; the identity handed it G bits, so the
+// classmap came out wrong (measured: [5]=6 vs healthy 0x31), every process-
+// heap allocation was granted a 16-byte stride, heap blocks overlapped, and
+// the whole "Species B" ACCVIO family followed (root-caused from a full
+// retire trace + Charon reference examine, 2026-08-14, JRN-B2-001).
+// AARM semantics: CVTGD appends three low-order zero fraction bits, then the
+// 8-bit exponent range is checked for overflow/underflow; CVTDG removes three
+// fraction bits with round-or-chop; an exp==0 operand that is not a true zero
+// (reserved operand / dirty zero) signals INV -- same policy as vax::unpack.
+namespace {
+inline constexpr int      kDExpPos   = 55;                              // D exp8 <62:55>
+inline constexpr uint32_t kDExpField = 0xFFu;
+inline constexpr int      kGtoDBias  = 0x400 - 0x80;                    // 1024 - 128 = 896
+inline constexpr uint64_t kDFracMask = (UINT64_C(1) << kDExpPos) - 1;   // frac <54:0>
+} // namespace
+
+auto SoftFloatBackend::cvtGD(uint64_t a, FpExecCtx const& c) -> FpResult
+{
+    uint32_t x = 0;
+    vax::Ufp const u = vax::unpack(a, x, vaxSwc(c));    // Inv for reserved/dirty
+    if (u.exp == 0)
+        return FpResult{ 0, vaxToFpExc(x) };            // true zero (Fc UNPREDICTABLE on Inv)
+    int expD = u.exp - kGtoDBias;
+    uint64_t const fracG = (u.frac >> vax::kGuard) & vax::kFracMask;  // 52 stored bits
+    uint64_t const fracD = fracG << 3;                  // + three low-order zeros
+    if (expD > static_cast<int>(kDExpField)) { x |= vax::VaxExc::Ovf; expD = kDExpField; }
+    if (expD < 1) {
+        if (c.variant.underflow) x |= vax::VaxExc::Unf;
+        return FpResult{ 0, vaxToFpExc(x) };            // flush to true zero
+    }
+    uint64_t const r = (static_cast<uint64_t>(u.sign) << vax::kSignPos)
+                     | (static_cast<uint64_t>(static_cast<uint32_t>(expD)) << kDExpPos)
+                     | fracD;
+    return FpResult{ r, vaxToFpExc(x) };
+}
+
+auto SoftFloatBackend::cvtDG(uint64_t a, FpExecCtx const& c) -> FpResult
+{
+    uint32_t x = 0;
+    uint32_t const sign  = static_cast<uint32_t>(a >> vax::kSignPos) & 1u;
+    int32_t  const expD  = static_cast<int32_t>((a >> kDExpPos) & kDExpField);
+    uint64_t const fracD = a & kDFracMask;              // 55 stored bits
+    if (expD == 0) {
+        if (sign != 0)                     x |= vax::VaxExc::Inv;   // reserved operand
+        else if (fracD != 0 && !vaxSwc(c)) x |= vax::VaxExc::Inv;   // dirty zero
+        return FpResult{ 0, vaxToFpExc(x) };
+    }
+    // Hidden bit to UFP bit 63; D's three extra fraction bits land in rpack's
+    // guard positions (bits 10:8), so round-half-up / chop and the carry-into-
+    // exponent case come from the shared kernel.  exp11 = exp8 + 896 is at
+    // most 255 + 896 = 1151 -- inside vax::G's window, so no overflow path.
+    vax::Ufp u;
+    u.sign = sign;
+    u.exp  = expD + kGtoDBias;
+    u.frac = ((UINT64_C(1) << kDExpPos) | fracD) << (63 - kDExpPos);
+    uint64_t const r = vax::rpack(u, vax::G, vaxChop(c), c.variant.underflow, x);
+    return FpResult{ r, vaxToFpExc(x) };
+}
 auto SoftFloatBackend::cvtGQ(uint64_t a, FpExecCtx const& c) -> FpResult
 {
     FpExc e;

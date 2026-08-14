@@ -340,3 +340,54 @@ TEST_CASE("IEEE CVTTQ overflow stores the true result's low 64 bits (FV-7)") {
     // pinned (the stored pattern stays SoftFloat's).
     CHECK(be.cvtTQ(kQNaN, rne()).exc.iov);
 }
+
+// ---------------------------------------------------------------------------
+// FV-9 (2026-08-14): CVTGD / CVTDG are real G<->D re-encodes, not identity.
+// The identity implementation handed LIBRTL's heap size-class init G-layout
+// bits where it extracts the D exponent field -> wrong classmap -> universal
+// heap under-allocation -> the OpenVMS "Species B" ACCVIO family (JRN-B2-001).
+// The 519.0 vector below is the exact case filmed in the convicting retire
+// trace: CVTQG(519) = 0x40A0380000000000 (G), whose D image must be
+// exp8 = 1034-896 = 0x8A at <62:55>, fraction << 3 -> 0x4501C00000000000
+// (0.5068359375 * 2^10 = 519.0 under D conventions).
+// ---------------------------------------------------------------------------
+TEST_CASE("VAX CVTGD: G->D re-encode (the filmed 519.0 vector) (FV-9)") {
+    SoftFloatBackend be;
+    uint64_t const g519 = be.cvtQG(519, vaxNormal()).bits;
+    CHECK(g519 == 0x40A0380000000000ULL);               // G: exp11 0x40A, frac 0x038...
+    auto const d = be.cvtGD(g519, vaxNormal());
+    CHECK(d.bits == 0x4501C00000000000ULL);             // D: exp8 0x8A, frac<<3
+    CHECK_FALSE(d.exc.inv); CHECK_FALSE(d.exc.ovf); CHECK_FALSE(d.exc.unf);
+    // Round-trip is exact (the three appended bits are zero).
+    CHECK(be.cvtDG(d.bits, vaxNormal()).bits == g519);
+    // True zero passes through as true zero.
+    CHECK(be.cvtGD(0, vaxNormal()).bits == 0u);
+    CHECK(be.cvtDG(0, vaxNormal()).bits == 0u);
+}
+
+TEST_CASE("VAX CVTDG: removes 3 fraction bits with VAX half-up; /C chops (FV-9)") {
+    SoftFloatBackend be;
+    // D = exp8 0x8A, fraction 0x4: the dropped 3 bits are exactly half a G
+    // LSB.  VAX half-up rounds AWAY -> G fraction 1; /C chops -> 0.
+    uint64_t const dHalf = 0x4500000000000004ULL;
+    CHECK(be.cvtDG(dHalf, vaxNormal()).bits  == 0x40A0000000000001ULL);
+    CHECK(be.cvtDG(dHalf, vaxChopped()).bits == 0x40A0000000000000ULL);
+}
+
+TEST_CASE("VAX CVTGD: 8-bit exponent window Ovf/Unf; reserved/dirty INV (FV-9)") {
+    SoftFloatBackend be;
+    // exp11 0x480 (1152) -> exp8 256: overflow, clamped per house rpack policy.
+    auto const o = be.cvtGD(0x4800000000000000ULL, vaxNormal());
+    CHECK(o.exc.ovf);
+    // exp11 0x100 (256) -> exp8 < 1: flush to zero; Unf only with /U.
+    uint64_t const gTiny = 0x1000000000000000ULL;
+    auto const u = be.cvtGD(gTiny, vaxUnderflowEnabled());
+    CHECK(u.bits == 0u); CHECK(u.exc.unf);
+    CHECK_FALSE(be.cvtGD(gTiny, vaxNormal()).exc.unf);
+    // Reserved operands (sign=1, exp=0) signal INV in both directions.
+    CHECK(be.cvtGD(0x8000000000000000ULL, vaxNormal()).exc.inv);
+    CHECK(be.cvtDG(0x8000000000000000ULL, vaxNormal()).exc.inv);
+    // Dirty zeros (exp=0, frac!=0) signal INV in default trap modes.
+    CHECK(be.cvtGD(0x0000000000000004ULL, vaxNormal()).exc.inv);
+    CHECK(be.cvtDG(0x0000000000000004ULL, vaxNormal()).exc.inv);
+}
