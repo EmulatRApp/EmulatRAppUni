@@ -32,7 +32,7 @@ fault pair fired anyway**, ~24 ms after `%STDRV-I-STARTUP`, same PCs,
 same signature. The crash reproduces across every configuration tested
 (aged/pristine/patched disk × poisoned/correct TDF × sharded/faithful
 TLB × wall-clock hours × ~50× speed regimes) and does **not** reproduce
-on Charon-ES40 or PersonalAlpha-DS20 with the same disk. It is a live
+on two other emulator products (ES40 and DS20 class) with the same disk. It is a live
 EmulatR execution defect ("B2") in the DCL/descriptor path. The
 timezone value was a traceable fellow traveler, not the cause.
 
@@ -158,16 +158,16 @@ and could not be dated from surviving evidence.
 3. `UTC$TIME_SETUP.COM` alone is **insufficient** — verified: it
    rewrites the timezone rule files but not the SYSINIT logical blob.
 
-## Implication for Beta: Migrated System Disks (Charon / vtAlpha)
+## Implication for Beta: Migrated System Disks (from other emulators)
 
-Beta users are expected to bring **existing system disks** from Charon
-and Vere (vtAlpha) installations. Those disks carry years of
+Beta users are expected to bring **existing system disks** from other
+emulator installations. Those disks carry years of
 legal-but-arbitrary persisted state — including TDFs anywhere in the
 ±13/+14-hour range, e.g. a New Zealand disk legitimately stores +13:00,
 the numeric mirror of the value that crashes us today. Tonight's
 central lesson therefore generalizes:
 
-> **A disk that boots on Charon must boot on EmulatR.** Data-dependent
+> **A disk that boots on a reference system must boot on EmulatR.** Data-dependent
 > divergence on legal input is an EmulatR defect by definition
 > (EmulatR-as-Oracle discipline), regardless of how unusual the input.
 
@@ -186,7 +186,7 @@ Consequences:
 ## Open Items (tracked separately)
 
 - **B2 — same-input divergence (live emulator defect, BETA-BLOCKING).**
-  Charon-ES40 and PersonalAlpha-DS20 boot the *same poisoned disk* to
+  two reference emulators (ES40/DS20 class) boot the *same poisoned disk* to
   completion: they set a wrong-but-legal TDF (−13:00) and continue.
   EmulatR alone ACCVIOs while processing the identical input — and any
   migrated beta disk with an unusual (or merely eastern-hemisphere)

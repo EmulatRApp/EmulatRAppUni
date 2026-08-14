@@ -142,7 +142,7 @@ silently.
 
 Two supported routes:
 
-### Route A -- migrate an existing disk (Charon / vtAlpha / real Alpha)
+### Route A -- migrate an existing disk (another emulator product or real Alpha hardware)
 
 1. Copy the disk image file into `vStorage/Alpha/`.
 2. Point the SCSI id-0 row's `media` at it (`model` should match the

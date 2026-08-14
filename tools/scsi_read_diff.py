@@ -11,7 +11,7 @@
 # WHY (JRN-SCSI-027)
 #   %SYSBOOT-F-LDFAIL / %LOADER-E-BADIMGOFF says the image bytes ARRIVED and
 #   do not parse -- the loader found an offset inside no image section.  The
-#   same dka0.vdisk boots OpenVMS under Charon, so the image is good and the
+#   same dka0.vdisk boots OpenVMS under the reference system, so the image is good and the
 #   read path is suspect.  Geometry is ruled out (INQUIRY type 0x00, READ
 #   CAPACITY block length 512, MODE SENSE descriptor from the same source,
 #   file size an exact multiple of 512), which leaves a TRANSFER-SHAPE

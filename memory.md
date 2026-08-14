@@ -126,10 +126,10 @@ drill into journals only as needed.
   GEOMETRY DOES NOT BIND (DEVDEPEND 0x00000604, cylinders 0) -- not yet
   attributable; the storm plausibly blocked the MODE SENSE exchange and
   the byte-7 rerun settles it (SPEC-STORAGE-001 C-10).
-- DEVTYPE IS 0x36 GENERIC_DK DESPITE THE EXACT DEC IDENTITY (Charon:
+- DEVTYPE IS 0x36 GENERIC_DK DESPITE THE EXACT DEC IDENTITY (reference system:
   0x89 DT$_RZ29).  LEAD, unread: UCB$L_DK_DISABLE_DDR = 1 -- Data
   Driven Recognition is OFF, so DKDRIVER never consults the recognition
-  database.  Charon runs PKQDRIVER, EmulatR PKEDRIVER (both confirmed).
+  database.  the reference system runs PKQDRIVER, EmulatR PKEDRIVER (both confirmed).
   CONSEQUENCE: SPEC-STORAGE-001 C-8 (generic identity) is not a change
   of behavior -- it makes the model honest about what DDR already
   forces.
@@ -153,7 +153,7 @@ drill into journals only as needed.
   EXISTS and NO DT$_RZ40 EXISTS; RZ28L is 172 (0xAC).  Generic slots:
   GENERIC_DK 54, GENERIC_DU 35, GENERIC_RX 180, FD1-FD8 129-136.
   DEVDEPEND packing VERIFIED: byte0 sectors/track, byte1 tracks/cyl,
-  bytes2-3 cylinders (Charon 0x0E7C1471 = 113/20/3708).
+  bytes2-3 cylinders (reference system 0x0E7C1471 = 113/20/3708).
 - MEASURED-CAPTURE PROCEDURE now documented in the SSOT
   (custom_drives): F$GETDVI DEVTYPE/DEVCLASS/SECTORS/TRACKS/CYLINDERS/
   MAXBLOCK/DEVDEPEND on a NON-EmulatR host, plus SHOW DEVICE/FULL.
@@ -1239,7 +1239,7 @@ dispatch matches them (silent PAL corruption otherwise).
   faithfully returned BADIMGOFF -> LDFAIL.  The "0x66666666 fill" of 028/030
   was never fill -- it is the live relocation BITMAP, and the file's chunk
   chain terminates cleanly (simulated walk on raw vdisk bytes: all values
-  classify; Charon's success reproduced from our own disk).  Idempotence
+  classify; the reference system's success reproduced from our own disk).  Idempotence
   flag digest+0x3d bit2 was CLEAR at pass 2 (its longword +0x3c sat ONE
   LONGWORD outside 030's PA-WATCH window).  State word *(0x14708):
   file-initial 0x0, live 0x1001, runtime-written; bit2 gates the second
@@ -1289,11 +1289,11 @@ dispatch matches them (silent PAL corruption otherwise).
   decodes (architect, on real VMS) as %LOADER-E-BADIMGOFF -- facility
   0x13 = LOADER, so the bytes ARRIVE and do not parse.  THE WHOLE I/O
   STACK IS EXONERATED BY EVIDENCE: payload 68/68 FNV-matched vs
-  dka0.vdisk (an image Charon boots into OpenVMS), DMA tiling 47/47
+  dka0.vdisk (an image the reference system boots into OpenVMS), DMA tiling 47/47
   exact cover with contiguous guest PAs, zero padding in the SYSBOOT
   window, and geometry closed by the driver's OWN block descriptor
   (0x000200) -- that exoneration is UNTOUCHED by the retraction, resting
-  on comparison against a Charon-bootable image, not on any loader model.
+  on comparison against a reference-bootable image, not on any loader model.
   Verdict rule once a valid anchor exists: ISD fields match the image but
   the compare fails -> 32-bit canonicalization lane (LDL/ADDL), EXTxH's
   genre; fields differ -> corruption upstream in memory.  Host-side

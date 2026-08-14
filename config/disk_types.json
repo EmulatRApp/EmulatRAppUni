@@ -13,7 +13,7 @@
   },
   "authority_kinds": {
     "document": "A cited hardware reference. Field 'authority' names document, table, and page.",
-    "measured": "Captured from a running system that is NOT EmulatR (Charon, or real hardware). Field 'authority' names the command, the host, and the capture date. Capturing from EmulatR itself is CIRCULAR and is not an authority.",
+    "measured": "Captured from a running system that is NOT EmulatR (other sources: a reference system, or real hardware). Field 'authority' names the command, the host, and the capture date. Capturing from EmulatR itself is CIRCULAR and is not an authority.",
     "synthetic": "An EmulatR-defined device with no real-world counterpart. Coherent by construction; the construction is the authority."
   },
   "drives": {
@@ -96,7 +96,7 @@
         "total_sectors": 8380080,
         "last_lba": 8380079,
         "formatted_capacity": "4.29 GB",
-        "authority": "FIXED BY THE EXISTING IMAGE (SPEC-STORAGE-001 C-9): dka0.vdisk holds a mounted ODS-5 volume laid out to 8380080 blocks. Corroborated MEASURED on Charon: F$GETDVI MAXBLOCK 8380080.",
+        "authority": "FIXED BY THE EXISTING IMAGE (SPEC-STORAGE-001 C-9): dka0.vdisk holds a mounted ODS-5 volume laid out to 8380080 blocks. Corroborated MEASURED on a reference system: F$GETDVI MAXBLOCK 8380080.",
         "fidelity": "CONFIRMED"
       },
       "geometry": {
@@ -106,7 +106,7 @@
         "rotation_rate_rpm": 7200,
         "banded": true,
         "product_variance_pct": 0.0,
-        "authority": "The geometry dka0.vdisk was built to: EK-SM2DR-PN.B01 Table 4 + Table 5 (RZ29L), corroborated MEASURED on Charon (F$GETDVI 113/20/3708; DEVDEPEND 0x0E7C1471).",
+        "authority": "The geometry dka0.vdisk was built to: EK-SM2DR-PN.B01 Table 4 + Table 5 (RZ29L), corroborated MEASURED on a reference system (F$GETDVI 113/20/3708; DEVDEPEND 0x0E7C1471).",
         "fidelity": "CONFIRMED",
         "note": "113 * 20 * 3708 = 8380080 EXACTLY. Generic IDENTITY, true GEOMETRY -- the two are independent surfaces (SPEC-STORAGE-001 C-9). Changing these values would invalidate the volume on the image."
       },
@@ -302,7 +302,7 @@
         "authority": "EK-SM2DR-PN.B01 Solaris format.dat section (DEC_RZ29L-AA(C)DEC-LYJ0)  inquiry_byte7 = 0x00, RESOLVED 2026-08-04 (JRN-AUD-004 DEC-1 / PLAN-SCSI-001 D-4). Was 0x12, a semantic derivation from the EK-SM2DR-PN.B01 feature list ('Tagged command queuing and multi-initiator support') -- true of the REAL drive, never of this target, and never a byte-level witness. MEASURED consumer: crash dump DKA0 UCB 81C67040 -- byte 7 = 0x12 on the wire, VMS set DK_FLAGS cmdq+port_cmdq, the HBA silently swallows tag messages (N-7), DK_UNEXPLAINED = 61,748 of 61,750 ops and DKA0 never went VALID. Re-assert only with Phase C-3 tagged queuing + C-2 reselection.",
         "fidelity": "PROVISIONAL",
         "open": [
-          "revision LYJ0 derived from the Solaris disk_type string; Charon UCB$L_DK_INQUIRY_DATA capture would promote it"
+          "revision LYJ0 derived from the Solaris disk_type string; a reference-system UCB$L_DK_INQUIRY_DATA capture would promote it"
         ]
       },
       "capacity": {
@@ -322,7 +322,7 @@
         "product_variance_pct": 0.0,
         "authority": "EK-SM2DR-PN.B01 Table 4 + Table 5 + Solaris format.dat (pcyl 3708)",
         "fidelity": "CONFIRMED",
-        "note": "113 * 20 * 3708 = 8380080 EXACTLY -- the only one of the three that closes. Table 5 prints 3078 for cylinders; that is a digit transposition, corrected to 3708 by Table 4 and the Solaris section. Corroborated by Charon DEVDEPEND 0x0E7C1471 and measured MAXBLOCK 0x007FDEB0."
+        "note": "113 * 20 * 3708 = 8380080 EXACTLY -- the only one of the three that closes. Table 5 prints 3078 for cylinders; that is a digit transposition, corrected to 3708 by Table 4 and the Solaris section. Corroborated by reference-system DEVDEPEND 0x0E7C1471 and measured MAXBLOCK 0x007FDEB0."
       },
       "guest": {
         "openvms": {
@@ -485,7 +485,7 @@
       "origin": {
         "kind": "measured",
         "command": "SHOW DEVICE/FULL DEV20$DKA0:  AND  F$GETDVI(\"DKA0\", ...) lexicals",
-        "host": "Charon (non-EmulatR reference system), volume DKA0.vdisk",
+        "host": "a non-EmulatR reference system, volume DKA0.vdisk",
         "captured": "2026-08-04",
         "captured_by": "architect",
         "volume_state": "mounted, ODS-5, label ALPHASYS -- the C2 state",
@@ -518,7 +518,7 @@
         "total_sectors": 8380080,
         "last_lba": 8380079,
         "formatted_capacity": "4.29 GB",
-        "authority": "MEASURED, Charon: F$GETDVI MAXBLOCK 8380080; SHOW DEVICE/FULL Total blocks 8380080",
+        "authority": "MEASURED, reference system: F$GETDVI MAXBLOCK 8380080; SHOW DEVICE/FULL Total blocks 8380080",
         "fidelity": "CONFIRMED"
       },
       "geometry": {
@@ -528,7 +528,7 @@
         "rotation_rate_rpm": null,
         "banded": true,
         "product_variance_pct": 0.0,
-        "authority": "MEASURED, Charon: F$GETDVI SECTORS 113 / TRACKS 20 / CYLINDERS 3708, corroborated by DEVDEPEND 243012721 (0x0E7C1471 -> 113/20/3708) and by SHOW DEVICE/FULL",
+        "authority": "MEASURED, reference system: F$GETDVI SECTORS 113 / TRACKS 20 / CYLINDERS 3708, corroborated by DEVDEPEND 243012721 (0x0E7C1471 -> 113/20/3708) and by SHOW DEVICE/FULL",
         "fidelity": "CONFIRMED",
         "coherence": "113 * 20 * 3708 = 8380080 == MAXBLOCK EXACTLY. Three independent reads agree (F$GETDVI scalars, DEVDEPEND packed longword, SHOW DEVICE/FULL) and all three match the EK-SM2DR-PN.B01 RZ29L values."
       },
@@ -541,7 +541,7 @@
           "dcdef_status": "PRESENT",
           "min_version_vax": null,
           "min_version_alpha": null,
-          "authority": "MEASURED, Charon: F$GETDVI DEVTYPE returns 137 decimal (0x89) and DEVCLASS 1. This is UCB$B_DEVTYPE read numerically -- not a rendered name. Symbol per JRN-DISK-002 Sec 4."
+          "authority": "MEASURED, reference system: F$GETDVI DEVTYPE returns 137 decimal (0x89) and DEVCLASS 1. This is UCB$B_DEVTYPE read numerically -- not a rendered name. Symbol per JRN-DISK-002 Sec 4."
         },
         "tru64": {
           "identified_by": "inquiry_string",
@@ -556,7 +556,7 @@
       ]
     },
     "_f_getdvi_mapping": {
-      "_note": "PREFERRED capture method. OpenVMS DCL F$GETDVI lexicals return NUMERIC values straight out of the UCB -- no rendered names to pattern-match, and DEVDEPEND cross-checks the other three. Run on a NON-EmulatR system (Charon or real hardware); running it against EmulatR reads back our own profile and is circular.",
+      "_note": "PREFERRED capture method. OpenVMS DCL F$GETDVI lexicals return NUMERIC values straight out of the UCB -- no rendered names to pattern-match, and DEVDEPEND cross-checks the other three. Run on a NON-EmulatR system (other sources: a reference system, or real hardware); running it against EmulatR reads back our own profile and is circular.",
       "_dcl": [
         "$ WRITE SYS$OUTPUT \"DEVTYPE   \" + F$GETDVI(\"DKA0\",\"DEVTYPE\")",
         "$ WRITE SYS$OUTPUT \"DEVCLASS  \" + F$GETDVI(\"DKA0\",\"DEVCLASS\")",

@@ -43,7 +43,7 @@ candidate.** The "garbage" values in the fault dumps are recognizably
 **PALcode TB-miss internals** (the VPTB and computed VPTE addresses)
 leaked into the interrupted program's architectural registers. The
 suspect seam is EmulatR's nested TB-miss / shadow-register (SDE) PAL
-glue — which is exactly why Charon and PersonalAlpha, which run their
+glue — which is exactly why other emulators, which run their
 own console/PAL environments, never reproduce it.
 
 ## The Reproducer
@@ -122,7 +122,7 @@ and — from 8/12 — TLB organization, arithmetic, and timing.
 1. **B2 remains the beta gate**, but its blast radius is now bounded:
    it is process-fatal in activation/rundown paths, not a system
    killer. An interactive system rides through it.
-2. The 8/12 migration guidance stands: a disk that boots on Charon
+2. The 8/12 migration guidance stands: a disk that boots on a reference system
    must boot on EmulatR; data-dependent divergence on legal input is
    an EmulatR defect by definition. Today strengthened this: the same
    defect fires with fully *correct* data.
@@ -189,7 +189,7 @@ prompt in seconds.
 
 ## Known Issues (unchanged or newly tracked)
 
-- B2 as above (capture run staged). Charon cross-check of the
+- B2 as above (capture run staged). Reference-system cross-check of the
   reproducer (expected clean) pending.
 - Typed characters echo only on Enter at SRM/VMS console prompts
   (host-side TX flush granularity; cosmetic; tracked).

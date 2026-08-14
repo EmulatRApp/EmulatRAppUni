@@ -444,7 +444,7 @@ auto SoftFloatBackend::cvtGF(uint64_t a, FpExecCtx const& c) -> FpResult
 // classmap came out wrong (measured: [5]=6 vs healthy 0x31), every process-
 // heap allocation was granted a 16-byte stride, heap blocks overlapped, and
 // the whole "Species B" ACCVIO family followed (root-caused from a full
-// retire trace + Charon reference examine, 2026-08-14, JRN-B2-001).
+// retire trace + reference-system examine, 2026-08-14, JRN-B2-001).
 // AARM semantics: CVTGD appends three low-order zero fraction bits, then the
 // 8-bit exponent range is checked for overflow/underflow; CVTDG removes three
 // fraction bits with round-or-chop; an exp==0 operand that is not a true zero

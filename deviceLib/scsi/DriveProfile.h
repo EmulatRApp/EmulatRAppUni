@@ -25,14 +25,14 @@
 // transposition (3708 is correct), and a 1024-byte sector in an HP disktab
 // context (512 is correct).  Do NOT re-extract without reading Sec 3.
 //
-// RZ29L geometry/count: CONFIRMED (three witnesses -- the document, Charon
+// RZ29L geometry/count: CONFIRMED (three witnesses -- the document, the reference system
 // live DEVDEPEND 0x0E7C1471, EmulatR's own measured MAXBLOCK 0x007FDEB0).
 // RZ28L/RZ40 geometry and ALL identity strings: _PROVISIONAL until a boot
 // with the profile selected produces a matching DEVDEPEND (geometry) and
-// Charon's UCB$L_DK_INQUIRY_DATA is captured (identity) -- Sec 8.
+// the reference system's UCB$L_DK_INQUIRY_DATA is captured (identity) -- Sec 8.
 //
 // ARCHITECT DECISIONS (2026-08-04): keys carry the L (RZ29L, per the source
-// doc, diverging from Charon's plain RZ29 display); selection is manifest-
+// doc, diverging from the reference system's plain RZ29 display); selection is manifest-
 // only (storage row "model"); image smaller than profile = attach REFUSED,
 // larger = loud warn; all three platforms default RZ29L for system disks.
 //
@@ -147,7 +147,7 @@ inline ProfileMediaCheck checkProfileMedia(DriveProfile const& p,
 // The table.  Values per SPEC-DISK-001 Sec 4 (already hazard-corrected --
 // see the header comment).  Identity strings follow the Sec 8 Solaris LEAD
 // ("DEC_RZ29L-AA(C)DEC-LYJ0" -> product "RZ29L-AA (C)DEC ", rev "LYJ0"),
-// _PROVISIONAL until Charon's UCB$L_DK_INQUIRY_DATA is captured.
+// _PROVISIONAL until the reference system's UCB$L_DK_INQUIRY_DATA is captured.
 // inquiry_byte7 = 0x00 on ALL profiles (JRN-AUD-004 DEC-1, 2026-08-04).
 // DO NOT set bit 1 (CmdQue) or bit 4 (Sync) here until the capability is
 // implemented: bit 1 without Phase C-3 tagged queuing measurably wedges the
