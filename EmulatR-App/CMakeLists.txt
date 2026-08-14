@@ -73,6 +73,35 @@ set_target_properties(EmulatrLaunch PROPERTIES
     WIN32_EXECUTABLE ON)
 
 # ----------------------------------------------------------------------------
+# Qt runtime deployment (2026-08-14, beta packaging).  windeployqt runs as a
+# POST_BUILD step so the build output directory is a complete, runnable,
+# installer-ready payload: Qt6Core/Gui/Widgets, platforms/qwindows.dll,
+# styles, imageformats -- everything EmulatrLaunch.exe needs on a clean
+# machine.  The Setup Factory manifest picks the dependencies up from here.
+# Trimmed of what a launcher does not use (translations, D3D compiler,
+# software OpenGL).  Windows-only by construction.
+# ----------------------------------------------------------------------------
+if(WIN32)
+    get_target_property(_qt_qmake Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(_qt_bindir "${_qt_qmake}" DIRECTORY)
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bindir}")
+    if(WINDEPLOYQT_EXECUTABLE)
+        add_custom_command(TARGET EmulatrLaunch POST_BUILD
+            COMMAND "${WINDEPLOYQT_EXECUTABLE}"
+                    --no-translations
+                    --no-system-d3d-compiler
+                    --no-opengl-sw
+                    "$<TARGET_FILE:EmulatrLaunch>"
+            COMMENT "windeployqt: staging Qt runtime beside EmulatrLaunch")
+    else()
+        message(WARNING
+            "windeployqt not found beside Qt6::qmake -- the build output will "
+            "not carry the Qt runtime; the installer payload must source it "
+            "another way.")
+    endif()
+endif()
+
+# ----------------------------------------------------------------------------
 # Tests.  Gate G6 names the IniOverlay round-trip byte-preservation test, the
 # denylist stripping test, and DiskImageFactory output against the G3 format
 # as REVIEW EVIDENCE, so they build by default rather than behind an option.

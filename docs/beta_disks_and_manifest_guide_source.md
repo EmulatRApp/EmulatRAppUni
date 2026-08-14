@@ -132,6 +132,14 @@ are silicon constants owned by the device models -- never add an
 
 ## 4. Making a system disk bootable
 
+**Firmware note (copyright posture, MUST appear in the topic):** EmulatR
+does not distribute DEC/HP SRM firmware images.  The installer creates
+`firmware\` empty; the user places their platform's SRM console image
+(e.g. `ds20_v7_3.exe`) there themselves.  The launcher's preflight
+reports a missing firmware image with guidance rather than failing
+silently.
+
+
 Two supported routes:
 
 ### Route A -- migrate an existing disk (Charon / vtAlpha / real Alpha)
