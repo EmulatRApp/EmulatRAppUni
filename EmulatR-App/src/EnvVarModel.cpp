@@ -15,7 +15,12 @@
 #include "EnvVarModel.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QFont>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <QSettings>
 
 #include "Version.h"
@@ -75,6 +80,7 @@ bool EnvVarModel::loadRegistry(QString* error)
     m_defs.clear();
     m_state.clear();
     m_visible.clear();
+    m_variant.clear();
 
     QFile f(QStringLiteral(":/data/emulatr_env_registry.tsv"));
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -136,6 +142,66 @@ bool EnvVarModel::loadRegistry(QString* error)
         return false;
     }
     return true;
+}
+
+bool EnvVarModel::loadRegistryForBinary(QString const& jsonPath, QString* error)
+{
+    // The baked TSV always loads first: it is the DENYLIST authority and the
+    // listing fallback for binaries that predate the per-binary declaration.
+    bool const tsvOk = loadRegistry(error);
+    if (jsonPath.isEmpty() || !QFileInfo::exists(jsonPath)) return tsvOk;
+
+    QFile f(jsonPath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        if (error) {
+            *error = QStringLiteral("cannot read %1 -- using the bundled "
+                                    "registry").arg(jsonPath);
+        }
+        return false;
+    }
+    QJsonParseError perr;
+    QJsonDocument const doc = QJsonDocument::fromJson(f.readAll(), &perr);
+    f.close();
+    if (doc.isNull() || !doc.isObject()) {
+        if (error) {
+            *error = QStringLiteral("%1: %2 -- using the bundled registry")
+                         .arg(jsonPath, perr.errorString());
+        }
+        return false;
+    }
+
+    // The declaration governs the LISTING; the TSV's denied rows survive it,
+    // so quarantine never depends on what the payload chose to say.
+    beginResetModel();
+    QList<EnvVarDef> defs;
+    QStringList deniedKept;
+    for (EnvVarDef const& d : m_defs) {
+        if (d.tier == EnvVarDef::Tier::Denied) {
+            defs.append(d);
+            deniedKept << d.name;
+        }
+    }
+    for (QJsonValue const& v : doc.object().value(QLatin1String("vars")).toArray()) {
+        QJsonObject const o = v.toObject();
+        EnvVarDef d;
+        d.name         = o.value(QLatin1String("name")).toString().trimmed();
+        d.kind         = kindFromString(o.value(QLatin1String("kind")).toString(), nullptr);
+        d.defaultValue = o.value(QLatin1String("default")).toString();
+        d.description  = o.value(QLatin1String("description")).toString();
+        d.tier         = tierFromString(o.value(QLatin1String("tier")).toString(), nullptr);
+        d.anchor       = o.value(QLatin1String("anchor")).toString();
+        if (d.name.isEmpty() || deniedKept.contains(d.name)) continue;
+        defs.append(d);
+    }
+    m_defs = defs;
+    m_state.clear();
+    for (EnvVarDef const& d : m_defs) m_state.append(State{ false, d.defaultValue });
+    m_variant = doc.object().value(QLatin1String("variant")).toString();
+
+    loadState();
+    rebuildVisible();
+    endResetModel();
+    return tsvOk;
 }
 
 QStringList EnvVarModel::deniedNames() const

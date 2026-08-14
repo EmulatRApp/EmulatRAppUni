@@ -73,6 +73,18 @@ public:
     // visible, not silently empty.
     bool loadRegistry(QString* error = nullptr);
 
+    // Per-binary declaration (2026-08-14): loads the baked TSV first (the
+    // denylist authority and the fallback listing), then, when jsonPath
+    // exists, replaces the LISTING with what the binary's own
+    // config/env_registry.json declares -- populated beside diagnostic
+    // builds, an empty envelope beside release builds, where the knobs are
+    // compiled out and listing them would be a lie.  Denied rows from the
+    // TSV always survive: quarantine never depends on the payload.
+    bool loadRegistryForBinary(QString const& jsonPath, QString* error = nullptr);
+
+    // "release", "diagnostic", or "" (no declaration -- TSV fallback).
+    QString registryVariant() const { return m_variant; }
+
     int  registryRowCount() const { return static_cast<int>(m_defs.size()); }
     bool registryIsEmpty()  const { return m_defs.isEmpty(); }
 
@@ -134,6 +146,7 @@ private:
     QList<State>     m_state;      // parallel to m_defs
     QList<int>       m_visible;    // indices into m_defs
     QString          m_systemId;
+    QString          m_variant;    // from the binary's declaration, or ""
     bool             m_showDev = false;
 };
 

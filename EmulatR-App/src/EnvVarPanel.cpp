@@ -108,17 +108,11 @@ EnvVarPanel::EnvVarPanel(EnvVarModel* model, QWidget* parent)
     outer->addWidget(m_view, 1);
 
     // ---- empty-registry note ---------------------------------------------
-    // The registry ships empty until gate G2b closes.  Saying so plainly beats
-    // an empty table that looks broken.
+    // An empty table must say WHY it is empty: a release image declares no
+    // variables (they are compiled out), which is a different story from a
+    // registry that failed to load.  refreshRegistryState() picks the text.
     m_empty = new QLabel(this);
     m_empty->setWordWrap(true);
-    m_empty->setText(
-        tr("<b>No environment variables are available yet.</b><br>"
-           "This panel renders only the curated registry produced by the "
-           "environment-variable census (spec gate G2b). Until that census is "
-           "signed off, no variable is offered here -- which is deliberate: "
-           "a diagnostic knob presented without evidence of what it does is "
-           "worse than no knob at all."));
     m_empty->setVisible(false);
     outer->addWidget(m_empty);
 
@@ -129,12 +123,31 @@ EnvVarPanel::EnvVarPanel(EnvVarModel* model, QWidget* parent)
                 this, &EnvVarPanel::onSelectionChanged);
     }
 
-    if (m_model) {
-        m_showDev->setVisible(m_model->hasDeveloperVariables());
-        bool const empty = m_model->registryIsEmpty();
-        m_view->setVisible(!empty);
-        m_empty->setVisible(empty);
+    refreshRegistryState();
+}
+
+void EnvVarPanel::refreshRegistryState()
+{
+    if (!m_model) return;
+    m_showDev->setVisible(m_model->hasDeveloperVariables());
+    bool const empty = m_model->registryIsEmpty();
+    if (m_model->registryVariant() == QLatin1String("release")) {
+        m_empty->setText(
+            tr("<b>Release image selected.</b><br>"
+               "The diagnostic environment variables are compiled out of "
+               "release builds, so none are offered here. To use them, pin "
+               "this system to a RelWithDebInfo or Debug binary in the "
+               "Emulator binary group above."));
+    } else {
+        m_empty->setText(
+            tr("<b>No environment variables are available.</b><br>"
+               "The variable registry for the selected emulator binary could "
+               "not be read, and the bundled fallback is empty. A diagnostic "
+               "knob presented without evidence of what it does is worse "
+               "than no knob at all."));
     }
+    m_view->setVisible(!empty);
+    m_empty->setVisible(empty);
     refreshCaution();
 }
 

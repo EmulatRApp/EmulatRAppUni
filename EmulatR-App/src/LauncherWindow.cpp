@@ -281,7 +281,8 @@ LauncherWindow::LauncherWindow(QWidget* parent) : QMainWindow(parent)
     m_watcher  = new QFileSystemWatcher(this);
 
     QString envError;
-    m_envModel->loadRegistry(&envError);   // empty registry is expected until G2b
+    m_envModel->loadRegistry(&envError);   // baked fallback; the per-binary
+                                           // declaration loads on selection
 
     buildUi();
 
@@ -849,6 +850,23 @@ void LauncherWindow::updateBinaryWidgets(int row)
         ExeDiscovery::findEmulatrForSystem(r.binaryConfig, r.binaryCustomPath);
     m_binaryNote->setText(res.found() ? QDir::toNativeSeparators(res.path)
                                       : res.detail);
+
+    // The env panel lists what THIS binary declares (config/env_registry.json
+    // beside it: populated for diagnostic builds, empty envelope for release,
+    // absent for legacy binaries -> bundled fallback).  Reload only when the
+    // resolved binary actually changed -- refreshDetails runs often.
+    QString const regPath = res.found()
+        ? QFileInfo(res.path).absoluteDir()
+              .filePath(QStringLiteral("config/env_registry.json"))
+        : QString();
+    if (regPath != m_envRegistryPath) {
+        m_envRegistryPath = regPath;
+        QString envErr;
+        m_envModel->loadRegistryForBinary(regPath, &envErr);
+        if (!envErr.isEmpty())
+            statusBar()->showMessage(envErr, 8000);
+        if (m_envPanel) m_envPanel->refreshRegistryState();
+    }
     if (m_snapMode) {
         QString mode = r.snapshotMode.trimmed().toLower();
         if (mode.isEmpty()) mode = QStringLiteral("safety");

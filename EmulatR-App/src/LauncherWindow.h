@@ -171,6 +171,7 @@ private:
     FixAction m_fix = FixAction::None;
 
     QString m_lastLogPath;
+    QString m_envRegistryPath;   // last-loaded per-binary env declaration
     bool    m_preflightOk = false;
     bool    m_updatingWidgets = false;   // guards programmatic widget updates
 };

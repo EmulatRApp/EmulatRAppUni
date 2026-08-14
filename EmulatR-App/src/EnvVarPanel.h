@@ -40,6 +40,12 @@ public:
     // a vanishing panel reads as a bug.
     void setSystemSelected(bool selected);
 
+    // Re-reads the model after a registry (re)load: table vs empty-note
+    // visibility, and the note's wording -- a release image (empty
+    // declaration, knobs compiled out) is explained differently from a
+    // registry that failed to load.
+    void refreshRegistryState();
+
 private slots:
     void onShowDevToggled(bool on);
     void onBrowseForPath();
