@@ -140,6 +140,21 @@ else
     echo "WARN: H&M version sync did not complete (rc=$?) -- see lines above; build continues."
 fi
 
+# ---- installer staging SSOT (release only, 2026-08-14) ---------------------
+# A release build refreshes dist/ASA-EmulatR via tools/make_dist.sh so Setup
+# Factory always packages current bits (it sources that ONE directory
+# recursively).  Skipped with a note when the launcher's release payload is
+# absent -- make_dist requires both halves.
+if [ "$CONFIG" = "release" ] && [ "$HOST" = "win" ]; then
+    if [ -x "$SRC/EmulatR-App/out/build/release/EmulatrLaunch.exe" ]; then
+        "$SRC/tools/make_dist.sh" \
+            || echo "WARN: make_dist failed -- dist/ASA-EmulatR is stale"
+    else
+        echo "NOTE: launcher release payload absent -- dist staging skipped."
+        echo "      Build it (EmulatR-App preset release), then run tools/make_dist.sh."
+    fi
+fi
+
 echo "=== done ==="
 if [ -f "$EXE" ]; then
     echo "built: $EXE  ($(date -r "$EXE" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' "$EXE" 2>/dev/null | cut -d. -f1))"
