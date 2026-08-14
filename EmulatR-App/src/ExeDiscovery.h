@@ -53,6 +53,7 @@ struct Result
 // Emulatr.exe.  Not resolving it disables Start with an explanatory status
 // line -- never a modal at startup (Section 6).
 Result findEmulatr();
+Result findEmulatrForSystem(QString const& binaryConfig, QString const& customPath);
 
 // PlatEd.  Absent on a machine that has not installed it; only the
 // "Open in PlatEd" affordance disables.  The launcher must ship and function

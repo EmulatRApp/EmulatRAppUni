@@ -27,9 +27,12 @@ namespace ExeDiscovery {
 
 namespace {
 
-// Step 2 -- the Setup Factory payload location (Section 6).
+// Step 2 -- the Setup Factory payload location (Section 6).  Canonical
+// install directory per the beta delivery plan (2026-08-14): the zip /
+// installer payload executes out of this directory.  Windows paths are
+// case-insensitive, but this spelling is the documented one.
 constexpr char const* kInstallDir =
-    "C:/Program Files/eNVy Systems, Inc/asa-emulatR";
+    "C:/Program Files/eNVy Systems, Inc/ASA-EmulatR";
 
 // Step 3 -- dev-tree build output.  Absent on tester machines, harmless.
 constexpr char const* kDevTreeRoot =
@@ -123,8 +126,59 @@ Result findEmulatr()
     return r;
 }
 
+// Per-system binary selection (2026-08-14): a named system may pin the
+// build config it launches.  "" / "discovered" keeps the tester-default
+// discovery chain; a named config resolves ONLY that dev-tree config and
+// is LOUD when absent (a pinned config silently substituted by another
+// binary is exactly the confusion the pin exists to prevent); "custom"
+// resolves the stored path, same loudness rule.
+Result findEmulatrForSystem(QString const& binaryConfig, QString const& customPath)
+{
+    QString const cfg = binaryConfig.trimmed().toLower();
+    if (cfg.isEmpty() || cfg == QLatin1String("discovered"))
+        return findEmulatr();
+
+    Result r;
+    if (cfg == QLatin1String("custom")) {
+        if (!customPath.isEmpty() && QFileInfo(customPath).isFile()) {
+            r.path   = QDir::toNativeSeparators(QFileInfo(customPath).absoluteFilePath());
+            r.source = Source::UserOverride;
+            r.detail = QStringLiteral("Using this system's custom binary path.");
+            return r;
+        }
+        r.detail = customPath.isEmpty()
+            ? QStringLiteral("This system is set to a custom binary, but no path is stored.")
+            : QStringLiteral("This system's custom binary does not exist: %1")
+                  .arg(QDir::toNativeSeparators(customPath));
+        return r;
+    }
+
+    QString const candidate = QDir(QString::fromLatin1(kDevTreeRoot))
+                                  .filePath(cfg + QStringLiteral("/Emulatr.exe"));
+    if (QFileInfo(candidate).isFile()) {
+        r.path   = QDir::toNativeSeparators(QFileInfo(candidate).absoluteFilePath());
+        r.source = Source::DevTree;
+        r.detail = QStringLiteral("Using the %1 build (pinned for this system).").arg(cfg);
+        return r;
+    }
+    r.detail = QStringLiteral(
+                   "This system is pinned to the %1 build, but %2 does not "
+                   "exist.  Build it, or set the system back to Discovered.")
+                   .arg(cfg, QDir::toNativeSeparators(candidate));
+    return r;
+}
+
 Result findPlatEd()
 {
+    // 2026-08-14: the platform editor ships as editors/platedit_qt.exe in
+    // the run-layout payload (build mirrors it beside Emulatr.exe; the
+    // installer carries the same layout).  The subpath rides probe()'s
+    // <dir>/<name> composition for both the installed location and every
+    // dev-tree config.  The pre-payload name "PlatEd.exe" is kept as a
+    // legacy fallback so an older standalone install still resolves.
+    Result r = probe(keys::kPlatEdExeOverride,
+                     QStringLiteral("editors/platedit_qt.exe"), nullptr);
+    if (r.found()) return r;
     return probe(keys::kPlatEdExeOverride, QStringLiteral("PlatEd.exe"), nullptr);
 }
 
@@ -182,6 +236,7 @@ QStringList searchedPathsForEmulatr()
 QStringList searchedPathsForPlatEd()
 {
     QStringList out;
+    probe(keys::kPlatEdExeOverride, QStringLiteral("editors/platedit_qt.exe"), &out);
     probe(keys::kPlatEdExeOverride, QStringLiteral("PlatEd.exe"), &out);
     return out;
 }

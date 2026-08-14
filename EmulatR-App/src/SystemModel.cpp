@@ -116,6 +116,8 @@ void SystemModel::load()
         r.name     = s.value(id + QStringLiteral("/name")).toString();
         r.platform = platformFromString(s.value(id + QStringLiteral("/platform")).toString());
         r.runDir   = s.value(id + QStringLiteral("/runDir")).toString();
+        r.binaryConfig     = s.value(id + QStringLiteral("/binaryConfig")).toString();
+        r.binaryCustomPath = s.value(id + QStringLiteral("/binaryCustomPath")).toString();
 
         // A record that lost a field is still shown -- silently dropping a
         // system because one key went missing would look like data loss to a
@@ -139,6 +141,8 @@ void SystemModel::persist(int row) const
     s.setValue(settingsKey(r.id, "name"),     r.name);
     s.setValue(settingsKey(r.id, "platform"), platformToString(r.platform));
     s.setValue(settingsKey(r.id, "runDir"),   r.runDir);
+    s.setValue(settingsKey(r.id, "binaryConfig"),     r.binaryConfig);
+    s.setValue(settingsKey(r.id, "binaryCustomPath"), r.binaryCustomPath);
 }
 
 void SystemModel::persistAll() const
@@ -409,6 +413,21 @@ void SystemModel::setHealth(int row, Health health, QString const& note)
         return;
     m_records[row].health     = health;
     m_records[row].healthNote = note;
+    emit dataChanged(index(row), index(row));
+}
+
+// Per-system emulator binary selection (2026-08-14).  Persisted immediately:
+// which binary a system launches is configuration, not transient state.
+void SystemModel::setBinaryConfig(int row, QString const& cfg,
+                                  QString const& customPath)
+{
+    if (!isValidRow(row)) return;
+    if (m_records.at(row).binaryConfig == cfg
+        && m_records.at(row).binaryCustomPath == customPath)
+        return;
+    m_records[row].binaryConfig     = cfg;
+    m_records[row].binaryCustomPath = customPath;
+    persist(row);
     emit dataChanged(index(row), index(row));
 }
 

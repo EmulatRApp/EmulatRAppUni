@@ -17,9 +17,13 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSet>
 #include <QStorageInfo>
 #include <QStringList>
+
+#include "ExeDiscovery.h"
 
 namespace launch {
 namespace DiskImageFactory {
@@ -72,8 +76,81 @@ QString Geometry::describe() const
 // ---------------------------------------------------------------------------
 // table
 // ---------------------------------------------------------------------------
+// SSOT-first (2026-08-14): the emulator's config/disk_types.json (schema 2)
+// is THE storage single source of truth -- the C++ DriveProfile table the
+// emulator serves to the guest is generated from the same data.  A launcher
+// that creates disks from its own bundled geometry list is the exact
+// two-owners-for-one-fact drift hazard the SSOT rules exist to prevent, so:
+//   1. find the emulator (ExeDiscovery), read <exe-dir>/config/disk_types.json;
+//   2. only when no emulator/SSOT is resolvable, fall back to the bundled
+//      TSV resource (offline authoring convenience, clearly second-best).
+// Withdrawn drive keys are never offered.  `class` must be "disk"; the key
+// itself is the manifest `model` value the platform editor expects.
+namespace {
+
+QList<Geometry> loadFromSsot(QString const& jsonPath, QString* error)
+{
+    QList<Geometry> out;
+    QFile f(jsonPath);
+    if (!f.open(QIODevice::ReadOnly)) {
+        if (error) *error = QStringLiteral("cannot open %1").arg(jsonPath);
+        return out;
+    }
+    QJsonParseError pe{};
+    QJsonDocument const doc = QJsonDocument::fromJson(f.readAll(), &pe);
+    if (doc.isNull() || !doc.isObject()) {
+        if (error) *error = QStringLiteral("%1: %2").arg(jsonPath, pe.errorString());
+        return out;
+    }
+    QJsonObject const root = doc.object();
+    auto harvest = [&out](QJsonObject const& drives) {
+        for (auto it = drives.begin(); it != drives.end(); ++it) {
+            QJsonObject const d = it.value().toObject();
+            if (d.value(QStringLiteral("class")).toString() != QLatin1String("disk"))
+                continue;
+            QJsonObject const cap = d.value(QStringLiteral("capacity")).toObject();
+            QJsonObject const geo = d.value(QStringLiteral("geometry")).toObject();
+            Geometry g;
+            g.model      = it.key();
+            g.iface      = d.value(QStringLiteral("transport")).toString().toLower();
+            g.secTrk     = static_cast<qint64>(geo.value(QStringLiteral("sectors_per_track")).toDouble());
+            g.heads      = static_cast<qint64>(geo.value(QStringLiteral("tracks_per_cylinder")).toDouble());
+            g.cyl        = static_cast<qint64>(geo.value(QStringLiteral("cylinders")).toDouble());
+            g.totalLbn   = static_cast<qint64>(cap.value(QStringLiteral("total_sectors")).toDouble());
+            g.blockBytes = static_cast<qint64>(cap.value(QStringLiteral("bytes_per_sector")).toDouble());
+            g.capacity   = cap.value(QStringLiteral("formatted_capacity")).toString();
+            g.note       = geo.value(QStringLiteral("authority")).toString();
+            if (g.isValid()) out.append(g);
+        }
+    };
+    harvest(root.value(QStringLiteral("drives")).toObject());
+    harvest(root.value(QStringLiteral("custom_drives")).toObject());
+    // "withdrawn" is deliberately not harvested.
+    return out;
+}
+
+}  // namespace
+
 QList<Geometry> loadTable(QString* error)
 {
+    // SSOT first: disk_types.json beside the discovered emulator.
+    {
+        ExeDiscovery::Result const emu = ExeDiscovery::findEmulatr();
+        if (emu.found()) {
+            QString const ssot = QFileInfo(emu.path).dir()
+                                     .filePath(QStringLiteral("config/disk_types.json"));
+            if (QFileInfo(ssot).isFile()) {
+                QString ssotErr;
+                QList<Geometry> const fromSsot = loadFromSsot(ssot, &ssotErr);
+                if (!fromSsot.isEmpty()) return fromSsot;
+                if (error && !ssotErr.isEmpty())
+                    *error = QStringLiteral("disk_types.json unusable (%1); "
+                                            "using the bundled table.").arg(ssotErr);
+            }
+        }
+    }
+
+    // Fallback: the bundled TSV (offline authoring; may lag the SSOT).
     QList<Geometry> out;
 
     QFile f(QStringLiteral(":/data/dec_drive_geometries.tsv"));

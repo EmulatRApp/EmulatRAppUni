@@ -473,6 +473,44 @@ QWidget* LauncherWindow::buildDetailsTab()
         if (row >= 0) openInExplorer(m_model->at(row).firmwareDir());
     });
 
+    // ---- emulator binary (per-system config pin, 2026-08-14) --------------
+    auto* bin     = new QGroupBox(tr("Emulator binary"), page);
+    auto* binForm = new QFormLayout(bin);
+    m_binaryCfg = new QComboBox(bin);
+    m_binaryCfg->addItem(tr("Discovered (recommended)"), QStringLiteral("discovered"));
+    m_binaryCfg->addItem(tr("Release"),                  QStringLiteral("release"));
+    m_binaryCfg->addItem(tr("RelWithDebInfo"),           QStringLiteral("relwithdebinfo"));
+    m_binaryCfg->addItem(tr("Debug"),                    QStringLiteral("debug"));
+    m_binaryCfg->addItem(tr("Custom..."),                QStringLiteral("custom"));
+    binForm->addRow(tr("Binary:"), m_binaryCfg);
+    m_binaryNote = new QLabel(bin);
+    m_binaryNote->setWordWrap(true);
+    binForm->addRow(QString(), m_binaryNote);
+    layout->addWidget(bin);
+
+    connect(m_binaryCfg, &QComboBox::currentIndexChanged, this, [this] {
+        if (m_updatingWidgets) return;
+        int const row = selectedRow();
+        if (row < 0) return;
+        QString const cfg = m_binaryCfg->currentData().toString();
+        QString customPath = m_model->at(row).binaryCustomPath;
+        if (cfg == QLatin1String("custom")) {
+            QString const picked = QFileDialog::getOpenFileName(
+                this, tr("Choose Emulatr.exe"),
+                customPath.isEmpty() ? QString() : customPath,
+                tr("Emulatr (Emulatr.exe);;Executables (*.exe)"));
+            if (picked.isEmpty()) {
+                // Cancelled: fall back to the stored selection.
+                updateBinaryWidgets(row);
+                return;
+            }
+            customPath = picked;
+        }
+        m_model->setBinaryConfig(row, cfg, customPath);
+        updateBinaryWidgets(row);
+        runPreflight();
+    });
+
     // ---- console + reserved service position (D4) ------------------------
     auto* consoleRow = new QHBoxLayout;
 
@@ -650,6 +688,7 @@ void LauncherWindow::refreshDetails()
         m_runDirLbl->setText(tr("--"));
         m_firmware->clear();
         m_firmwareNote->clear();
+        if (m_binaryNote) m_binaryNote->clear();
         m_consoleNote->clear();
         m_platEdNote->clear();
         m_updatingWidgets = false;
@@ -663,6 +702,7 @@ void LauncherWindow::refreshDetails()
                                .arg(platformToString(r.platform),
                                     platformDescription(r.platform)));
     m_runDirLbl->setText(QDir::toNativeSeparators(r.runDir));
+    updateBinaryWidgets(row);
 
     // ---- firmware (W2): only files inside the run dir, never a free path --
     QString const previous = m_firmware->currentData().toString();
@@ -709,6 +749,25 @@ void LauncherWindow::refreshDetails()
 
     m_updatingWidgets = false;
     refreshActionStates();
+}
+
+// Sync the per-system binary pin widgets from the record and show the
+// resolved path (or the loud failure detail) beneath the combo.
+void LauncherWindow::updateBinaryWidgets(int row)
+{
+    if (!m_binaryCfg || !m_model->isValidRow(row)) return;
+    SystemRecord const& r = m_model->at(row);
+    bool const guard = m_updatingWidgets;
+    m_updatingWidgets = true;
+    QString cfg = r.binaryConfig.trimmed().toLower();
+    if (cfg.isEmpty()) cfg = QStringLiteral("discovered");
+    int const idx = m_binaryCfg->findData(cfg);
+    m_binaryCfg->setCurrentIndex(idx < 0 ? 0 : idx);
+    ExeDiscovery::Result const res =
+        ExeDiscovery::findEmulatrForSystem(r.binaryConfig, r.binaryCustomPath);
+    m_binaryNote->setText(res.found() ? QDir::toNativeSeparators(res.path)
+                                      : res.detail);
+    m_updatingWidgets = guard;
 }
 
 void LauncherWindow::onFirmwareChanged(int)
@@ -941,8 +1000,9 @@ void LauncherWindow::runPreflight()
 
     RunDirSkeleton::ValidationResult v = RunDirSkeleton::validate(r.runDir, r.platform);
 
-    // Emulatr.exe resolved (Section 6).
-    ExeDiscovery::Result const exe = ExeDiscovery::findEmulatr();
+    // Emulatr.exe resolved (Section 6), honoring the per-system binary pin.
+    ExeDiscovery::Result const exe =
+        ExeDiscovery::findEmulatrForSystem(r.binaryConfig, r.binaryCustomPath);
     if (!exe.found()) {
         v.problems << tr("Emulatr.exe could not be found. %1").arg(exe.detail);
         if (m_fix == FixAction::None) m_fix = FixAction::OpenSettings;
@@ -1088,7 +1148,8 @@ void LauncherWindow::onStart()
         return;
     }
 
-    ExeDiscovery::Result const exe = ExeDiscovery::findEmulatr();
+    ExeDiscovery::Result const exe =
+        ExeDiscovery::findEmulatrForSystem(r.binaryConfig, r.binaryCustomPath);
 
     QProcessEnvironment const inherited = QProcessEnvironment::systemEnvironment();
 

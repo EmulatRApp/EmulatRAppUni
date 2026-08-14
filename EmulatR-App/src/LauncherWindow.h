@@ -136,6 +136,9 @@ private:
     QLabel*      m_runDirLbl    = nullptr;
     QComboBox*   m_firmware     = nullptr;
     QLabel*      m_firmwareNote = nullptr;
+    QComboBox*   m_binaryCfg    = nullptr;   // per-system emulator binary pin
+    QLabel*      m_binaryNote   = nullptr;
+    void updateBinaryWidgets(int row);
     QSpinBox*    m_consolePort  = nullptr;
     QCheckBox*   m_exposeLan    = nullptr;
     QLabel*      m_consoleNote  = nullptr;

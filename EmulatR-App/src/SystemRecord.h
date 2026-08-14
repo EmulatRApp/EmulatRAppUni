@@ -99,6 +99,14 @@ struct SystemRecord
     Platform platform = Platform::Unknown;
     QString  runDir;
 
+    // Which Emulatr.exe this system launches (2026-08-14, dev convenience):
+    // "" or "discovered" -> ExeDiscovery::findEmulatr() (override/installed/
+    // newest dev config -- the tester default); "release" |
+    // "relwithdebinfo" | "debug" -> that dev-tree config explicitly;
+    // "custom" -> binaryCustomPath.  Persisted per system.
+    QString  binaryConfig;
+    QString  binaryCustomPath;
+
     // Transient (not persisted).
     bool     running     = false;
     Health   health      = Health::Unknown;
