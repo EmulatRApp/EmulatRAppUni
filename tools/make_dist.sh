@@ -76,6 +76,13 @@ for t in mkdisk.py srm_console_driver.py alpha_disasm.py; do
     [[ -f "$SRC/tools/$t" ]] && cp "$SRC/tools/$t" "$DIST/tools/"
 done
 
+# ---- neutralize dev-machine paths in the shipped ini ------------------------
+# config/Emulatr.ini is the DEV ini; its diskDir points at this machine's
+# vStorage.  Shipped, diskDir goes empty (= resolve relative media against
+# the launch CWD), which is correct for both launcher profiles (their own
+# ini wins) and bare runs from the install dir.
+sed -i 's|^diskDir = .*|diskDir =|' "$DIST/config/Emulatr.ini"
+
 # ---- scrub anything that must never ship -----------------------------------
 find "$DIST" -name "*.pdb" -delete
 find "$DIST" -name "CMake*" -prune -exec rm -rf {} + 2>/dev/null || true
