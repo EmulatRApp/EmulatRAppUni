@@ -131,7 +131,13 @@ bool EmulatorProcess::openMirrorLog(QString* error)
 void EmulatorProcess::appendToLog(QString const& text)
 {
     if (!m_log) return;
-    m_log->write(text.toUtf8());
+    // The child's Windows stdio already emits \r\n; the log is open in Text
+    // mode, which would expand that \n AGAIN -> \r\r\n, rendering as a blank
+    // line after every line.  Strip \r and let Text mode do the one
+    // translation.
+    QString t = text;
+    t.remove(QLatin1Char('\r'));
+    m_log->write(t.toUtf8());
     m_log->flush();          // a crash must not cost the tester the tail
 }
 

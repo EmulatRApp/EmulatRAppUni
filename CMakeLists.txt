@@ -523,7 +523,13 @@ option(EMULATR_BRINGUP_PROBES
        OFF)
 
 if(EMULATR_BRINGUP_PROBES)
-    target_compile_definitions(Emulatr PRIVATE EMULATR_BRINGUP_PROBES=1)
+    # NEVER in Release, even when the option is on: the cache entry is sticky
+    # (option() cannot turn it back off), and on 2026-08-14 a long-forgotten
+    # -DEMULATR_BRINGUP_PROBES=ON put PCSAMPLE/HW_REI/MEMDIAG chatter into the
+    # beta release binary.  The generator expression scopes the probes to the
+    # diagnostic configs, matching the per-binary env-registry declaration.
+    target_compile_definitions(Emulatr PRIVATE
+        $<$<NOT:$<CONFIG:Release>>:EMULATR_BRINGUP_PROBES=1>)
 endif()
 
 # ----------------------------------------------------------------------------
