@@ -118,6 +118,20 @@ SnapshotResult save(Machine&                       machine,
     }
     ds.writeRawData(commentBuf, kCommentSize);
 
+    // -- Config fingerprint (v2) -----------------------------------------
+    // The identity of the configuration this state is coherent WITH: the
+    // platform manifest and every attached media file at construction.
+    {
+        Machine::ConfigFingerprint const& fp = machine.configFingerprint();
+        ds << static_cast<quint64>(fp.manifestHash);
+        ds << QString::fromStdString(fp.manifestLeaf);
+        ds << static_cast<quint32>(fp.media.size());
+        for (auto const& m : fp.media) {
+            ds << QString::fromStdString(m.first);
+            ds << static_cast<quint64>(m.second);
+        }
+    }
+
     // -- CpuState (raw POD bytes) ----------------------------------------
     ds.writeRawData(reinterpret_cast<char const*>(&cpu), sizeof(cpu));
 
@@ -325,7 +339,7 @@ SnapshotResult load(Machine&                      machine,
     uint32_t chipsetVersion  = 0;
     ds >> formatVersion >> cpuStateVersion >> chipsetVersion;
 
-    if (formatVersion != kFormatVersion
+    if ((formatVersion != kFormatVersion && formatVersion != kFormatVersionLegacy)
         || cpuStateVersion != kCpuStateVersion
         || chipsetVersion != kChipsetVersion)
     {
@@ -353,6 +367,60 @@ SnapshotResult load(Machine&                      machine,
 
     char commentBuf[kCommentSize] = {};
     ds.readRawData(commentBuf, kCommentSize);
+
+    // -- Config fingerprint (v2): validate BEFORE touching machine state --
+    // A snapshot is only coherent against the exact manifest and media it
+    // was captured with; the disk CONTENTS live outside the snapshot, so a
+    // resume over a changed configuration describes platters that no longer
+    // exist.  Refuse loudly; autoload's caller falls through to cold boot.
+    if (formatVersion >= 2) {
+        quint64 fpHash = 0;
+        QString fpLeaf;
+        quint32 fpCount = 0;
+        ds >> fpHash >> fpLeaf >> fpCount;
+        std::vector<std::pair<std::string, uint64_t>> fpMedia;
+        fpMedia.reserve(fpCount);
+        for (quint32 i = 0; i < fpCount; ++i) {
+            QString leaf; quint64 bytes = 0;
+            ds >> leaf >> bytes;
+            fpMedia.emplace_back(leaf.toStdString(),
+                                 static_cast<uint64_t>(bytes));
+        }
+        Machine::ConfigFingerprint const& cur = machine.configFingerprint();
+        auto sorted = [](std::vector<std::pair<std::string, uint64_t>> v) {
+            std::sort(v.begin(), v.end());
+            return v;
+        };
+        std::vector<std::pair<std::string, uint64_t>> curMedia = cur.media;
+        if (fpHash != static_cast<quint64>(cur.manifestHash)
+            || sorted(fpMedia) != sorted(curMedia))
+        {
+            r.errorMessage  = "Snapshot::load: CONFIG MISMATCH -- captured with "
+                              "manifest '";
+            r.errorMessage += fpLeaf.toStdString();
+            r.errorMessage += "' and " + std::to_string(fpMedia.size())
+                            + " media file(s); the machine now has '";
+            r.errorMessage += cur.manifestLeaf;
+            r.errorMessage += "' and " + std::to_string(curMedia.size())
+                            + ".  A snapshot is only coherent against the exact "
+                              "manifest and media it was captured with; "
+                              "refusing to resume (cold boot instead).";
+            for (auto const& m : sorted(fpMedia)) {
+                bool present = false;
+                for (auto const& c : curMedia)
+                    if (c == m) { present = true; break; }
+                if (!present) {
+                    r.errorMessage += "  snapshot-side: " + m.first + " ("
+                                    + std::to_string(m.second) + " bytes).";
+                }
+            }
+            SPDLOG_ERROR(r.errorMessage);
+            return r;
+        }
+    } else {
+        SPDLOG_WARN("Snapshot::load: legacy v1 snapshot (no config "
+                    "fingerprint) -- resume coherence cannot be validated");
+    }
 
     // -- CpuState --------------------------------------------------------
     coreLib::CpuState cpuTmp{};

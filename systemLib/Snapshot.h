@@ -96,7 +96,16 @@ class Machine;
 // invalid (loadSnapshot returns failure with a clear error message).
 // ---------------------------------------------------------------------------
 inline constexpr char     kSnapshotMagic[8]      = { 'E','M','U','L','A','T','R','1' };
-inline constexpr uint32_t kFormatVersion         = 1;
+// kFormatVersion history:
+//   v1 -> v2 (2026-08-14): config fingerprint added to the header (manifest
+//   hash + leaf, and per-attached-media leaf + byte size), written after the
+//   comment block.  load() validates it against the CURRENT machine BEFORE
+//   any state is restored and REFUSES a mismatched resume -- a snapshot is
+//   only coherent against the exact manifest and media it was captured with
+//   (architect ruling, first OpenVMS install night).  v1 files still load,
+//   with a WARN that coherence cannot be validated.
+inline constexpr uint32_t kFormatVersion         = 2;
+inline constexpr uint32_t kFormatVersionLegacy   = 1;   // pre-fingerprint
 // kCpuStateVersion history:
 //   v1 -> v2 (2026-05-11): unalignTrapEnabled bool added.
 //   v2 -> v3 (2026-05-12): CBoxState struct added (writeMany +

@@ -73,6 +73,7 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <fstream>
 #include <vector>
 #include <iomanip>
 #include <sstream>
@@ -530,6 +531,24 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
         }
         ManifestLoadResult const mr = PlatformConfig::load(manifestPath);
 
+        // Config fingerprint: hash the manifest bytes actually resolved so
+        // snapshots can refuse a resume against a changed configuration.
+        if (!manifestPath.empty()) {
+            std::error_code fpEc;
+            std::filesystem::path const mp(manifestPath);
+            if (std::filesystem::exists(mp, fpEc) && !fpEc) {
+                std::ifstream mf(mp, std::ios::binary);
+                uint64_t h = 1469598103934665603ull;          // FNV-1a 64
+                for (int c = mf.get(); c != std::char_traits<char>::eof();
+                     c = mf.get()) {
+                    h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+                    h *= 1099511628211ull;
+                }
+                m_configFp.manifestHash = h;
+                m_configFp.manifestLeaf = mp.filename().string();
+            }
+        }
+
         std::vector<IicPcf8584::IicDevice> devs;
         devs.reserve(mr.manifest.iic.size());
         for (IicDeviceEntry const& e : mr.manifest.iic) {
@@ -913,6 +932,16 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
                     spdlog::info("Storage: attached {} '{}' to {} ch{} unit{}",
                                  what, mediaSpec, isScsi ? "SCSI" : "IDE",
                                  int(st.channel), int(st.unit));
+                if (ok && !isHost) {
+                    // Record the attached media identity for the snapshot
+                    // config fingerprint (leaf + byte size at attach).
+                    std::error_code szEc;
+                    std::filesystem::path const mpth(mediaSpec);
+                    uint64_t const bytes =
+                        std::filesystem::file_size(mpth, szEc);
+                    m_configFp.media.emplace_back(
+                        mpth.filename().string(), szEc ? 0ull : bytes);
+                }
                 else
                     spdlog::warn("Storage: {} '{}' attach rejected; "
                                  "{} ch{} unit{} left empty",

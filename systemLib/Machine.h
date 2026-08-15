@@ -301,6 +301,25 @@ public:
         return m_snapshotDir;
     }
 
+    // ------------------------------------------------------------------
+    // Config fingerprint (2026-08-14).  The identity of the configuration
+    // this machine was constructed with: the resolved platform manifest
+    // (FNV-1a of its bytes; 0 = compiled-in default) and every attached
+    // media file (leaf name + byte size at attach).  Snapshot::save stamps
+    // it into the header; Snapshot::load refuses to resume when it no
+    // longer matches -- disk CONTENTS live outside the snapshot, so a
+    // resume over changed media describes platters that no longer exist.
+    // ------------------------------------------------------------------
+    struct ConfigFingerprint {
+        uint64_t    manifestHash = 0;
+        std::string manifestLeaf;
+        std::vector<std::pair<std::string, uint64_t>> media;  // leaf, bytes
+    };
+    ConfigFingerprint const& configFingerprint() const noexcept
+    {
+        return m_configFp;
+    }
+
     // Disable / re-enable the automatic save-on-halt and periodic-save
     // hooks inside run().  Tests that exercise step() in tight loops
     // and do not want the disk traffic should disable.  Default: on.
@@ -592,6 +611,7 @@ private:
     // false so the test suite stays silent; main.cpp explicitly opts
     // in for the production binary via setAutoSnapshotEnabled(true).
     std::filesystem::path    m_snapshotDir       = "snapshots";
+    ConfigFingerprint        m_configFp;
     uint64_t                 m_nextAutoSaveCycle = 0;
     bool                     m_autoSnapshotEnabled = false;
     uint64_t                 m_autoSavePeriodCycles = 0;  // 0 = kAutoSavePeriodCycles
