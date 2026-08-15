@@ -779,13 +779,55 @@ QString LauncherWindow::manifestPathFor(SystemRecord const& r) const
     QString const leaf = manifestLeafName(fwRel, r.platform);
     if (leaf.isEmpty()) return QString();
 
+    // A SYSTEM-LOCAL manifest (run dir) wins: the installed default lives in
+    // Program Files, which is read-only, so edits are copy-on-first-edit into
+    // the run dir and the launch sets EMULATR_PLATFORM_CONFIG to the copy.
+    QString const local = QDir(r.runDir).filePath(leaf);
+    if (QFileInfo::exists(local)) return local;
+
     ExeDiscovery::Result const exe =
         ExeDiscovery::findEmulatrForSystem(r.binaryConfig, r.binaryCustomPath);
     if (exe.found())
         return QFileInfo(exe.path).absoluteDir().filePath(leaf);
     // No resolvable binary (the system cannot start anyway): fall back to the
     // run dir so the name at least stays stem-correct in the UI.
-    return QDir(r.runDir).filePath(leaf);
+    return local;
+}
+
+// Copy-on-first-edit: make sure the system owns a WRITABLE manifest in its
+// run dir, seeding it from the installed (possibly read-only) default the
+// first time.  Returns the run-dir path, or empty with *error.
+QString LauncherWindow::ensureSystemLocalManifest(SystemRecord const& r,
+                                                  QString* error)
+{
+    QString const current = manifestPathFor(r);
+    if (current.isEmpty()) {
+        if (error) *error = tr("no manifest name (no platform, no firmware)");
+        return QString();
+    }
+    QString const leaf  = QFileInfo(current).fileName();
+    QString const local = QDir(r.runDir).filePath(leaf);
+    if (QFileInfo::exists(local)) return local;
+
+    if (!QFileInfo::exists(current)) {
+        if (error) {
+            *error = tr("no manifest to seed from: %1 does not exist")
+                         .arg(QDir::toNativeSeparators(current));
+        }
+        return QString();
+    }
+    if (!QFile::copy(current, local)) {
+        if (error) {
+            *error = tr("cannot copy %1 into the run directory")
+                         .arg(QDir::toNativeSeparators(current));
+        }
+        return QString();
+    }
+    // The installed default may carry the read-only bit; the copy must not.
+    QFile f(local);
+    f.setPermissions(f.permissions() | QFileDevice::WriteOwner
+                                     | QFileDevice::WriteUser);
+    return local;
 }
 
 void LauncherWindow::refreshDetails()
@@ -854,10 +896,19 @@ void LauncherWindow::refreshDetails()
                  : term.detail);
 
     // ---- PlatEd (W5) ------------------------------------------------------
-    m_platEdNote->setText(
-        m_platEd->isAvailable()
-            ? tr("Manifest: %1").arg(QDir::toNativeSeparators(manifestPathFor(r)))
-            : m_platEd->unavailableReason());
+    if (m_platEd->isAvailable()) {
+        QString const mp = manifestPathFor(r);
+        bool const systemLocal =
+            !mp.isEmpty() && QFileInfo::exists(mp)
+            && QFileInfo(mp).absolutePath() == QDir(r.runDir).absolutePath();
+        m_platEdNote->setText(tr("Manifest: %1  %2")
+            .arg(QDir::toNativeSeparators(mp),
+                 systemLocal ? tr("(system-local)")
+                             : tr("(installed default -- editing copies it "
+                                  "into the run directory)")));
+    } else {
+        m_platEdNote->setText(m_platEd->unavailableReason());
+    }
 
     m_updatingWidgets = false;
     refreshActionStates();
@@ -978,8 +1029,15 @@ void LauncherWindow::onOpenInPlatEd()
     int const row = selectedRow();
     if (row < 0) return;
 
+    // Copy-on-first-edit: PlatEd always gets the system-local, writable copy
+    // (the installed default under Program Files is read-only).
     QString error;
-    if (!m_platEd->openManifest(manifestPathFor(m_model->at(row)), &error)) {
+    QString const local = ensureSystemLocalManifest(m_model->at(row), &error);
+    if (local.isEmpty()) {
+        QMessageBox::information(this, tr("PlatEd"), error);
+        return;
+    }
+    if (!m_platEd->openManifest(local, &error)) {
         QMessageBox::information(this, tr("PlatEd"), error);
         return;
     }
@@ -1318,6 +1376,17 @@ void LauncherWindow::onStart()
     if (r.platformMode.trimmed().toLower() == QLatin1String("silicon"))
         req.environment.insert(QStringLiteral("EMULATR_PLATFORM"),
                                QStringLiteral("silicon"));
+    // System-local manifest redirect: when the run dir owns a manifest copy
+    // (copy-on-first-edit via PlatEd), the core must load THAT, not the
+    // installed default beside the exe.  Re-derived every launch from the run
+    // dir itself, so it survives kit uninstall/reinstall untouched.
+    {
+        QString const localManifest = QDir(r.runDir).filePath(
+            manifestLeafName(req.firmwareRelPath, r.platform));
+        if (QFileInfo::exists(localManifest))
+            req.environment.insert(QStringLiteral("EMULATR_PLATFORM_CONFIG"),
+                                   QDir::toNativeSeparators(localManifest));
+    }
     req.envForLog       = m_envModel->effectiveSelectionForLog();
     req.strippedForLog  = m_envModel->strippedFrom(inherited);
 
