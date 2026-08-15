@@ -267,8 +267,9 @@ void EnvVarModel::loadState()
 
     QSettings s = openSettings();
     for (int i = 0; i < m_defs.size(); ++i) {
-        QString const key = QStringLiteral("systems/%1/env/%2")
-                                .arg(m_systemId, m_defs.at(i).name);
+        QString const key = QStringLiteral("%1/%2/env/%3")
+                                .arg(QLatin1String(keys::kSystemsGroup),
+                                     m_systemId, m_defs.at(i).name);
         if (!s.contains(key)) continue;
         QStringList const v = s.value(key).toStringList();
         if (v.isEmpty()) continue;
@@ -286,7 +287,8 @@ void EnvVarModel::saveState(QString const& name) const
     if (idx < 0) return;
 
     QSettings s = openSettings();
-    QString const key = QStringLiteral("systems/%1/env/%2").arg(m_systemId, name);
+    QString const key = QStringLiteral("%1/%2/env/%3")
+                            .arg(QLatin1String(keys::kSystemsGroup), m_systemId, name);
     s.setValue(key, QStringList{ m_state.at(idx).checked ? QStringLiteral("1")
                                                          : QStringLiteral("0"),
                                  m_state.at(idx).value });

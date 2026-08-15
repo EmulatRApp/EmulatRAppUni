@@ -28,7 +28,7 @@ namespace launch {
 
 namespace {
 
-constexpr char const* kSystemsGroup = "systems";
+constexpr char const* kSystemsGroup = launch::keys::kSystemsGroup;
 
 QString newGuid()
 {

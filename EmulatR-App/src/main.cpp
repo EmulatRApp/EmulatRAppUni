@@ -30,6 +30,10 @@ int main(int argc, char* argv[])
     QCoreApplication::setApplicationName(QString::fromLatin1(launch::kAppName));
     QCoreApplication::setApplicationVersion(QString::fromLatin1(launch::kAppVersion));
 
+    // Product-hive move (2026-08-14): carry an existing EmulatrLaunch hive
+    // into Software\eNVy Systems\EmulatR with launch_ prefixes, once.
+    launch::migrateLegacyLaunchSettings();
+
     // Section 10: "Plain native style, no custom theming in v1."  Nothing is
     // set here on purpose.
 
