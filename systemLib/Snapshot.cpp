@@ -503,6 +503,16 @@ SnapshotResult autoloadLatest(Machine&                      machine,
         if (!entry.is_regular_file(ec)) continue;
         if (entry.path().extension() != kSnapshotExtension) continue;
 
+        // NEVER autoload a halt-forensic capture (auto_halt_*): it is the
+        // preserved state of a DEAD machine (guest shutdown/bugcheck), kept
+        // for post-mortem only.  Restoring one yields a halted CPU, an
+        // instant clean exit -- and, before this filter, ANOTHER halt
+        // capture on the way out: every guest shutdown bricked all
+        // subsequent starts until the snapshots dir was cleared by hand
+        // (found 2026-08-14, first OpenVMS install run on the beta kit).
+        if (entry.path().filename().string().rfind("auto_halt_", 0) == 0)
+            continue;
+
         auto const mt = entry.last_write_time(ec);
         if (ec) continue;
         if (!found || mt > newestMtime) {
