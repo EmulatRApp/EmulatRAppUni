@@ -119,6 +119,7 @@ void SystemModel::load()
         r.binaryConfig     = s.value(id + QStringLiteral("/binaryConfig")).toString();
         r.binaryCustomPath = s.value(id + QStringLiteral("/binaryCustomPath")).toString();
         r.snapshotMode     = s.value(id + QStringLiteral("/snapshotMode")).toString();
+        r.platformMode     = s.value(id + QStringLiteral("/platformMode")).toString();
 
         // A record that lost a field is still shown -- silently dropping a
         // system because one key went missing would look like data loss to a
@@ -145,6 +146,7 @@ void SystemModel::persist(int row) const
     s.setValue(settingsKey(r.id, "binaryConfig"),     r.binaryConfig);
     s.setValue(settingsKey(r.id, "binaryCustomPath"), r.binaryCustomPath);
     s.setValue(settingsKey(r.id, "snapshotMode"),     r.snapshotMode);
+    s.setValue(settingsKey(r.id, "platformMode"),     r.platformMode);
 }
 
 void SystemModel::persistAll() const
@@ -438,6 +440,15 @@ void SystemModel::setSnapshotMode(int row, QString const& mode)
     if (!isValidRow(row)) return;
     if (m_records.at(row).snapshotMode == mode) return;
     m_records[row].snapshotMode = mode;
+    persist(row);
+    emit dataChanged(index(row), index(row));
+}
+
+void SystemModel::setPlatformMode(int row, QString const& mode)
+{
+    if (!isValidRow(row)) return;
+    if (m_records.at(row).platformMode == mode) return;
+    m_records[row].platformMode = mode;
     persist(row);
     emit dataChanged(index(row), index(row));
 }

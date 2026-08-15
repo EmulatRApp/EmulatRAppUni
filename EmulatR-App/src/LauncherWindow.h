@@ -34,6 +34,7 @@
 
 class QCheckBox;
 class QComboBox;
+class QRadioButton;
 class QFileSystemWatcher;
 class QTimer;
 class QGroupBox;
@@ -147,6 +148,8 @@ private:
     QComboBox*   m_binaryCfg    = nullptr;   // per-system emulator binary pin
     QLabel*      m_binaryNote   = nullptr;
     QComboBox*   m_snapMode     = nullptr;   // per-system snapshot cadence knob
+    QRadioButton* m_modeIsp     = nullptr;   // execution mode: ISP (default)
+    QRadioButton* m_modeSilicon = nullptr;   //   vs REAL_HW silicon path
     void updateBinaryWidgets(int row);
     QSpinBox*    m_consolePort  = nullptr;
     QCheckBox*   m_exposeLan    = nullptr;

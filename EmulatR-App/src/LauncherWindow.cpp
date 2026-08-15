@@ -41,6 +41,7 @@
 #include <QPainter>
 #include <QProcess>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QScrollArea>
 #include <QSettings>
 #include <QSpinBox>
@@ -553,6 +554,34 @@ QWidget* LauncherWindow::buildDetailsTab()
         runPreflight();
     });
 
+    // ---- execution mode (2026-08-14) --------------------------------------
+    // One truth in the core: the firmware's own platform() probe.  ISP is the
+    // default, unapologetically -- it boots to >>>.  Silicon is the faithful
+    // REAL_HW path and is presented as the experiment it currently is.
+    auto* modeBox  = new QGroupBox(tr("Execution mode"), page);
+    auto* modeForm = new QVBoxLayout(modeBox);
+    m_modeIsp = new QRadioButton(
+        tr("ISP (recommended) -- the firmware's pre-silicon simulator path; "
+           "boots to the SRM console"), modeBox);
+    m_modeSilicon = new QRadioButton(
+        tr("Silicon -- the faithful REAL_HW path (experimental: does not yet "
+           "reach the console)"), modeBox);
+    m_modeIsp->setChecked(true);
+    modeForm->addWidget(m_modeIsp);
+    modeForm->addWidget(m_modeSilicon);
+    layout->addWidget(modeBox);
+
+    auto onModeToggled = [this] {
+        if (m_updatingWidgets) return;
+        int const row = selectedRow();
+        if (row < 0) return;
+        m_model->setPlatformMode(row, m_modeSilicon->isChecked()
+                                          ? QStringLiteral("silicon")
+                                          : QStringLiteral("isp"));
+    };
+    connect(m_modeIsp,     &QRadioButton::toggled, this, onModeToggled);
+    connect(m_modeSilicon, &QRadioButton::toggled, this, onModeToggled);
+
     // ---- console + reserved service position (D4) ------------------------
     auto* consoleRow = new QHBoxLayout;
 
@@ -872,6 +901,11 @@ void LauncherWindow::updateBinaryWidgets(int row)
         if (mode.isEmpty()) mode = QStringLiteral("safety");
         int const mi = m_snapMode->findData(mode);
         m_snapMode->setCurrentIndex(mi < 0 ? 0 : mi);
+    }
+    if (m_modeIsp && m_modeSilicon) {
+        bool const silicon =
+            r.platformMode.trimmed().toLower() == QLatin1String("silicon");
+        (silicon ? m_modeSilicon : m_modeIsp)->setChecked(true);
     }
     m_updatingWidgets = guard;
 }
@@ -1279,6 +1313,11 @@ void LauncherWindow::onStart()
                                    QStringLiteral("1000000000"));
         // "" / "safety": emulator default (50B-cycle period), nothing to set.
     }
+    // Execution-mode radio: silicon sets the one-truth env lever; ISP is the
+    // core's own default, so nothing is set (absent-is-not-empty).
+    if (r.platformMode.trimmed().toLower() == QLatin1String("silicon"))
+        req.environment.insert(QStringLiteral("EMULATR_PLATFORM"),
+                               QStringLiteral("silicon"));
     req.envForLog       = m_envModel->effectiveSelectionForLog();
     req.strippedForLog  = m_envModel->strippedFrom(inherited);
 

@@ -128,6 +128,14 @@ struct SystemRecord
     // "off" -> EMULATR_AUTOSNAP=off (no periodic saves at all).
     QString  snapshotMode;
 
+    // Execution-mode radio (2026-08-14): "" or "isp" -> ISP (default,
+    // unapologetically -- the firmware's pre-silicon simulator path, boots to
+    // SRM >>>); "silicon" -> EMULATR_PLATFORM=silicon overlay, the faithful
+    // REAL_HW path (experimental: does not yet reach the console -- the
+    // GAP-PLAT-001 parity project).  One truth in the core: the firmware's
+    // own platform() probe (pipelineLib/MemDrainer.h 0xBFFC intercept).
+    QString  platformMode;
+
     // Transient (not persisted).
     bool     running     = false;
     Health   health      = Health::Unknown;
