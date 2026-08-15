@@ -45,7 +45,7 @@
       "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "scsi_disk",
-          "model": "RZ29L", "media": "Alpha/dka0.vdisk", "media_kind": "image",
+          "model": "RZ29L", "media": "dka0.vdisk", "media_kind": "image",
           "comment": "SCSI id 0 -> dka0: the VMS system disk. SAME image ds20 and es40 point at (vStorage/Alpha/dka0.vdisk, resolved against [Storage] diskDir). HAZARD, named: three manifests now share one image -- running two platforms against it concurrently will corrupt it. Serialize runs." }
       ] }
   ]

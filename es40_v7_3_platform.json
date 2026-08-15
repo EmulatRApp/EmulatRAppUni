@@ -38,7 +38,7 @@
           "model": "EMULATR VIRTUAL DISK", "media": "",
           "comment": "primary master = dqa0. 2026-07-25 (JRN-SCSI-005 probe 4.1): media EMPTIED -- the VMS system disk moved to the 53C810 at slot 3 (dka0); a dual IDE+SCSI attach of one image is forbidden. Restore Alpha/dka0.vdisk here to revert." },
         { "channel": 0, "unit": 1, "lun": 0, "type": "atapi_cdrom",
-          "model": "EMULATR VIRTUAL CDROM", "media": "Alpha/OpenVMS_v82.iso",
+          "model": "EMULATR VIRTUAL CDROM", "media": "",
           "comment": "primary slave = dqa1, ATAPI CD (OpenVMS install media)." }
       ] },
     { "name": "pka_53c810", "model": "ncr53c810", "hose": 0, "bus": 0, "slot": 3, "func": 0,
@@ -49,7 +49,7 @@
       "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "scsi_disk",
-          "model": "RZ29L", "media": "Alpha/dka0.vdisk", "media_kind": "image",
+          "model": "RZ29L", "media": "dka0.vdisk", "media_kind": "image",
           "comment": "SCSI id 0 -> dka0: THE VMS system disk (same image AXPBox boots to VMS V8.3; JRN-SCSI-005)." }
       ] },
     { "name": "de500_tulip", "model": "de500", "hose": 0, "bus": 0, "slot": 7, "func": 0,

@@ -35,7 +35,7 @@
       "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 1, "lun": 0, "type": "atapi_cdrom",
-          "model": "EMULATR VIRTUAL CDROM", "media": "Alpha/OpenVMS_v82.iso", "media_kind": "iso",
+          "model": "EMULATR VIRTUAL CDROM", "media": "", "media_kind": "iso",
           "comment": "primary slave = dqa1, ATAPI CD. media empty = no disc loaded." }
       ] },
     { "name": "de500_tulip", "model": "de500", "hose": 0, "bus": 0, "slot": 7, "func": 0,
@@ -52,25 +52,25 @@
       "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 0, "lun": 0, "type": "scsi_disk",
-          "model": "RZ29L", "media": "Alpha/dka0.vdisk", "media_kind": "image",
+          "model": "RZ29L", "media": "dka0.vdisk", "media_kind": "image",
           "comment": "SCSI id 0 -> dka0: THE VMS system disk (moved from IDE dqa0; the P3 NOIOVEC retest target -- b dka0)." },
         { "channel": 0, "unit": 1, "lun": 0, "type": "scsi_disk",
-          "model": "EMULATR-512M", "media": "Alpha/dka1.img", "media_kind": "image",
+          "model": "EMULATR-512M", "media": "dka1.img", "media_kind": "image",
           "comment": "SCSI id 1 -> dka100." },
         { "channel": 0, "unit": 2, "lun": 0, "type": "scsi_disk",
-          "model": "EMULATR-512M", "media": "Alpha/dka2.img", "media_kind": "image",
+          "model": "EMULATR-512M", "media": "dka2.img", "media_kind": "image",
           "comment": "SCSI id 2 -> dka200." },
         { "channel": 0, "unit": 3, "lun": 0, "type": "scsi_disk",
-          "model": "EMULATR-512M", "media": "Alpha/dka3.img", "media_kind": "image",
+          "model": "EMULATR-512M", "media": "dka3.img", "media_kind": "image",
           "comment": "SCSI id 3 -> dka300." },
         { "channel": 0, "unit": 4, "lun": 0, "type": "scsi_disk",
-          "model": "EMULATR-512M", "media": "Alpha/dka4.img", "media_kind": "image",
+          "model": "EMULATR-512M", "media": "dka4.img", "media_kind": "image",
           "comment": "SCSI id 4 -> dka400." },
         { "channel": 0, "unit": 5, "lun": 0, "type": "scsi_disk",
-          "model": "EMULATR-512M", "media": "Alpha/dka5.img", "media_kind": "image",
+          "model": "EMULATR-512M", "media": "dka5.img", "media_kind": "image",
           "comment": "SCSI id 5 -> dka500." },
         { "channel": 0, "unit": 6, "lun": 0, "type": "scsi_disk",
-          "model": "EMULATR-512M", "media": "Alpha/dka6.img", "media_kind": "image",
+          "model": "EMULATR-512M", "media": "dka6.img", "media_kind": "image",
           "comment": "SCSI id 6 -> dka600." }
       ] }
   ]
