@@ -21,6 +21,7 @@
 #include <QFileInfo>
 #include <QSaveFile>
 
+#include "ExeDiscovery.h"
 #include "FirmwareCheck.h"
 #include "IniOverlay.h"
 
@@ -232,6 +233,35 @@ bool create(QString const& runDir, Platform platform, int consolePort, QString* 
                          .arg(QDir::toNativeSeparators(iniPath), out.errorString());
         }
         return false;
+    }
+
+    // ------------------------------------------------------------------
+    // Seed the platform's manifest(s) into the run dir (2026-08-14): the
+    // install lives under Program Files, read-only, so a run dir that only
+    // POINTS there is half a profile.  Copying at creation makes each system
+    // self-contained from birth -- immediately editable in PlatEd, launched
+    // via the EMULATR_PLATFORM_CONFIG redirect, and independent of kit
+    // upgrades.  Manifests are stem-keyed and the firmware image is not
+    // chosen yet, so copy every installed manifest for this MODEL (prefix
+    // glob: ds20*_platform.json).  Best-effort: a launcher-only install has
+    // no emulator beside it yet, and the copy-on-first-edit fallback in
+    // LauncherWindow still covers that case.
+    {
+        ExeDiscovery::Result const emu = ExeDiscovery::findEmulatr();
+        if (emu.found()) {
+            QDir const exeDir = QFileInfo(emu.path).absoluteDir();
+            QString const pattern =
+                platformToString(platform).toLower() + QStringLiteral("*_platform.json");
+            for (QString const& leaf : exeDir.entryList({ pattern }, QDir::Files)) {
+                QString const dst = d.filePath(leaf);
+                if (QFileInfo::exists(dst)) continue;      // never clobber
+                if (QFile::copy(exeDir.filePath(leaf), dst)) {
+                    QFile f(dst);                          // shed the RO bit
+                    f.setPermissions(f.permissions() | QFileDevice::WriteOwner
+                                                     | QFileDevice::WriteUser);
+                }
+            }
+        }
     }
     return true;
 }
