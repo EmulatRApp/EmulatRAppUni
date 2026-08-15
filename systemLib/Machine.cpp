@@ -74,6 +74,7 @@
 #include <filesystem>
 #include <string>
 #include <fstream>
+#include <string_view>
 #include <vector>
 #include <iomanip>
 #include <sstream>
@@ -533,6 +534,15 @@ Machine::Machine(uint64_t memSize, emulatr::config::EmulatorSettings settings)
 
         // Config fingerprint: hash the manifest bytes actually resolved so
         // snapshots can refuse a resume against a changed configuration.
+        // The execution mode is part of the identity: the firmware's ISP-vs-
+        // REAL_HW decision (the 0xBFFC platform() answer, MemDrainer.h)
+        // shapes all subsequent init state, so captures never cross modes.
+        {
+            char const* const pm = std::getenv("EMULATR_PLATFORM");
+            m_configFp.platformMode =
+                (pm != nullptr && std::string_view(pm) == "silicon")
+                    ? "silicon" : "isp";
+        }
         if (!manifestPath.empty()) {
             std::error_code fpEc;
             std::filesystem::path const mp(manifestPath);

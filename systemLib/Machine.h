@@ -313,6 +313,9 @@ public:
     struct ConfigFingerprint {
         uint64_t    manifestHash = 0;
         std::string manifestLeaf;
+        std::string platformMode;   // "isp" | "silicon" -- the 0xBFFC answer
+                                    // is baked into ALL firmware init history,
+                                    // so a snapshot never crosses modes
         std::vector<std::pair<std::string, uint64_t>> media;  // leaf, bytes
     };
     ConfigFingerprint const& configFingerprint() const noexcept

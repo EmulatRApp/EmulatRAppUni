@@ -125,6 +125,7 @@ SnapshotResult save(Machine&                       machine,
         Machine::ConfigFingerprint const& fp = machine.configFingerprint();
         ds << static_cast<quint64>(fp.manifestHash);
         ds << QString::fromStdString(fp.manifestLeaf);
+        ds << QString::fromStdString(fp.platformMode);
         ds << static_cast<quint32>(fp.media.size());
         for (auto const& m : fp.media) {
             ds << QString::fromStdString(m.first);
@@ -376,8 +377,9 @@ SnapshotResult load(Machine&                      machine,
     if (formatVersion >= 2) {
         quint64 fpHash = 0;
         QString fpLeaf;
+        QString fpMode;
         quint32 fpCount = 0;
-        ds >> fpHash >> fpLeaf >> fpCount;
+        ds >> fpHash >> fpLeaf >> fpMode >> fpCount;
         std::vector<std::pair<std::string, uint64_t>> fpMedia;
         fpMedia.reserve(fpCount);
         for (quint32 i = 0; i < fpCount; ++i) {
@@ -393,18 +395,22 @@ SnapshotResult load(Machine&                      machine,
         };
         std::vector<std::pair<std::string, uint64_t>> curMedia = cur.media;
         if (fpHash != static_cast<quint64>(cur.manifestHash)
+            || fpMode.toStdString() != cur.platformMode
             || sorted(fpMedia) != sorted(curMedia))
         {
             r.errorMessage  = "Snapshot::load: CONFIG MISMATCH -- captured with "
                               "manifest '";
             r.errorMessage += fpLeaf.toStdString();
-            r.errorMessage += "' and " + std::to_string(fpMedia.size())
+            r.errorMessage += "' in " + fpMode.toStdString()
+                            + " mode with " + std::to_string(fpMedia.size())
                             + " media file(s); the machine now has '";
             r.errorMessage += cur.manifestLeaf;
-            r.errorMessage += "' and " + std::to_string(curMedia.size())
+            r.errorMessage += "' in " + cur.platformMode + " mode with "
+                            + std::to_string(curMedia.size())
                             + ".  A snapshot is only coherent against the exact "
-                              "manifest and media it was captured with; "
-                              "refusing to resume (cold boot instead).";
+                              "manifest, media, and execution mode it was "
+                              "captured with; refusing to resume (cold boot "
+                              "instead).";
             for (auto const& m : sorted(fpMedia)) {
                 bool present = false;
                 for (auto const& c : curMedia)
