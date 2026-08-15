@@ -564,8 +564,14 @@ QWidget* LauncherWindow::buildDetailsTab()
         tr("ISP (recommended) -- the firmware's pre-silicon simulator path; "
            "boots to the SRM console"), modeBox);
     m_modeSilicon = new QRadioButton(
-        tr("Silicon -- the faithful REAL_HW path (experimental: does not yet "
-           "reach the console)"), modeBox);
+        tr("Silicon -- the faithful REAL_HW path (not available in this "
+           "beta: blocks at the first ATAPI transaction, GAP-PLAT-001)"),
+        modeBox);
+    // DISABLED for beta (architect, 2026-08-14 silicon-record run): offering
+    // a mode that visibly stalls would burn testers' goodwill.  The radio
+    // stays visible so the roadmap shows; re-enable when GAP-PLAT-001's IDE
+    // interrupt seam closes.
+    m_modeSilicon->setEnabled(false);
     m_modeIsp->setChecked(true);
     modeForm->addWidget(m_modeIsp);
     modeForm->addWidget(m_modeSilicon);
@@ -954,8 +960,10 @@ void LauncherWindow::updateBinaryWidgets(int row)
         m_snapMode->setCurrentIndex(mi < 0 ? 0 : mi);
     }
     if (m_modeIsp && m_modeSilicon) {
+        // A stored "silicon" from before the beta disable coerces to ISP.
         bool const silicon =
-            r.platformMode.trimmed().toLower() == QLatin1String("silicon");
+            m_modeSilicon->isEnabled()
+            && r.platformMode.trimmed().toLower() == QLatin1String("silicon");
         (silicon ? m_modeSilicon : m_modeIsp)->setChecked(true);
     }
     m_updatingWidgets = guard;
@@ -1372,8 +1380,11 @@ void LauncherWindow::onStart()
         // "" / "safety": emulator default (50B-cycle period), nothing to set.
     }
     // Execution-mode radio: silicon sets the one-truth env lever; ISP is the
-    // core's own default, so nothing is set (absent-is-not-empty).
-    if (r.platformMode.trimmed().toLower() == QLatin1String("silicon"))
+    // core's own default, so nothing is set (absent-is-not-empty).  While the
+    // silicon radio is beta-disabled, a stored "silicon" never reaches the
+    // child either -- the UI coercion and the launch agree.
+    if (m_modeSilicon && m_modeSilicon->isEnabled()
+        && r.platformMode.trimmed().toLower() == QLatin1String("silicon"))
         req.environment.insert(QStringLiteral("EMULATR_PLATFORM"),
                                QStringLiteral("silicon"));
     // System-local manifest redirect: when the run dir owns a manifest copy
