@@ -35,8 +35,13 @@
       "option_rom": false,
       "storage": [
         { "channel": 0, "unit": 1, "lun": 0, "type": "atapi_cdrom",
-          "model": "EMULATR VIRTUAL CDROM", "media": "", "media_kind": "iso",
-          "comment": "primary slave = dqa1, ATAPI CD. media empty = no disc loaded." }
+          "model": "EMULATR VIRTUAL CDROM", "media": "OpenVMS_v82.iso", "media_kind": "iso",
+          "enabled": true,
+          "comment": "primary slave = dqa1, ATAPI CD -- the ONE CD drive the model wires (setCdMedia has no channel/unit). Two discs are declared for the install documentation; exactly one row may be enabled at a time (disabled rows may share the slot by design). Swap discs by flipping the two enabled flags." },
+        { "channel": 0, "unit": 1, "lun": 0, "type": "atapi_cdrom",
+          "model": "EMULATR VIRTUAL CDROM", "media": "OpenVMS-Alpha7.3-1.iso", "media_kind": "iso",
+          "enabled": false,
+          "comment": "PARKED second disc for dqa1 (V7.3-1 distribution). Enable this row and disable the V8.2 row above to swap." }
       ] },
     { "name": "de500_tulip", "model": "de500", "hose": 0, "bus": 0, "slot": 7, "func": 0,
       "vendor": "0x1011", "device": "0x0019", "class_code": "0x020000",
