@@ -135,11 +135,22 @@ TEST_CASE("invalid SG PTE latches PERROR<SGE> when enabled; freeze + LOST")
     CHECK(((perror >> 18) & 0x3FFFFFFFULL) == (0x00200000ULL >> 2));
     CHECK(errorLevel);
 
-    // Second error while frozen: only LOST<0> can set.
+    // Second error while frozen: only LOST<0> can set -- but LOST is
+    // ITSELF gated by PERRMASK<0> (HRM 10.2.5.7: a 0 MASK bit "prevents
+    // the setting of the corresponding bit in the PERROR register,
+    // regardless of the detection of errors"; Batch F D-2, 2026-08-02,
+    // JRN-AUD-003).  With PERRMASK=SGE only, LOST must stay clear.
+    (void) p.translateDma(0x00202000ULL, 8);
+    CHECK((p.readCSR(kPERROR) & 0x1ULL) == 0);               // LOST gated off
+    CHECK(((p.readCSR(kPERROR) >> 18) & 0x3FFFFFFFULL)
+          == (0x00200000ULL >> 2));                          // info held
+
+    // Enable LOST in the mask (bit 0) and re-err: now LOST sets.
+    p.writeCSR(kPERRMASK, 0x11ULL);
     (void) p.translateDma(0x00202000ULL, 8);
     CHECK((p.readCSR(kPERROR) & 0x1ULL) != 0);               // LOST
     CHECK(((p.readCSR(kPERROR) >> 18) & 0x3FFFFFFFULL)
-          == (0x00200000ULL >> 2));                          // info held
+          == (0x00200000ULL >> 2));                          // info still held
 
     // W1C of all error bits unfreezes, drops info, deasserts b_error.
     p.writeCSR(kPERROR, 0xFFFULL);

@@ -252,73 +252,36 @@ TEST_CASE("Tsunami: tryWrite at a DRAM PA returns false")
 
 
 // ============================================================================
-// 6. GuestMemory routing: PA -> Tsunami flows through GuestMemory's MMIO
-//    hooks when an adapter is attached.
+// 6. GuestMemory contract at MMIO PAs.
 //
-//    This exercises the live PA-routing path that the MEM-stage drainer
-//    will use at runtime: a load/store PA hits GuestMemory.read/write,
-//    which consults the MMIO hook before falling through to the flat-
-//    array DRAM backing.  When the hook returns true, DRAM is bypassed
-//    and the access is satisfied by the chipset.
+//    HISTORY: this section originally exercised GuestMemory's MMIO hook
+//    seam (attachMmioHooks), then the "dumb byte-store" contract (OOR
+//    reads back zero with Ok).  BOTH are gone: the 2026-07-19 contiguous-
+//    backing change (e724cf9, T. Peer decision -- see GuestMemory.h header)
+//    made out-of-range accesses FAULT with MemStatus::OutOfRange so a
+//    pointer running off the end SURFACES instead of silently reading
+//    zero.  MMIO routing happens in the TsunamiChipset arbiter BEFORE the
+//    byte-store is ever reached (NXM/BusError verified in
+//    tests/chipsetLib/test_systembus_arbiter.cpp).  These cases pin the
+//    current contract.
 // ============================================================================
 
-namespace {
-
-// Test-only adapters bridging the GuestMemory bool-returning hook
-// contract to the deprecated MmioRegistry's bool-returning tryRead/
-// tryWrite.  The registry is retained in this test pending its
-// eventual migration to a direct chipset-attach test pattern; see
-// MmioRegistry.h TODO(deprecated) comment.  Hook signature was
-// briefly value-returning during the V2 rewrite but reverted to
-// bool-return 2026-05-17 after the OOR regression chase -- see
-// journals/MemoryV2_Integration_Notes.md.
-bool guestMemoryMmioRead(void*     ctx,
-                         uint64_t  pa,
-                         uint8_t   width,
-                         uint64_t& valueOut) noexcept
+TEST_CASE("GuestMemory does NOT route MMIO: a Cchip CSC PA beyond the backing faults OutOfRange")
 {
-    auto* reg = static_cast<pipelineLib::MmioRegistry const*>(ctx);
-    return reg->tryRead(pa, width, valueOut);
-}
-
-bool guestMemoryMmioWrite(void*    ctx,
-                          uint64_t pa,
-                          uint64_t value,
-                          uint8_t  width) noexcept
-{
-    auto* reg = static_cast<pipelineLib::MmioRegistry*>(ctx);
-    return reg->tryWrite(pa, value, width);
-}
-
-}  // anonymous namespace
-
-
-TEST_CASE("GuestMemory routes a Cchip CSC PA through the attached MMIO hook")
-{
-    TsunamiUnderTest t;
+    // The arbiter routes MMIO before GuestMemory; the byte-store itself
+    // must refuse a PA past its backing, not fabricate a value.
     memoryLib::GuestMemory mem(/*sizeBytes*/ 64ULL * 1024 * 1024);  // 64 MiB DRAM
 
-    // mem.attachMmioHooks(&t.registry,
-    //                     &guestMemoryMmioRead,
-    //                     &guestMemoryMmioWrite);
-
-    // Read at Cchip CSC PA (way above DRAM bounds; without the hook
-    // this would return OutOfRange).
-    uint64_t cscValue = 0;
+    uint64_t cscValue = 0xdead;
     auto const status = mem.read8(kCchipCscPa, cscValue);
 
-    CHECK(status == memoryLib::MemStatus::Ok);
-    CHECK(cscValue != 0xFFFFFFFFFFFFFFFFULL);   // not off-bus
+    CHECK(status == memoryLib::MemStatus::OutOfRange);
+    CHECK(cscValue == 0);                       // out param zeroed on fault
 }
 
-TEST_CASE("GuestMemory: PA below MMIO window still hits DRAM (hook returns false)")
+TEST_CASE("GuestMemory: in-range PA hits DRAM and roundtrips")
 {
-    TsunamiUnderTest t;
     memoryLib::GuestMemory mem(/*sizeBytes*/ 64ULL * 1024 * 1024);
-
-    // mem.attachMmioHooks(&t.registry,
-    //                     &guestMemoryMmioRead,
-    //                     &guestMemoryMmioWrite);
 
     constexpr uint64_t kProbe = 0x123456789ABCDEF0ULL;
     CHECK(mem.write8(0x1000ULL, kProbe) == memoryLib::MemStatus::Ok);
@@ -328,17 +291,15 @@ TEST_CASE("GuestMemory: PA below MMIO window still hits DRAM (hook returns false
     CHECK(readback == kProbe);
 }
 
-TEST_CASE("GuestMemory is a dumb byte-store: out-of-range PAs read back zero, not a fault")
+TEST_CASE("GuestMemory bounds-faults out-of-range writes too (dropped, OutOfRange)")
 {
-    // Post-amputation GuestMemory performs NO range-checking -- that moved to
-    // the TsunamiChipset arbiter (NXM/BusError is verified in
-    // tests/chipsetLib/test_systembus_arbiter.cpp).  A PA beyond the backing
-    // reads back zero with MemStatus::Ok; validating the address is the bus's
-    // responsibility, not the byte-store's.
     memoryLib::GuestMemory mem(/*sizeBytes*/ 64ULL * 1024 * 1024);
 
+    CHECK(mem.write8(kCchipCscPa, 0x1ULL) == memoryLib::MemStatus::OutOfRange);
+
+    // Straddling the end of the backing faults as well (width > remainder).
     uint64_t value = 0xdead;
-    auto const status = mem.read8(kCchipCscPa, value);
-    CHECK(status == memoryLib::MemStatus::Ok);
+    CHECK(mem.read8(64ULL * 1024 * 1024 - 4, value)
+          == memoryLib::MemStatus::OutOfRange);
     CHECK(value == 0);
 }

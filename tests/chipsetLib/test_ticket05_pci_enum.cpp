@@ -35,12 +35,19 @@
 
 using namespace Tsunami21272;
 
-TEST_CASE("Pchip WSBA0 holds its last write (live CSR)")
+TEST_CASE("Pchip WSBA0 write roundtrips through the field mask (live CSR)")
 {
+    // HRM Table 10-35: WSBA0 stores ADDR<31:20> | SG<1> | ENA<0> only
+    // (mask 0xFFF00003); MBZ bits are dropped by silicon, and the SRM's
+    // readback-to-confirm protocol observes the masked value.  The old
+    // premise ("holds its last write" unmasked) predated the JRN-PCI-001
+    // field-masked writes (15cc83c, 2026-08-06) and was never silicon-true.
     TsunamiChipset cs(ChipsetVariant::Tsunami, 1, 1ULL << 30);
     uint64_t const pa = Base::kPchip0_CSR + Pchip::WSBA0;
     cs.mmioWrite(pa, 0x0000000012345678ULL, 8);
-    CHECK(cs.mmioRead(pa, 8) == 0x0000000012345678ULL);
+    CHECK(cs.mmioRead(pa, 8) == 0x0000000012300000ULL);   // MBZ dropped
+    cs.mmioWrite(pa, 0x00000000ABC00003ULL, 8);           // all-RW pattern
+    CHECK(cs.mmioRead(pa, 8) == 0x00000000ABC00003ULL);   // held verbatim
 }
 
 TEST_CASE("Empty PCI config slot returns 0xFFFFFFFF")

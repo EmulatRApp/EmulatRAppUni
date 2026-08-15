@@ -185,8 +185,12 @@ TEST_CASE("palBox::execHwMfpr -- reads HW_EXC_ADDR")
     CHECK(r.regWriteValue == 0x12345000ULL);
 }
 
-TEST_CASE("palBox::execHwMfpr -- reads HW_CM as integer mode bits")
+TEST_CASE("palBox::execHwMfpr -- reads HW_CM (PS) with CM at data bits [4:3]")
 {
+    // 2026-08-09 faithfulness fix (0a6d5af, JRN-AST-001): a PS read
+    // returns CM in its ARCHITECTED data position, bits [4:3]
+    // (ev6_defs.mar EV6__PS__CM__S = 3).  The old premise ("integer
+    // mode bits" at [1:0]) was the unfaithful V1 form.
     InstructionGrain g = makeHwGrain(0x19, /*ra*/ 3, kScbdCm,
                                       kHwMfprFlags, &palBox::execHwMfpr);
     CpuState cpu{};
@@ -196,7 +200,7 @@ TEST_CASE("palBox::execHwMfpr -- reads HW_CM as integer mode bits")
 
     BoxResult r = palBox::execHwMfpr(g, ctx);
 
-    CHECK(r.regWriteValue == 3u);
+    CHECK(r.regWriteValue == (3u << 3));   // CM<4:3> = User
 }
 
 TEST_CASE("palBox::execHwMfpr -- unknown selector raises kFaultUnimplemented")

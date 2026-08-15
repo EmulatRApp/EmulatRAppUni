@@ -79,11 +79,23 @@ struct Harness {
         auto m = std::make_unique<RamMedia>();
         media  = m.get();
         disk.setMedia(std::move(m));
+        // Bounds-checked DMA: the EMULATR_DIAG_N810 one-shot dumps
+        // (reconnectGraphDump, the RESEL-002 E6 nexus probe) read ABSOLUTE
+        // guest addresses (0xC0000000 script region, 0xC0010EE0 mailboxes)
+        // that exist on a real boot but lie far beyond this 64KB test RAM.
+        // An unchecked memcpy is a wild read (SEGV, 2026-08-13 suite run);
+        // out-of-range spans serve zeros / drop instead, matching what the
+        // dumps show for unpopulated script RAM.
         hba.setDmaAccess(
             [this](uint64_t a, void* d, size_t n) {
+                if (a >= ram.size() || n > ram.size() - a) {
+                    std::memset(d, 0, n);
+                    return;
+                }
                 std::memcpy(d, ram.data() + a, n);
             },
             [this](uint64_t a, void const* s, size_t n) {
+                if (a >= ram.size() || n > ram.size() - a) return;
                 std::memcpy(ram.data() + a, s, n);
             });
         hba.attachTarget(0, &disk);
@@ -688,26 +700,36 @@ TEST_CASE("SPEC-DISK-001 T-11..T-16: MODE SENSE pages, two-step, DBD, "
     h.disk.setProfile(scsi::findDriveProfile("RZ29L"));
     uint8_t buf[256]; scsi::ScsiCommand c;
 
+    // 3Fh composite grew twice since T-16 was written (2026-08-04): Batch
+    // H-7 added page 01h R-W Error Recovery (12 bytes) and Batch H-8 added
+    // page 08h Caching (20 bytes) -- both MEASURED SYS$DKDRIVER requirements
+    // (15cc83c, 2026-08-06; see VirtualDiskDevice.h).  Ascending order:
+    // hdr(4) + bd(8) + 01h(12) + 03h(24) + 04h(24) + 08h(20) = 92.
     uint8_t const msAll[6] = { 0x1A, 0, 0x3F, 0, 255, 0 };       // T-16 all pages
-    CHECK(runCmd(h.disk, msAll, 6, buf, sizeof buf, c) == 60);   // 4+8+24+24
-    CHECK(buf[0] == 59);              // mode data length (n-1)
+    CHECK(runCmd(h.disk, msAll, 6, buf, sizeof buf, c) == 92);
+    CHECK(buf[0] == 91);              // mode data length (n-1)
     CHECK(buf[3] == 8);               // block descriptor present
-    CHECK(buf[12] == 0x03);           // page 3 first (ascending)
-    CHECK(buf[12 + 10] == 0x00);      // T-12 sectors/track BE hi
-    CHECK(buf[12 + 11] == 113);       //   = 0x71
-    CHECK(buf[12 + 12] == 0x02);      //   block bytes 512 BE
-    CHECK(buf[12 + 13] == 0x00);
-    CHECK(buf[36] == 0x04);           // page 4 second
-    CHECK(buf[36 + 2] == 0x00);       // T-11 cylinders 3708 (3 bytes BE)
-    CHECK(buf[36 + 3] == 0x0E);
-    CHECK(buf[36 + 4] == 0x7C);
-    CHECK(buf[36 + 5] == 20);         //   heads
-    CHECK(buf[36 + 20] == 0x1C);      //   7200 RPM BE
-    CHECK(buf[36 + 21] == 0x20);
+    CHECK(buf[12] == 0x01);           // page 1 first (ascending, H-7)
+    CHECK(buf[13] == 0x0A);           //   page length 10
+    CHECK(buf[24] == 0x03);           // page 3 second
+    CHECK(buf[24 + 10] == 0x00);      // T-12 sectors/track BE hi
+    CHECK(buf[24 + 11] == 113);       //   = 0x71
+    CHECK(buf[24 + 12] == 0x02);      //   block bytes 512 BE
+    CHECK(buf[24 + 13] == 0x00);
+    CHECK(buf[48] == 0x04);           // page 4 third
+    CHECK(buf[48 + 2] == 0x00);       // T-11 cylinders 3708 (3 bytes BE)
+    CHECK(buf[48 + 3] == 0x0E);
+    CHECK(buf[48 + 4] == 0x7C);
+    CHECK(buf[48 + 5] == 20);         //   heads
+    CHECK(buf[48 + 20] == 0x1C);      //   7200 RPM BE
+    CHECK(buf[48 + 21] == 0x20);
+    CHECK(buf[72] == 0x08);           // page 8 last (H-8)
+    CHECK(buf[73] == 0x12);           //   page length 18
+    CHECK(buf[74] == 0x0A);           //   AXPBox-identical flag byte
 
     uint8_t const msShort[6] = { 0x1A, 0, 0x3F, 0, 4, 0 };       // T-13 two-step
     CHECK(runCmd(h.disk, msShort, 6, buf, sizeof buf, c) == 4);
-    CHECK(buf[0] == 59);              // header still sizes the FULL response
+    CHECK(buf[0] == 91);              // header still sizes the FULL response
 
     uint8_t const msDbd[6] = { 0x1A, 0x08, 0x04, 0, 255, 0 };    // T-14 DBD
     CHECK(runCmd(h.disk, msDbd, 6, buf, sizeof buf, c) == 28);   // 4+24, no bd

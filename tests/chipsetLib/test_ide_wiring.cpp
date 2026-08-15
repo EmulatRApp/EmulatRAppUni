@@ -53,6 +53,18 @@ uint64_t cfgPA(unsigned dev, unsigned func, unsigned reg) noexcept
 TEST_CASE("IDE wiring: CY82C693 IDE enumerates at bus0/dev5/func1")
 {
     TsunamiChipset cs(ChipsetVariant::Tsunami, 1, 1ULL << 30);
+
+    // BDF config registration is MANIFEST-DRIVEN since the VMB checkpoint
+    // (5c7d858, 2026-07-23): Machine::run -> registerManifestPci() resolves
+    // each PciModel::Named entry via pciHandlerForModel() and registers it
+    // at the manifest-declared (slot,func).  A bare chipset therefore
+    // enumerates NOTHING at 5/1 -- pin that, then mirror the manifest step
+    // for the DS10/DS20 board (Cypress IDE at dev 5 func 1) and verify the
+    // handler answers.
+    CHECK((cs.mmioRead(cfgPA(5, 1, 0x00), 4) & 0xFFFFFFFFu) == 0xFFFFFFFFu);
+    cs.pchip().registerPciDevice(0, /*device*/ 5, /*func*/ 1,
+                                 cs.pciHandlerForModel("cypress_ide"));
+
     uint32_t const id = static_cast<uint32_t>(cs.mmioRead(cfgPA(5, 1, 0x00), 4) & 0xFFFFFFFFu);
     CHECK((id & 0xFFFFu) == 0x1080);             // vendor: Cypress
     CHECK(((id >> 16) & 0xFFFFu) == 0xC693);     // device: _PROVISIONAL
